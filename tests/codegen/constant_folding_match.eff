@@ -1,0 +1,43 @@
+type a = Nil | Cons of (int * a)
+;;
+let f x = 
+  match x with 
+    | 1 -> 0
+    | _ -> 4
+;;
+let g a = 
+  let a0 =     
+    match a with 
+      | Nil -> 0
+      | Cons(x, Nil) -> x + 4
+      | Cons(4, x) -> 7
+      | x -> 13
+  in
+  let a1 =     
+    match Nil with 
+      | Nil -> 0
+      | Cons(x, Nil) -> x + 4
+      | Cons(4, x) -> 7
+      | x -> 13
+  in
+  let a2 =      
+    match Cons(3, Nil) with 
+      | Nil -> 0
+      | Cons(x, Nil) -> x + 4
+      | Cons(4, x) -> 7
+      | x -> 13
+  in
+  let a3 =     
+    match Cons(3, Cons(4, Cons(10, Nil))) with 
+      | Nil -> 0
+      | Cons(x, Nil) -> x + 4
+      | Cons(4, x) -> 7
+      | x -> 13
+  in
+  let a4 =     
+    match Cons(4, Cons(4, Cons(10, Nil))) with 
+      | Nil -> 0
+      | Cons(x, Nil) -> x + 4
+      | Cons(4, x) -> 7
+      | x -> 13
+  in (a0, a1, a2, a3, a4)

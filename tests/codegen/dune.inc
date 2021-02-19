@@ -90,6 +90,45 @@
  (deps
  %{bin:eff}
   (source_tree .))
+   (target "constant_folding_match.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 0 1 2)
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./constant_folding_match.eff")))))
+
+(rule
+ (deps "constant_folding_match.eff.out")
+ (target "constant_folding_match.eff.out.formatted")
+  (action
+   (with-outputs-to "%{target}"
+    (with-accepted-exit-codes (or 0 1 2)
+     (run ocamlformat constant_folding_match.eff.out)))))
+
+(rule
+ (deps "constant_folding_match.eff.out.formatted" ocaml_header.tmp)
+ (target "constant_folding_match.eff.out.formatted.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - constant_folding_match.eff.out.formatted)))))
+
+(rule
+ (deps "constant_folding_match.eff.out.formatted.ocaml_with_header")
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "constant_folding_match.eff.out.formatted.ocaml_with_header"))))
+
+(rule
+ (deps "constant_folding_match.eff.out.formatted")
+  (alias runtest)
+   (action
+    (diff "constant_folding_match.eff.ref" "constant_folding_match.eff.out.formatted")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
    (target "handle_match.eff.out")
     (action
      (with-outputs-to "%{target}"
@@ -514,6 +553,45 @@
   (alias runtest)
    (action
     (diff "optimize_pattern_match.eff.ref" "optimize_pattern_match.eff.out.formatted")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
+   (target "optimize_short_circuit.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 0 1 2)
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./optimize_short_circuit.eff")))))
+
+(rule
+ (deps "optimize_short_circuit.eff.out")
+ (target "optimize_short_circuit.eff.out.formatted")
+  (action
+   (with-outputs-to "%{target}"
+    (with-accepted-exit-codes (or 0 1 2)
+     (run ocamlformat optimize_short_circuit.eff.out)))))
+
+(rule
+ (deps "optimize_short_circuit.eff.out.formatted" ocaml_header.tmp)
+ (target "optimize_short_circuit.eff.out.formatted.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - optimize_short_circuit.eff.out.formatted)))))
+
+(rule
+ (deps "optimize_short_circuit.eff.out.formatted.ocaml_with_header")
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "optimize_short_circuit.eff.out.formatted.ocaml_with_header"))))
+
+(rule
+ (deps "optimize_short_circuit.eff.out.formatted")
+  (alias runtest)
+   (action
+    (diff "optimize_short_circuit.eff.ref" "optimize_short_circuit.eff.out.formatted")))
 
 (rule
  (deps

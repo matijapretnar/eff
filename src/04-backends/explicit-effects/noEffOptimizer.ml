@@ -144,7 +144,17 @@ and n_abstraction_2_args state
     ({ term = pat1, pat2, term; ty } : NoEff.n_abstraction_2_args) =
   { term = (pat1, pat2, optimize_term state term); ty }
 
-and reduce_match t abs ty = NoEff.n_match (t, abs) ty
+and reduce_bool_match t abs = NoEff.n_match (t, abs) (NoEff.NTyBasic BooleanTy)
+
+and reduce_constant_match state const (abs : NoEff.n_abstraction list) =
+  let rec folder : NoEff.n_abstraction list -> NoEff.n_term option = function
+    | [] -> None
+    | abs :: xs -> (
+        match NoEff.beta_reduce abs const with
+        | Some trm -> Some (optimize_term state trm)
+        | None -> folder xs)
+  in
+  folder abs
 
 (*   match abs with [(p1, t1); (p2, t2)] ->  *)
 and reduce_letrec l t =
@@ -196,7 +206,13 @@ and reduce_term' state (n_term : NoEff.n_term) =
   | NLet (e, a) -> beta_reduce state a e
   | NLetRec (l, t) -> reduce_letrec l t
   | NApplyTerm ({ term = NFun abs; _ }, t) -> beta_reduce_with_ty state abs t
-  (*| NMatch (t, abs) -> reduce_match t abs n_term.ty *)
+  | NMatch (({ term = NoEff.NConst _; _ } as c), abs)
+  | NMatch (({ term = NoEff.NVariant _; _ } as c), abs) -> (
+      match reduce_constant_match state c abs with
+      | Some t -> t
+      | None -> n_term)
+  | NMatch (t, abs) when n_term.ty = NoEff.NTyBasic BooleanTy ->
+      reduce_bool_match t abs
   | _ -> n_term
 
 and reduce_term state n_term =

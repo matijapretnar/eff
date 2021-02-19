@@ -1,0 +1,18 @@
+type a = Nil | Cons of (int * a)
+
+let _f_41 (_x_42 : int) = match _x_42 with 1 -> 0 | _ -> 4
+
+let f = _f_41
+
+let _g_43 (_a_44 : a) =
+  ( (match _a_44 with
+    | Nil -> 0
+    | Cons (_x_46, Nil) -> _x_46 + 4
+    | Cons (4, _x_48) -> 7
+    | _x_49 -> 13),
+    0,
+    3 + 4,
+    13,
+    7 )
+
+let g = _g_43
