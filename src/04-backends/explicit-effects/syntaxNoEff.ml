@@ -132,8 +132,8 @@ let bind (t, abs) : n_term =
   let _, out = abs.ty in
   { term = NBind (t, abs); ty = out }
 
-let handle (t1, t2) : n_term =
-  match t1.ty with
+let handle ((t1, t2) : n_term * n_term) : n_term =
+  match t2.ty with
   | NTyHandler (_ty1, ty2) -> { term = NHandle (t1, t2); ty = ty2 }
   | _ -> assert false
 
