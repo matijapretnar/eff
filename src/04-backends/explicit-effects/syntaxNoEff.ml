@@ -210,10 +210,10 @@ let occurrences (x : variable) (inside, outside) =
 let pattern_match p e =
   let rec extend_subst p e sbst =
     match (p.term, e.term) with
-    | PNVar x, _ -> Some (Assoc.update x e sbst)
+    | PNVar x, _ -> Some (Assoc.update x.term e sbst)
     | PNAs (p, x), _ ->
         Option.bind (extend_subst p e sbst) (fun sbst ->
-            Some (Assoc.update x e sbst))
+            Some (Assoc.update x.term e sbst))
     | PNNonbinding, _ -> Some sbst
     | PNTuple ps, NTuple es ->
         List.fold_right2
@@ -245,7 +245,7 @@ let rec substitute_term sbst term =
 and substitute_term' sbst n_term =
   match n_term with
   | NVar x -> (
-      match Assoc.lookup x sbst with Some e' -> e'.term | None -> n_term)
+      match Assoc.lookup x.term sbst with Some e' -> e'.term | None -> n_term)
   | NTuple t -> NTuple (List.map (substitute_term sbst) t)
   | NFun a -> NFun (substitute_abstraction_with_ty sbst a)
   | NApplyTerm (t1, t2) ->
@@ -291,7 +291,7 @@ and substitue_handler sbst h =
       };
   }
 
-let beta_reduce (pat, trm1) trm2 =
+let beta_reduce { term = pat, trm2; _ } trm1 =
   (* let { term = pat, trm2; _ } = refresh_abstraction Assoc.empty abs in *)
   let sub = pattern_match pat trm1 in
   Option.map (fun sub -> substitute_term sub trm2) sub

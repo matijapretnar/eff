@@ -157,7 +157,7 @@ and reduce_letrec l t =
         NoEff.NMatch ({ term = NoEff.NVar v'; _ }, [ { term = p', t'; _ } ]) )
     | ( NoEff.PNVar v,
         NoEff.NLet ({ term = NoEff.NVar v'; _ }, { term = p', t'; _ }) )
-      when v = v' ->
+      when v.term = v'.term ->
         let vars = NoEff.free_vars t' in
         let inside, outside = NoEff.occurrences v' vars in
         if inside = 0 && outside = 0 then { term = (p', t'); ty }
@@ -172,7 +172,7 @@ and beta_reduce state ({ term = p, cmp; _ } as abs) trm2 : NoEff.n_term =
   | Inlinable, _
   (* Inline constants and variables anyway *)
   | NotInlinable, (NoEff.NVar _ | NoEff.NConst _) -> (
-      match NoEff.beta_reduce abs.term trm2 with
+      match NoEff.beta_reduce abs trm2 with
       | Some trm -> optimize_term state trm
       | None -> NoEff.n_let (trm2, abs))
   | NotPresent, _ -> cmp
@@ -196,7 +196,7 @@ and reduce_term' state (n_term : NoEff.n_term) =
   | NLet (e, a) -> beta_reduce state a e
   | NLetRec (l, t) -> reduce_letrec l t
   | NApplyTerm ({ term = NFun abs; _ }, t) -> beta_reduce_with_ty state abs t
-  | NMatch (t, abs) -> reduce_match t abs n_term.ty
+  (*| NMatch (t, abs) -> reduce_match t abs n_term.ty *)
   | _ -> n_term
 
 and reduce_term state n_term =
