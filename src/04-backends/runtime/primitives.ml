@@ -37,6 +37,10 @@ let int_int_to_int f =
   let int_f v1 v2 = value_int (f (V.to_int v1) (V.to_int v2)) in
   binary_closure int_f
 
+(** [int_to_int f] takes a unary integer function f and transforms it into
+    a closure that takes two values and evaluates to a value. *)
+let int_to_int f = from_fun (fun v -> value_int (f (V.to_int v)))
+
 (** [float_to_float f] takes a unary float function f and transforms it into
     a closure that takes two values and evaluates to a value. *)
 let float_to_float f = from_fun (fun v -> value_float (f (V.to_float v)))
@@ -46,6 +50,16 @@ let float_to_float f = from_fun (fun v -> value_float (f (V.to_float v)))
 let float_float_to_float f =
   let float_f v1 v2 = value_float (f (V.to_float v1) (V.to_float v2)) in
   binary_closure float_f
+
+(** [bool_to_bool f] takes a unary bool function f and transforms it into
+    a closure that takes two values and evaluates to a value. *)
+let bool_to_bool f = from_fun (fun v -> value_bool (f (V.to_bool v)))
+
+(** [bool_bool_to_bool f] takes a binary bool function f and transforms it
+    into a closure that takes two values and evaluates to a value. *)
+let bool_bool_to_bool f =
+  let bool_f v1 v2 = value_bool (f (V.to_bool v1) (V.to_bool v2)) in
+  binary_closure bool_f
 
 (* Comparison of values is a trickier business than you might think. *)
 let rec compare v1 v2 =
@@ -161,6 +175,9 @@ let primitive_value = function
       binary_closure (fun v1 v2 -> value_bool (less_than v1 v2))
   | Primitives.CompareNe ->
       binary_closure (fun v1 v2 -> value_bool (not_equal v1 v2))
+  | Primitives.BoolNot -> bool_to_bool not
+  | Primitives.BoolAnd -> bool_bool_to_bool ( && )
+  | Primitives.BoolOr -> bool_bool_to_bool ( || )
   | Primitives.FloatAcos -> float_to_float acos
   | Primitives.FloatAdd -> float_float_to_float ( +. )
   | Primitives.FloatAsin -> float_to_float asin
@@ -187,6 +204,7 @@ let primitive_value = function
   | Primitives.IntegerMod -> int_int_to_int ( mod )
   | Primitives.IntegerMul -> int_int_to_int ( * )
   | Primitives.IntegerNeg -> from_fun (fun v -> value_int (-V.to_int v))
+  | Primitives.IntegerAbs -> int_to_int abs
   | Primitives.IntegerPow -> int_int_to_int pow
   | Primitives.IntegerSub -> int_int_to_int ( - )
   | Primitives.IntOfFloat ->

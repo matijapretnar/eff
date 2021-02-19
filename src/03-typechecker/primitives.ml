@@ -18,6 +18,10 @@ let unary_float_op_ty = ([], Type.Arrow (Type.float_ty, Type.float_ty))
 let binary_float_op_ty =
   ([], binary_op_ty Type.float_ty Type.float_ty Type.float_ty)
 
+let unary_bool_op_ty = ([], Type.Arrow (Type.bool_ty, Type.bool_ty))
+
+let binary_bool_op_ty = ([], binary_op_ty Type.bool_ty Type.bool_ty Type.bool_ty)
+
 let comparison_ty = poly_type (fun a -> binary_op_ty a a Type.bool_ty)
 
 let primitive_type_scheme = function
@@ -27,6 +31,9 @@ let primitive_type_scheme = function
   | Primitives.CompareLe -> comparison_ty
   | Primitives.CompareLt -> comparison_ty
   | Primitives.CompareNe -> comparison_ty
+  | Primitives.BoolNot -> unary_bool_op_ty
+  | Primitives.BoolAnd -> binary_bool_op_ty
+  | Primitives.BoolOr -> binary_bool_op_ty
   | Primitives.FloatAcos -> unary_float_op_ty
   | Primitives.FloatAdd -> binary_float_op_ty
   | Primitives.FloatAsin -> unary_float_op_ty
@@ -52,6 +59,7 @@ let primitive_type_scheme = function
   | Primitives.IntegerMod -> binary_integer_op_ty
   | Primitives.IntegerMul -> binary_integer_op_ty
   | Primitives.IntegerNeg -> unary_integer_op_ty
+  | Primitives.IntegerAbs -> unary_integer_op_ty
   | Primitives.IntegerPow -> binary_integer_op_ty
   | Primitives.IntegerSub -> binary_integer_op_ty
   | Primitives.IntOfFloat -> mono_type (Type.Arrow (Type.float_ty, Type.int_ty))

@@ -1,4 +1,4 @@
-let _decide_func_41 (_bl_42 : bool) =
-  match _bl_42 with true -> 10 | false -> 20
+let _decide_func_45 (_bl_46 : bool) =
+  match _bl_46 with true -> 10 | false -> 20
 
-let decide_func = _decide_func_41
+let decide_func = _decide_func_45

@@ -79,6 +79,7 @@ and n_term' =
   | NMatch of n_term * n_abstraction list
   | NRecord of (CoreTypes.Field.t, n_term) Assoc.t
   | NVariant of CoreTypes.Label.t * n_term option
+  | NDirectPrimitive of Language.Primitives.primitive
 
 and n_handler = (n_handler', n_type * n_type) typed
 
@@ -147,6 +148,26 @@ let variant (l, t) ty : n_term = { term = NVariant (l, t); ty }
 
 let abstraction (p, c) : n_abstraction = { term = (p, c); ty = (p.ty, c.ty) }
 
+let direct_and_term =
+  {
+    term = NDirectPrimitive Language.Primitives.BoolAnd;
+    ty =
+      NTyArrow
+        (NTyBasic BooleanTy, NTyArrow (NTyBasic BooleanTy, NTyBasic BooleanTy));
+  }
+
+let direct_and t1 t2 = apply_term (apply_term (direct_and_term, t1), t2)
+
+let direct_or_term =
+  {
+    term = NDirectPrimitive Language.Primitives.BoolOr;
+    ty =
+      NTyArrow
+        (NTyBasic BooleanTy, NTyArrow (NTyBasic BooleanTy, NTyBasic BooleanTy));
+  }
+
+let direct_or t1 t2 = apply_term (apply_term (direct_and_term, t1), t2)
+
 type n_tydef =
   | TyDefRecord of (CoreTypes.Field.t, n_type) Assoc.t
   | TyDefSum of (CoreTypes.Label.t, n_type option) Assoc.t
@@ -193,6 +214,7 @@ let rec subs_var_in_term par subs { term; ty } =
     | NVariant (lbl, None) -> NVariant (lbl, None)
     | NVariant (lbl, Some t) ->
         NVariant (lbl, Some (subs_var_in_term par subs t))
+    | NDirectPrimitive _ as t -> t
   in
   { term = term'; ty }
 
@@ -270,6 +292,7 @@ and substitute_term' sbst n_term =
         ((substitute_term sbst) t, List.map (substitute_abstraction sbst) abs)
   | NRecord recs -> NRecord (Assoc.map (substitute_term sbst) recs)
   | NVariant (lbl, a) -> NVariant (lbl, Option.map (substitute_term sbst) a)
+  | NDirectPrimitive _ as t -> t
 
 and substitute_abstraction sbst { term = p, c; ty } =
   { term = (p, substitute_term sbst c); ty }
@@ -326,6 +349,7 @@ let rec free_vars term =
   | NMatch (e, l) -> free_vars e @@@ concat_vars (List.map free_vars_abs l)
   | NRecord r -> Assoc.values_of r |> List.map free_vars |> concat_vars
   | NVariant (_, e) -> Option.default_map ([], []) free_vars e
+  | NDirectPrimitive _ -> ([], [])
 
 and free_vars_handler h =
   free_vars_abs_with_ty h.term.return_clause
@@ -456,6 +480,8 @@ let rec print_term ?max_level t ppf =
   | NVariant (l, Some t) ->
       print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)
   | NVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
+  | NDirectPrimitive p ->
+      print "DirectPrimitive (%s)" (Language.Primitives.primitive_name p)
 
 and print_let_rec_abstraction (f, abs) ppf =
   Format.fprintf ppf "%t %t" (print_variable f) (print_let_abstraction abs)

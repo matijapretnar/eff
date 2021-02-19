@@ -1,26 +1,26 @@
 type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
 
-let _two_41 = 2
+let _two_45 = 2
 
-let two = _two_41
+let two = _two_45
 
-let _three_42 = 3
+let _three_46 = 3
 
-let three = _three_42
+let three = _three_46
 
 type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
-let rec _concat_43 _x_61 =
-  match _x_61 with
-  | IntNil -> fun (_ys_74 : intlist) -> _ys_74
-  | IntCons (_z_76, _zs_75) ->
-      fun (_ys_77 : intlist) -> IntCons (_z_76, _concat_43 _zs_75 _ys_77)
+let rec _concat_47 _x_65 =
+  match _x_65 with
+  | IntNil -> fun (_ys_78 : intlist) -> _ys_78
+  | IntCons (_z_80, _zs_79) ->
+      fun (_ys_81 : intlist) -> IntCons (_z_80, _concat_47 _zs_79 _ys_81)
 in
-let rec _f_70 (_x_65, _k_72) =
-  let _l_62 (_y_67 : bool) =
-    _k_72 (match _y_67 with true -> 2 | false -> 3)
+let rec _f_74 (_x_69, _k_76) =
+  let _l_66 (_y_71 : bool) =
+    _k_76 (match _y_71 with true -> 2 | false -> 3)
   in
-  _concat_43 (_l_62 true) (_l_62 false)
+  _concat_47 (_l_66 true) (_l_66 false)
 in
-_f_70 ((), fun (_x_55 : int) -> IntCons (_x_55, IntNil))
+_f_74 ((), fun (_x_59 : int) -> IntCons (_x_59, IntNil))

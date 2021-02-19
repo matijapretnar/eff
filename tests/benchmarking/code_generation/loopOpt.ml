@@ -1,119 +1,119 @@
 open OcamlHeader
 
-let rec _loop_pure_41 _x_47 =
-  match _x_47 = 0 with true -> () | false -> _loop_pure_41 (_x_47 - 1)
+let rec _loop_pure_45 _x_51 =
+  match _x_51 = 0 with true -> () | false -> _loop_pure_45 (_x_51 - 1)
 
-let loop_pure = _loop_pure_41
+let loop_pure = _loop_pure_45
 
-let _test_pure_53 (_n_54 : int) = _loop_pure_41 _n_54
+let _test_pure_57 (_n_58 : int) = _loop_pure_45 _n_58
 
-let test_pure = _test_pure_53
+let test_pure = _test_pure_57
 
 type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
 
-let rec _loop_latent_55 _x_66 =
-  match _x_66 = 0 with
+let rec _loop_latent_59 _x_70 =
+  match _x_70 = 0 with
   | true -> Value ()
   | false -> (
-      match _x_66 < 0 with
+      match _x_70 < 0 with
       | true ->
           Call
             ( Fail,
               (),
-              fun (_y_75 : empty) ->
-                Value (match _y_75 with _ -> assert false) )
-      | false -> _loop_latent_55 (_x_66 - 1))
+              fun (_y_79 : empty) ->
+                Value (match _y_79 with _ -> assert false) )
+      | false -> _loop_latent_59 (_x_70 - 1))
 
-let loop_latent = _loop_latent_55
+let loop_latent = _loop_latent_59
 
-let _test_latent_78 (_n_79 : int) = _loop_latent_55 _n_79
+let _test_latent_82 (_n_83 : int) = _loop_latent_59 _n_83
 
-let test_latent = _test_latent_78
+let test_latent = _test_latent_82
 
 type (_, _) eff_internal_effect += Incr : (unit, unit) eff_internal_effect
 
-let rec _loop_incr_80 _x_88 =
-  match _x_88 = 0 with
+let rec _loop_incr_84 _x_92 =
+  match _x_92 = 0 with
   | true -> Value ()
-  | false -> Call (Incr, (), fun (_y_94 : unit) -> _loop_incr_80 (_x_88 - 1))
+  | false -> Call (Incr, (), fun (_y_98 : unit) -> _loop_incr_84 (_x_92 - 1))
 
-let loop_incr = _loop_incr_80
+let loop_incr = _loop_incr_84
 
-let _test_incr_97 (_n_98 : int) =
-  (let rec _loop_incr_113 (_x_88, _k_115) =
-     match _x_88 = 0 with
-     | true -> _k_115 ()
+let _test_incr_101 (_n_102 : int) =
+  (let rec _loop_incr_117 (_x_92, _k_119) =
+     match _x_92 = 0 with
+     | true -> _k_119 ()
      | false ->
-         fun (_x_118 : int) ->
-           _loop_incr_113
-             (_x_88 - 1, fun (_x_114 : unit) -> _k_115 _x_114)
-             (_x_118 + 1)
+         fun (_x_122 : int) ->
+           _loop_incr_117
+             (_x_92 - 1, fun (_x_118 : unit) -> _k_119 _x_118)
+             (_x_122 + 1)
    in
-   _loop_incr_113 (_n_98, fun (_x_105 : unit) (_x_107 : int) -> _x_107))
+   _loop_incr_117 (_n_102, fun (_x_109 : unit) (_x_111 : int) -> _x_111))
     0
 
-let test_incr = _test_incr_97
+let test_incr = _test_incr_101
 
-let rec _loop_incr'_122 _x_130 =
-  match _x_130 = 0 with
+let rec _loop_incr'_126 _x_134 =
+  match _x_134 = 0 with
   | true -> Value ()
   | false ->
-      _loop_incr'_122 (_x_130 - 1) >> fun _ ->
-      Call (Incr, (), fun (_y_138 : unit) -> Value _y_138)
+      _loop_incr'_126 (_x_134 - 1) >> fun _ ->
+      Call (Incr, (), fun (_y_142 : unit) -> Value _y_142)
 
-let loop_incr' = _loop_incr'_122
+let loop_incr' = _loop_incr'_126
 
-let _test_incr'_139 (_n_140 : int) =
-  (let rec _loop_incr'_155 (_x_130, _k_158) =
-     match _x_130 = 0 with
-     | true -> _k_158 ()
+let _test_incr'_143 (_n_144 : int) =
+  (let rec _loop_incr'_159 (_x_134, _k_162) =
+     match _x_134 = 0 with
+     | true -> _k_162 ()
      | false ->
-         _loop_incr'_155
-           (_x_130 - 1, fun (_ : unit) (_x_162 : int) -> _k_158 () (_x_162 + 1))
-   and _loop_incr_156 (_x_88, _k_168) =
-     match _x_88 = 0 with
-     | true -> _k_168 ()
+         _loop_incr'_159
+           (_x_134 - 1, fun (_ : unit) (_x_166 : int) -> _k_162 () (_x_166 + 1))
+   and _loop_incr_160 (_x_92, _k_172) =
+     match _x_92 = 0 with
+     | true -> _k_172 ()
      | false ->
-         fun (_x_171 : int) ->
-           _loop_incr_156
-             (_x_88 - 1, fun (_x_167 : unit) -> _k_168 _x_167)
-             (_x_171 + 1)
+         fun (_x_175 : int) ->
+           _loop_incr_160
+             (_x_92 - 1, fun (_x_171 : unit) -> _k_172 _x_171)
+             (_x_175 + 1)
    in
-   _loop_incr'_155 (_n_140, fun (_x_147 : unit) (_x_149 : int) -> _x_149))
+   _loop_incr'_159 (_n_144, fun (_x_151 : unit) (_x_153 : int) -> _x_153))
     0
 
-let test_incr' = _test_incr'_139
+let test_incr' = _test_incr'_143
 
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
 type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
 
-let rec _loop_state_175 _x_188 =
-  match _x_188 = 0 with
+let rec _loop_state_179 _x_192 =
+  match _x_192 = 0 with
   | true -> Value ()
   | false ->
       Call
         ( Get,
           (),
-          fun (_y_197 : int) ->
+          fun (_y_201 : int) ->
             Call
               ( Put,
-                _y_197 + 1,
-                fun (_y_200 : unit) -> _loop_state_175 (_x_188 - 1) ) )
+                _y_201 + 1,
+                fun (_y_204 : unit) -> _loop_state_179 (_x_192 - 1) ) )
 
-let loop_state = _loop_state_175
+let loop_state = _loop_state_179
 
-let _test_state_203 (_n_204 : int) =
-  (let rec _loop_state_221 (_x_188, _k_223) =
-     match _x_188 = 0 with
-     | true -> _k_223 ()
+let _test_state_207 (_n_208 : int) =
+  (let rec _loop_state_225 (_x_192, _k_227) =
+     match _x_192 = 0 with
+     | true -> _k_227 ()
      | false ->
-         fun (_s_233 : int) ->
-           _loop_state_221
-             (_x_188 - 1, fun (_x_241 : unit) -> _k_223 _x_241)
-             (_s_233 + 1)
+         fun (_s_237 : int) ->
+           _loop_state_225
+             (_x_192 - 1, fun (_x_245 : unit) -> _k_227 _x_245)
+             (_s_237 + 1)
    in
-   _loop_state_221 (_n_204, fun (_x_212 : unit) (_x_214 : int) -> _x_214))
+   _loop_state_225 (_n_208, fun (_x_216 : unit) (_x_218 : int) -> _x_218))
     0
 
-let test_state = _test_state_203
+let test_state = _test_state_207

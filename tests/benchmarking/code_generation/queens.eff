@@ -4,7 +4,7 @@ effect Decide : unit -> bool
 effect Fail : unit -> empty
 
 (*type 'a option = None | Some of 'a;; *)
-type queen = Queen of int * int
+type queen =  int * int
 type rows = RowsEmpty | RowsCons of int * rows
 type solution = SolutionEmpty | SolutionPlace of queen * solution
 type solutions = SolutionsNil | SolutionsCons of solution * solutions
@@ -18,25 +18,19 @@ let rec ( @ ) xs ys =
   | SolutionsNil -> ys
   | SolutionsCons (x, xs) -> SolutionsCons (x, xs @ ys)
 
-let ( > ) x y = y < x
-
-let ( <> ) x y = if y = x then false else true
-
-let abs x = if x < 0 then -x else x
-
-let no_attack (Queen (x, y)) (Queen (x', y')) =
+let no_attack ( (x, y)) ( (x', y')) =
   x <> x' && y <> y' && abs (x - x') <> abs (y - y')
 
 let rec not_attacked x' qs =
   match qs with
   | SolutionEmpty -> true
   | SolutionPlace (x, xs) ->
-      if no_attack x' x then not_attacked x' xs else false
+      (no_attack x' x) && (not_attacked x' xs)
 
 let available number_of_queens x qs =
   let rec loop (possible, y) =
     if y < 1 then possible
-    else if not_attacked (Queen (x, y)) qs then
+    else if not_attacked ( (x, y)) qs then
       loop (RowsCons (y, possible), y - 1)
     else loop (possible, y - 1)
   in
@@ -52,7 +46,7 @@ let queens number_of_queens =
     if x > number_of_queens then qs
     else
       let y = tr_choose (available number_of_queens x qs) in
-      tr_place (x + 1, SolutionPlace (Queen (x, y), qs))
+      tr_place (x + 1, SolutionPlace ( (x, y), qs))
   in
   tr_place (1, SolutionEmpty)
 

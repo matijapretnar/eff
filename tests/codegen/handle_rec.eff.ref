@@ -1,20 +1,20 @@
 type (_, _) eff_internal_effect += Eff : (unit, unit) eff_internal_effect
 
 ;;
-let rec _f_41 _x_54 =
-  match _x_54 = 0 with
+let rec _f_45 _x_58 =
+  match _x_58 = 0 with
   | true -> Value 1
-  | false -> Call (Eff, (), fun (_y_61 : unit) -> _f_41 (_x_54 - 1))
+  | false -> Call (Eff, (), fun (_y_65 : unit) -> _f_45 (_x_58 - 1))
 in
-let rec _f_64 (_x_54, _k_66) =
-  match _x_54 = 0 with
-  | true -> _k_66 1
-  | false -> _f_64 (_x_54 - 1, fun (_x_65 : int) -> _k_66 _x_65) * 2
+let rec _f_68 (_x_58, _k_70) =
+  match _x_58 = 0 with
+  | true -> _k_70 1
+  | false -> _f_68 (_x_58 - 1, fun (_x_69 : int) -> _k_70 _x_69) * 2
 in
-_f_64 (5, fun (_id_50 : int) -> _id_50)
+_f_68 (5, fun (_id_54 : int) -> _id_54)
 
 ;;
-let rec _g_71 _x_82 =
-  match _x_82 = 0 with true -> 1 | false -> _g_71 (_x_82 - 1)
+let rec _g_75 _x_86 =
+  match _x_86 = 0 with true -> 1 | false -> _g_75 (_x_86 - 1)
 in
-_g_71 5
+_g_75 5

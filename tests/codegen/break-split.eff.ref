@@ -1,18 +1,18 @@
 type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
 
-let _two_41 = 2
+let _two_45 = 2
 
-let two = _two_41
+let two = _two_45
 
-let _three_42 = 3
+let _three_46 = 3
 
-let three = _three_42
+let three = _three_46
 
 ;;
-let rec _f_61 (_x_56, _k_63) =
-  let _l_53 (_y_58 : bool) =
-    _k_63 (match _y_58 with true -> 2 | false -> 3)
+let rec _f_65 (_x_60, _k_67) =
+  let _l_57 (_y_62 : bool) =
+    _k_67 (match _y_62 with true -> 2 | false -> 3)
   in
-  _l_53 true + _l_53 false
+  _l_57 true + _l_57 false
 in
-_f_61 ((), fun (_x_47 : int) -> _x_47)
+_f_65 ((), fun (_x_51 : int) -> _x_51)

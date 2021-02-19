@@ -78,7 +78,7 @@ and optimize_term state (n_term : NoEff.n_term) =
 
 and optimize_term' state (n_term : NoEff.n_term) =
   match n_term.term with
-  | NVar _ | NConst _ -> n_term
+  | NVar _ | NConst _ | NDirectPrimitive _ -> n_term
   | NTuple ts -> NoEff.tuple (List.map (optimize_term state) ts)
   | NFun { term = p, ty1, term; _ } ->
       NoEff.funct (p, ty1, optimize_term state term)
@@ -144,7 +144,44 @@ and n_abstraction_2_args state
     ({ term = pat1, pat2, term; ty } : NoEff.n_abstraction_2_args) =
   { term = (pat1, pat2, optimize_term state term); ty }
 
-and reduce_bool_match t abs = NoEff.n_match (t, abs) (NoEff.NTyBasic BooleanTy)
+and reduce_bool_match _state t (abs : NoEff.n_abstraction list) =
+  (* Todo: optimize list in some canonical way and substitute parameters *)
+  match abs with
+  | [
+   { term = { term = p1; _ }, { term = c1; _ }; _ };
+   { term = { term = p2; _ }, { term = c2; _ }; _ };
+  ] -> (
+      (* Nonbinding is important,
+         to not overlook cases when variable can be later used
+         that variable can be inlined
+      *)
+      match ((p1, c1), (p2, c2)) with
+      | ( (NoEff.PNConst (Boolean true), NoEff.NConst (Boolean true)),
+          ((NoEff.PNConst _, _) as other) )
+      | ( (NoEff.PNConst (Boolean true), NoEff.NConst (Boolean true)),
+          ((NoEff.PNNonbinding, _) as other) )
+      | ( ((NoEff.PNConst _, _) as other),
+          (NoEff.PNConst (Boolean true), NoEff.NConst (Boolean true)) )
+      | ( ((NoEff.PNNonbinding, _) as other),
+          (NoEff.PNConst (Boolean true), NoEff.NConst (Boolean true)) ) ->
+          (* match a with
+             | true -> true
+             | false | _ -> b  ~-> a || b *)
+          NoEff.direct_or t { term = snd other; ty = NoEff.NTyBasic BooleanTy }
+      | ( (NoEff.PNConst (Boolean false), NoEff.NConst (Boolean false)),
+          ((NoEff.PNConst _, _) as other) )
+      | ( (NoEff.PNConst (Boolean false), NoEff.NConst (Boolean false)),
+          ((NoEff.PNNonbinding, _) as other) )
+      | ( ((NoEff.PNConst _, _) as other),
+          (NoEff.PNConst (Boolean false), NoEff.NConst (Boolean false)) )
+      | ( ((NoEff.PNNonbinding, _) as other),
+          (NoEff.PNConst (Boolean false), NoEff.NConst (Boolean false)) ) ->
+          (* match a with
+             | false -> false
+             | true | _ -> b  ~-> a && b *)
+          NoEff.direct_and t { term = snd other; ty = NoEff.NTyBasic BooleanTy }
+      | _ -> NoEff.n_match (t, abs) (NoEff.NTyBasic BooleanTy))
+  | _ -> NoEff.n_match (t, abs) (NoEff.NTyBasic BooleanTy)
 
 and reduce_constant_match state const (abs : NoEff.n_abstraction list) =
   let rec folder : NoEff.n_abstraction list -> NoEff.n_term option = function
@@ -212,7 +249,7 @@ and reduce_term' state (n_term : NoEff.n_term) =
       | Some t -> t
       | None -> n_term)
   | NMatch (t, abs) when n_term.ty = NoEff.NTyBasic BooleanTy ->
-      reduce_bool_match t abs
+      reduce_bool_match state t abs
   | _ -> n_term
 
 and reduce_term state n_term =

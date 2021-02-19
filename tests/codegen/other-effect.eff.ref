@@ -1,18 +1,18 @@
 type (_, _) eff_internal_effect += WriteInt : (int, unit) eff_internal_effect
 
 ;;
-let rec _f_48 _x_57 =
+let rec _f_52 _x_61 =
   Call
     ( WriteInt,
-      _x_57,
-      fun (_y_61 : unit) ->
-        match _x_57 = 0 with true -> Value () | false -> _f_48 (_x_57 - 1) )
+      _x_61,
+      fun (_y_65 : unit) ->
+        match _x_61 = 0 with true -> Value () | false -> _f_52 (_x_61 - 1) )
 in
-let rec _f_66 (_x_57, _k_68) =
-  _x_57
+let rec _f_70 (_x_61, _k_72) =
+  _x_61
   +
-  match _x_57 = 0 with
-  | true -> _k_68 ()
-  | false -> _f_66 (_x_57 - 1, fun (_x_80 : unit) -> _k_68 _x_80)
+  match _x_61 = 0 with
+  | true -> _k_72 ()
+  | false -> _f_70 (_x_61 - 1, fun (_x_84 : unit) -> _k_72 _x_84)
 in
-_f_66 (10, fun (_x_45 : unit) -> 0)
+_f_70 (10, fun (_x_49 : unit) -> 0)
