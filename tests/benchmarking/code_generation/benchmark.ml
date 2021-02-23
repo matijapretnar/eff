@@ -10,6 +10,8 @@ and number_of_queens = 8
 
 and number_of_range = 100
 
+and number_of_tree = 100
+
 and size_of_interp_expression = 200
 
 let run_loop_pure = true
@@ -30,6 +32,8 @@ and run_interp = true
 
 and run_range = true
 
+and run_tree = true
+
 let benchmark test =
   let ols =
     Analyze.ols ~bootstrap:0 ~r_square:true ~predictors:Measure.[| run |]
@@ -39,7 +43,7 @@ let benchmark test =
   in
   let cfg =
     (* Benchmark.cfg ~limit:5000 ~quota:(Time.second 5.0) ~kde:(Some 1000) () *)
-    Benchmark.cfg ~limit:500 ~quota:(Time.second 0.5) ~kde:(Some 100) ()
+    Benchmark.cfg ~limit:5000 ~quota:(Time.second 5.0) ~kde:(Some 1000) ()
   in
   let raw_results = Benchmark.all cfg instances test in
   let results =
@@ -344,5 +348,9 @@ let () =
       ];
   if run_range then (
     let set = suite.range_benchmarks number_of_range in
+    Printf.printf "%s :\n" set.name;
+    run_and_show_set set);
+  if run_tree then (
+    let set = suite.tree_benchmark number_of_tree in
     Printf.printf "%s :\n" set.name;
     run_and_show_set set)

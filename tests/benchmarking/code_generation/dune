@@ -37,6 +37,11 @@
    (run ./generate_benchmark_rules.exe))))
 
 (rule
+ (alias generate_benchmarks)
+ (action
+  (diff dune.inc dune.gen)))
+
+(rule
  (deps
   (source_tree .))
  (targets benchmark.output)

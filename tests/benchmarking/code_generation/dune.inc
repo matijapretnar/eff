@@ -98,3 +98,28 @@
    (action
     (diff "rangeOpt.ml" "rangeOpt.formatted")))
 
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
+   (target "treeOpt.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 1 2)
+       (run eff --no-stdlib --compile-plain-ocaml  "./tree.eff")))))
+
+(rule
+ (deps "treeOpt.out")
+  (target "treeOpt.formatted")
+   (action
+    (with-outputs-to "treeOpt.formatted"
+     (with-accepted-exit-codes (or 0 1 2)
+      (run ocamlformat treeOpt.out)))))
+
+(rule
+ (deps treeOpt.formatted)
+  (alias generate_benchmarks)
+   (action
+    (diff "treeOpt.ml" "treeOpt.formatted")))
+

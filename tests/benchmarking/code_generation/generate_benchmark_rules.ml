@@ -1,4 +1,4 @@
-let names = [ "loop"; "queens"; "interp"; "range" ]
+let names = [ "loop"; "queens"; "interp"; "range"; "tree" ]
 
 let invalid = [] (*  ("loop", "NoOptImpure") ] *)
 

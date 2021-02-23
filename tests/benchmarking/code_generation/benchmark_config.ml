@@ -23,6 +23,7 @@ type test_suite = {
   queens_all_benchmark : int -> int benchmark_set;
   interpreter_benchmark : int -> int benchmark_set;
   range_benchmarks : int -> int benchmark_set;
+  tree_benchmark : int -> int benchmark_set;
 }
 
 let loop_benchmarks number_of_loops =
@@ -173,6 +174,21 @@ let range_benchmarks number_of_range =
     param = number_of_range;
   }
 
+let tree_benchmark number =
+  {
+    name = "TREE BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, optimized",
+          forget_value TreeOpt.test_max,
+          always_true TreeOpt.test_max );
+        ( "Native",
+          forget_value TreeNative.test_max,
+          always_true TreeNative.test_max );
+      ];
+    param = number;
+  }
+
 let default_test_suite =
   {
     loop_benchmarks;
@@ -185,4 +201,5 @@ let default_test_suite =
     queens_all_benchmark;
     interpreter_benchmark;
     range_benchmarks;
+    tree_benchmark;
   }
