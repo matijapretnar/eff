@@ -106,28 +106,22 @@ and elab_dirty_coercion { term = tcoer, dcoer; _ } =
   else if not (is_empty_dirt d2) then NoEff.NCoerComp tyelab
   else failwith "Ill-typed bang coercion"
 
-let rec elab_pattern p : NoEff.n_pattern =
-  let term =
-    match p.term with
-    | PVar x -> PNVar (NoEff.variable x.term (elab_ty p.ty))
-    | PAs (p, x) -> PNAs (elab_pattern p, NoEff.variable x.term (elab_ty p.ty))
-    | PTuple ps -> PNTuple (List.map elab_pattern ps)
-    | PConst c -> PNConst c
-    | PRecord recs -> NoEff.PNRecord (Assoc.map elab_pattern recs)
-    | PVariant (l, None) -> NoEff.PNVariant (l, None)
-    | PVariant (l, Some p) -> NoEff.PNVariant (l, Some (elab_pattern p))
-    | PNonbinding -> PNNonbinding
-  in
-  { term; ty = elab_ty p.ty }
+let rec elab_pattern p =
+  match p.term with
+  | PVar x -> PNVar x.term
+  | PAs (p, x) -> PNAs (elab_pattern p, x.term)
+  | PTuple ps -> PNTuple (List.map elab_pattern ps)
+  | PConst c -> PNConst c
+  | PRecord recs -> NoEff.PNRecord (Assoc.map elab_pattern recs)
+  | PVariant (l, None) -> NoEff.PNVariant (l, None)
+  | PVariant (l, Some p) -> NoEff.PNVariant (l, Some (elab_pattern p))
+  | PNonbinding -> PNNonbinding
 
-let elab_variable { term; ty } = NoEff.variable term (elab_ty ty)
-
-let rec elab_expression exp =
-  { term = elab_expression' exp.term; ty = elab_ty exp.ty }
+let rec elab_expression exp = elab_expression' exp.term
 
 and elab_expression' exp =
   match exp with
-  | ExEff.Var x -> NoEff.NVar (NoEff.variable x.term (elab_ty x.ty))
+  | ExEff.Var x -> NoEff.NVar x.term
   | ExEff.Const c -> NoEff.NConst c
   | ExEff.Tuple vs -> NoEff.NTuple (List.map elab_expression vs)
   | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty abs)
@@ -142,78 +136,49 @@ and elab_expression' exp =
         let _, (_ty, dirt) = h.term.value_clause.ty in
         if ExEffTypes.is_empty_dirt dirt (* Handler - Case 2 *) then
           let subst_cont_effect ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
-              : n_effect * n_abstraction_2_args =
+              =
             let elab1 = elab_ty ty1 in
             let elab2 = elab_ty ty2 in
             let elabcomp = elab_computation comp in
             match p2.term with
-            | PVar { term = x; ty } ->
-                let el_ty = elab_ty ty in
-                let var_x = NoEff.variable x el_ty in
-                let rtr =
-                  NoEff.cast
-                    ( NoEff.var var_x,
-                      NoEff.NCoerArrow
-                        (NoEff.NCoerRefl, NoEff.NCoerUnsafe NoEff.NCoerRefl) )
-                in
+            | PVar { term = x; _ } ->
                 ( (eff, (elab1, elab2)),
-                  {
-                    term =
-                      ( elab_pattern p1,
-                        elab_pattern p2,
-                        {
-                          term =
-                            NReturn (subs_var_in_term var_x rtr.term elabcomp);
-                          ty = elabcomp.ty;
-                        } );
-                    ty = (elab1, elab2, elabcomp.ty);
-                  } )
+                  ( elab_pattern p1,
+                    elab_pattern p2,
+                    NReturn
+                      (subs_var_in_term x
+                         (NCast
+                            ( NVar x,
+                              NoEff.NCoerArrow
+                                ( NoEff.NCoerRefl,
+                                  NoEff.NCoerUnsafe NoEff.NCoerRefl ) ))
+                         elabcomp) ) )
             | _ -> failwith "STIEN: wrong elab handler case 2"
           in
-          let p, ty, c = elabvc.term in
-
-          NHandler
+          let p, ty, c = elabvc in
+          NoEff.NHandler
             {
-              term =
-                {
-                  return_clause =
-                    {
-                      term = (p, ty, { term = NoEff.NReturn c; ty = c.ty });
-                      ty = elabvc.ty;
-                    };
-                  effect_clauses =
-                    Assoc.map_of_list subst_cont_effect
-                      (Assoc.to_list h.term.effect_clauses.effect_part);
-                };
-              ty = elabvc.ty;
+              return_clause = (p, ty, NoEff.NReturn c);
+              effect_clauses =
+                Assoc.map_of_list subst_cont_effect
+                  (Assoc.to_list h.term.effect_clauses.effect_part);
             } (* Handler - Case 3 *)
         else
           let elab_effect_clause ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
-              : n_effect * n_abstraction_2_args =
+              =
             let elab1 = elab_ty ty1 in
             let elab2 = elab_ty ty2 in
             let elabcomp = elab_computation comp in
-            let ep1 = elab_pattern p1 in
-            let ep2 = elab_pattern p2 in
-
-            ( (eff, (elab1, elab2)),
-              {
-                term = (ep1, ep2, elabcomp);
-                ty = (ep1.ty, ep2.ty, elabcomp.ty);
-              } )
+            ((eff, (elab1, elab2)), (elab_pattern p1, elab_pattern p2, elabcomp))
           in
-          let p, ty, c = elabvc.term in
+          let p, ty, c = elabvc in
           NoEff.NHandler
             {
-              term =
-                {
-                  return_clause = { term = (p, ty, c); ty = elabvc.ty };
-                  (* Filip: Not sure if this needs NReturn *)
-                  effect_clauses =
-                    Assoc.map_of_list elab_effect_clause
-                      (Assoc.to_list h.term.effect_clauses.effect_part);
-                };
-              ty = elabvc.ty;
+              return_clause = (p, ty, c);
+              (* Filip: Not sure if this needs NReturn *)
+              effect_clauses =
+                Assoc.map_of_list elab_effect_clause
+                  (Assoc.to_list h.term.effect_clauses.effect_part);
             }
   | ExEff.CastExp (value, coer) ->
       let elab1 = elab_expression value in
@@ -225,33 +190,21 @@ and elab_expression' exp =
       NoEff.NVariant (lbl, Some elab_e)
   | ExEff.Record _ass -> failwith "records not supported yet"
 
-and elab_abstraction { term = a; ty = t1, (t2, _) } =
-  { term = elab_abstraction' a; ty = (elab_ty t1, elab_ty t2) }
-
-and elab_abstraction' (p, c) =
+and elab_abstraction { term = p, c; _ } =
   let elab2 = elab_computation c in
   (elab_pattern p, elab2)
 
-and elab_abstraction_with_param_ty { term; ty = ty1, (ty2, _) } =
-  {
-    term = elab_abstraction_with_param_ty' term ty1;
-    ty = (elab_ty ty1, elab_ty ty2);
-  }
-
-and elab_abstraction_with_param_ty' (p, c) param_ty =
+and elab_abstraction_with_param_ty { term = p, c; ty = param_ty, _ } =
   let elab2 = elab_computation c in
   (elab_pattern p, elab_ty param_ty, elab2)
 
-and elab_computation cmp =
-  let ty, _ = cmp.ty in
-  let ty = elab_ty ty in
-  { term = elab_computation' cmp.term; ty }
+and elab_computation cmp = elab_computation' cmp.term
 
 and elab_computation' c =
   match c with
   | ExEff.Value value ->
       let elab = elab_expression value in
-      elab.term
+      elab
   | ExEff.LetVal (value, abs) ->
       let elabv = elab_expression value in
       let elababs = elab_abstraction abs in
@@ -263,7 +216,9 @@ and elab_computation' c =
       let elabv = elab_expression value in
       match abs_lst with
       | [] -> NoEff.NMatch (elabv, [])
-      | _ :: _ -> NoEff.NMatch (elabv, List.map elab_abstraction abs_lst))
+      | _ :: _ ->
+          NoEff.NMatch
+            (elabv, List.map (fun abs -> elab_abstraction abs) abs_lst))
   | ExEff.Apply (v1, v2) ->
       let telab1 = elab_expression v1 in
       let elab2 = elab_expression v2 in
@@ -280,7 +235,7 @@ and elab_computation' c =
             NoEff.NApplyTerm (velab, elabc)
           else if Type.is_empty_dirt vdirt2 (* Handle - Case 2 *) then
             NoEff.NCast
-              (NoEff.handle (elabc, velab), NoEff.NCoerUnsafe NoEff.NCoerRefl)
+              (NoEff.NHandle (elabc, velab), NoEff.NCoerUnsafe NoEff.NCoerRefl)
             (* Handle - Case 3 *)
           else NoEff.NHandle (elabc, velab)
       | _ -> failwith "Ill-typed handler")
@@ -306,13 +261,7 @@ and elab_computation' c =
       NoEff.NCast (coelab, elabc)
 
 and elab_rec_definitions defs =
-  Assoc.kmap
-    (fun ({ term = v; ty }, abs) ->
-      let ty = elab_ty ty in
-      let v : NoEff.variable = NoEff.variable v ty in
-      let abs : NoEff.n_abstraction = elab_abstraction abs in
-      (v, abs))
-    defs
+  Assoc.kmap (fun (x, abs) -> (x.term, elab_abstraction abs)) defs
 
 let rec elab_source_ty = function
   | Language.Type.Apply (name, ts) ->
