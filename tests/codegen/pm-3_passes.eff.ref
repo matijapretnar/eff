@@ -10,9 +10,11 @@ let rec _concat_45 _x_65 =
       fun (_ys_82 : intlist) -> IntCons (_z_81, _concat_45 _zs_80 _ys_82)
 in
 let _l_66 (_y_75 : bool) =
-  let _x_60 = match _y_75 with true -> 10 | false -> 20 in
   let _l_66 (_y_72 : bool) =
-    IntCons ((_x_60 - match _y_72 with true -> 0 | false -> 5), IntNil)
+    IntCons
+      ( ((match _y_75 with true -> 10 | false -> 20)
+        - match _y_72 with true -> 0 | false -> 5),
+        IntNil )
   in
   _concat_45 (_l_66 true) (_l_66 false)
 in

@@ -22,11 +22,13 @@ let abstraction_inlinability (pat, cmp) =
   let rec check_variables = function
     | [] -> NotPresent
     | x :: xs -> (
-        let inside_occ, outside_occ = NoEff.occurrences x vars in
-        if inside_occ > 0 || outside_occ > 1 then NotInlinable
+        let occ =
+          SyntaxNoEff.VariableMap.find_opt x vars |> Option.value ~default:0
+        in
+        if occ > 1 then NotInlinable
         else
           match check_variables xs with
-          | NotPresent -> if outside_occ = 0 then NotPresent else Inlinable
+          | NotPresent -> if occ = 0 then NotPresent else Inlinable
           | inlinability -> inlinability)
   in
   check_variables (NoEff.pattern_vars pat)
@@ -145,10 +147,11 @@ and reduce_letrec l t =
     (* Let rec with pattern unwrap gets compiled to let rec with let unwrap case *)
     | NoEff.PNVar v, NoEff.NMatch (NoEff.NVar v', [ (p', t') ])
     | NoEff.PNVar v, NoEff.NLet (NoEff.NVar v', (p', t'))
-      when v = v' ->
+      when v = v' -> (
         let vars = NoEff.free_vars t' in
-        let inside, outside = NoEff.occurrences v' vars in
-        if inside = 0 && outside = 0 then (p', t') else (p, t)
+        match SyntaxNoEff.VariableMap.find_opt v' vars with
+        | Some x when x > 0 -> (p, t)
+        | _ -> (p', t'))
     | n -> n
   in
   NoEff.NLetRec (Assoc.map reduce_single l, t)

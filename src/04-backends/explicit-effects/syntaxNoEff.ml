@@ -4,6 +4,7 @@ open Utils
 module CoreTypes = Language.CoreTypes
 module Const = Language.Const
 module Variable = Symbol.Make (Symbol.String)
+module VariableMap = Map.Make (Variable)
 
 type n_type =
   (* Might remove this later to drop all polymorphism *)
@@ -228,17 +229,19 @@ let direct_or t1 t2 =
 
 (* Free variables *)
 
-let ( @@@ ) (inside1, outside1) (inside2, outside2) =
-  (inside1 @ inside2, outside1 @ outside2)
+let ( @@@ ) occur1 occur2 =
+  VariableMap.merge
+    (fun _ oc1 oc2 ->
+      Some (Option.value ~default:0 oc1 + Option.value ~default:0 oc2))
+    occur1 occur2
 
-let ( --- ) (inside, outside) bound =
-  let remove_bound xs = List.filter (fun x -> not (List.mem x bound)) xs in
-  (remove_bound inside, remove_bound outside)
+let ( --- ) occur bound =
+  VariableMap.filter (fun x _ -> not (List.mem x bound)) occur
 
-let concat_vars vars = List.fold_right ( @@@ ) vars ([], [])
+let concat_vars vars = List.fold_right ( @@@ ) vars VariableMap.empty
 
 let rec free_vars = function
-  | NVar v -> ([], [ v ])
+  | NVar v -> VariableMap.singleton v 1
   | NTuple l -> concat_vars (List.map free_vars l)
   | NFun abs -> free_vars_abs_with_ty abs
   | NHandle (t1, t2) | NApplyTerm (t1, t2) -> free_vars t1 @@@ free_vars t2
@@ -248,33 +251,30 @@ let rec free_vars = function
   | NLet (e, a) -> free_vars e @@@ free_vars_abs a
   | NCall (_, e, a) -> free_vars e @@@ free_vars_abs_with_ty a
   | NBind (e, a) -> free_vars e @@@ free_vars_abs a
-  | NConst _ -> ([], [])
-  | NLetRec (defs, c) ->
-      (List.map free_vars_letrec (Assoc.to_list defs) |> concat_vars)
-      @@@ free_vars c
+  | NConst _ | NDirectPrimitive _ -> VariableMap.empty
+  | NLetRec (li, c1) ->
+      let xs, vars =
+        List.fold_right
+          (fun (x, abs) (xs, vars) -> (x :: xs, free_vars_abs abs @@@ vars))
+          (Assoc.to_list li)
+          ([], free_vars c1)
+      in
+      vars --- xs
   | NMatch (e, l) -> free_vars e @@@ concat_vars (List.map free_vars_abs l)
   | NRecord r -> Assoc.values_of r |> List.map free_vars |> concat_vars
-  | NVariant (_, e) -> Option.default_map ([], []) free_vars e
-  | NDirectPrimitive _ -> ([], [])
+  | NVariant (_, e) -> Option.default_map VariableMap.empty free_vars e
 
 and free_vars_handler h =
   free_vars_abs_with_ty h.return_clause
   @@@ (Assoc.values_of h.effect_clauses
       |> List.map free_vars_abs2 |> concat_vars)
 
-and free_vars_abs (p, c) =
-  let inside, outside = free_vars c --- pattern_vars p in
-  (inside @ outside, [])
-
-and free_vars_letrec (v, (p, c)) =
-  let inside, outside = free_vars c --- pattern_vars p --- [ v ] in
-  (inside @ outside, [])
+and free_vars_abs (p, c) = free_vars c --- pattern_vars p
 
 and free_vars_abs_with_ty (p, _ty, c) = free_vars_abs (p, c)
 
 and free_vars_abs2 (p1, p2, c) =
-  let inside, outside = free_vars c --- pattern_vars p2 --- pattern_vars p1 in
-  (inside @ outside, [])
+  free_vars c --- pattern_vars p2 --- pattern_vars p1
 
 (********************** PRINT FUNCTIONS **********************)
 
