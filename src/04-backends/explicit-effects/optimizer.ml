@@ -390,6 +390,16 @@ and reduce_expression' state expr =
 and reduce_computation state comp =
   reduce_if_fuel reduce_computation' state comp
 
+and reduce_constant_match state const (abs : Term.abstraction list) =
+  let rec folder : Term.abstraction list -> Term.computation option = function
+    | [] -> None
+    | abs :: xs -> (
+        match Term.beta_reduce abs const with
+        | Some cmp -> Some (optimize_computation state cmp)
+        | None -> folder xs)
+  in
+  folder abs
+
 and reduce_computation' state comp =
   match comp.term with
   (* TODO: matches of a constant *)
@@ -502,6 +512,9 @@ and reduce_computation' state comp =
         (optimize_computation state
            (Term.handle (exp, cast_computation state cmp drty_coer1)))
         drty_coer2
+  | Term.Match (({ term = Term.Const _; _ } as c), abs)
+  | Term.Match (({ term = Term.Variant _; _ } as c), abs) -> (
+      match reduce_constant_match state c abs with Some t -> t | None -> comp)
   | _ -> comp
 
 let process_computation state comp =
