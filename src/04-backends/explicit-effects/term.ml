@@ -508,7 +508,7 @@ let pattern_match p e =
         extend_subst p e sbst
     | PConst c, Const c' when Const.equal c c' -> Some sbst
     | _, _ ->
-        Print.debug "%t = %t" (print_pattern p) (print_expression e);
+        (* Print.debug "%t = %t" (print_pattern p) (print_expression e); *)
         None
   in
   extend_subst p e Assoc.empty

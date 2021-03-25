@@ -477,11 +477,11 @@ and tcComp' state : Untyped.plain_computation -> tcCompOutput' = function
 (* Type inference for a located computation *)
 and tcComp state (c : Untyped.computation) : tcCompOutput =
   let (trm, ty), cnstrs = tcComp' state c.it in
-  Print.debug "%t -> %t : %t / %t"
-    (Untyped.print_computation c)
-    (Term.print_computation' trm)
-    (Type.print_dirty ty)
-    (Constraint.print_constraints cnstrs);
+  (* Print.debug "%t -> %t : %t / %t"
+     (Untyped.print_computation c)
+     (Term.print_computation' trm)
+     (Type.print_dirty ty)
+     (Constraint.print_constraints cnstrs); *)
   ({ term = trm; ty }, cnstrs)
 
 (* Typecheck a value wrapped in a return *)
