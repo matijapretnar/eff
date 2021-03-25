@@ -7,10 +7,5 @@ let rec _f_52 _x_61 =
       _x_61,
       fun (_y_65 : unit) -> if _x_61 = 0 then Value () else _f_52 (_x_61 - 1) )
 in
-let rec _f_70 (_x_61, _k_72) =
-  _x_61
-  +
-  if _x_61 = 0 then _k_72 ()
-  else _f_70 (_x_61 - 1, fun (_x_84 : unit) -> _k_72 _x_84)
-in
-_f_70 (10, fun (_x_49 : unit) -> 0)
+let rec _f_70 _x_61 = _x_61 + if _x_61 = 0 then 0 else _f_70 (_x_61 - 1) in
+_f_70 10

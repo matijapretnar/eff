@@ -5,12 +5,9 @@ let rec _f_45 _x_58 =
   if _x_58 = 0 then Value 1
   else Call (Eff, (), fun (_y_65 : unit) -> _f_45 (_x_58 - 1))
 in
-let rec _f_68 (_x_58, _k_70) =
-  if _x_58 = 0 then _k_70 1
-  else _f_68 (_x_58 - 1, fun (_x_69 : int) -> _k_70 _x_69) * 2
-in
-_f_68 (5, fun (_id_54 : int) -> _id_54)
+let rec _f_68 _x_58 = if _x_58 = 0 then 1 else _f_68 (_x_58 - 1) * 2 in
+_f_68 5
 
 ;;
-let rec _g_75 _x_86 = if _x_86 = 0 then 1 else _g_75 (_x_86 - 1) in
-_g_75 5
+let rec _g_73 _x_84 = if _x_84 = 0 then 1 else _g_73 (_x_84 - 1) in
+_g_73 5

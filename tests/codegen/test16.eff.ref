@@ -12,10 +12,9 @@ type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
            Call (Put, _y_82 + 1, fun (_y_85 : unit) -> _loop_46 (_x_69 - 1)) )
    else Value ()
  in
- let rec _loop_88 (_x_69, _k_90) =
-   if 0 < _x_69 then fun (_s_99 : int) ->
-     _loop_88 (_x_69 - 1, fun (_x_107 : unit) -> _k_90 _x_107) (_s_99 + 1)
-   else _k_90 ()
+ let rec _loop_88 _x_69 =
+   if 0 < _x_69 then fun (_s_96 : int) -> _loop_88 (_x_69 - 1) (_s_96 + 1)
+   else fun (_ : int) -> ()
  in
- _loop_88 (10, fun (_x_61 : unit) (_ : int) -> _x_61))
+ _loop_88 10)
   0

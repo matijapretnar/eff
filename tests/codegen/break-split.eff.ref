@@ -9,8 +9,8 @@ let _three_46 = 3
 let three = _three_46
 
 ;;
-let rec _f_65 (_x_60, _k_67) =
-  let _l_57 (_y_62 : bool) = _k_67 (if _y_62 then 2 else 3) in
+let rec _f_65 _x_60 =
+  let _l_57 (_y_62 : bool) = if _y_62 then 2 else 3 in
   _l_57 true + _l_57 false
 in
-_f_65 ((), fun (_x_51 : int) -> _x_51)
+_f_65 ()

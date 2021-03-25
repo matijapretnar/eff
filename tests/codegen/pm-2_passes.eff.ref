@@ -13,12 +13,12 @@ type intlist = IntNil | IntCons of (int * intlist)
 ;;
 let rec _concat_47 _x_65 =
   match _x_65 with
-  | IntNil -> fun (_ys_78 : intlist) -> _ys_78
-  | IntCons (_z_80, _zs_79) ->
-      fun (_ys_81 : intlist) -> IntCons (_z_80, _concat_47 _zs_79 _ys_81)
+  | IntNil -> fun (_ys_76 : intlist) -> _ys_76
+  | IntCons (_z_78, _zs_77) ->
+      fun (_ys_79 : intlist) -> IntCons (_z_78, _concat_47 _zs_77 _ys_79)
 in
-let rec _f_74 (_x_69, _k_76) =
-  let _l_66 (_y_71 : bool) = _k_76 (if _y_71 then 2 else 3) in
+let rec _f_74 _x_69 =
+  let _l_66 (_y_71 : bool) = IntCons ((if _y_71 then 2 else 3), IntNil) in
   _concat_47 (_l_66 true) (_l_66 false)
 in
-_f_74 ((), fun (_x_59 : int) -> IntCons (_x_59, IntNil))
+_f_74 ()

@@ -26,19 +26,19 @@ let available number_of_queens x qs =
   in
   loop ([], number_of_queens)
 
-let rec tr_choose xs =
+let rec choose xs =
   match xs with
   | [] -> (absurd (perform (Fail ()))) 
-  | (x:: xs') -> if perform (Decide ()) then x else tr_choose xs'
+  | (x:: xs') -> if perform (Decide ()) then x else choose xs'
 
 let queens number_of_queens =
-  let rec tr_place (x, qs) =
+  let rec place (x, qs) =
     if x > number_of_queens then qs
     else
-      let y = tr_choose (available number_of_queens x qs) in
-      tr_place (x + 1, ((x, y):: qs))
+      let y = choose (available number_of_queens x qs) in
+      place (x + 1, ((x, y):: qs))
   in
-  tr_place (1, [])
+  place (1, [])
 
 let queens_one_option number_of_queens =
   match queens number_of_queens

@@ -42,25 +42,25 @@ let _effect_max_96 (_m_97 : int) =
               else _find_max_98 _right_127)
               >> fun _next_131 -> Value (_x_128 + _next_131) )
   in
-  let rec _find_max_133 (_x_118, _k_135) =
+  let rec _find_max_136 (_x_118, _k_138) =
     match _x_118 with
-    | Empty -> _k_135 0
-    | Node (Empty, _x_126, Empty) -> _k_135 _x_126
+    | Empty -> _k_138 0
+    | Node (Empty, _x_126, Empty) -> _k_138 _x_126
     | Node (_left_129, _x_128, _right_127) ->
         let _l_119 (_y_130 : bool) =
           if _y_130 then
-            _find_max_133
-              (_left_129, fun (_next_131 : int) -> _k_135 (_x_128 + _next_131))
+            _find_max_136
+              (_left_129, fun (_next_131 : int) -> _k_138 (_x_128 + _next_131))
           else
-            _find_max_133
-              (_right_127, fun (_next_131 : int) -> _k_135 (_x_128 + _next_131))
+            _find_max_136
+              (_right_127, fun (_next_131 : int) -> _k_138 (_x_128 + _next_131))
         in
         _max_91 (_l_119 true) (_l_119 false)
   in
-  _find_max_133 (_tester_45 _m_97, fun (_x_113 : int) -> _x_113)
+  _find_max_136 (_tester_45 _m_97, fun (_x_113 : int) -> _x_113)
 
 let effect_max = _effect_max_96
 
-let _test_max_138 (_m_139 : int) = _effect_max_96 _m_139
+let _test_max_141 (_m_142 : int) = _effect_max_96 _m_142
 
-let test_max = _test_max_138
+let test_max = _test_max_141
