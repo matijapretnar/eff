@@ -45,12 +45,10 @@ let not_attacked = _not_attacked_77
 let _available_93 (_number_of_queens_94 : int) (_x_95 : int) (_qs_96 : solution)
     =
   let rec _loop_97 (_possible_98, _y_99) =
-    match _y_99 < 1 with
-    | true -> _possible_98
-    | false -> (
-        match _not_attacked_77 (_x_95, _y_99) _qs_96 with
-        | true -> _loop_97 (RowsCons (_y_99, _possible_98), _y_99 - 1)
-        | false -> _loop_97 (_possible_98, _y_99 - 1))
+    if _y_99 < 1 then _possible_98
+    else if _not_attacked_77 (_x_95, _y_99) _qs_96 then
+      _loop_97 (RowsCons (_y_99, _possible_98), _y_99 - 1)
+    else _loop_97 (_possible_98, _y_99 - 1)
   in
   _loop_97 (RowsEmpty, _number_of_queens_94)
 
@@ -68,20 +66,17 @@ let rec _tr_choose_119 _x_129 =
         ( Decide,
           (),
           fun (_y_140 : bool) ->
-            match _y_140 with
-            | true -> Value _x_139
-            | false -> _tr_choose_119 _xs'_138 )
+            if _y_140 then Value _x_139 else _tr_choose_119 _xs'_138 )
 
 let tr_choose = _tr_choose_119
 
 let _queens_141 (_number_of_queens_142 : int) =
   let rec _tr_place_143 (_x_144, _qs_145) =
-    match _x_144 > _number_of_queens_142 with
-    | true -> Value _qs_145
-    | false ->
-        _tr_choose_119 (_available_93 _number_of_queens_142 _x_144 _qs_145)
-        >> fun _y_148 ->
-        _tr_place_143 (_x_144 + 1, SolutionPlace ((_x_144, _y_148), _qs_145))
+    if _x_144 > _number_of_queens_142 then Value _qs_145
+    else
+      _tr_choose_119 (_available_93 _number_of_queens_142 _x_144 _qs_145)
+      >> fun _y_148 ->
+      _tr_place_143 (_x_144 + 1, SolutionPlace ((_x_144, _y_148), _qs_145))
   in
   _tr_place_143 (1, SolutionEmpty)
 
@@ -90,33 +85,30 @@ let queens = _queens_141
 let _queens_one_option_165 (_number_of_queens_166 : int) =
   let rec _queens_179 _number_of_queens_142 =
     let rec _tr_place_143 (_x_144, _qs_145) =
-      match _x_144 > _number_of_queens_142 with
-      | true -> Value _qs_145
-      | false ->
-          _tr_choose_119 (_available_93 _number_of_queens_142 _x_144 _qs_145)
-          >> fun _y_148 ->
-          _tr_place_143 (_x_144 + 1, SolutionPlace ((_x_144, _y_148), _qs_145))
+      if _x_144 > _number_of_queens_142 then Value _qs_145
+      else
+        _tr_choose_119 (_available_93 _number_of_queens_142 _x_144 _qs_145)
+        >> fun _y_148 ->
+        _tr_place_143 (_x_144 + 1, SolutionPlace ((_x_144, _y_148), _qs_145))
     in
     let rec _tr_place_190 (_x_144, _qs_145) =
-      match _x_144 > _number_of_queens_142 with
-      | true -> Some _qs_145
-      | false ->
-          let rec _tr_choose_192 _x_129 =
-            match _x_129 with
-            | RowsEmpty -> None
-            | RowsCons (_x_139, _xs'_138) -> (
-                let _l_175 (_y_140 : bool) =
-                  match _y_140 with
-                  | true ->
-                      _tr_place_190
-                        (_x_144 + 1, SolutionPlace ((_x_144, _x_139), _qs_145))
-                  | false -> _tr_choose_192 _xs'_138
-                in
-                match _l_175 true with
-                | Some _x_170 -> Some _x_170
-                | None -> _l_175 false)
-          in
-          _tr_choose_192 (_available_93 _number_of_queens_142 _x_144 _qs_145)
+      if _x_144 > _number_of_queens_142 then Some _qs_145
+      else
+        let rec _tr_choose_192 _x_129 =
+          match _x_129 with
+          | RowsEmpty -> None
+          | RowsCons (_x_139, _xs'_138) -> (
+              let _l_175 (_y_140 : bool) =
+                if _y_140 then
+                  _tr_place_190
+                    (_x_144 + 1, SolutionPlace ((_x_144, _x_139), _qs_145))
+                else _tr_choose_192 _xs'_138
+              in
+              match _l_175 true with
+              | Some _x_170 -> Some _x_170
+              | None -> _l_175 false)
+        in
+        _tr_choose_192 (_available_93 _number_of_queens_142 _x_144 _qs_145)
     in
     _tr_place_190 (1, SolutionEmpty)
   in
@@ -127,31 +119,29 @@ let queens_one_option = _queens_one_option_165
 let _queens_all_213 (_number_of_queens_214 : int) =
   let rec _queens_228 _number_of_queens_142 =
     let rec _tr_place_143 (_x_144, _qs_145) =
-      match _x_144 > _number_of_queens_142 with
-      | true -> Value _qs_145
-      | false ->
-          _tr_choose_119 (_available_93 _number_of_queens_142 _x_144 _qs_145)
-          >> fun _y_148 ->
-          _tr_place_143 (_x_144 + 1, SolutionPlace ((_x_144, _y_148), _qs_145))
+      if _x_144 > _number_of_queens_142 then Value _qs_145
+      else
+        _tr_choose_119 (_available_93 _number_of_queens_142 _x_144 _qs_145)
+        >> fun _y_148 ->
+        _tr_place_143 (_x_144 + 1, SolutionPlace ((_x_144, _y_148), _qs_145))
     in
     let rec _tr_place_239 (_x_144, _qs_145) =
-      match _x_144 > _number_of_queens_142 with
-      | true -> SolutionsCons (_qs_145, SolutionsNil)
-      | false ->
-          let rec _tr_choose_241 _x_129 =
-            match _x_129 with
-            | RowsEmpty -> SolutionsNil
-            | RowsCons (_x_139, _xs'_138) ->
-                let _l_224 (_y_140 : bool) =
-                  match _y_140 with
-                  | true ->
-                      _tr_place_239
-                        (_x_144 + 1, SolutionPlace ((_x_144, _x_139), _qs_145))
-                  | false -> _tr_choose_241 _xs'_138
-                in
-                _op_47 (* @ *) (_l_224 true) (_l_224 false)
-          in
-          _tr_choose_241 (_available_93 _number_of_queens_142 _x_144 _qs_145)
+      if _x_144 > _number_of_queens_142 then
+        SolutionsCons (_qs_145, SolutionsNil)
+      else
+        let rec _tr_choose_241 _x_129 =
+          match _x_129 with
+          | RowsEmpty -> SolutionsNil
+          | RowsCons (_x_139, _xs'_138) ->
+              let _l_224 (_y_140 : bool) =
+                if _y_140 then
+                  _tr_place_239
+                    (_x_144 + 1, SolutionPlace ((_x_144, _x_139), _qs_145))
+                else _tr_choose_241 _xs'_138
+              in
+              _op_47 (* @ *) (_l_224 true) (_l_224 false)
+        in
+        _tr_choose_241 (_available_93 _number_of_queens_142 _x_144 _qs_145)
     in
     _tr_place_239 (1, SolutionEmpty)
   in
@@ -162,35 +152,32 @@ let queens_all = _queens_all_213
 let _queens_one_cps_263 (_number_of_queens_264 : int) =
   (let rec _queens_329 _number_of_queens_330 =
      let rec _tr_place_331 (_x_334, _qs_333) =
-       match _x_334 > _number_of_queens_330 with
-       | true -> Value _qs_333
-       | false ->
-           _tr_choose_119 (_available_93 _number_of_queens_330 _x_334 _qs_333)
-           >> fun _y_340 ->
-           _tr_place_331 (_x_334 + 1, SolutionPlace ((_x_334, _y_340), _qs_333))
+       if _x_334 > _number_of_queens_330 then Value _qs_333
+       else
+         _tr_choose_119 (_available_93 _number_of_queens_330 _x_334 _qs_333)
+         >> fun _y_340 ->
+         _tr_place_331 (_x_334 + 1, SolutionPlace ((_x_334, _y_340), _qs_333))
      in
      let rec _tr_place_343 (_x_346, _qs_345) =
-       match _x_346 > _number_of_queens_330 with
-       | true ->
-           coer_arrow coer_refl_ty (coer_return coer_refl_ty)
-             (fun (_ : unit -> solution computation) -> _qs_345)
-       | false ->
-           let rec _tr_choose_352 _x_353 =
-             match _x_353 with
-             | RowsEmpty ->
-                 fun (_kf_354 : unit -> solution computation) -> _kf_354 ()
-             | RowsCons (_x_356, _xs'_355) ->
-                 let _l_357 (_y_361 : bool) =
-                   match _y_361 with
-                   | true ->
-                       _tr_place_343
-                         (_x_346 + 1, SolutionPlace ((_x_346, _x_356), _qs_345))
-                   | false -> _tr_choose_352 _xs'_355
-                 in
-                 fun (_kf_358 : unit -> solution computation) ->
-                   _l_357 true (fun (_ : unit) -> _l_357 false _kf_358)
-           in
-           _tr_choose_352 (_available_93 _number_of_queens_330 _x_346 _qs_345)
+       if _x_346 > _number_of_queens_330 then
+         coer_arrow coer_refl_ty (coer_return coer_refl_ty)
+           (fun (_ : unit -> solution computation) -> _qs_345)
+       else
+         let rec _tr_choose_352 _x_353 =
+           match _x_353 with
+           | RowsEmpty ->
+               fun (_kf_354 : unit -> solution computation) -> _kf_354 ()
+           | RowsCons (_x_356, _xs'_355) ->
+               let _l_357 (_y_361 : bool) =
+                 if _y_361 then
+                   _tr_place_343
+                     (_x_346 + 1, SolutionPlace ((_x_346, _x_356), _qs_345))
+                 else _tr_choose_352 _xs'_355
+               in
+               fun (_kf_358 : unit -> solution computation) ->
+                 _l_357 true (fun (_ : unit) -> _l_357 false _kf_358)
+         in
+         _tr_choose_352 (_available_93 _number_of_queens_330 _x_346 _qs_345)
      in
      _tr_place_343 (1, SolutionEmpty)
    in

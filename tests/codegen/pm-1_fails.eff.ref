@@ -34,10 +34,6 @@ force_unsafe
             | eff' -> fun arg k -> Call (eff', arg, k));
       })
      (let rec _f_63 _x_70 =
-        Call
-          ( Decide,
-            (),
-            fun (_y_72 : bool) ->
-              Value (match _y_72 with true -> 2 | false -> 3) )
+        Call (Decide, (), fun (_y_72 : bool) -> Value (if _y_72 then 2 else 3))
       in
       _f_63 ()))

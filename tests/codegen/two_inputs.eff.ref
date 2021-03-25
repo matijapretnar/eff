@@ -8,7 +8,5 @@ let rec _op_45 (* @ *) _x_65 (_ys_84 : int_list) =
   | Nil -> _ys_84
   | Cons (_x_86, _xs_85) -> Cons (_x_86, _op_45 (* @ *) _xs_85 _ys_84)
 in
-let _l_66 (_y_82 : bool) =
-  Cons ((match _y_82 with true -> 10 | false -> 20), Nil)
-in
+let _l_66 (_y_82 : bool) = Cons ((if _y_82 then 10 else 20), Nil) in
 _op_45 (* @ *) (_l_66 true) (_l_66 false)

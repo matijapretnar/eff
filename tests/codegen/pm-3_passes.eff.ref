@@ -11,10 +11,7 @@ let rec _concat_45 _x_65 =
 in
 let _l_66 (_y_75 : bool) =
   let _l_66 (_y_72 : bool) =
-    IntCons
-      ( ((match _y_75 with true -> 10 | false -> 20)
-        - match _y_72 with true -> 0 | false -> 5),
-        IntNil )
+    IntCons (((if _y_75 then 10 else 20) - if _y_72 then 0 else 5), IntNil)
   in
   _concat_45 (_l_66 true) (_l_66 false)
 in

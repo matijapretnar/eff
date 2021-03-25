@@ -188,6 +188,13 @@ let rec pp_term ?max_level state noEff_term ppf =
   | NMatch (t, []) ->
       print ~at_level:2 "@[<hv>match %t with@, _ -> assert false@]"
         (pp_term state t)
+  | NMatch
+      ( t,
+        [
+          (PNConst (Const.Boolean true), t1); (PNConst (Const.Boolean false), t2);
+        ] ) ->
+      print ~at_level:2 "@[<hv>if %t then %t else %t @]" (pp_term state t)
+        (pp_term state t1) (pp_term state t2)
   | NMatch (t, cases) ->
       print ~at_level:2 "@[<hv>begin match %t with @, %t end @]"
         (pp_term state t)

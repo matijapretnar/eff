@@ -1,6 +1,5 @@
 let rec _even_46 _x_58 = _x_58 = 0 || _odd_45 (_x_58 - 1)
 
-and _odd_45 _x_57 =
-  match _x_57 = 0 with true -> false | false -> _even_46 (_x_57 - 1)
+and _odd_45 _x_57 = if _x_57 = 0 then false else _even_46 (_x_57 - 1)
 
 let even, odd = (_even_46, _odd_45)

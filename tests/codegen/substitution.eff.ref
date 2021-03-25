@@ -1,4 +1,3 @@
-let _decide_func_45 (_bl_46 : bool) =
-  match _bl_46 with true -> 10 | false -> 20
+let _decide_func_45 (_bl_46 : bool) = if _bl_46 then 10 else 20
 
 let decide_func = _decide_func_45

@@ -1,5 +1,3 @@
 ;;
-let rec __loop_45 _x_51 =
-  match _x_51 = 0 with true -> 0 | false -> __loop_45 (_x_51 - 1)
-in
+let rec __loop_45 _x_51 = if _x_51 = 0 then 0 else __loop_45 (_x_51 - 1) in
 ()
