@@ -69,3 +69,41 @@ let test_general m =
   | effect (Choose ()) k -> (k true) @ (k false) 
   in
   maxl 0 (with h handle explore t)
+
+
+effect Get: unit -> int
+
+let absurd void = (match void with)
+
+
+let test_leaf_state m = 
+  let rec maxl acc = function
+  | Nil -> acc
+  | Cons(x, xs) -> maxl (max x acc ) xs
+  in
+  let rec populate_leafs i n = 
+    if i = n then Nil else 
+    Cons(i*3, (populate_leafs (i+1) n))
+  in
+  let leafs = populate_leafs 0 154 in
+  let t = tester m in
+  let rec explore t = match t with
+    | Empty -> perform (Get ())
+    | Node (left, x, right) -> 
+      let next = if (perform (Choose ())) then (op x (explore left)) else op x (explore right) in
+      next
+  in
+  let h = handler 
+  | x -> Cons(x, Nil)
+  | effect (Choose ()) k -> (k true) @ (k false) 
+  in
+  let monad_state = handler
+  | y -> (fun _ -> y)
+  | effect (Get ()) k -> (
+    fun s -> (match s with 
+    | Cons(x, rest) -> (k x) rest
+    )
+  )
+  in
+  maxl 0 ((with monad_state handle ((with h handle explore t))) leafs)
+
