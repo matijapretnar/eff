@@ -39,3 +39,33 @@ let effect_max m =
 ;;
 let test_max m =
   effect_max m
+
+
+let op x y = x - 3*y
+
+
+type intlist = Nil | Cons of (int * intlist)
+
+let rec ( @ ) xs ys =
+  match xs with
+  | Nil -> ys
+  | Cons (x, xs) -> Cons (x, xs @ ys)
+
+
+let test_general m = 
+  let rec maxl acc = function
+    | Nil -> acc
+    | Cons(x, xs) -> maxl (max x acc ) xs
+  in
+  let t = tester m in
+  let rec explore t = match t with
+    | Empty -> 0
+    | Node (left, x, right) -> 
+      let next = if (perform (Choose ())) then (op x (explore left)) else op x (explore right) in
+      next
+  in
+  let h = handler 
+  | x -> Cons(x, Nil)
+  | effect (Choose ()) k -> (k true) @ (k false) 
+  in
+  maxl 0 (with h handle explore t)

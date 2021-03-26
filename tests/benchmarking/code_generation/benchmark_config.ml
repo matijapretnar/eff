@@ -154,9 +154,12 @@ let interpreter_benchmark n =
         ( "Generated, optimized",
           forget_value InterpOpt.bigTest,
           fun n -> InterpOpt.bigTest n = -1 );
-        ( "Native",
-          forget_value InterpNative.bigTest,
-          fun n -> InterpNative.bigTest n = -1 );
+        ( "Native exception",
+          forget_value InterpNative.bigTestException,
+          fun n -> InterpNative.bigTestException n = -1 );
+        ( "Native option",
+          forget_value InterpNative.bigTestOption,
+          fun n -> InterpNative.bigTestOption n = -1 );
       ];
     param = n;
   }
@@ -180,10 +183,10 @@ let tree_benchmark number =
     benchmarks =
       [
         ( "Generated, optimized",
-          forget_value TreeOpt.test_max,
+          forget_value TreeOpt.test_general,
           always_true TreeOpt.test_max );
         ( "Native",
-          forget_value TreeNative.test_max,
+          forget_value TreeNative.test_general,
           always_true TreeNative.test_max );
       ];
     param = number;

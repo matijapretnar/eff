@@ -4,7 +4,7 @@ open Notty_unix
 
 let suite : Benchmark_config.test_suite = Config.test_suite
 
-let number_of_loops = 100
+let number_of_loops = 1000
 
 and number_of_queens = 8
 
@@ -350,7 +350,15 @@ let () =
     let set = suite.range_benchmarks number_of_range in
     Printf.printf "%s :\n" set.name;
     run_and_show_set set);
-  if run_tree then (
-    let set = suite.tree_benchmark number_of_tree in
-    Printf.printf "%s :\n" set.name;
-    run_and_show_set set)
+  if run_tree then
+    List.iter
+      (fun n ->
+        let set = suite.tree_benchmark n in
+        Printf.printf "%s (size: %d):\n" set.name set.param;
+        run_and_show_set set)
+      [
+        number_of_tree;
+        2 * number_of_tree;
+        4 * number_of_tree;
+        8 * number_of_tree;
+      ]

@@ -22,7 +22,7 @@ let rec createCase n =
   | 1 -> Div (Num 100, createZeroCase 3)
   | _ -> Add (addCase, createCase (n - 1))
 
-let bigTest num =
+let bigTestException num =
   let rec interp = function
     | Num b -> b
     | Add (l, r) ->
@@ -42,6 +42,42 @@ let bigTest num =
         let x = interp l in
         if y = 0 then raise DivByZero else x / y
   in
-
   let finalCase = createCase num in
   try interp finalCase with DivByZero -> -1
+
+let bigTestOption num =
+  let rec interp = function
+    | Num b -> Some b
+    | Add (l, r) -> (
+        let x = interp l in
+        match x with
+        | None -> None
+        | Some x -> (
+            let y = interp r in
+            match y with None -> None | Some y -> Some (x + y)))
+    | Mul (l, r) -> (
+        let x = interp l in
+        match x with
+        | None -> None
+        | Some x -> (
+            let y = interp r in
+            match y with None -> None | Some y -> Some (x * y)))
+    | Sub (l, r) -> (
+        let x = interp l in
+        match x with
+        | None -> None
+        | Some x -> (
+            let y = interp r in
+            match y with None -> None | Some y -> Some (x - y)))
+    | Div (l, r) -> (
+        let y = interp r in
+        match y with
+        | None -> None
+        | Some y -> (
+            match interp l with
+            | None -> None
+            | Some x -> if y = 0 then None else Some (x / y)))
+  in
+
+  let finalCase = createCase num in
+  match interp finalCase with None -> -1 | Some x -> x

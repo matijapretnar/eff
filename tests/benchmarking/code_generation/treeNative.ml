@@ -25,3 +25,15 @@ let rec find_max t =
 let test_max m =
   let t = tester m in
   find_max t
+
+let op x y = x - (3 * y)
+
+let test_general m =
+  let rec maxl l = List.fold_left max 0 l in
+  let t = tester m in
+  let rec explore t =
+    match t with
+    | Empty -> [ 0 ]
+    | Node (left, x, right) -> List.map (op x) (explore left @ explore right)
+  in
+  List.fold_left max 0 (explore t)
