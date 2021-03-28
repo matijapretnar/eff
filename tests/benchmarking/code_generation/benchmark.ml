@@ -34,6 +34,8 @@ and run_range = true
 
 and run_tree = true
 
+and run_state_tree = true
+
 let benchmark test =
   let ols =
     Analyze.ols ~bootstrap:0 ~r_square:true ~predictors:Measure.[| run |]
@@ -354,7 +356,19 @@ let () =
     List.iter
       (fun n ->
         let set = suite.tree_benchmark n in
-        Printf.printf "%s (size: %d):\n" set.name set.param;
+        Printf.printf "%s (leaf_val: %d):\n" set.name set.param;
+        run_and_show_set set)
+      [
+        number_of_tree;
+        2 * number_of_tree;
+        4 * number_of_tree;
+        8 * number_of_tree;
+      ];
+  if run_state_tree then
+    List.iter
+      (fun n ->
+        let set = suite.state_tree_benchmark n in
+        Printf.printf "%s (leaf_val: %d):\n" set.name set.param;
         run_and_show_set set)
       [
         number_of_tree;

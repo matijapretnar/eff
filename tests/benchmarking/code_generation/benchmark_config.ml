@@ -24,6 +24,7 @@ type test_suite = {
   interpreter_benchmark : int -> int benchmark_set;
   range_benchmarks : int -> int benchmark_set;
   tree_benchmark : int -> int benchmark_set;
+  state_tree_benchmark : int -> int benchmark_set;
 }
 
 let loop_benchmarks number_of_loops =
@@ -184,10 +185,25 @@ let tree_benchmark number =
       [
         ( "Generated, optimized",
           forget_value TreeOpt.test_general,
-          always_true TreeOpt.test_max );
+          always_true TreeOpt.test_general );
         ( "Native",
           forget_value TreeNative.test_general,
-          always_true TreeNative.test_max );
+          always_true TreeNative.test_general );
+      ];
+    param = number;
+  }
+
+let state_tree_benchmark number =
+  {
+    name = "STATE TREE BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, optimized",
+          forget_value TreeOpt.test_leaf_state,
+          always_true TreeOpt.test_leaf_state );
+        ( "Native",
+          forget_value TreeNative.test_leaf_state,
+          always_true TreeNative.test_leaf_state );
       ];
     param = number;
   }
@@ -205,4 +221,5 @@ let default_test_suite =
     interpreter_benchmark;
     range_benchmarks;
     tree_benchmark;
+    state_tree_benchmark;
   }

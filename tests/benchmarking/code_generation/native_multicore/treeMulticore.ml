@@ -39,3 +39,38 @@ let test_general (m: int) : int=
   | effect (Choose ()) k -> let k' = Obj.clone_continuation k in (continue k true) @ (continue k' false)
   | x -> [x]
   )
+
+let test_leaf_state (m: int)= 
+  let leafs = ref (List.init 154 (fun i -> i * 3)) in
+  let t = tester m in
+  let rec explore t = match t with
+    | Empty -> (
+      match !leafs with
+        | x :: xs ->
+            leafs := xs;
+            x
+        | [] -> assert false
+     )
+     | Node (left, x, right) -> 
+      let next = if (perform (Choose ())) then (op x (explore left)) else (op x (explore right)) in
+      next
+  in
+  List.fold_left max 0 (match explore t
+  with
+  | effect (Choose ()) k -> 
+    let k' = Obj.clone_continuation k in 
+    (* 
+    Explicit sequencing, as there is no guarantee on element evaluation order 
+    Since both branches produce side effects and are non orthogonal, this is important.
+    Not performance wise, but result wise. 
+    *)
+    let left_branch = (continue k' true) in 
+    left_branch @ (continue k false)
+  | x -> [x]
+  )
+
+
+(* 
+# test_leaf_state 100;;
+  - : int = 187924331 
+*)

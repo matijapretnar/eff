@@ -37,3 +37,29 @@ let test_general m =
     | Node (left, x, right) -> List.map (op x) (explore left @ explore right)
   in
   List.fold_left max 0 (explore t)
+
+let rec count_leafs = function
+  | Node (l, _, r) -> count_leafs l + count_leafs r
+  | Empty -> 1
+
+let test_leaf_state m =
+  let leafs = ref (List.init 154 (fun i -> i * 3)) in
+  let rec maxl l = List.fold_left max 0 l in
+  let t = tester m in
+  let rec explore t =
+    match t with
+    | Empty -> (
+        match !leafs with
+        | x :: xs ->
+            leafs := xs;
+            [ x ])
+        | [] -> assert false
+    | Node (left, x, right) -> let lef = explore left in  List.map (op x) (lef @ explore right)
+  in
+
+  List.fold_left max 0 (explore t)
+
+(* 
+# test_leaf_state 100;;
+  - : int = 187924331 
+*)

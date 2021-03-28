@@ -92,6 +92,13 @@ let test_suite =
            forget_value TreeMulticore.test_general,
            always_true TreeMulticore.test_general )
   in
+  let state_tree_benchmark =
+    base_suite.state_tree_benchmark
+    |> add_benchmark
+         ( "Multicore",
+           forget_value TreeMulticore.test_leaf_state,
+           always_true TreeMulticore.test_leaf_state )
+  in
   {
     base_suite with
     interpreter_benchmark;
@@ -105,4 +112,5 @@ let test_suite =
     queens_one_benchmark;
     queens_one_cps_benchmark;
     tree_benchmark;
+    state_tree_benchmark;
   }

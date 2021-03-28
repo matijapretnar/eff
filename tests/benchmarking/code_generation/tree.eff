@@ -43,6 +43,7 @@ let test_max m =
 
 let op x y = x - 3*y
 
+let max a b = if a > b then a else b
 
 type intlist = Nil | Cons of (int * intlist)
 
@@ -90,7 +91,7 @@ let test_leaf_state m =
   let rec explore t = match t with
     | Empty -> perform (Get ())
     | Node (left, x, right) -> 
-      let next = if (perform (Choose ())) then (op x (explore left)) else op x (explore right) in
+      let next = if (perform (Choose ())) then (op x (explore left)) else (op x (explore right)) in
       next
   in
   let h = handler 
@@ -102,8 +103,14 @@ let test_leaf_state m =
   | effect (Get ()) k -> (
     fun s -> (match s with 
     | Cons(x, rest) -> (k x) rest
+    | Nil -> -999
     )
   )
   in
   maxl 0 ((with monad_state handle ((with h handle explore t))) leafs)
 
+
+(* 
+# test_leaf_state 100;;
+  - : int = 187924331 
+*)
