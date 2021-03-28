@@ -187,9 +187,12 @@ let rec equal_ty type1 type2 =
   | TyParam (tv1, _skel1), TyParam (tv2, _skel2) -> tv1 = tv2
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
       equal_ty ttya1 ttyb1 && equal_dirty dirtya1 dirtyb1
-  | Tuple tys1, Tuple tys2 -> List.for_all2 equal_ty tys1 tys2
+  | Tuple tys1, Tuple tys2 ->
+      List.length tys1 = List.length tys2 && List.for_all2 equal_ty tys1 tys2
   | Apply (ty_name1, tys1), Apply (ty_name2, tys2) ->
-      ty_name1 = ty_name2 && List.for_all2 equal_ty tys1 tys2
+      ty_name1 = ty_name2
+      && List.length tys1 = List.length tys2
+      && List.for_all2 equal_ty tys1 tys2
   | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
       equal_dirty dirtya1 dirtyb1 && equal_dirty dirtya2 dirtyb2
   | TyBasic ptya, TyBasic ptyb -> ptya = ptyb
