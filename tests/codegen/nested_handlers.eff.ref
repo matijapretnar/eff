@@ -1,7 +1,43 @@
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
+type (_, _) eff_internal_effect += Fail : (unit, unit) eff_internal_effect
+
+type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
+
 let _test_nested_45 (_m_46 : int) =
   let rec _simple_68 _x_58 = _m_46 in
   _simple_68 ()
 
 let test_nested = _test_nested_45
+
+let _test_nested_72 (_m_73 : int) =
+  let rec _go_74 _x_93 =
+    if _x_93 = 0 then Call (Fail, (), fun (_y_108 : unit) -> Value _y_108)
+    else
+      Call
+        ( Decide,
+          (),
+          fun (_y_109 : bool) ->
+            if _y_109 then _go_74 (_x_93 - 1) else _go_74 (_x_93 - 2) )
+  in
+  let rec _go_114 _x_93 =
+    if _x_93 = 0 then Call (Fail, (), fun (_y_108 : unit) -> Value _y_108)
+    else
+      let _l_95 (_y_109 : bool) =
+        if _y_109 then _go_114 (_x_93 - 1) else _go_114 (_x_93 - 2)
+      in
+      (handler
+         {
+           value_clause = (fun (_id_85 : unit) -> Value _id_85);
+           effect_clauses =
+             (fun (type a b) (eff : (a, b) eff_internal_effect) :
+                  (a -> (b -> _) -> _) ->
+               match eff with
+               | Fail -> fun () _l_94 -> _l_95 false
+               | eff' -> fun arg k -> Call (eff', arg, k));
+         })
+        (_l_95 true)
+  in
+  _go_114 _m_73
+
+let test_nested = _test_nested_72
