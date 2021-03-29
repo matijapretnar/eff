@@ -402,6 +402,45 @@
  (deps
  %{bin:eff}
   (source_tree .))
+   (target "nested_handlers.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 0 1 2)
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./nested_handlers.eff")))))
+
+(rule
+ (deps "nested_handlers.eff.out")
+ (target "nested_handlers.eff.out.formatted")
+  (action
+   (with-outputs-to "%{target}"
+    (with-accepted-exit-codes (or 0 1 2)
+     (run ocamlformat nested_handlers.eff.out)))))
+
+(rule
+ (deps "nested_handlers.eff.out.formatted" ocaml_header.tmp)
+ (target "nested_handlers.eff.out.formatted.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - nested_handlers.eff.out.formatted)))))
+
+(rule
+ (deps "nested_handlers.eff.out.formatted.ocaml_with_header")
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "nested_handlers.eff.out.formatted.ocaml_with_header"))))
+
+(rule
+ (deps "nested_handlers.eff.out.formatted")
+  (alias runtest)
+   (action
+    (diff "nested_handlers.eff.ref" "nested_handlers.eff.out.formatted")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
    (target "norec.eff.out")
     (action
      (with-outputs-to "%{target}"
@@ -865,6 +904,45 @@
   (alias runtest)
    (action
     (diff "rec2.eff.ref" "rec2.eff.out.formatted")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
+   (target "redefine_local.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 0 1 2)
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./redefine_local.eff")))))
+
+(rule
+ (deps "redefine_local.eff.out")
+ (target "redefine_local.eff.out.formatted")
+  (action
+   (with-outputs-to "%{target}"
+    (with-accepted-exit-codes (or 0 1 2)
+     (run ocamlformat redefine_local.eff.out)))))
+
+(rule
+ (deps "redefine_local.eff.out.formatted" ocaml_header.tmp)
+ (target "redefine_local.eff.out.formatted.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - redefine_local.eff.out.formatted)))))
+
+(rule
+ (deps "redefine_local.eff.out.formatted.ocaml_with_header")
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "redefine_local.eff.out.formatted.ocaml_with_header"))))
+
+(rule
+ (deps "redefine_local.eff.out.formatted")
+  (alias runtest)
+   (action
+    (diff "redefine_local.eff.ref" "redefine_local.eff.out.formatted")))
 
 (rule
  (deps

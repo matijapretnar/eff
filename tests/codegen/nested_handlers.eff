@@ -1,0 +1,15 @@
+effect Get: unit -> int
+
+
+let test_nested m = 
+  let rec simple () = 
+    perform (Get ())  
+  in
+  let h = handler 
+  | x -> x
+  in
+  let d = handler
+  | effect (Get ()) k -> k 21 
+  in
+  ((with d handle ((with h handle simple ()))))
+
