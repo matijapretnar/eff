@@ -52,8 +52,8 @@ let test_leaf_state (m: int)=
         | [] -> assert false
      )
      | Node (left, x, right) -> 
-      let next = if (perform (Choose ())) then (op x (explore left)) else (op x (explore right)) in
-      next
+      let next = if (perform (Choose ())) then left else right in
+      (op x (explore next))
   in
   List.fold_left max 0 (match explore t
   with

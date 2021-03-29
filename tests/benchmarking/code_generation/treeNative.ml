@@ -52,9 +52,11 @@ let test_leaf_state m =
         match !leafs with
         | x :: xs ->
             leafs := xs;
-            [ x ])
-        | [] -> assert false
-    | Node (left, x, right) -> let lef = explore left in  List.map (op x) (lef @ explore right)
+            [ x ]
+        | [] -> assert false)
+    | Node (left, x, right) ->
+        let lef = explore left in
+        List.map (op x) (lef @ explore right)
   in
 
   List.fold_left max 0 (explore t)

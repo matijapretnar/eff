@@ -91,8 +91,8 @@ let test_leaf_state m =
   let rec explore t = match t with
     | Empty -> perform (Get ())
     | Node (left, x, right) -> 
-      let next = if (perform (Choose ())) then (op x (explore left)) else (op x (explore right)) in
-      next
+      let next = if (perform (Choose ())) then left else right in
+      (op x (explore next))
   in
   let h = handler 
   | x -> Cons(x, Nil)
@@ -103,7 +103,7 @@ let test_leaf_state m =
   | effect (Get ()) k -> (
     fun s -> (match s with 
     | Cons(x, rest) -> (k x) rest
-    | Nil -> -999
+    | Nil -> Nil
     )
   )
   in
