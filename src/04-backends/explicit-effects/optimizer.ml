@@ -103,14 +103,15 @@ let rec recast_computation hnd comp =
       in
       if Type.EffectSet.disjoint effs handled_effs then
         let _, (_, drt_out) = hnd.ty in
-        let drt_diff =
+        let drt_union =
           {
-            Type.effect_set = Type.EffectSet.diff effs drt_out.Type.effect_set;
+            Type.effect_set = Type.EffectSet.union effs drt_out.Type.effect_set;
             Type.row = drt_out.Type.row;
           }
         in
+        let _, comp_drty = comp.ty in
         let ty_coer = Constraint.reflTy ty
-        and drt_coer = Constraint.empty drt_diff in
+        and drt_coer = Constraint.empty_with_drt comp_drty drt_union in
         Some (Term.castComp (comp, Constraint.bangCoercion (ty_coer, drt_coer)))
       else None
   | _, _ -> None

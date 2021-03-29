@@ -9,7 +9,7 @@ let test_nested m =
   | x -> x
   in
   let d = handler
-  | effect (Get ()) k -> k 21 
+  | effect (Get ()) k -> k m 
   in
   ((with d handle ((with h handle simple ()))))
 

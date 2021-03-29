@@ -81,6 +81,8 @@ let reflDirty (ty, drt) = bangCoercion (reflTy ty, reflDirt drt)
 
 let empty drt = { term = Empty; ty = (Type.empty_dirt, drt) }
 
+let empty_with_drt ty drt = { term = Empty; ty = (ty, drt) }
+
 let unionDirt (effs, dcoer) =
   let drt, drt' = dcoer.ty in
   {

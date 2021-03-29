@@ -1,0 +1,7 @@
+type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
+
+let _test_nested_45 (_m_46 : int) =
+  let rec _simple_68 _x_58 = _m_46 in
+  _simple_68 ()
+
+let test_nested = _test_nested_45
