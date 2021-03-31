@@ -52,7 +52,6 @@ and optimize_ty_coercion' state (n_coer : NoEff.n_coercion) =
   | NCoerComp n -> NCoerComp (optimize_ty_coercion state n)
   | NCoerReturn n -> NCoerReturn (optimize_ty_coercion state n)
   | NCoerUnsafe n -> NCoerUnsafe (optimize_ty_coercion state n)
-  | NCoerForceUnsafe -> NCoerForceUnsafe
   | NCoerApply (t, lst) ->
       NCoerApply (t, List.map (optimize_ty_coercion state) lst)
   | NCoerTuple lst -> NCoerTuple (List.map (optimize_ty_coercion state) lst)
@@ -63,7 +62,6 @@ and reduce_ty_coercion' _state n_coer =
   match n_coer with
   | NoEff.NCoerArrow (NCoerRefl, NCoerRefl) -> NCoerRefl
   | NoEff.NCoerHandler (NCoerRefl, NCoerRefl) -> NCoerRefl
-  | NCoerUnsafe NCoerRefl -> NCoerForceUnsafe
   | NCoerComp NCoerRefl -> NCoerRefl
   | NoEff.NCoerTuple coers
     when List.for_all (fun coer -> coer = NoEff.NCoerRefl) coers ->
@@ -130,16 +128,6 @@ and n_abstraction_2_args state ((pat1, pat2, term) : NoEff.n_abstraction_2_args)
     =
   (pat1, pat2, optimize_term state term)
 
-and reduce_constant_match state const (abs : NoEff.n_abstraction list) =
-  let rec folder : NoEff.n_abstraction list -> NoEff.n_term option = function
-    | [] -> None
-    | abs :: xs -> (
-        match NoEff.beta_reduce abs const with
-        | Some trm -> Some (optimize_term state trm)
-        | None -> folder xs)
-  in
-  folder abs
-
 and beta_reduce state ((_, trm1) as abs) trm2 =
   match (abstraction_inlinability abs, trm2) with
   | Inlinable, _
@@ -158,25 +146,6 @@ and reduce_term' state (n_term : NoEff.n_term) =
   | NCast (t, NCoerRefl) -> t
   | NBind (NReturn t, c) -> beta_reduce state c t
   | NLet (e, a) -> beta_reduce state a e
-  | NMatch
-      ( t1,
-        [
-          (NoEff.PNConst (Boolean true), NoEff.NConst (Boolean true));
-          (NoEff.PNConst (Boolean false), t2);
-        ] ) ->
-      optimize_term state (NoEff.direct_or t1 t2)
-  | NMatch
-      ( t1,
-        [
-          (NoEff.PNConst (Boolean true), t2);
-          (NoEff.PNConst (Boolean false), NoEff.NConst (Boolean false));
-        ] ) ->
-      optimize_term state (NoEff.direct_and t1 t2)
-  | NMatch ((NoEff.NConst _ as c), abs) | NMatch ((NoEff.NVariant _ as c), abs)
-    -> (
-      match reduce_constant_match state c abs with
-      | Some t -> t
-      | None -> n_term)
   | _ -> n_term
 
 and reduce_term state n_term =

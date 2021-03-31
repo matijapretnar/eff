@@ -20,10 +20,6 @@ let unary_float_op_ty = pure_arrow float_ty float_ty
 
 let binary_float_op_ty = binary_op_ty float_ty float_ty float_ty
 
-let unary_bool_op_ty = pure_arrow bool_ty bool_ty
-
-let binary_bool_op_ty = binary_op_ty bool_ty bool_ty bool_ty
-
 let binary_string_op_ty = binary_op_ty string_ty string_ty string_ty
 
 (* TODO: I want to be polymorphic *)
@@ -36,9 +32,6 @@ let primitive_type_scheme = function
   | CompareLe -> comparison_ty
   | CompareLt -> comparison_ty
   | CompareNe -> comparison_ty
-  | BoolNot -> unary_bool_op_ty
-  | BoolAnd -> binary_bool_op_ty
-  | BoolOr -> binary_bool_op_ty
   | FloatAcos -> unary_float_op_ty
   | FloatAdd -> binary_float_op_ty
   | FloatAsin -> unary_float_op_ty

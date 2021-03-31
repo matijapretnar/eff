@@ -6,12 +6,12 @@ type (_, _) eff_internal_effect += Op2 : (int, int) eff_internal_effect
 coer_hand_to_fun coer_refl_ty force_unsafe
   (handler
      {
-       value_clause = (fun (_x_49 : int) -> Value _x_49);
+       value_clause = (fun (_x_46 : int) -> Value _x_46);
        effect_clauses =
          (fun (type a b) (eff : (a, b) eff_internal_effect) :
               (a -> (b -> _) -> _) ->
            match eff with
-           | Op1 -> fun _n_45 _l_52 -> Value 1
-           | Op2 -> fun _n_47 _l_53 -> Value 2
+           | Op1 -> fun _n_42 _l_49 -> Value 1
+           | Op2 -> fun _n_44 _l_50 -> Value 2
            | eff' -> fun arg k -> Call (eff', arg, k));
      })

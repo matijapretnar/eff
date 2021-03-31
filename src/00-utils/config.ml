@@ -26,4 +26,4 @@ let enable_optimization = ref true
 
 let profiling = ref false
 
-let optimization_fuel = ref 100
+let optimization_fuel = ref 5

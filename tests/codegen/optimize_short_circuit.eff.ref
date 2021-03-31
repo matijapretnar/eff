@@ -1,3 +1,3 @@
-let _a_45 (_b_46 : bool) (_c_47 : bool) = _b_46 && _c_47
+let _a_42 (_b_43 : bool) (_c_44 : bool) = _b_43 && _c_44
 
-let a = _a_45
+let a = _a_42

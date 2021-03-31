@@ -5,9 +5,6 @@ type primitive =
   | CompareLe
   | CompareLt
   | CompareNe
-  | BoolNot
-  | BoolAnd
-  | BoolOr
   | FloatAcos
   | FloatAdd
   | FloatAsin
@@ -54,9 +51,6 @@ let primitives =
     CompareLt;
     CompareLt;
     CompareNe;
-    BoolNot;
-    BoolAnd;
-    BoolOr;
     FloatAcos;
     FloatAdd;
     FloatAsin;
@@ -101,9 +95,6 @@ let primitive_name = function
   | CompareLe -> "<="
   | CompareLt -> "<"
   | CompareNe -> "<>"
-  | BoolNot -> "not"
-  | BoolAnd -> "&&"
-  | BoolOr -> "||"
   | FloatAcos -> "acos"
   | FloatAdd -> "+."
   | FloatAsin -> "asin"

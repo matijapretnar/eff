@@ -1,39 +1,39 @@
 type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
 
-let _two_45 = 2
+let _two_42 = 2
 
-let two = _two_45
+let two = _two_42
 
-let _three_46 = 3
+let _three_43 = 3
 
-let three = _three_46
+let three = _three_43
 
 type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
 force_unsafe
-  ((let rec _concat_48 _x_66 =
-      match _x_66 with
-      | IntNil -> fun (_ys_76 : intlist) -> _ys_76
-      | IntCons (_z_78, _zs_77) ->
-          fun (_ys_79 : intlist) -> IntCons (_z_78, _concat_48 _zs_77 _ys_79)
+  ((let rec _concat_45 _x_63 =
+      match _x_63 with
+      | IntNil -> fun (_ys_73 : intlist) -> _ys_73
+      | IntCons (_z_75, _zs_74) ->
+          fun (_ys_76 : intlist) -> IntCons (_z_75, _concat_45 _zs_74 _ys_76)
     in
     handler
       {
-        value_clause = (fun (_x_60 : int) -> Value (IntCons (_x_60, IntNil)));
+        value_clause = (fun (_x_57 : int) -> Value (IntCons (_x_57, IntNil)));
         effect_clauses =
           (fun (type a b) (eff : (a, b) eff_internal_effect) :
                (a -> (b -> _) -> _) ->
             match eff with
             | Decide ->
-                fun () _l_67 ->
+                fun () _l_64 ->
                   Value
-                    (_concat_48
-                       (coer_arrow coer_refl_ty force_unsafe _l_67 true)
-                       (coer_arrow coer_refl_ty force_unsafe _l_67 false))
+                    (_concat_45
+                       (coer_arrow coer_refl_ty force_unsafe _l_64 true)
+                       (coer_arrow coer_refl_ty force_unsafe _l_64 false))
             | eff' -> fun arg k -> Call (eff', arg, k));
       })
-     (let rec _f_63 _x_70 =
-        Call (Decide, (), fun (_y_72 : bool) -> Value (if _y_72 then 2 else 3))
+     (let rec _f_60 _x_67 =
+        Call (Decide, (), fun (_y_69 : bool) -> Value (if _y_69 then 2 else 3))
       in
-      _f_63 ()))
+      _f_60 ()))

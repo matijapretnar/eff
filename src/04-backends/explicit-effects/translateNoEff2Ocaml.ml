@@ -137,9 +137,9 @@ let rec pp_coercion ?max_level coer ppf =
       print ~at_level:1 "coer_computation %t" (pp_coercion ~max_level:0 w)
   | NCoerReturn w ->
       print ~at_level:1 "coer_return %t" (pp_coercion ~max_level:0 w)
+  | NCoerUnsafe NCoerRefl -> print "force_unsafe"
   | NCoerUnsafe w ->
       print ~at_level:1 "coer_unsafe %t" (pp_coercion ~max_level:0 w)
-  | NCoerForceUnsafe -> print "force_unsafe"
   | NCoerTuple cs ->
       print ~at_level:1 "coer_tuple_%d %t" (List.length cs)
         (pp_tuple pp_coercion cs)
@@ -188,6 +188,24 @@ let rec pp_term ?max_level state noEff_term ppf =
   | NMatch (t, []) ->
       print ~at_level:2 "@[<hv>match %t with@, _ -> assert false@]"
         (pp_term state t)
+  | NMatch
+      ( t1,
+        [
+          (PNConst (Boolean true), NConst (Boolean true));
+          (PNConst (Boolean false), t2);
+        ] ) ->
+      print ~at_level:2 "%t || %t"
+        (pp_term state ~max_level:0 t1)
+        (pp_term state ~max_level:0 t2)
+  | NMatch
+      ( t1,
+        [
+          (PNConst (Boolean true), t2);
+          (PNConst (Boolean false), NConst (Boolean false));
+        ] ) ->
+      print ~at_level:2 "%t && %t"
+        (pp_term state ~max_level:0 t1)
+        (pp_term state ~max_level:0 t2)
   | NMatch
       ( t,
         [

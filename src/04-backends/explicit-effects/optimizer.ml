@@ -116,58 +116,6 @@ let rec recast_computation hnd comp =
       else None
   | _, _ -> None
 
-let rec optimize_ty_coercion state (tcoer : Constraint.ty_coercion) =
-  reduce_ty_coercion state
-    { tcoer with term = optimize_ty_coercion' state tcoer.term }
-
-and optimize_ty_coercion' state tcoer =
-  match tcoer with
-  | ReflTy -> tcoer
-  | ArrowCoercion (tc, dc) ->
-      ArrowCoercion
-        (optimize_ty_coercion state tc, optimize_dirty_coercion state dc)
-  | HandlerCoercion (dc1, dc2) ->
-      HandlerCoercion
-        (optimize_dirty_coercion state dc1, optimize_dirty_coercion state dc2)
-  | TyCoercionVar _ -> tcoer
-  | ApplyCoercion (v, lst) ->
-      ApplyCoercion (v, List.map (optimize_ty_coercion state) lst)
-  | TupleCoercion lst ->
-      TupleCoercion (List.map (optimize_ty_coercion state) lst)
-
-and optimize_dirt_coercion state (dcoer : Constraint.dirt_coercion) =
-  reduce_dirt_coercion state
-    { dcoer with term = optimize_dirt_coercion' state dcoer.term }
-
-and optimize_dirt_coercion' state (dcoer : Constraint.dirt_coercion') =
-  match dcoer with
-  | ReflDirt | DirtCoercionVar _ | Empty -> dcoer
-  | UnionDirt (s, dc) -> UnionDirt (s, optimize_dirt_coercion state dc)
-
-and optimize_dirty_coercion state { term = tcoer, dcoer; _ } =
-  Constraint.bangCoercion
-    (optimize_ty_coercion state tcoer, optimize_dirt_coercion state dcoer)
-
-and reduce_ty_coercion state ty_coer =
-  { ty_coer with term = reduce_ty_coercion' state ty_coer.term }
-
-and reduce_ty_coercion' _state = function
-  (* TODO: Is it sufficient to just check if the input and output types match? *)
-  | ArrowCoercion
-      ( { term = ReflTy; _ },
-        { term = { term = ReflTy; _ }, { term = ReflDirt; _ }; _ } ) ->
-      ReflTy
-  | tcoer -> tcoer
-
-and reduce_dirt_coercion state drt_coer =
-  { drt_coer with term = reduce_dirt_coercion' state drt_coer }
-
-and reduce_dirt_coercion' _state drt_coer =
-  match drt_coer.term with
-  | Empty when Type.is_empty_dirt (snd drt_coer.ty) -> ReflDirt
-  | UnionDirt (_, { term = ReflDirt; _ }) -> ReflDirt
-  | dcoer -> dcoer
-
 let rec optimize_expression state exp =
   let exp' = optimize_expression' state exp in
   (* Print.debug "EXP: %t : %t" (Term.print_expression exp) (Type.print_ty exp.ty); *)
@@ -192,8 +140,7 @@ and optimize_expression' state exp =
   | Term.Lambda abs -> Term.lambda (optimize_abstraction state abs)
   | Term.Handler hnd -> Term.handler (optimize_handler state hnd)
   | Term.CastExp (exp, coer) ->
-      Term.castExp
-        (optimize_expression state exp, optimize_ty_coercion state coer)
+      Term.castExp (optimize_expression state exp, coer)
 
 and optimize_computation state cmp =
   (* Print.debug "CMP: %t" (Term.print_computation cmp); *)
@@ -228,8 +175,7 @@ and optimize_computation' state cmp =
   | Term.Bind (cmp, abs) ->
       Term.bind (optimize_computation state cmp, optimize_abstraction state abs)
   | Term.CastComp (cmp, dtcoer) ->
-      Term.castComp
-        (optimize_computation state cmp, optimize_dirty_coercion state dtcoer)
+      Term.castComp (optimize_computation state cmp, dtcoer)
 
 and optimize_handler state hnd =
   {

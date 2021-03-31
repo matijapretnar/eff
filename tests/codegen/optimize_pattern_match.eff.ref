@@ -1,5 +1,5 @@
-let _k_45 (_b_46 : int) =
-  let rec _a_47 (_x_48, _y_49) (_z_50 : int) = _x_48 + _y_49 + _z_50 + _b_46 in
-  _a_47
+let _k_42 (_b_43 : int) =
+  let rec _a_44 (_x_45, _y_46) (_z_47 : int) = _x_45 + _y_46 + _z_47 + _b_43 in
+  _a_44
 
-let k = _k_45
+let k = _k_42

@@ -3,10 +3,10 @@ type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
 type int_list = Nil | Cons of (int * int_list)
 
 ;;
-let rec _op_45 (* @ *) _x_65 (_ys_84 : int_list) =
-  match _x_65 with
-  | Nil -> _ys_84
-  | Cons (_x_86, _xs_85) -> Cons (_x_86, _op_45 (* @ *) _xs_85 _ys_84)
+let rec _op_42 (* @ *) _x_62 (_ys_81 : int_list) =
+  match _x_62 with
+  | Nil -> _ys_81
+  | Cons (_x_83, _xs_82) -> Cons (_x_83, _op_42 (* @ *) _xs_82 _ys_81)
 in
-let _l_66 (_y_82 : bool) = Cons ((if _y_82 then 10 else 20), Nil) in
-_op_45 (* @ *) (_l_66 true) (_l_66 false)
+let _l_63 (_y_79 : bool) = Cons ((if _y_79 then 10 else 20), Nil) in
+_op_42 (* @ *) (_l_63 true) (_l_63 false)

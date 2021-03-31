@@ -4,11 +4,11 @@ type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect
 coer_hand_to_fun coer_refl_ty force_unsafe
   (handler
      {
-       value_clause = (fun (_id_47 : int) -> Value _id_47);
+       value_clause = (fun (_id_44 : int) -> Value _id_44);
        effect_clauses =
          (fun (type a b) (eff : (a, b) eff_internal_effect) :
               (a -> (b -> _) -> _) ->
            match eff with
-           | Op -> fun _n_45 _l_49 -> Value 2
+           | Op -> fun _n_42 _l_46 -> Value 2
            | eff' -> fun arg k -> Call (eff', arg, k));
      })

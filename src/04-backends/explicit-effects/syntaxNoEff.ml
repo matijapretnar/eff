@@ -28,7 +28,6 @@ type n_coercion =
   | NCoerComp of n_coercion
   | NCoerReturn of n_coercion
   | NCoerUnsafe of n_coercion
-  | NCoerForceUnsafe
   | NCoerApply of CoreTypes.TyName.t * n_coercion list
   | NCoerTuple of n_coercion list
 
@@ -221,12 +220,6 @@ let beta_reduce (pat, trm2) trm1 =
   let sub = pattern_match pat trm1 in
   Option.map (fun sub -> substitute_term sub trm2) sub
 
-let direct_and t1 t2 =
-  NApplyTerm (NApplyTerm (NDirectPrimitive Language.Primitives.BoolAnd, t1), t2)
-
-let direct_or t1 t2 =
-  NApplyTerm (NApplyTerm (NDirectPrimitive Language.Primitives.BoolOr, t1), t2)
-
 (* Free variables *)
 
 let ( @@@ ) occur1 occur2 =
@@ -318,7 +311,6 @@ let rec print_coercion ?max_level coer ppf =
   | NCoerComp c -> print "(Comp %t)" (print_coercion c)
   | NCoerReturn c -> print "(return %t)" (print_coercion c)
   | NCoerUnsafe c -> print "(unsafe %t)" (print_coercion c)
-  | NCoerForceUnsafe -> print "(force_unsafe)"
   | NCoerTuple _ls -> print "tuplecoer"
   | NCoerApply (_ty_name, _cs) -> print "applycoer"
 

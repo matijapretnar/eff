@@ -1,13 +1,13 @@
 type (_, _) eff_internal_effect += Eff : (unit, unit) eff_internal_effect
 
 ;;
-let rec _f_45 _x_58 =
-  if _x_58 = 0 then Value 1
-  else Call (Eff, (), fun (_y_65 : unit) -> _f_45 (_x_58 - 1))
+let rec _f_42 _x_55 =
+  if _x_55 = 0 then Value 1
+  else Call (Eff, (), fun (_y_62 : unit) -> _f_42 (_x_55 - 1))
 in
-let rec _f_68 _x_58 = if _x_58 = 0 then 1 else _f_68 (_x_58 - 1) * 2 in
-_f_68 5
+let rec _f_65 _x_55 = if _x_55 = 0 then 1 else _f_65 (_x_55 - 1) * 2 in
+_f_65 5
 
 ;;
-let rec _g_73 _x_84 = if _x_84 = 0 then 1 else _g_73 (_x_84 - 1) in
-_g_73 5
+let rec _g_70 _x_81 = if _x_81 = 0 then 1 else _g_70 (_x_81 - 1) in
+_g_70 5

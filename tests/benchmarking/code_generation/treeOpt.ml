@@ -4,255 +4,255 @@ type tree = Empty | Node of (tree * int * tree)
 
 type (_, _) eff_internal_effect += Choose : (unit, bool) eff_internal_effect
 
-let _tester_45 (_k_46 : int) =
-  let _leaf_47 (_a_48 : int) = Node (Empty, _a_48 * _k_46, Empty) in
-  let _bot_51 (_t_52 : tree) (_t2_53 : tree) =
+let _tester_42 (_k_43 : int) =
+  let _leaf_44 (_a_45 : int) = Node (Empty, _a_45 * _k_43, Empty) in
+  let _bot_48 (_t_49 : tree) (_t2_50 : tree) =
     Node
-      ( Node (Node (_t_52, 0, _t2_53), 2, _leaf_47 13),
+      ( Node (Node (_t_49, 0, _t2_50), 2, _leaf_44 13),
         5,
-        Node (_leaf_47 9, 7, Node (_t2_53, 3, Node (_leaf_47 3, 5, _t2_53))) )
+        Node (_leaf_44 9, 7, Node (_t2_50, 3, Node (_leaf_44 3, 5, _t2_50))) )
   in
-  _bot_51
+  _bot_48
     (Node
-       (_bot_51 (_leaf_47 3) (_leaf_47 4), 10, _bot_51 (_leaf_47 1) (_leaf_47 3)))
-    (_bot_51
+       (_bot_48 (_leaf_44 3) (_leaf_44 4), 10, _bot_48 (_leaf_44 1) (_leaf_44 3)))
+    (_bot_48
        (Node
-          ( _bot_51 (_leaf_47 3) (_leaf_47 4),
+          ( _bot_48 (_leaf_44 3) (_leaf_44 4),
             10,
-            _bot_51 (_leaf_47 1) (_leaf_47 3) ))
-       (_leaf_47 10))
+            _bot_48 (_leaf_44 1) (_leaf_44 3) ))
+       (_leaf_44 10))
 
-let tester = _tester_45
+let tester = _tester_42
 
-let _max_91 (_a_92 : int) (_b_93 : int) = if _a_92 > _b_93 then _a_92 else _b_93
+let _max_88 (_a_89 : int) (_b_90 : int) = if _a_89 > _b_90 then _a_89 else _b_90
 
-let max = _max_91
+let max = _max_88
 
-let _effect_max_96 (_m_97 : int) =
-  let rec _find_max_98 _x_118 =
-    match _x_118 with
+let _effect_max_93 (_m_94 : int) =
+  let rec _find_max_95 _x_115 =
+    match _x_115 with
     | Empty -> Value 0
-    | Node (Empty, _x_126, Empty) -> Value _x_126
-    | Node (_left_129, _x_128, _right_127) ->
+    | Node (Empty, _x_123, Empty) -> Value _x_123
+    | Node (_left_126, _x_125, _right_124) ->
         Call
           ( Choose,
             (),
-            fun (_y_130 : bool) ->
-              (if _y_130 then _find_max_98 _left_129
-              else _find_max_98 _right_127)
-              >> fun _next_131 -> Value (_x_128 + _next_131) )
+            fun (_y_127 : bool) ->
+              (if _y_127 then _find_max_95 _left_126
+              else _find_max_95 _right_124)
+              >> fun _next_128 -> Value (_x_125 + _next_128) )
   in
-  let rec _find_max_136 (_x_118, _k_138) =
-    match _x_118 with
-    | Empty -> _k_138 0
-    | Node (Empty, _x_126, Empty) -> _k_138 _x_126
-    | Node (_left_129, _x_128, _right_127) ->
-        let _l_119 (_y_130 : bool) =
-          if _y_130 then
-            _find_max_136
-              (_left_129, fun (_next_131 : int) -> _k_138 (_x_128 + _next_131))
+  let rec _find_max_133 (_x_115, _k_135) =
+    match _x_115 with
+    | Empty -> _k_135 0
+    | Node (Empty, _x_123, Empty) -> _k_135 _x_123
+    | Node (_left_126, _x_125, _right_124) ->
+        let _l_116 (_y_127 : bool) =
+          if _y_127 then
+            _find_max_133
+              (_left_126, fun (_next_128 : int) -> _k_135 (_x_125 + _next_128))
           else
-            _find_max_136
-              (_right_127, fun (_next_131 : int) -> _k_138 (_x_128 + _next_131))
+            _find_max_133
+              (_right_124, fun (_next_128 : int) -> _k_135 (_x_125 + _next_128))
         in
-        _max_91 (_l_119 true) (_l_119 false)
+        _max_88 (_l_116 true) (_l_116 false)
   in
-  _find_max_136 (_tester_45 _m_97, fun (_x_113 : int) -> _x_113)
+  _find_max_133 (_tester_42 _m_94, fun (_x_110 : int) -> _x_110)
 
-let effect_max = _effect_max_96
+let effect_max = _effect_max_93
 
-let _test_max_141 (_m_142 : int) = _effect_max_96 _m_142
+let _test_max_138 (_m_139 : int) = _effect_max_93 _m_139
 
-let test_max = _test_max_141
+let test_max = _test_max_138
 
-let _op_143 (_x_144 : int) (_y_145 : int) = _x_144 - (3 * _y_145)
+let _op_140 (_x_141 : int) (_y_142 : int) = _x_141 - (3 * _y_142)
 
-let op = _op_143
+let op = _op_140
 
-let _max_149 (_a_150 : int) (_b_151 : int) =
-  if _a_150 > _b_151 then _a_150 else _b_151
+let _max_146 (_a_147 : int) (_b_148 : int) =
+  if _a_147 > _b_148 then _a_147 else _b_148
 
-let max = _max_149
+let max = _max_146
 
 type intlist = Nil | Cons of (int * intlist)
 
-let rec _op_154 (* @ *) _x_161 (_ys_163 : intlist) =
-  match _x_161 with
-  | Nil -> _ys_163
-  | Cons (_x_165, _xs_164) -> Cons (_x_165, _op_154 (* @ *) _xs_164 _ys_163)
+let rec _op_151 (* @ *) _x_158 (_ys_160 : intlist) =
+  match _x_158 with
+  | Nil -> _ys_160
+  | Cons (_x_162, _xs_161) -> Cons (_x_162, _op_151 (* @ *) _xs_161 _ys_160)
 
-let _op_154 (* @ *) = _op_154 (* @ *)
+let _op_151 (* @ *) = _op_151 (* @ *)
 
-let _test_general_168 (_m_169 : int) =
-  let rec _maxl_170 _x_200 (_x_235 : intlist) =
-    match _x_235 with
-    | Nil -> _x_200
-    | Cons (_x_237, _xs_236) -> _maxl_170 (_max_149 _x_237 _x_200) _xs_236
+let _test_general_165 (_m_166 : int) =
+  let rec _maxl_167 _x_197 (_x_232 : intlist) =
+    match _x_232 with
+    | Nil -> _x_197
+    | Cons (_x_234, _xs_233) -> _maxl_167 (_max_146 _x_234 _x_197) _xs_233
   in
-  let rec _explore_179 _x_203 =
-    match _x_203 with
+  let rec _explore_176 _x_200 =
+    match _x_200 with
     | Empty -> Value 0
-    | Node (_left_219, _x_218, _right_217) ->
+    | Node (_left_216, _x_215, _right_214) ->
         Call
           ( Choose,
             (),
-            fun (_y_220 : bool) ->
-              (if _y_220 then
-               _explore_179 _left_219 >> fun _b_223 ->
-               Value (_op_143 _x_218 _b_223)
+            fun (_y_217 : bool) ->
+              (if _y_217 then
+               _explore_176 _left_216 >> fun _b_220 ->
+               Value (_op_140 _x_215 _b_220)
               else
-                _explore_179 _right_217 >> fun _b_225 ->
-                Value (_op_143 _x_218 _b_225))
-              >> fun _next_221 -> Value _next_221 )
+                _explore_176 _right_214 >> fun _b_222 ->
+                Value (_op_140 _x_215 _b_222))
+              >> fun _next_218 -> Value _next_218 )
   in
-  _maxl_170 0
-    (let rec _explore_229 (_x_203, _k_231) =
-       match _x_203 with
-       | Empty -> _k_231 0
-       | Node (_left_219, _x_218, _right_217) ->
-           let _l_204 (_y_220 : bool) =
-             if _y_220 then
-               _explore_229
-                 ( _left_219,
-                   fun (_b_223 : int) -> _k_231 (_op_143 _x_218 _b_223) )
+  _maxl_167 0
+    (let rec _explore_226 (_x_200, _k_228) =
+       match _x_200 with
+       | Empty -> _k_228 0
+       | Node (_left_216, _x_215, _right_214) ->
+           let _l_201 (_y_217 : bool) =
+             if _y_217 then
+               _explore_226
+                 ( _left_216,
+                   fun (_b_220 : int) -> _k_228 (_op_140 _x_215 _b_220) )
              else
-               _explore_229
-                 ( _right_217,
-                   fun (_b_225 : int) -> _k_231 (_op_143 _x_218 _b_225) )
+               _explore_226
+                 ( _right_214,
+                   fun (_b_222 : int) -> _k_228 (_op_140 _x_215 _b_222) )
            in
-           _op_154 (* @ *) (_l_204 true) (_l_204 false)
+           _op_151 (* @ *) (_l_201 true) (_l_201 false)
      in
-     _explore_229 (_tester_45 _m_169, fun (_x_195 : int) -> Cons (_x_195, Nil)))
+     _explore_226 (_tester_42 _m_166, fun (_x_192 : int) -> Cons (_x_192, Nil)))
 
-let test_general = _test_general_168
+let test_general = _test_general_165
 
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
-let _absurd_241 (_void_242 : float) = match _void_242 with _ -> assert false
+let _absurd_238 (_void_239 : float) = match _void_239 with _ -> assert false
 
-let absurd = _absurd_241
+let absurd = _absurd_238
 
-let _test_leaf_state_243 (_m_244 : int) =
-  let rec _maxl_245 _x_296 (_x_625 : intlist) =
-    match _x_625 with
-    | Nil -> _x_296
-    | Cons (_x_627, _xs_626) -> _maxl_245 (_max_149 _x_627 _x_296) _xs_626
+let _test_leaf_state_240 (_m_241 : int) =
+  let rec _maxl_242 _x_293 (_x_362 : intlist) =
+    match _x_362 with
+    | Nil -> _x_293
+    | Cons (_x_364, _xs_363) -> _maxl_242 (_max_146 _x_364 _x_293) _xs_363
   in
-  let rec _populate_leafs_253 _x_297 (_n_361 : int) =
-    if _x_297 = _n_361 then Nil
-    else Cons (_x_297 * 3, _populate_leafs_253 (_x_297 + 1) _n_361)
+  let rec _populate_leafs_250 _x_294 (_n_339 : int) =
+    if _x_294 = _n_339 then Nil
+    else Cons (_x_294 * 3, _populate_leafs_250 (_x_294 + 1) _n_339)
   in
-  let rec _explore_267 _x_302 =
-    match _x_302 with
-    | Empty -> Call (Get, (), fun (_y_327 : int) -> Value _y_327)
-    | Node (_left_330, _x_329, _right_328) ->
+  let rec _explore_264 _x_299 =
+    match _x_299 with
+    | Empty -> Call (Get, (), fun (_y_324 : int) -> Value _y_324)
+    | Node (_left_327, _x_326, _right_325) ->
         Call
           ( Choose,
             (),
-            fun (_y_331 : bool) ->
-              _explore_267 (if _y_331 then _left_330 else _right_328)
-              >> fun _b_334 -> Value (_op_143 _x_329 _b_334) )
+            fun (_y_328 : bool) ->
+              _explore_264 (if _y_328 then _left_327 else _right_325)
+              >> fun _b_331 -> Value (_op_140 _x_326 _b_331) )
   in
-  _maxl_245 0
-    ((let rec _explore_337 (_x_302, _k_339) =
-        match _x_302 with
-        | Empty -> Call (Get, (), fun (_y_327 : int) -> _k_339 _y_327)
-        | Node (_left_330, _x_329, _right_328) ->
-            let _l_303 (_y_331 : bool) =
-              _explore_337
-                ( (if _y_331 then _left_330 else _right_328),
-                  fun (_b_334 : int) -> _k_339 (_op_143 _x_329 _b_334) )
+  _maxl_242 0
+    ((let rec _explore_334 (_x_299, _k_336) =
+        match _x_299 with
+        | Empty -> Call (Get, (), fun (_y_324 : int) -> _k_336 _y_324)
+        | Node (_left_327, _x_326, _right_325) ->
+            let _l_300 (_y_328 : bool) =
+              _explore_334
+                ( (if _y_328 then _left_327 else _right_325),
+                  fun (_b_331 : int) -> _k_336 (_op_140 _x_326 _b_331) )
             in
-            _l_303 true >> fun _b_279 ->
-            _l_303 false >> fun _b_280 -> Value (_op_154 (* @ *) _b_279 _b_280)
+            _l_300 true >> fun _b_276 ->
+            _l_300 false >> fun _b_277 -> Value (_op_151 (* @ *) _b_276 _b_277)
       in
-      let rec _explore_341 (_x_302, _k_339) =
-        match _x_302 with
+      let rec _explore_348 (_x_299, _k_336) =
+        match _x_299 with
         | Empty -> (
-            fun (_s_343 : intlist) ->
-              match _s_343 with
-              | Cons (_x_345, _rest_344) ->
+            fun (_s_350 : intlist) ->
+              match _s_350 with
+              | Cons (_x_352, _rest_351) ->
                   force_unsafe
                     ((handler
                         {
                           value_clause =
-                            (fun (_x_348 : intlist) ->
-                              Value (fun (_ : intlist) -> _x_348));
+                            (fun (_x_355 : intlist) ->
+                              Value (fun (_ : intlist) -> _x_355));
                           effect_clauses =
                             (fun (type a b) (eff : (a, b) eff_internal_effect) :
                                  (a -> (b -> _) -> _) ->
                               match eff with
                               | Get ->
-                                  fun () _l_349 ->
+                                  fun () _l_356 ->
                                     Value
-                                      (fun (_s_350 : intlist) ->
-                                        match _s_350 with
-                                        | Cons (_x_352, _rest_351) ->
+                                      (fun (_s_357 : intlist) ->
+                                        match _s_357 with
+                                        | Cons (_x_359, _rest_358) ->
                                             coer_arrow coer_refl_ty force_unsafe
-                                              _l_349 _x_352 _rest_351
+                                              _l_356 _x_359 _rest_358
                                         | Nil -> Nil)
                               | eff' -> fun arg k -> Call (eff', arg, k));
                         })
-                       (_k_339 _x_345))
-                    _rest_344
+                       (_k_336 _x_352))
+                    _rest_351
               | Nil -> Nil)
-        | Node (_left_330, _x_329, _right_328) ->
-            let _l_303 (_y_331 : bool) =
-              _explore_337
-                ( (if _y_331 then _left_330 else _right_328),
-                  fun (_b_334 : int) -> _k_339 (_op_143 _x_329 _b_334) )
+        | Node (_left_327, _x_326, _right_325) ->
+            let _l_300 (_y_328 : bool) =
+              _explore_334
+                ( (if _y_328 then _left_327 else _right_325),
+                  fun (_b_331 : int) -> _k_336 (_op_140 _x_326 _b_331) )
             in
             force_unsafe
               ((handler
                   {
                     value_clause =
-                      (fun (_b_279 : intlist) ->
+                      (fun (_b_276 : intlist) ->
                         Value
                           (force_unsafe
                              ((handler
                                  {
                                    value_clause =
-                                     (fun (_b_280 : intlist) ->
+                                     (fun (_b_277 : intlist) ->
                                        Value
                                          (fun (_ : intlist) ->
-                                           _op_154 (* @ *) _b_279 _b_280));
+                                           _op_151 (* @ *) _b_276 _b_277));
                                    effect_clauses =
                                      (fun (type a b)
                                           (eff : (a, b) eff_internal_effect) :
                                           (a -> (b -> _) -> _) ->
                                        match eff with
                                        | Get ->
-                                           fun () _l_316 ->
+                                           fun () _l_313 ->
                                              Value
-                                               (fun (_s_317 : intlist) ->
-                                                 match _s_317 with
-                                                 | Cons (_x_319, _rest_318) ->
+                                               (fun (_s_314 : intlist) ->
+                                                 match _s_314 with
+                                                 | Cons (_x_316, _rest_315) ->
                                                      coer_arrow coer_refl_ty
-                                                       force_unsafe _l_316
-                                                       _x_319 _rest_318
+                                                       force_unsafe _l_313
+                                                       _x_316 _rest_315
                                                  | Nil -> Nil)
                                        | eff' -> fun arg k -> Call (eff', arg, k));
                                  })
-                                (_l_303 false))));
+                                (_l_300 false))));
                     effect_clauses =
                       (fun (type a b) (eff : (a, b) eff_internal_effect) :
                            (a -> (b -> _) -> _) ->
                         match eff with
                         | Get ->
-                            fun () _l_316 ->
+                            fun () _l_313 ->
                               Value
-                                (fun (_s_317 : intlist) ->
-                                  match _s_317 with
-                                  | Cons (_x_319, _rest_318) ->
+                                (fun (_s_314 : intlist) ->
+                                  match _s_314 with
+                                  | Cons (_x_316, _rest_315) ->
                                       coer_arrow coer_refl_ty force_unsafe
-                                        _l_316 _x_319 _rest_318
+                                        _l_313 _x_316 _rest_315
                                   | Nil -> Nil)
                         | eff' -> fun arg k -> Call (eff', arg, k));
                   })
-                 (_l_303 true))
+                 (_l_300 true))
       in
-      _explore_341
-        (_tester_45 _m_244, fun (_x_281 : int) -> Value (Cons (_x_281, Nil))))
-       (_populate_leafs_253 0 154))
+      _explore_348
+        (_tester_42 _m_241, fun (_x_278 : int) -> Value (Cons (_x_278, Nil))))
+       (_populate_leafs_250 0 154))
 
-let test_leaf_state = _test_leaf_state_243
+let test_leaf_state = _test_leaf_state_240

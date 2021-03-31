@@ -51,16 +51,6 @@ let float_float_to_float f =
   let float_f v1 v2 = value_float (f (V.to_float v1) (V.to_float v2)) in
   binary_closure float_f
 
-(** [bool_to_bool f] takes a unary bool function f and transforms it into
-    a closure that takes two values and evaluates to a value. *)
-let bool_to_bool f = from_fun (fun v -> value_bool (f (V.to_bool v)))
-
-(** [bool_bool_to_bool f] takes a binary bool function f and transforms it
-    into a closure that takes two values and evaluates to a value. *)
-let bool_bool_to_bool f =
-  let bool_f v1 v2 = value_bool (f (V.to_bool v1) (V.to_bool v2)) in
-  binary_closure bool_f
-
 (* Comparison of values is a trickier business than you might think. *)
 let rec compare v1 v2 =
   match v1 with
@@ -175,9 +165,6 @@ let primitive_value = function
       binary_closure (fun v1 v2 -> value_bool (less_than v1 v2))
   | Primitives.CompareNe ->
       binary_closure (fun v1 v2 -> value_bool (not_equal v1 v2))
-  | Primitives.BoolNot -> bool_to_bool not
-  | Primitives.BoolAnd -> bool_bool_to_bool ( && )
-  | Primitives.BoolOr -> bool_bool_to_bool ( || )
   | Primitives.FloatAcos -> float_to_float acos
   | Primitives.FloatAdd -> float_float_to_float ( +. )
   | Primitives.FloatAsin -> float_to_float asin

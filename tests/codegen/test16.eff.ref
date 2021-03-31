@@ -3,18 +3,18 @@ type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
 
 ;;
-(let rec _loop_46 _x_69 =
-   if 0 < _x_69 then
+(let rec _loop_43 _x_66 =
+   if 0 < _x_66 then
      Call
        ( Get,
          (),
-         fun (_y_82 : int) ->
-           Call (Put, _y_82 + 1, fun (_y_85 : unit) -> _loop_46 (_x_69 - 1)) )
+         fun (_y_79 : int) ->
+           Call (Put, _y_79 + 1, fun (_y_82 : unit) -> _loop_43 (_x_66 - 1)) )
    else Value ()
  in
- let rec _loop_88 _x_69 =
-   if 0 < _x_69 then fun (_s_96 : int) -> _loop_88 (_x_69 - 1) (_s_96 + 1)
+ let rec _loop_85 _x_66 =
+   if 0 < _x_66 then fun (_s_93 : int) -> _loop_85 (_x_66 - 1) (_s_93 + 1)
    else fun (_ : int) -> ()
  in
- _loop_88 10)
+ _loop_85 10)
   0

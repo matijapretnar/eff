@@ -4,40 +4,40 @@ type (_, _) eff_internal_effect += Fail : (unit, unit) eff_internal_effect
 
 type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
 
-let _test_nested_45 (_m_46 : int) =
-  let rec _simple_68 _x_58 = _m_46 in
-  _simple_68 ()
+let _test_nested_42 (_m_43 : int) =
+  let rec _simple_65 _x_55 = _m_43 in
+  _simple_65 ()
 
-let test_nested = _test_nested_45
+let test_nested = _test_nested_42
 
-let _test_nested_72 (_m_73 : int) =
-  let rec _go_74 _x_93 =
-    if _x_93 = 0 then Call (Fail, (), fun (_y_108 : unit) -> Value _y_108)
+let _test_nested_69 (_m_70 : int) =
+  let rec _go_71 _x_90 =
+    if _x_90 = 0 then Call (Fail, (), fun (_y_105 : unit) -> Value _y_105)
     else
       Call
         ( Decide,
           (),
-          fun (_y_109 : bool) ->
-            if _y_109 then _go_74 (_x_93 - 1) else _go_74 (_x_93 - 2) )
+          fun (_y_106 : bool) ->
+            if _y_106 then _go_71 (_x_90 - 1) else _go_71 (_x_90 - 2) )
   in
-  let rec _go_114 _x_93 =
-    if _x_93 = 0 then Call (Fail, (), fun (_y_108 : unit) -> Value _y_108)
+  let rec _go_111 _x_90 =
+    if _x_90 = 0 then Call (Fail, (), fun (_y_105 : unit) -> Value _y_105)
     else
-      let _l_95 (_y_109 : bool) =
-        if _y_109 then _go_114 (_x_93 - 1) else _go_114 (_x_93 - 2)
+      let _l_92 (_y_106 : bool) =
+        if _y_106 then _go_111 (_x_90 - 1) else _go_111 (_x_90 - 2)
       in
       (handler
          {
-           value_clause = (fun (_id_85 : unit) -> Value _id_85);
+           value_clause = (fun (_id_82 : unit) -> Value _id_82);
            effect_clauses =
              (fun (type a b) (eff : (a, b) eff_internal_effect) :
                   (a -> (b -> _) -> _) ->
                match eff with
-               | Fail -> fun () _l_94 -> _l_95 false
+               | Fail -> fun () _l_91 -> _l_92 false
                | eff' -> fun arg k -> Call (eff', arg, k));
          })
-        (_l_95 true)
+        (_l_92 true)
   in
-  _go_114 _m_73
+  _go_111 _m_70
 
-let test_nested = _test_nested_72
+let test_nested = _test_nested_69
