@@ -52,16 +52,16 @@ let rec _loop_incr'_120 _x_128 =
 let loop_incr' = _loop_incr'_120
 
 let _test_incr'_137 (_n_138 : int) =
-  (let rec _loop_incr'_163 (_x_128, _k_166) =
-     if _x_128 = 0 then _k_166 ()
+  (let rec _loop_incr'_164 (_x_128, _k_167) =
+     if _x_128 = 0 then _k_167 ()
      else
-       _loop_incr'_163
-         (_x_128 - 1, fun (_ : unit) (_x_170 : int) -> _k_166 () (_x_170 + 1))
-   and _loop_incr_164 _x_89 =
+       _loop_incr'_164
+         (_x_128 - 1, fun (_ : unit) (_x_171 : int) -> _k_167 () (_x_171 + 1))
+   and _loop_incr_165 _x_89 =
      if _x_89 = 0 then fun (_x_147 : int) -> _x_147
-     else fun (_x_176 : int) -> _loop_incr_164 (_x_89 - 1) (_x_176 + 1)
+     else fun (_x_177 : int) -> _loop_incr_165 (_x_89 - 1) (_x_177 + 1)
    in
-   _loop_incr'_163 (_n_138, fun (_x_145 : unit) (_x_147 : int) -> _x_147))
+   _loop_incr'_164 (_n_138, fun (_x_145 : unit) (_x_147 : int) -> _x_147))
     0
 
 let test_incr' = _test_incr'_137
@@ -70,26 +70,26 @@ type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
 type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
 
-let rec _loop_state_180 _x_193 =
-  if _x_193 = 0 then Value ()
+let rec _loop_state_181 _x_194 =
+  if _x_194 = 0 then Value ()
   else
     Call
       ( Get,
         (),
-        fun (_y_202 : int) ->
+        fun (_y_203 : int) ->
           Call
             ( Put,
-              _y_202 + 1,
-              fun (_y_205 : unit) -> _loop_state_180 (_x_193 - 1) ) )
+              _y_203 + 1,
+              fun (_y_206 : unit) -> _loop_state_181 (_x_194 - 1) ) )
 
-let loop_state = _loop_state_180
+let loop_state = _loop_state_181
 
-let _test_state_208 (_n_209 : int) =
-  (let rec _loop_state_226 _x_193 =
-     if _x_193 = 0 then fun (_x_219 : int) -> _x_219
-     else fun (_s_234 : int) -> _loop_state_226 (_x_193 - 1) (_s_234 + 1)
+let _test_state_209 (_n_210 : int) =
+  (let rec _loop_state_227 _x_194 =
+     if _x_194 = 0 then fun (_x_220 : int) -> _x_220
+     else fun (_s_235 : int) -> _loop_state_227 (_x_194 - 1) (_s_235 + 1)
    in
-   _loop_state_226 _n_209)
+   _loop_state_227 _n_210)
     0
 
-let test_state = _test_state_208
+let test_state = _test_state_209

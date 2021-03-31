@@ -91,34 +91,33 @@ let _queens_one_option_162 (_number_of_queens_163 : int) =
         >> fun _y_145 ->
         _place_140 (_x_141 + 1, SolutionPlace ((_x_141, _y_145), _qs_142))
     in
-    force_unsafe
-      ((handler
-          {
-            value_clause = (fun (_x_169 : solution) -> Value (Some _x_169));
-            effect_clauses =
-              (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                   (a -> (b -> _) -> _) ->
-                match eff with
-                | Decide ->
-                    fun _ _l_172 ->
-                      Value
-                        (match
-                           coer_arrow coer_refl_ty force_unsafe _l_172 true
-                         with
-                        | Some _x_167 -> Some _x_167
-                        | None ->
-                            coer_arrow coer_refl_ty force_unsafe _l_172 false)
-                | Fail -> fun _ _l_173 -> Value None
-                | eff' -> fun arg k -> Call (eff', arg, k));
-          })
-         (_place_140 (1, SolutionEmpty)))
+    let rec _place_177 (_x_141, _qs_142) =
+      if _x_141 > _number_of_queens_139 then Some _qs_142
+      else
+        let rec _choose_179 _x_126 =
+          match _x_126 with
+          | RowsEmpty -> None
+          | RowsCons (_x_136, _xs'_135) -> (
+              let _l_172 (_y_137 : bool) =
+                if _y_137 then
+                  _place_177
+                    (_x_141 + 1, SolutionPlace ((_x_141, _x_136), _qs_142))
+                else _choose_179 _xs'_135
+              in
+              match _l_172 true with
+              | Some _x_167 -> Some _x_167
+              | None -> _l_172 false)
+        in
+        _choose_179 (_available_90 _number_of_queens_139 _x_141 _qs_142)
+    in
+    _place_177 (1, SolutionEmpty)
   in
   _queens_176 _number_of_queens_163
 
 let queens_one_option = _queens_one_option_162
 
-let _queens_all_177 (_number_of_queens_178 : int) =
-  let rec _queens_192 _number_of_queens_139 =
+let _queens_all_183 (_number_of_queens_184 : int) =
+  let rec _queens_198 _number_of_queens_139 =
     let rec _place_140 (_x_141, _qs_142) =
       if _x_141 > _number_of_queens_139 then Value _qs_142
       else
@@ -126,80 +125,66 @@ let _queens_all_177 (_number_of_queens_178 : int) =
         >> fun _y_145 ->
         _place_140 (_x_141 + 1, SolutionPlace ((_x_141, _y_145), _qs_142))
     in
-    force_unsafe
-      ((handler
-          {
-            value_clause =
-              (fun (_x_185 : solution) ->
-                Value (SolutionsCons (_x_185, SolutionsNil)));
-            effect_clauses =
-              (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                   (a -> (b -> _) -> _) ->
-                match eff with
-                | Decide ->
-                    fun _ _l_188 ->
-                      Value
-                        (_op_44 (* @ *)
-                           (coer_arrow coer_refl_ty force_unsafe _l_188 true)
-                           (coer_arrow coer_refl_ty force_unsafe _l_188 false))
-                | Fail -> fun _ _l_189 -> Value SolutionsNil
-                | eff' -> fun arg k -> Call (eff', arg, k));
-          })
-         (_place_140 (1, SolutionEmpty)))
+    let rec _place_199 (_x_141, _qs_142) =
+      if _x_141 > _number_of_queens_139 then
+        SolutionsCons (_qs_142, SolutionsNil)
+      else
+        let rec _choose_201 _x_126 =
+          match _x_126 with
+          | RowsEmpty -> SolutionsNil
+          | RowsCons (_x_136, _xs'_135) ->
+              let _l_194 (_y_137 : bool) =
+                if _y_137 then
+                  _place_199
+                    (_x_141 + 1, SolutionPlace ((_x_141, _x_136), _qs_142))
+                else _choose_201 _xs'_135
+              in
+              _op_44 (* @ *) (_l_194 true) (_l_194 false)
+        in
+        _choose_201 (_available_90 _number_of_queens_139 _x_141 _qs_142)
+    in
+    _place_199 (1, SolutionEmpty)
   in
-  _queens_192 _number_of_queens_178
+  _queens_198 _number_of_queens_184
 
-let queens_all = _queens_all_177
+let queens_all = _queens_all_183
 
-let _queens_one_cps_193 (_number_of_queens_194 : int) =
-  (let rec _queens_224 _number_of_queens_225 =
-     let rec _place_226 (_x_228, _qs_227) =
-       if _x_228 > _number_of_queens_225 then Value _qs_227
+let _queens_one_cps_205 (_number_of_queens_206 : int) =
+  (let rec _queens_242 _number_of_queens_243 =
+     let rec _place_244 (_x_246, _qs_245) =
+       if _x_246 > _number_of_queens_243 then Value _qs_245
        else
-         _choose_116 (_available_90 _number_of_queens_225 _x_228 _qs_227)
-         >> fun _y_234 ->
-         _place_226 (_x_228 + 1, SolutionPlace ((_x_228, _y_234), _qs_227))
+         _choose_116 (_available_90 _number_of_queens_243 _x_246 _qs_245)
+         >> fun _y_252 ->
+         _place_244 (_x_246 + 1, SolutionPlace ((_x_246, _y_252), _qs_245))
      in
-     let rec _place_246 (_x_228, _qs_227) =
-       if _x_228 > _number_of_queens_225 then
+     let rec _place_255 (_x_257, _qs_256) =
+       if _x_257 > _number_of_queens_243 then
          coer_arrow coer_refl_ty (coer_return coer_refl_ty)
-           (fun (_ : unit -> solution computation) -> _qs_227)
+           (fun (_ : unit -> solution computation) -> _qs_256)
        else
-         force_unsafe
-           ((handler
-               {
-                 value_clause =
-                   (fun (_y_234 : int) ->
-                     Value
-                       (_place_246
-                          (_x_228 + 1, SolutionPlace ((_x_228, _y_234), _qs_227))));
-                 effect_clauses =
-                   (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                        (a -> (b -> _) -> _) ->
-                     match eff with
-                     | Decide ->
-                         fun _ _l_238 ->
-                           Value
-                             (fun (_kf_239 : unit -> solution computation) ->
-                               coer_arrow coer_refl_ty force_unsafe _l_238 true
-                                 (fun (_ : unit) ->
-                                   coer_arrow coer_refl_ty force_unsafe _l_238
-                                     false _kf_239))
-                     | Fail ->
-                         fun _ _l_242 ->
-                           Value
-                             (fun (_kf_243 : unit -> solution computation) ->
-                               _kf_243 ())
-                     | eff' -> fun arg k -> Call (eff', arg, k));
-               })
-              (_choose_116 (_available_90 _number_of_queens_225 _x_228 _qs_227)))
+         let rec _choose_263 _x_264 =
+           match _x_264 with
+           | RowsEmpty ->
+               fun (_kf_265 : unit -> solution computation) -> _kf_265 ()
+           | RowsCons (_x_267, _xs'_266) ->
+               let _l_268 (_y_272 : bool) =
+                 if _y_272 then
+                   _place_255
+                     (_x_257 + 1, SolutionPlace ((_x_257, _x_267), _qs_256))
+                 else _choose_263 _xs'_266
+               in
+               fun (_kf_269 : unit -> solution computation) ->
+                 _l_268 true (fun (_ : unit) -> _l_268 false _kf_269)
+         in
+         _choose_263 (_available_90 _number_of_queens_243 _x_257 _qs_256)
      in
-     _place_246 (1, SolutionEmpty)
+     _place_255 (1, SolutionEmpty)
    in
-   _queens_224 _number_of_queens_194) (fun (() : unit) ->
+   _queens_242 _number_of_queens_206) (fun (() : unit) ->
       Call
         ( Fail,
           (),
-          fun (_y_223 : empty) -> Value (match _y_223 with _ -> assert false) ))
+          fun (_y_241 : empty) -> Value (match _y_241 with _ -> assert false) ))
 
-let queens_one_cps = _queens_one_cps_193
+let queens_one_cps = _queens_one_cps_205
