@@ -140,22 +140,6 @@ and reduce_constant_match state const (abs : NoEff.n_abstraction list) =
   in
   folder abs
 
-and reduce_letrec l t =
-  (* Is it worth it to remove unneeded let rec ? *)
-  let reduce_single (p, t) =
-    match (p, t) with
-    (* Let rec with pattern unwrap gets compiled to let rec with let unwrap case *)
-    | NoEff.PNVar v, NoEff.NMatch (NoEff.NVar v', [ (p', t') ])
-    | NoEff.PNVar v, NoEff.NLet (NoEff.NVar v', (p', t'))
-      when v = v' -> (
-        let vars = NoEff.free_vars t' in
-        match SyntaxNoEff.VariableMap.find_opt v' vars with
-        | Some x when x > 0 -> (p, t)
-        | _ -> (p', t'))
-    | n -> n
-  in
-  NoEff.NLetRec (Assoc.map reduce_single l, t)
-
 and beta_reduce state ((_, trm1) as abs) trm2 =
   match (abstraction_inlinability abs, trm2) with
   | Inlinable, _
@@ -173,11 +157,6 @@ and reduce_term' state (n_term : NoEff.n_term) =
   | NCast (t, (NCoerReturn NCoerRefl as _c)) -> NoEff.NReturn t
   | NCast (t, NCoerRefl) -> t
   | NBind (NReturn t, c) -> beta_reduce state c t
-  | NBind (NCall (e, arg, ((_, ty, _) as k)), f) ->
-      let v = NoEff.Variable.fresh "x" in
-      let p' = NoEff.PNVar v in
-      let cont = NoEff.NApplyTerm (NoEff.NFun k, NoEff.NVar v) in
-      optimize_term state (NCall (e, arg, (p', ty, NoEff.NBind (cont, f))))
   | NLet (e, a) -> beta_reduce state a e
   | NMatch
       ( t1,
@@ -198,8 +177,6 @@ and reduce_term' state (n_term : NoEff.n_term) =
       match reduce_constant_match state c abs with
       | Some t -> t
       | None -> n_term)
-  | NLetRec (l, t) -> reduce_letrec l t
-  | NApplyTerm (NFun (p, _, c), t) -> beta_reduce state (p, c) t
   | _ -> n_term
 
 and reduce_term state n_term =

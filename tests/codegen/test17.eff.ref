@@ -1,4 +1,4 @@
 type my_ty = Cons of my_ty
 
 ;;
-fun (_x_45 : my_ty) -> match _x_45 with Cons _argmnt_46 -> Cons _argmnt_46
+fun (Cons _argmnt_46 : my_ty) -> Cons _argmnt_46

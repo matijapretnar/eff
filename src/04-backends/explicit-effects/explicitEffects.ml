@@ -218,6 +218,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     defs'
 
   let process_computation state c =
+    Print.debug "%t" (Term.print_computation c);
     let c' = optimize_term state @@ TranslateExEff2NoEff.elab_computation c in
     { state with prog = SyntaxNoEff.Term c' :: state.prog }
 
@@ -237,6 +238,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     let defs' =
       Assoc.kmap
         (fun (x, e) ->
+          Print.debug "%t" (Term.print_expression e);
           (x.term, optimize_term state @@ TranslateExEff2NoEff.elab_expression e))
         defs
     in

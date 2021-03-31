@@ -252,7 +252,13 @@ and optimize_abstraction state abs =
   { abs with term = optimize_abstraction' state abs.term }
 
 and optimize_abstraction' state (pat, cmp) =
-  (pat, optimize_computation state cmp)
+  let cmp' = optimize_computation state cmp in
+  match (pat.term, cmp'.term) with
+  | Term.PVar v, Term.Match ({ term = Var v'; _ }, [ abs ])
+  | Term.PVar v, Term.LetVal ({ term = Var v'; _ }, abs)
+    when v = v' && Term.does_not_occur v.term (Term.free_vars_abs abs) ->
+      abs.term
+  | _ -> (pat, cmp')
 
 and optimize_abstraction2 state abs2 =
   { abs2 with term = optimize_abstraction2' state abs2.term }

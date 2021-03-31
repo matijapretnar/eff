@@ -575,6 +575,9 @@ and free_vars_abs { term = p, c; _ } = free_vars_comp c --- pattern_vars p
 and free_vars_abs2 { term = p1, p2, c; _ } =
   free_vars_comp c --- pattern_vars p2 --- pattern_vars p1
 
+let does_not_occur v vars =
+  match VariableMap.find_opt v vars with Some x -> x = 0 | None -> true
+
 let cast_expression e ty =
   let omega, cons = Constraint.fresh_ty_coer (e.ty, ty) in
   (castExp (e, omega), cons)
