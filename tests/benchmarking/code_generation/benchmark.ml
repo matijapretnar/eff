@@ -14,27 +14,31 @@ and number_of_tree = 100
 
 and size_of_interp_expression = 200
 
-let run_loop_pure = true
+let run_loop_pure = false
 
-and run_loop_latent = true
+and run_loop_latent = false
 
-and run_loop_incr = true
+and run_loop_incr = false
 
-and run_loop_incr' = true
+and run_loop_incr' = false
 
-and run_loop_state = true
+and run_loop_state = false
 
-and run_queens_one = true
+and run_queens_one = false
 
-and run_queens_all = true
+and run_queens_all = false
 
-and run_interp = true
+and run_interp = false
 
-and run_range = true
+and run_interp_state = true
 
-and run_tree = true
+and run_range = false
 
-and run_state_tree = true
+and run_tree = false
+
+and run_state_tree = false
+
+and run_state_update_tree = false
 
 let benchmark test =
   let ols =
@@ -348,6 +352,18 @@ let () =
         4 * size_of_interp_expression;
         8 * size_of_interp_expression;
       ];
+  if run_interp_state then
+    List.iter
+      (fun n ->
+        let set = suite.interpreter_state_benchmark n in
+        Printf.printf "%s (size: %d):\n" set.name set.param;
+        run_and_show_set set)
+      [
+        size_of_interp_expression;
+        2 * size_of_interp_expression;
+        4 * size_of_interp_expression;
+        8 * size_of_interp_expression;
+      ];
   if run_range then (
     let set = suite.range_benchmarks number_of_range in
     Printf.printf "%s :\n" set.name;
@@ -368,6 +384,18 @@ let () =
     List.iter
       (fun n ->
         let set = suite.state_tree_benchmark n in
+        Printf.printf "%s (leaf_val: %d):\n" set.name set.param;
+        run_and_show_set set)
+      [
+        number_of_tree;
+        2 * number_of_tree;
+        4 * number_of_tree;
+        8 * number_of_tree;
+      ];
+  if run_state_update_tree then
+    List.iter
+      (fun n ->
+        let set = suite.state_with_update_tree_benchmark n in
         Printf.printf "%s (leaf_val: %d):\n" set.name set.param;
         run_and_show_set set)
       [

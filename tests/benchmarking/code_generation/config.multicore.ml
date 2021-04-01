@@ -14,6 +14,14 @@ let test_suite =
         fun n -> InterpMulticore.bigTest n = -1 )
       base_suite.interpreter_benchmark
   in
+  let interpreter_state_benchmark =
+    add_benchmark
+      ( "Multicore",
+        forget_value InterpMulticore.testState,
+        fun n -> InterpMulticore.testState n = -1 )
+      base_suite.interpreter_state_benchmark
+  in
+
   let range_benchmarks =
     base_suite.range_benchmarks
     |> add_benchmark
@@ -98,10 +106,22 @@ let test_suite =
          ( "Multicore",
            forget_value TreeMulticore.test_leaf_state,
            always_true TreeMulticore.test_leaf_state )
+    |> add_benchmark
+         ( "Multicore state handler",
+           forget_value TreeMulticore.test_leaf_state_effect,
+           always_true TreeMulticore.test_leaf_state_effect )
+  in
+  let state_with_update_tree_benchmark =
+    base_suite.state_with_update_tree_benchmark
+    |> add_benchmark
+         ( "Multicore",
+           forget_value TreeMulticore.test_leaf_state_update,
+           always_true TreeMulticore.test_leaf_state_update )
   in
   {
     base_suite with
     interpreter_benchmark;
+    interpreter_state_benchmark;
     range_benchmarks;
     loop_benchmarks;
     loop_latent_benchmarks;
@@ -113,4 +133,5 @@ let test_suite =
     queens_one_cps_benchmark;
     tree_benchmark;
     state_tree_benchmark;
+    state_with_update_tree_benchmark;
   }

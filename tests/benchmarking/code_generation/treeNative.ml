@@ -58,8 +58,36 @@ let test_leaf_state m =
         let lef = explore left in
         List.map (op x) (lef @ explore right)
   in
-
   List.fold_left max 0 (explore t)
+
+let k = List.map
+
+let test_leaf_pure_state m =
+  let leafs = List.init 154 (fun i -> i * 3) in
+  let rec maxl l = List.fold_left max 0 l in
+  let t = tester m in
+  let rec explore t leafs =
+    match t with
+    | Empty -> ( match leafs with x :: xs -> ([ x ], xs) | [] -> assert false)
+    | Node (left, x, right) ->
+        let lef, leafs = explore left leafs in
+        let rig, leafs = explore right leafs in
+        (List.map (op x) (lef @ rig), leafs)
+  in
+  List.fold_left max 0 (fst (explore t leafs))
+
+let test_leaf_state_update m =
+  let rec maxl l = List.fold_left max 0 l in
+  let t = tester m in
+  let rec explore t state =
+    match t with
+    | Empty -> ([ state ], state)
+    | Node (left, x, right) ->
+        let lef, state = explore left (x * x) in
+        let rig, state = explore right state in
+        (List.map (op x) (lef @ rig), state)
+  in
+  List.fold_left max 0 (fst (explore t (-1)))
 
 (* 
 # test_leaf_state 100;;

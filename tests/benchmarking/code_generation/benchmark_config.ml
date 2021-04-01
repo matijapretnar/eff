@@ -5,7 +5,7 @@ type 'a benchmark_set = {
 }
 
 let forget_value f x =
-  let _ = f x in
+  let _ = Sys.opaque_identity (f x) in
   ()
 
 let always_true f x =
@@ -22,9 +22,11 @@ type test_suite = {
   queens_one_benchmark : int -> int benchmark_set;
   queens_all_benchmark : int -> int benchmark_set;
   interpreter_benchmark : int -> int benchmark_set;
+  interpreter_state_benchmark : int -> int benchmark_set;
   range_benchmarks : int -> int benchmark_set;
   tree_benchmark : int -> int benchmark_set;
   state_tree_benchmark : int -> int benchmark_set;
+  state_with_update_tree_benchmark : int -> int benchmark_set;
 }
 
 let loop_benchmarks number_of_loops =
@@ -165,6 +167,21 @@ let interpreter_benchmark n =
     param = n;
   }
 
+let interpreter_state_benchmark n =
+  {
+    name = "INTERPRETER STATE BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, optimized",
+          forget_value InterpOpt.testState,
+          always_true InterpOpt.testState );
+        ( "Native pure",
+          forget_value InterpNative.testState,
+          always_true InterpNative.testState );
+      ];
+    param = n;
+  }
+
 let range_benchmarks number_of_range =
   {
     name = "RANGE BENCHMARK";
@@ -204,6 +221,24 @@ let state_tree_benchmark number =
         ( "Native",
           forget_value TreeNative.test_leaf_state,
           always_true TreeNative.test_leaf_state );
+        ( "Native pure state",
+          forget_value TreeNative.test_leaf_pure_state,
+          always_true TreeNative.test_leaf_pure_state );
+      ];
+    param = number;
+  }
+
+let state_with_update_tree_benchmark number =
+  {
+    name = "STATE TREE BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, optimized",
+          forget_value TreeOpt.test_leaf_state_update,
+          always_true TreeOpt.test_leaf_state_update );
+        ( "Native",
+          forget_value TreeNative.test_leaf_state_update,
+          always_true TreeNative.test_leaf_state_update );
       ];
     param = number;
   }
@@ -219,7 +254,9 @@ let default_test_suite =
     queens_one_benchmark;
     queens_all_benchmark;
     interpreter_benchmark;
+    interpreter_state_benchmark;
     range_benchmarks;
     tree_benchmark;
     state_tree_benchmark;
+    state_with_update_tree_benchmark;
   }

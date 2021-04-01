@@ -133,14 +133,14 @@ let _absurd_238 (_void_239 : float) = match _void_239 with _ -> assert false
 let absurd = _absurd_238
 
 let _test_leaf_state_240 (_m_241 : int) =
-  let rec _maxl_242 _x_293 (_x_362 : intlist) =
-    match _x_362 with
+  let rec _maxl_242 _x_293 (_x_622 : intlist) =
+    match _x_622 with
     | Nil -> _x_293
-    | Cons (_x_364, _xs_363) -> _maxl_242 (_max_146 _x_364 _x_293) _xs_363
+    | Cons (_x_624, _xs_623) -> _maxl_242 (_max_146 _x_624 _x_293) _xs_623
   in
-  let rec _populate_leafs_250 _x_294 (_n_339 : int) =
-    if _x_294 = _n_339 then Nil
-    else Cons (_x_294 * 3, _populate_leafs_250 (_x_294 + 1) _n_339)
+  let rec _populate_leafs_250 _x_294 (_n_358 : int) =
+    if _x_294 = _n_358 then Nil
+    else Cons (_x_294 * 3, _populate_leafs_250 (_x_294 + 1) _n_358)
   in
   let rec _explore_264 _x_299 =
     match _x_299 with
@@ -166,35 +166,35 @@ let _test_leaf_state_240 (_m_241 : int) =
             _l_300 true >> fun _b_276 ->
             _l_300 false >> fun _b_277 -> Value (_op_151 (* @ *) _b_276 _b_277)
       in
-      let rec _explore_348 (_x_299, _k_336) =
+      let rec _explore_338 (_x_299, _k_336) =
         match _x_299 with
         | Empty -> (
-            fun (_s_350 : intlist) ->
-              match _s_350 with
-              | Cons (_x_352, _rest_351) ->
+            fun (_s_340 : intlist) ->
+              match _s_340 with
+              | Cons (_x_342, _rest_341) ->
                   force_unsafe
                     ((handler
                         {
                           value_clause =
-                            (fun (_x_355 : intlist) ->
-                              Value (fun (_ : intlist) -> _x_355));
+                            (fun (_x_345 : intlist) ->
+                              Value (fun (_ : intlist) -> _x_345));
                           effect_clauses =
                             (fun (type a b) (eff : (a, b) eff_internal_effect) :
                                  (a -> (b -> _) -> _) ->
                               match eff with
                               | Get ->
-                                  fun () _l_356 ->
+                                  fun () _l_346 ->
                                     Value
-                                      (fun (_s_357 : intlist) ->
-                                        match _s_357 with
-                                        | Cons (_x_359, _rest_358) ->
+                                      (fun (_s_347 : intlist) ->
+                                        match _s_347 with
+                                        | Cons (_x_349, _rest_348) ->
                                             coer_arrow coer_refl_ty force_unsafe
-                                              _l_356 _x_359 _rest_358
+                                              _l_346 _x_349 _rest_348
                                         | Nil -> Nil)
                               | eff' -> fun arg k -> Call (eff', arg, k));
                         })
-                       (_k_336 _x_352))
-                    _rest_351
+                       (_k_336 _x_342))
+                    _rest_341
               | Nil -> Nil)
         | Node (_left_327, _x_326, _right_325) ->
             let _l_300 (_y_328 : bool) =
@@ -251,8 +251,151 @@ let _test_leaf_state_240 (_m_241 : int) =
                   })
                  (_l_300 true))
       in
-      _explore_348
+      _explore_338
         (_tester_42 _m_241, fun (_x_278 : int) -> Value (Cons (_x_278, Nil))))
        (_populate_leafs_250 0 154))
 
 let test_leaf_state = _test_leaf_state_240
+
+type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
+
+let _test_leaf_state_update_972 (_m_973 : int) =
+  let rec _maxl_974 _x_1016 (_x_1285 : intlist) =
+    match _x_1285 with
+    | Nil -> _x_1016
+    | Cons (_x_1287, _xs_1286) -> _maxl_974 (_max_146 _x_1287 _x_1016) _xs_1286
+  in
+  let rec _explore_983 _x_1023 =
+    match _x_1023 with
+    | Empty -> Call (Get, (), fun (_y_1054 : int) -> Value _y_1054)
+    | Node (_left_1057, _x_1056, _right_1055) ->
+        Call
+          ( Set,
+            _x_1056 * _x_1056,
+            fun (_y_1060 : unit) ->
+              Call
+                ( Choose,
+                  (),
+                  fun (_y_1061 : bool) ->
+                    _explore_983 (if _y_1061 then _left_1057 else _right_1055)
+                    >> fun _b_1064 -> Value (_op_140 _x_1056 _b_1064) ) )
+  in
+  _maxl_974 0
+    ((let rec _explore_1067 (_x_1023, _k_1069) =
+        match _x_1023 with
+        | Empty -> Call (Get, (), fun (_y_1054 : int) -> _k_1069 _y_1054)
+        | Node (_left_1057, _x_1056, _right_1055) ->
+            Call
+              ( Set,
+                _x_1056 * _x_1056,
+                fun (_y_1060 : unit) ->
+                  let _l_1024 (_y_1061 : bool) =
+                    _explore_1067
+                      ( (if _y_1061 then _left_1057 else _right_1055),
+                        fun (_b_1064 : int) -> _k_1069 (_op_140 _x_1056 _b_1064)
+                      )
+                  in
+                  _l_1024 true >> fun _b_997 ->
+                  _l_1024 false >> fun _b_998 ->
+                  Value (_op_151 (* @ *) _b_997 _b_998) )
+      in
+      let rec _explore_1071 (_x_1023, _k_1069) =
+        match _x_1023 with
+        | Empty ->
+            fun (_s_1073 : int) ->
+              force_unsafe
+                ((handler
+                    {
+                      value_clause =
+                        (fun (_x_1076 : intlist) ->
+                          Value (fun (_ : int) -> _x_1076));
+                      effect_clauses =
+                        (fun (type a b) (eff : (a, b) eff_internal_effect) :
+                             (a -> (b -> _) -> _) ->
+                          match eff with
+                          | Get ->
+                              fun () _l_1077 ->
+                                Value
+                                  (fun (_s_1078 : int) ->
+                                    coer_arrow coer_refl_ty force_unsafe _l_1077
+                                      _s_1078 _s_1078)
+                          | Set ->
+                              fun _s_1080 _l_1081 ->
+                                Value
+                                  (fun (_ : int) ->
+                                    coer_arrow coer_refl_ty force_unsafe _l_1081
+                                      () _s_1080)
+                          | eff' -> fun arg k -> Call (eff', arg, k));
+                    })
+                   (_k_1069 _s_1073))
+                _s_1073
+        | Node (_left_1057, _x_1056, _right_1055) ->
+            fun (_ : int) ->
+              (let _l_1087 (_y_1104 : bool) =
+                 _explore_1067
+                   ( (if _y_1104 then _left_1057 else _right_1055),
+                     fun (_b_1107 : int) -> _k_1069 (_op_140 _x_1056 _b_1107) )
+               in
+               force_unsafe
+                 ((handler
+                     {
+                       value_clause =
+                         (fun (_b_1088 : intlist) ->
+                           Value
+                             (force_unsafe
+                                ((handler
+                                    {
+                                      value_clause =
+                                        (fun (_b_1090 : intlist) ->
+                                          Value
+                                            (fun (_ : int) ->
+                                              _op_151 (* @ *) _b_1088 _b_1090));
+                                      effect_clauses =
+                                        (fun (type a b)
+                                             (eff : (a, b) eff_internal_effect)
+                                             : (a -> (b -> _) -> _) ->
+                                          match eff with
+                                          | Get ->
+                                              fun () _l_1092 ->
+                                                Value
+                                                  (fun (_s_1093 : int) ->
+                                                    coer_arrow coer_refl_ty
+                                                      force_unsafe _l_1092
+                                                      _s_1093 _s_1093)
+                                          | Set ->
+                                              fun _s_1095 _l_1096 ->
+                                                Value
+                                                  (fun (_ : int) ->
+                                                    coer_arrow coer_refl_ty
+                                                      force_unsafe _l_1096 ()
+                                                      _s_1095)
+                                          | eff' ->
+                                              fun arg k -> Call (eff', arg, k));
+                                    })
+                                   (_l_1087 false))));
+                       effect_clauses =
+                         (fun (type a b) (eff : (a, b) eff_internal_effect) :
+                              (a -> (b -> _) -> _) ->
+                           match eff with
+                           | Get ->
+                               fun () _l_1098 ->
+                                 Value
+                                   (fun (_s_1099 : int) ->
+                                     coer_arrow coer_refl_ty force_unsafe
+                                       _l_1098 _s_1099 _s_1099)
+                           | Set ->
+                               fun _s_1101 _l_1102 ->
+                                 Value
+                                   (fun (_ : int) ->
+                                     coer_arrow coer_refl_ty force_unsafe
+                                       _l_1102 () _s_1101)
+                           | eff' -> fun arg k -> Call (eff', arg, k));
+                     })
+                    (_l_1087 true)))
+                (_x_1056 * _x_1056)
+      in
+      _explore_1071
+        (_tester_42 _m_973, fun (_x_999 : int) -> Value (Cons (_x_999, Nil))))
+       ~-1)
+
+let test_leaf_state_update = _test_leaf_state_update_972

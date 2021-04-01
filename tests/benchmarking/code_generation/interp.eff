@@ -54,3 +54,50 @@ let bigTest num =
     | effect (DivByZero ()) k ->  -1
   in
   with arithmeticHandler handle interp finalCase
+
+effect Get: unit -> int
+effect Set: int -> unit
+;;
+let testState n = 
+  let rec interp = function
+  | Num b -> 
+    perform (Set (b*b));
+    b
+  | Add (l, r) ->
+    let x = interp l in
+    let y = interp r in
+    x + y
+  | Mul (l, r) ->
+    let x = interp l in
+    let y = interp r in
+    x * y
+  | Sub (l, r) ->
+    let x = interp l in
+    let y = interp r in
+    x - y
+  | Div (l, r) ->
+    let y = interp r in
+    let x = interp l in
+    begin match y with
+    | 0 -> perform (Get ())
+    | _ -> x / y
+    end
+  in
+  let monad_state = handler
+  | y -> (fun _ -> y)
+  | effect (Get ()) k -> (
+    fun s -> (k s) s
+    )
+  | effect (Set s) k -> (
+    fun _ -> (k ()) s
+  )
+  in
+  let finalCase = createCase n in
+  (with monad_state handle interp finalCase) n
+
+(*
+
+# testState 100;;
+- : int = 12772
+
+*)

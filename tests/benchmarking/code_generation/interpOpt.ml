@@ -84,3 +84,90 @@ let _bigTest_73 (_num_74 : int) =
   _interp_135 (_createCase_61 _num_74, fun (_id_101 : int) -> _id_101)
 
 let bigTest = _bigTest_73
+
+type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
+
+type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
+
+let _testState_140 (_n_141 : int) =
+  let rec _interp_142 _x_183 =
+    match _x_183 with
+    | Num _b_195 ->
+        Call (Set, _b_195 * _b_195, fun (_y_198 : unit) -> Value _b_195)
+    | Add (_l_200, _r_199) ->
+        _interp_142 _l_200 >> fun _x_201 ->
+        _interp_142 _r_199 >> fun _y_202 -> Value (_x_201 + _y_202)
+    | Mul (_l_205, _r_204) ->
+        _interp_142 _l_205 >> fun _x_206 ->
+        _interp_142 _r_204 >> fun _y_207 -> Value (_x_206 * _y_207)
+    | Sub (_l_210, _r_209) ->
+        _interp_142 _l_210 >> fun _x_211 ->
+        _interp_142 _r_209 >> fun _y_212 -> Value (_x_211 - _y_212)
+    | Div (_l_215, _r_214) -> (
+        _interp_142 _r_214 >> fun _y_216 ->
+        _interp_142 _l_215 >> fun _x_217 ->
+        match _y_216 with
+        | 0 -> Call (Get, (), fun (_y_218 : int) -> Value _y_218)
+        | _ -> Value (_x_217 / _y_216))
+  in
+  (let rec _interp_225 (_x_183, _k_227) =
+     match _x_183 with
+     | Num _b_195 -> fun (_ : int) -> _k_227 _b_195 (_b_195 * _b_195)
+     | Add (_l_200, _r_199) ->
+         _interp_225
+           ( _l_200,
+             fun (_x_201 : int) ->
+               _interp_225
+                 (_r_199, fun (_y_202 : int) -> _k_227 (_x_201 + _y_202)) )
+     | Mul (_l_205, _r_204) ->
+         _interp_225
+           ( _l_205,
+             fun (_x_206 : int) ->
+               _interp_225
+                 (_r_204, fun (_y_207 : int) -> _k_227 (_x_206 * _y_207)) )
+     | Sub (_l_210, _r_209) ->
+         _interp_225
+           ( _l_210,
+             fun (_x_211 : int) ->
+               _interp_225
+                 (_r_209, fun (_y_212 : int) -> _k_227 (_x_211 - _y_212)) )
+     | Div (_l_215, _r_214) ->
+         _interp_225
+           ( _r_214,
+             fun (_y_216 : int) ->
+               _interp_225
+                 ( _l_215,
+                   fun (_x_217 : int) ->
+                     force_unsafe
+                       ((handler
+                           {
+                             value_clause =
+                               (fun (_x_226 : int) -> Value (_k_227 _x_226));
+                             effect_clauses =
+                               (fun (type a b)
+                                    (eff : (a, b) eff_internal_effect) :
+                                    (a -> (b -> _) -> _) ->
+                                 match eff with
+                                 | Get ->
+                                     fun () _l_184 ->
+                                       Value
+                                         (fun (_s_169 : int) ->
+                                           coer_arrow coer_refl_ty force_unsafe
+                                             _l_184 _s_169 _s_169)
+                                 | Set ->
+                                     fun _s_171 _l_185 ->
+                                       Value
+                                         (fun (_ : int) ->
+                                           coer_arrow coer_refl_ty force_unsafe
+                                             _l_185 () _s_171)
+                                 | eff' -> fun arg k -> Call (eff', arg, k));
+                           })
+                          (match _y_216 with
+                          | 0 ->
+                              Call (Get, (), fun (_y_218 : int) -> Value _y_218)
+                          | _ -> Value (_x_217 / _y_216))) ) )
+   in
+   _interp_225 (_createCase_61 _n_141, fun (_x_174 : int) (_ : int) -> _x_174))
+    _n_141
+
+let testState = _testState_140

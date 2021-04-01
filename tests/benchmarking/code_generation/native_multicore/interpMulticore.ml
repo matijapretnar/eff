@@ -55,3 +55,50 @@ let bigTest num =
   with 
   | effect (DivByZero ()) k -> -1
   | x -> x
+
+
+effect Get: unit -> int
+effect Set: int -> unit
+;;
+let testState num = 
+  let rec interp = function
+  | Num b -> 
+    perform (Set (b*b));
+    b
+  | Add (l, r) ->
+    let x = interp l in
+    let y = interp r in
+    x + y
+  | Mul (l, r) ->
+    let x = interp l in
+    let y = interp r in
+    x * y
+  | Sub (l, r) ->
+    let x = interp l in
+    let y = interp r in
+    x - y
+  | Div (l, r) ->
+    let y = interp r in
+    let x = interp l in
+    begin match y with
+    | 0 -> perform (Get ())
+    | _ -> x / y
+    end
+  in
+  let finalCase = createCase num in
+  (match interp finalCase with
+  | y -> (fun _ -> y)
+  | effect (Get ()) k -> (
+    fun (s: int) -> 
+      (continue k s) s
+    )
+  | effect (Set s) k -> (
+    fun _ -> (continue k ()) s
+  ) ) (num)
+
+(*
+
+# testState 100;;
+- : int = 12772
+
+*)

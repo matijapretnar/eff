@@ -69,6 +69,81 @@ let test_leaf_state (m: int)=
   | x -> [x]
   )
 
+effect Get: unit -> int
+
+let test_leaf_state_effect (m: int)= 
+  let leafs = (List.init 154 (fun i -> i * 3)) in
+  let t = tester m in
+  let rec explore t = match t with
+    | Empty -> (
+        perform (Get ())
+      )
+      | Node (left, x, right) -> 
+      let next = if (perform (Choose ())) then left else right in
+      (op x (explore next))
+  in
+  (List.fold_left max 0 (
+    (match 
+    (match explore t with
+      | effect (Choose ()) k -> 
+        let k' = Obj.clone_continuation k in 
+        (* 
+        Explicit sequencing, as there is no guarantee on element evaluation order 
+        Since both branches produce side effects and are non orthogonal, this is important.
+        Not performance wise, but result wise. 
+        *)
+        let (left_branch) = (continue k' true) in 
+        left_branch @ (continue k false)
+      | x -> [x]
+      ) with
+    | y -> (fun _ -> y)
+    | effect (Get ()) k -> (
+      fun (s: int list) -> (match s with 
+      | x::rest -> (continue k x) rest
+      | [] -> []
+      )
+    ) ) leafs
+  ))
+
+effect Set: int -> unit
+
+let test_leaf_state_update m= 
+  let t = tester m in
+  let rec explore t = match t with
+    | Empty -> (
+        perform (Get ())
+      )
+      | Node (left, x, right) -> (
+        perform (Set (x*x));
+      let next = if (perform (Choose ())) then left else right in
+      (op x (explore next))
+      )
+  in
+  (List.fold_left max 0 (
+    (match 
+    (match explore t with
+      | effect (Choose ()) k -> 
+        let k' = Obj.clone_continuation k in 
+        (* 
+        Explicit sequencing, as there is no guarantee on element evaluation order 
+        Since both branches produce side effects and are non orthogonal, this is important.
+        Not performance wise, but result wise. 
+        *)
+        let (left_branch) = (continue k' true) in 
+        left_branch @ (continue k false)
+      | x -> [x]
+      ) with
+    | y -> (fun _ -> y)
+    | effect (Get ()) k -> (
+      fun (s: int) -> 
+        (continue k s) s
+      )
+    | effect (Set s) k -> (
+      fun _ -> (continue k ()) s
+    )  
+    )  (-1)
+  )
+  )
 
 (* 
 # test_leaf_state 100;;

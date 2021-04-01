@@ -78,6 +78,36 @@ let bigTestOption num =
             | None -> None
             | Some x -> if y = 0 then None else Some (x / y)))
   in
-
   let finalCase = createCase num in
   match interp finalCase with None -> -1 | Some x -> x
+
+let testState n =
+  let rec interp b = function
+    | Num b -> (b, b * b)
+    | Add (l, r) ->
+        let x, b = interp b l in
+        let y, b = interp b r in
+        (x + y, b)
+    | Mul (l, r) ->
+        let x, b = interp b l in
+        let y, b = interp b r in
+        (x * y, b)
+    | Sub (l, r) ->
+        let x, b = interp b l in
+        let y, b = interp b r in
+        (x - y, b)
+    | Div (l, r) ->
+        let y, b = interp b r in
+        let x, b = interp b l in
+        if y = 0 then (b, b) else (x / y, b)
+  in
+  let finalCase = createCase n in
+  fst (interp n finalCase)
+
+
+(*
+
+# testState 100;;
+- : int = 12772
+
+*)
