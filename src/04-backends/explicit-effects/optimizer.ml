@@ -70,10 +70,7 @@ let keep_used_bindings defs cmp =
   in
   let free_vars = Term.concat_vars (free_vars_cmp :: free_vars_defs) in
   List.filter
-    (fun (x, _) ->
-      match Term.VariableMap.find_opt x.term free_vars with
-      | None | Some 0 -> false
-      | Some _ -> true)
+    (fun (x, _) -> not (Term.does_not_occur x.term free_vars))
     (Assoc.to_list defs)
 
 let rec extract_cast_value comp =
@@ -466,7 +463,9 @@ and reduce_computation' state comp =
       let cmp' = handle_computation state' hnd cmp in
       match keep_used_bindings (Assoc.of_list spec_rec_defs) cmp' with
       | [] -> cmp'
-      | defs' -> Term.letRec (Assoc.of_list defs', cmp'))
+      | defs' ->
+          Term.letRec (Assoc.of_list defs', cmp') |> optimize_computation state'
+      )
   | Term.Handle
       ( {
           term =
