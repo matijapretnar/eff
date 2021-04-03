@@ -14,6 +14,12 @@ and number_of_tree = 100
 
 and size_of_interp_expression = 200
 
+and number_of_count = 1_000_000
+
+and number_of_generator = 1_000_000
+
+and number_of_queen_capability = 16
+
 let run_loop_pure = false
 
 and run_loop_latent = false
@@ -30,7 +36,7 @@ and run_queens_all = false
 
 and run_interp = false
 
-and run_interp_state = true
+and run_interp_state = false
 
 and run_range = false
 
@@ -39,6 +45,13 @@ and run_tree = false
 and run_state_tree = false
 
 and run_state_update_tree = false
+
+(* Capability benchmarks *)
+and run_count_benchmarks = true
+
+and run_generator_benchmarks = true
+
+and run_queen_capabilty_benchmarks = true
 
 let benchmark test =
   let ols =
@@ -305,6 +318,7 @@ let run_and_show_set (benchmark_set : 'a Benchmark_config.benchmark_set) =
   Printf.printf "\n\n"
 
 let () =
+  let start_time = Sys.time () in
   if run_loop_pure then (
     let set = suite.loop_benchmarks number_of_loops in
     Printf.printf "%s (%d loops):\n" set.name set.param;
@@ -403,4 +417,36 @@ let () =
         2 * number_of_tree;
         4 * number_of_tree;
         8 * number_of_tree;
-      ]
+      ];
+  if run_count_benchmarks then
+    List.iter
+      (fun n ->
+        let set = suite.count_benchmark n in
+        Printf.printf "%s (N: %d):\n" set.name set.param;
+        run_and_show_set set)
+      [
+        number_of_count;
+        2 * number_of_count;
+        4 * number_of_count;
+        8 * number_of_count;
+      ];
+  if run_generator_benchmarks then
+    List.iter
+      (fun n ->
+        let set = suite.generator_benchmark n in
+        Printf.printf "%s (N: %d):\n" set.name set.param;
+        run_and_show_set set)
+      [
+        number_of_generator;
+        2 * number_of_generator;
+        4 * number_of_generator;
+        8 * number_of_generator;
+      ];
+  if run_queen_capabilty_benchmarks then
+    List.iter
+      (fun n ->
+        let set = suite.queen_capabilty_benchmarks n in
+        Printf.printf "%s (N: %d):\n" set.name set.param;
+        run_and_show_set set)
+      [ number_of_queen_capability ];
+  Printf.printf "Full suite took: %f s\n" (Sys.time () -. start_time)

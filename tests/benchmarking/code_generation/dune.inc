@@ -123,3 +123,28 @@
    (action
     (diff "treeOpt.ml" "treeOpt.formatted")))
 
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
+   (target "capability_benchmarksOpt.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 1 2)
+       (run eff --no-stdlib --compile-plain-ocaml  "./capability_benchmarks.eff")))))
+
+(rule
+ (deps "capability_benchmarksOpt.out")
+  (target "capability_benchmarksOpt.formatted")
+   (action
+    (with-outputs-to "capability_benchmarksOpt.formatted"
+     (with-accepted-exit-codes (or 0 1 2)
+      (run ocamlformat capability_benchmarksOpt.out)))))
+
+(rule
+ (deps capability_benchmarksOpt.formatted)
+  (alias generate_benchmarks)
+   (action
+    (diff "capability_benchmarksOpt.ml" "capability_benchmarksOpt.formatted")))
+

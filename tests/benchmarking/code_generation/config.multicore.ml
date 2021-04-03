@@ -118,6 +118,27 @@ let test_suite =
            forget_value TreeMulticore.test_leaf_state_update,
            always_true TreeMulticore.test_leaf_state_update )
   in
+  let count_benchmark =
+    base_suite.count_benchmark
+    |> add_benchmark
+         ( "Multicore",
+           forget_value CapabilityBenchmarks.testCount,
+           always_true CapabilityBenchmarks.testCount )
+  in
+  let generator_benchmark =
+    base_suite.generator_benchmark
+    |> add_benchmark
+         ( "Multicore",
+           forget_value CapabilityBenchmarks.testGenerator,
+           always_true CapabilityBenchmarks.testGenerator )
+  in
+  let queen_capabilty_benchmarks =
+    base_suite.queen_capabilty_benchmarks
+    |> add_benchmark
+         ( "Multicore",
+           forget_value CapabilityBenchmarks.queens_all,
+           always_true CapabilityBenchmarks.queens_all )
+  in
   {
     base_suite with
     interpreter_benchmark;
@@ -134,4 +155,7 @@ let test_suite =
     tree_benchmark;
     state_tree_benchmark;
     state_with_update_tree_benchmark;
+    count_benchmark;
+    generator_benchmark;
+    queen_capabilty_benchmarks;
   }

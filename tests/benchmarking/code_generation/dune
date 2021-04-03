@@ -2,6 +2,8 @@
 
 (executables
  (names benchmark)
+ (ocamlopt_flags
+  (:standard -O3))
  (modes native)
  (modules
   (:standard \ generate_benchmark_rules))

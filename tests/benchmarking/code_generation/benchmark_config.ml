@@ -27,6 +27,9 @@ type test_suite = {
   tree_benchmark : int -> int benchmark_set;
   state_tree_benchmark : int -> int benchmark_set;
   state_with_update_tree_benchmark : int -> int benchmark_set;
+  count_benchmark : int -> int benchmark_set;
+  generator_benchmark : int -> int benchmark_set;
+  queen_capabilty_benchmarks : int -> int benchmark_set;
 }
 
 let loop_benchmarks number_of_loops =
@@ -243,6 +246,51 @@ let state_with_update_tree_benchmark number =
     param = number;
   }
 
+let count_benchmark number =
+  {
+    name = "COUNT BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, optimized",
+          forget_value Capability_benchmarksOpt.testCount,
+          always_true Capability_benchmarksOpt.testCount );
+        ( "Native",
+          forget_value Capability_benchmarks_native.testCount,
+          always_true Capability_benchmarks_native.testCount );
+      ];
+    param = number;
+  }
+
+let generator_benchmark number =
+  {
+    name = "GENERATOR BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, optimized",
+          forget_value Capability_benchmarksOpt.testGenerator,
+          always_true Capability_benchmarksOpt.testGenerator );
+        (* ( "Generated, lambda lift by hand", (* Lambda lift *)
+           forget_value Capability_benchmarksOpt.testGenerator2,
+           always_true Capability_benchmarksOpt.testGenerator2 ); *)
+        ( "Native",
+          forget_value Capability_benchmarks_native.testGenerator,
+          always_true Capability_benchmarks_native.testGenerator );
+      ];
+    param = number;
+  }
+
+let queen_capabilty_benchmarks number =
+  {
+    name = "QUEEN CAPABILTY BENCHMARK";
+    benchmarks =
+      [
+        ( "Generated, optimized",
+          forget_value Capability_benchmarksOpt.queens_all,
+          always_true Capability_benchmarksOpt.queens_all );
+      ];
+    param = number;
+  }
+
 let default_test_suite =
   {
     loop_benchmarks;
@@ -259,4 +307,7 @@ let default_test_suite =
     tree_benchmark;
     state_tree_benchmark;
     state_with_update_tree_benchmark;
+    count_benchmark;
+    generator_benchmark;
+    queen_capabilty_benchmarks;
   }
