@@ -397,3 +397,51 @@ let _test_leaf_state_update_978 (_m_979 : int) =
        ~-1)
 
 let test_leaf_state_update = _test_leaf_state_update_978
+
+let _test_leaf_state_update_merged_handler_10087 (_m_10088 : int) =
+  let rec _maxl_10089 _x_10130 (_x_10198 : intlist) =
+    match _x_10198 with
+    | Nil -> _x_10130
+    | Cons (_x_10200, _xs_10199) ->
+        _maxl_10089 (_max_146 _x_10200 _x_10130) _xs_10199
+  in
+  let rec _explore_10098 _x_10137 =
+    match _x_10137 with
+    | Empty -> Call (Get, (), fun (_y_10155 : int) -> Value _y_10155)
+    | Node (_left_10158, _x_10157, _right_10156) ->
+        Call
+          ( Set,
+            _x_10157 * _x_10157,
+            fun (_y_10161 : unit) ->
+              Call
+                ( Choose,
+                  (),
+                  fun (_y_10162 : bool) ->
+                    _explore_10098
+                      (if _y_10162 then _left_10158 else _right_10156)
+                    >> fun _b_10165 -> Value (_op_140 _x_10157 _b_10165) ) )
+  in
+  _maxl_10089 0
+    ((let rec _explore_10173 (_x_10137, _k_10175) (_x_1 : int) =
+        match _x_10137 with
+        | Empty -> _k_10175 _x_1 _x_1
+        | Node (_left_10158, _x_10157, _right_10156) ->
+            (let _l_10185 (_y_10192 : bool) =
+               _explore_10173
+                 ( (if _y_10192 then _left_10158 else _right_10156),
+                   fun (_b_10195 : int) -> _k_10175 (_op_140 _x_10157 _b_10195)
+                 )
+             in
+             fun (_s_10186 : int) ->
+               _op_151
+                 (* @ *) (_l_10185 true _s_10186)
+                 (_l_10185 false _s_10186))
+              (_x_10157 * _x_10157)
+      in
+      _explore_10173
+        ( _tester_42 _m_10088,
+          fun (_x_10123 : int) (_ : int) -> Cons (_x_10123, Nil) ))
+       ~-1)
+
+let test_leaf_state_update_merged_handler =
+  _test_leaf_state_update_merged_handler_10087

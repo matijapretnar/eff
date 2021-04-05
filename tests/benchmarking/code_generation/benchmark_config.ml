@@ -239,6 +239,9 @@ let state_with_update_tree_benchmark number =
         ( "Generated, optimized",
           forget_value TreeOpt.test_leaf_state_update,
           always_true TreeOpt.test_leaf_state_update );
+        ( "Generated, optimized merged",
+          forget_value TreeOpt.test_leaf_state_update_merged_handler,
+          always_true TreeOpt.test_leaf_state_update_merged_handler );
         ( "Native",
           forget_value TreeNative.test_leaf_state_update,
           always_true TreeNative.test_leaf_state_update );
