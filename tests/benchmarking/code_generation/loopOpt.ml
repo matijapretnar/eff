@@ -68,48 +68,25 @@ type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
 type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
 
-let rec _loop_state_181 _x_210 =
-  if _x_210 = 0 then Value ()
+let rec _loop_state_181 _x_194 =
+  if _x_194 = 0 then Value ()
   else
     Call
       ( Get,
         (),
-        fun (_y_231 : int) ->
+        fun (_y_203 : int) ->
           Call
             ( Put,
-              _y_231 + 1,
-              fun (_y_234 : unit) ->
-                Call
-                  ( Get,
-                    (),
-                    fun (_y_235 : int) ->
-                      Call
-                        ( Put,
-                          _y_235 + 1,
-                          fun (_y_238 : unit) ->
-                            Call
-                              ( Get,
-                                (),
-                                fun (_y_239 : int) ->
-                                  Call
-                                    ( Put,
-                                      _y_239 + 1,
-                                      fun (_y_242 : unit) ->
-                                        Call
-                                          ( Incr,
-                                            (),
-                                            fun (_y_243 : unit) ->
-                                              _loop_state_181 (_x_210 - 1) ) )
-                              ) ) ) ) )
+              _y_203 + 1,
+              fun (_y_206 : unit) -> _loop_state_181 (_x_194 - 1) ) )
 
 let loop_state = _loop_state_181
 
-let _test_state_246 (_n_247 : int) =
-  (let rec _loop_state_270 _x_210 (_x_2 : int) =
-     if _x_210 = 0 then _x_2
-     else _loop_state_270 (_x_210 - 1) (_x_2 + 1 + 1 + 1 + 1)
+let _test_state_209 (_n_210 : int) =
+  (let rec _loop_state_227 _x_194 (_x_2 : int) =
+     if _x_194 = 0 then _x_2 else _loop_state_227 (_x_194 - 1) (_x_2 + 1)
    in
-   _loop_state_270 _n_247)
+   _loop_state_227 _n_210)
     0
 
-let test_state = _test_state_246
+let test_state = _test_state_209

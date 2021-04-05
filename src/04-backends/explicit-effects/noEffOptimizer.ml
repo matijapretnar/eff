@@ -76,7 +76,7 @@ let rec sub_leafs subs (n_term : NoEff.n_term) =
   | NoEff.NHandle (_, _)
   | NoEff.NConst _ ->
       n_term
-  | NoEff.NFun (NoEff.PNVar _, _, t)-> NoEff.substitute_term subs t
+  | NoEff.NFun (NoEff.PNVar _, _, t) -> NoEff.substitute_term subs t
   | NoEff.NFun (NoEff.PNNonbinding, _, t) -> NoEff.substitute_term subs t
   | NoEff.NFun (NoEff.PNConst _, _, t) -> NoEff.substitute_term subs t
   | NoEff.NFun _ -> n_term
@@ -217,8 +217,6 @@ and reduce_term' state (n_term : NoEff.n_term) =
   | NCast (t, NCoerRefl) -> t
   | NBind (NReturn t, c) -> beta_reduce state c t
   | NLet (e, a) -> beta_reduce state a e
-  | NFun (p, ty, c) when not (is_fun c) ->
-      NoEff.NFun (p, ty, naive_lambda_lift c)
   | NLetRec (defs, t) ->
       let defs =
         Assoc.kmap
@@ -226,10 +224,6 @@ and reduce_term' state (n_term : NoEff.n_term) =
             if is_fun c then (v, (p, c)) else (v, (p, naive_lambda_lift c)))
           defs
       in
-      let _v, (_p, tt) = Assoc.to_list defs |> List.hd in
-      Print.debug "REDUCING: %t; %t" (NoEff.Variable.print _v)
-        (NoEff.print_term tt);
-
       NLetRec (defs, t)
   | _ -> n_term
 
