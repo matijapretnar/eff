@@ -24,13 +24,13 @@ let run_loop_pure = false
 
 and run_loop_latent = false
 
-and run_loop_incr = false
+and run_loop_incr = true
 
 and run_loop_incr' = false
 
-and run_loop_state = false
+and run_loop_state = true
 
-and run_queens_one = false
+and run_queens_one = true
 
 and run_queens_all = false
 
@@ -44,14 +44,14 @@ and run_tree = false
 
 and run_state_tree = false
 
-and run_state_update_tree = false
+and run_state_update_tree = true
 
 (* Capability benchmarks *)
-and run_count_benchmarks = true
+and run_count_benchmarks = false
 
 and run_generator_benchmarks = true
 
-and run_queen_capabilty_benchmarks = true
+and run_queen_capabilty_benchmarks = false
 
 let benchmark test =
   let ols =
@@ -339,7 +339,7 @@ let () =
         run_and_show_set set)
       [ number_of_loops; 2 * number_of_loops ];
   if run_loop_state then (
-    let set = suite.loop_incr_benchmark number_of_loops in
+    let set = suite.loop_state_benchmark number_of_loops in
     Printf.printf "%s (%d loops):\n" set.name set.param;
     run_and_show_set set);
   if run_queens_one then (

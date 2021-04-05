@@ -12,3 +12,27 @@ let test n =
 	handle ( range n ) with
 	| x -> x
 	| effect (Fetch _) k -> k 42
+
+
+(* effect Get: unit -> int_list
+effect Put: int_list -> unit
+
+;;
+let test n = 
+	let rec range n =
+		match n with
+		| 0 -> perform (Put Nil)
+		| _ ->
+			(let q = (perform (Fetch ())) in
+			range (n-1);
+			perform ( Put (Cons(q,  perform (Get ()) ))
+			))
+	in			
+	(handle (handle ( range n ) with
+	| x -> x
+	| effect (Fetch _) k -> k 42
+	) with 
+	| y -> (fun _ -> y)
+	| effect (Get ()) k -> (fun s -> k s s)
+	| effect (Put s') k -> (fun _ -> k () s')
+	) Nil *)

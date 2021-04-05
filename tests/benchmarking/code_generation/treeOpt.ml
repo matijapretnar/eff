@@ -299,100 +299,98 @@ let _test_leaf_state_update_978 (_m_979 : int) =
                   _l_1030 false >> fun _b_1004 ->
                   Value (_op_151 (* @ *) _b_1003 _b_1004) )
       in
-      let rec _explore_1077 (_x_1029, _k_1075) =
+      let rec _explore_1077 (_x_1029, _k_1075) (_x_0 : int) =
         match _x_1029 with
         | Empty ->
-            fun (_s_1079 : int) ->
-              force_unsafe
-                ((handler
-                    {
-                      value_clause =
-                        (fun (_x_1082 : intlist) ->
-                          Value (fun (_ : int) -> _x_1082));
-                      effect_clauses =
-                        (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                             (a -> (b -> _) -> _) ->
-                          match eff with
-                          | Get ->
-                              fun () _l_1083 ->
-                                Value
-                                  (fun (_s_1084 : int) ->
-                                    coer_arrow coer_refl_ty force_unsafe _l_1083
-                                      _s_1084 _s_1084)
-                          | Set ->
-                              fun _s_1086 _l_1087 ->
-                                Value
-                                  (fun (_ : int) ->
-                                    coer_arrow coer_refl_ty force_unsafe _l_1087
-                                      () _s_1086)
-                          | eff' -> fun arg k -> Call (eff', arg, k));
-                    })
-                   (_k_1075 _s_1079))
-                _s_1079
+            force_unsafe
+              ((handler
+                  {
+                    value_clause =
+                      (fun (_x_1082 : intlist) ->
+                        Value (fun (_ : int) -> _x_1082));
+                    effect_clauses =
+                      (fun (type a b) (eff : (a, b) eff_internal_effect) :
+                           (a -> (b -> _) -> _) ->
+                        match eff with
+                        | Get ->
+                            fun () _l_1083 ->
+                              Value
+                                (fun (_s_1084 : int) ->
+                                  coer_arrow coer_refl_ty force_unsafe _l_1083
+                                    _s_1084 _s_1084)
+                        | Set ->
+                            fun _s_1086 _l_1087 ->
+                              Value
+                                (fun (_ : int) ->
+                                  coer_arrow coer_refl_ty force_unsafe _l_1087
+                                    () _s_1086)
+                        | eff' -> fun arg k -> Call (eff', arg, k));
+                  })
+                 (_k_1075 _x_0))
+              _x_0
         | Node (_left_1063, _x_1062, _right_1061) ->
-            fun (_ : int) ->
-              (let _l_1093 (_y_1110 : bool) =
-                 _explore_1073
-                   ( (if _y_1110 then _left_1063 else _right_1061),
-                     fun (_b_1113 : int) -> _k_1075 (_op_140 _x_1062 _b_1113) )
-               in
-               force_unsafe
-                 ((handler
-                     {
-                       value_clause =
-                         (fun (_b_1094 : intlist) ->
-                           Value
-                             (force_unsafe
-                                ((handler
-                                    {
-                                      value_clause =
-                                        (fun (_b_1096 : intlist) ->
-                                          Value
-                                            (fun (_ : int) ->
-                                              _op_151 (* @ *) _b_1094 _b_1096));
-                                      effect_clauses =
-                                        (fun (type a b)
-                                             (eff : (a, b) eff_internal_effect)
-                                             : (a -> (b -> _) -> _) ->
-                                          match eff with
-                                          | Get ->
-                                              fun () _l_1098 ->
-                                                Value
-                                                  (fun (_s_1099 : int) ->
-                                                    coer_arrow coer_refl_ty
-                                                      force_unsafe _l_1098
-                                                      _s_1099 _s_1099)
-                                          | Set ->
-                                              fun _s_1101 _l_1102 ->
-                                                Value
-                                                  (fun (_ : int) ->
-                                                    coer_arrow coer_refl_ty
-                                                      force_unsafe _l_1102 ()
-                                                      _s_1101)
-                                          | eff' ->
-                                              fun arg k -> Call (eff', arg, k));
-                                    })
-                                   (_l_1093 false))));
-                       effect_clauses =
-                         (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                              (a -> (b -> _) -> _) ->
-                           match eff with
-                           | Get ->
-                               fun () _l_1104 ->
-                                 Value
-                                   (fun (_s_1105 : int) ->
-                                     coer_arrow coer_refl_ty force_unsafe
-                                       _l_1104 _s_1105 _s_1105)
-                           | Set ->
-                               fun _s_1107 _l_1108 ->
-                                 Value
-                                   (fun (_ : int) ->
-                                     coer_arrow coer_refl_ty force_unsafe
-                                       _l_1108 () _s_1107)
-                           | eff' -> fun arg k -> Call (eff', arg, k));
-                     })
-                    (_l_1093 true)))
-                (_x_1062 * _x_1062)
+            (let _l_1093 (_y_1110 : bool) =
+               _explore_1073
+                 ( (if _y_1110 then _left_1063 else _right_1061),
+                   fun (_b_1113 : int) -> _k_1075 (_op_140 _x_1062 _b_1113) )
+             in
+             force_unsafe
+               ((handler
+                   {
+                     value_clause =
+                       (fun (_b_1094 : intlist) ->
+                         Value
+                           (force_unsafe
+                              ((handler
+                                  {
+                                    value_clause =
+                                      (fun (_b_1096 : intlist) ->
+                                        Value
+                                          (fun (_ : int) ->
+                                            _op_151 (* @ *) _b_1094 _b_1096));
+                                    effect_clauses =
+                                      (fun (type a b)
+                                           (eff : (a, b) eff_internal_effect) :
+                                           (a -> (b -> _) -> _) ->
+                                        match eff with
+                                        | Get ->
+                                            fun () _l_1098 ->
+                                              Value
+                                                (fun (_s_1099 : int) ->
+                                                  coer_arrow coer_refl_ty
+                                                    force_unsafe _l_1098 _s_1099
+                                                    _s_1099)
+                                        | Set ->
+                                            fun _s_1101 _l_1102 ->
+                                              Value
+                                                (fun (_ : int) ->
+                                                  coer_arrow coer_refl_ty
+                                                    force_unsafe _l_1102 ()
+                                                    _s_1101)
+                                        | eff' ->
+                                            fun arg k -> Call (eff', arg, k));
+                                  })
+                                 (_l_1093 false))));
+                     effect_clauses =
+                       (fun (type a b) (eff : (a, b) eff_internal_effect) :
+                            (a -> (b -> _) -> _) ->
+                         match eff with
+                         | Get ->
+                             fun () _l_1104 ->
+                               Value
+                                 (fun (_s_1105 : int) ->
+                                   coer_arrow coer_refl_ty force_unsafe _l_1104
+                                     _s_1105 _s_1105)
+                         | Set ->
+                             fun _s_1107 _l_1108 ->
+                               Value
+                                 (fun (_ : int) ->
+                                   coer_arrow coer_refl_ty force_unsafe _l_1108
+                                     () _s_1107)
+                         | eff' -> fun arg k -> Call (eff', arg, k));
+                   })
+                  (_l_1093 true)))
+              (_x_1062 * _x_1062)
       in
       _explore_1077
         (_tester_42 _m_979, fun (_x_1005 : int) -> Value (Cons (_x_1005, Nil))))

@@ -12,11 +12,10 @@ type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
 force_unsafe
-  ((let rec _concat_45 _x_63 =
+  ((let rec _concat_45 _x_63 (_x_0 : intlist) =
       match _x_63 with
-      | IntNil -> fun (_ys_73 : intlist) -> _ys_73
-      | IntCons (_z_75, _zs_74) ->
-          fun (_ys_76 : intlist) -> IntCons (_z_75, _concat_45 _zs_74 _ys_76)
+      | IntNil -> _x_0
+      | IntCons (_z_75, _zs_74) -> IntCons (_z_75, _concat_45 _zs_74 _x_0)
     in
     handler
       {

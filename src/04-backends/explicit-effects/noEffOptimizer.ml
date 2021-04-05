@@ -33,6 +33,77 @@ let abstraction_inlinability (pat, cmp) =
   in
   check_variables (NoEff.pattern_vars pat)
 
+let is_fun = function NoEff.NFun _ -> true | _ -> false
+
+let rec get_fun_leafs (n_term : NoEff.n_term) =
+  match n_term with
+  | NoEff.NVar _ | NoEff.NTuple _
+  | NoEff.NApplyTerm (_, _)
+  | NoEff.NReturn _ | NoEff.NHandler _ | NoEff.NRecord _
+  | NoEff.NVariant (_, _)
+  | NoEff.NDirectPrimitive _
+  | NoEff.NCall (_, _, _)
+  | NoEff.NHandle (_, _)
+  | NoEff.NConst _ ->
+      None
+  | NoEff.NFun ((NoEff.PNVar p, _, _) as t) -> Some [ (Some p, t) ]
+  | NoEff.NFun ((NoEff.PNNonbinding, _, _) as t) -> Some [ (None, t) ]
+  | NoEff.NFun ((NoEff.PNConst _, _, _) as t) -> Some [ (None, t) ]
+  | NoEff.NFun _ -> None
+  | NoEff.NCast (t, _)
+  | NoEff.NLetRec (_, t)
+  | NoEff.NLet (_, (_, t))
+  | NoEff.NBind (_, (_, t)) ->
+      get_fun_leafs t
+  | NoEff.NMatch (_, lst) ->
+      let rec seq l =
+        match l with
+        | [] -> Some []
+        | (_, t) :: xs ->
+            Option.bind (get_fun_leafs t) (fun x ->
+                Option.bind (seq xs) (fun xs -> Some (x @ xs)))
+      in
+      seq lst
+
+let rec sub_leafs subs (n_term : NoEff.n_term) =
+  match n_term with
+  | NoEff.NVar _ | NoEff.NTuple _
+  | NoEff.NApplyTerm (_, _)
+  | NoEff.NReturn _ | NoEff.NHandler _ | NoEff.NRecord _
+  | NoEff.NVariant (_, _)
+  | NoEff.NDirectPrimitive _
+  | NoEff.NCall (_, _, _)
+  | NoEff.NHandle (_, _)
+  | NoEff.NConst _ ->
+      n_term
+  | NoEff.NFun (NoEff.PNVar _, _, t)-> NoEff.substitute_term subs t
+  | NoEff.NFun (NoEff.PNNonbinding, _, t) -> NoEff.substitute_term subs t
+  | NoEff.NFun (NoEff.PNConst _, _, t) -> NoEff.substitute_term subs t
+  | NoEff.NFun _ -> n_term
+  | NoEff.NCast (t, c) -> NoEff.NCast (sub_leafs subs t, c)
+  | NoEff.NLetRec (d, t) -> NoEff.NLetRec (d, sub_leafs subs t)
+  | NoEff.NLet (n, (p, t)) -> NoEff.NLet (n, (p, sub_leafs subs t))
+  | NoEff.NBind (n, (p, t)) -> NoEff.NBind (n, (p, sub_leafs subs t))
+  | NoEff.NMatch (trm, lst) ->
+      NoEff.NMatch (trm, List.map (fun (p, t) -> (p, sub_leafs subs t)) lst)
+
+let naive_lambda_lift e =
+  match get_fun_leafs e with
+  | Some leafs -> (
+      match leafs with
+      | [] -> e
+      | (_, (_, ty, _)) :: _ ->
+          let v = NoEff.Variable.fresh "x" in
+          let p = NoEff.PNVar v in
+          let subs =
+            leafs
+            |> List.filter_map (fun (x, _) ->
+                   Option.map (fun x -> (x, NoEff.NVar v)) x)
+            |> Assoc.of_list
+          in
+          NoEff.NFun (p, ty, sub_leafs subs e))
+  | None -> e
+
 let rec optimize_ty_coercion state (n_coer : NoEff.n_coercion) =
   reduce_ty_coercion state (optimize_ty_coercion' state n_coer)
 
@@ -146,6 +217,20 @@ and reduce_term' state (n_term : NoEff.n_term) =
   | NCast (t, NCoerRefl) -> t
   | NBind (NReturn t, c) -> beta_reduce state c t
   | NLet (e, a) -> beta_reduce state a e
+  | NFun (p, ty, c) when not (is_fun c) ->
+      NoEff.NFun (p, ty, naive_lambda_lift c)
+  | NLetRec (defs, t) ->
+      let defs =
+        Assoc.kmap
+          (fun (v, (p, c)) ->
+            if is_fun c then (v, (p, c)) else (v, (p, naive_lambda_lift c)))
+          defs
+      in
+      let _v, (_p, tt) = Assoc.to_list defs |> List.hd in
+      Print.debug "REDUCING: %t; %t" (NoEff.Variable.print _v)
+        (NoEff.print_term tt);
+
+      NLetRec (defs, t)
   | _ -> n_term
 
 and reduce_term state n_term =

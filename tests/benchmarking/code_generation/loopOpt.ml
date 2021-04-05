@@ -34,9 +34,8 @@ let rec _loop_incr_81 _x_89 =
 let loop_incr = _loop_incr_81
 
 let _test_incr_98 (_n_99 : int) =
-  (let rec _loop_incr_114 _x_89 =
-     if _x_89 = 0 then fun (_x_108 : int) -> _x_108
-     else fun (_x_116 : int) -> _loop_incr_114 (_x_89 - 1) (_x_116 + 1)
+  (let rec _loop_incr_114 _x_89 (_x_0 : int) =
+     if _x_89 = 0 then _x_0 else _loop_incr_114 (_x_89 - 1) (_x_0 + 1)
    in
    _loop_incr_114 _n_99)
     0
@@ -57,9 +56,8 @@ let _test_incr'_137 (_n_138 : int) =
      else
        _loop_incr'_164
          (_x_128 - 1, fun (_ : unit) (_x_171 : int) -> _k_167 () (_x_171 + 1))
-   and _loop_incr_165 _x_89 =
-     if _x_89 = 0 then fun (_x_147 : int) -> _x_147
-     else fun (_x_177 : int) -> _loop_incr_165 (_x_89 - 1) (_x_177 + 1)
+   and _loop_incr_165 _x_89 (_x_1 : int) =
+     if _x_89 = 0 then _x_1 else _loop_incr_165 (_x_89 - 1) (_x_1 + 1)
    in
    _loop_incr'_164 (_n_138, fun (_x_145 : unit) (_x_147 : int) -> _x_147))
     0
@@ -70,26 +68,48 @@ type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
 type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
 
-let rec _loop_state_181 _x_194 =
-  if _x_194 = 0 then Value ()
+let rec _loop_state_181 _x_210 =
+  if _x_210 = 0 then Value ()
   else
     Call
       ( Get,
         (),
-        fun (_y_203 : int) ->
+        fun (_y_231 : int) ->
           Call
             ( Put,
-              _y_203 + 1,
-              fun (_y_206 : unit) -> _loop_state_181 (_x_194 - 1) ) )
+              _y_231 + 1,
+              fun (_y_234 : unit) ->
+                Call
+                  ( Get,
+                    (),
+                    fun (_y_235 : int) ->
+                      Call
+                        ( Put,
+                          _y_235 + 1,
+                          fun (_y_238 : unit) ->
+                            Call
+                              ( Get,
+                                (),
+                                fun (_y_239 : int) ->
+                                  Call
+                                    ( Put,
+                                      _y_239 + 1,
+                                      fun (_y_242 : unit) ->
+                                        Call
+                                          ( Incr,
+                                            (),
+                                            fun (_y_243 : unit) ->
+                                              _loop_state_181 (_x_210 - 1) ) )
+                              ) ) ) ) )
 
 let loop_state = _loop_state_181
 
-let _test_state_209 (_n_210 : int) =
-  (let rec _loop_state_227 _x_194 =
-     if _x_194 = 0 then fun (_x_220 : int) -> _x_220
-     else fun (_s_235 : int) -> _loop_state_227 (_x_194 - 1) (_s_235 + 1)
+let _test_state_246 (_n_247 : int) =
+  (let rec _loop_state_270 _x_210 (_x_2 : int) =
+     if _x_210 = 0 then _x_2
+     else _loop_state_270 (_x_210 - 1) (_x_2 + 1 + 1 + 1 + 1)
    in
-   _loop_state_227 _n_210)
+   _loop_state_270 _n_247)
     0
 
-let test_state = _test_state_209
+let test_state = _test_state_246

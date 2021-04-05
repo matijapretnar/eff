@@ -154,9 +154,8 @@ let _testGenerator_233 (_m_234 : int) =
                  _y_368 + (_x_364 mod 42),
                  fun (_y_373 : unit) -> _sum_363 (_x_364 - 1) ) )
    in
-   let rec _sum_376 _x_377 =
-     if _x_377 = 0 then fun (_s_380 : int) -> _s_380
-     else fun (_s_381 : int) -> _sum_376 (_x_377 - 1) (_s_381 + (_x_377 mod 42))
+   let rec _sum_376 _x_377 (_x_0 : int) =
+     if _x_377 = 0 then _x_0 else _sum_376 (_x_377 - 1) (_x_0 + (_x_377 mod 42))
    in
    _sum_376 _m_234)
     _m_234

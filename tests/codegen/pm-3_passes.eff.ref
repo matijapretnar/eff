@@ -3,11 +3,10 @@ type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
 type intlist = IntNil | IntCons of (int * intlist)
 
 ;;
-let rec _concat_42 _x_62 =
+let rec _concat_42 _x_62 (_x_0 : intlist) =
   match _x_62 with
-  | IntNil -> fun (_ys_76 : intlist) -> _ys_76
-  | IntCons (_z_78, _zs_77) ->
-      fun (_ys_79 : intlist) -> IntCons (_z_78, _concat_42 _zs_77 _ys_79)
+  | IntNil -> _x_0
+  | IntCons (_z_78, _zs_77) -> IntCons (_z_78, _concat_42 _zs_77 _x_0)
 in
 let _l_63 (_y_72 : bool) =
   let _l_63 (_y_69 : bool) =
