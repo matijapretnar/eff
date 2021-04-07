@@ -14,6 +14,36 @@ let test n =
 	| effect (Fetch _) k -> k 42
 
 
+	effect GeneratorPut: int -> unit
+	effect GeneratorGet: unit -> int 
+	effect GeneratorProduce: int -> int
+	;;
+	let testGenerator m = 
+		let n = 42 in
+		let rec sum i = 
+			if i = 0 then perform (GeneratorGet ())
+			else 
+				(perform (GeneratorPut ( (perform (GeneratorGet ())) + (perform (GeneratorProduce i))));
+				sum (i-1))
+		in 
+		let monad_state = handler 
+			| effect (GeneratorGet ()) k -> (
+				fun s -> (k s) s
+			)
+			| effect (GeneratorPut s) k -> (
+				fun _ -> (k ()) s
+			)
+			| y -> (fun _ -> y)
+		in
+		let produce_handler = handler 
+			| effect (GeneratorProduce i) k -> (k (i mod n))
+		in
+		(with monad_state handle (
+			with produce_handler handle (sum m) 
+		)) m
+		
+
+
 (* effect Get: unit -> int_list
 effect Put: int_list -> unit
 
