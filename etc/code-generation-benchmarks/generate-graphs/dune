@@ -1,0 +1,7 @@
+(executables
+ (names graphs)
+ (modes native)
+ (ocamlopt_flags
+  (:standard -O3))
+ (libraries benchmark_suite)
+ (promote (until-clean)))

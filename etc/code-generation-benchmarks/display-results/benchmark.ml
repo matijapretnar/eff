@@ -2,57 +2,6 @@ open Bechamel
 open Toolkit
 open Notty_unix
 
-let suite : Benchmark_config.test_suite = Config.test_suite
-
-let number_of_loops = 1000
-
-and number_of_queens = 8
-
-and number_of_range = 100
-
-and number_of_tree = 100
-
-and size_of_interp_expression = 200
-
-and number_of_count = 1_000_000
-
-and number_of_generator = 1_000_000
-
-and number_of_queen_capability = 16
-
-let run_loop_pure = false
-
-and run_loop_latent = false
-
-and run_loop_incr = true
-
-and run_loop_incr' = false
-
-and run_loop_state = true
-
-and run_queens_one = true
-
-and run_queens_all = false
-
-and run_interp = false
-
-and run_interp_state = false
-
-and run_range = false
-
-and run_tree = false
-
-and run_state_tree = false
-
-and run_state_update_tree = true
-
-(* Capability benchmarks *)
-and run_count_benchmarks = false
-
-and run_generator_benchmarks = true
-
-and run_queen_capabilty_benchmarks = false
-
 let benchmark test =
   let ols =
     Analyze.ols ~bootstrap:0 ~r_square:true ~predictors:Measure.[| run |]
@@ -60,10 +9,7 @@ let benchmark test =
   let instances =
     Instance.[ minor_allocated; major_allocated; monotonic_clock; promoted ]
   in
-  let cfg =
-    (* Benchmark.cfg ~limit:5000 ~quota:(Time.second 5.0) ~kde:(Some 1000) () *)
-    Benchmark.cfg ~limit:5000 ~quota:(Time.second 5.0) ~kde:(Some 1000) ()
-  in
+  let cfg = Benchmark.cfg ~limit:50 ~quota:(Time.second 0.5) () in
   let raw_results = Benchmark.all cfg instances test in
   let results =
     List.map (fun instance -> Analyze.all ols instance raw_results) instances
@@ -285,168 +231,66 @@ let run_and_show test =
     | Some (w, h) -> { Bechamel_notty.w; h }
     | None -> { Bechamel_notty.w = 80; h = 1 }
   in
-  let results, b = benchmark test in
-  Hashtbl.iter (fun k _ -> print_endline k) b;
+  let results, _b = benchmark test in
+  (* Hashtbl.iter (fun k _ -> print_endline k) b; *)
   img (window, results) |> eol |> output_image
 
-let st = Staged.stage
-
-let forget_value f x =
-  let _ = f x in
-  ()
-
-let always_true f x =
-  let _ = f x in
-  true
-
-let run_and_show_set (benchmark_set : 'a Benchmark_config.benchmark_set) =
-  List.iter
-    (fun (name, _, tester) ->
-      try
-        if not @@ tester benchmark_set.param then
-          Printf.printf "Test: %s was wrong\n" name
-      with e ->
-        Printf.printf "Test: %s failed at runtime with: %s \n" name
-          (Printexc.to_string e))
-    benchmark_set.benchmarks;
+let run_and_show_set
+    (benchmark_set : 'a Benchmark_suite.Benchmark_config.benchmark_set) param =
   run_and_show
   @@ Test.make_grouped ~name:"" ~fmt:"%s%s"
        (List.map
-          (fun (name, fn, _) ->
-            Test.make ~name (st (fun () -> fn benchmark_set.param)))
+          (fun (name, fn) ->
+            Test.make ~name
+              (Staged.stage (fun () ->
+                   try ignore (fn param)
+                   with e ->
+                     Printf.printf "Test: %s failed at runtime with: %s \n" name
+                       (Printexc.to_string e))))
           benchmark_set.benchmarks);
   Printf.printf "\n\n"
 
+let suite = Benchmark_suite.Benchmark_config.default_test_suite
+
+let run_benchmarks set =
+  List.iter
+    (fun param ->
+      Printf.printf "%s (%d %s):\n" set.Benchmark_suite.Benchmark_config.name
+        param set.parameter_unit;
+      run_and_show_set set param)
+    set.parameters
+
 let () =
-  let start_time = Sys.time () in
-  if run_loop_pure then (
-    let set = suite.loop_benchmarks number_of_loops in
-    Printf.printf "%s (%d loops):\n" set.name set.param;
-    run_and_show_set set);
-  if run_loop_latent then (
-    let set = suite.loop_latent_benchmarks number_of_loops in
-    Printf.printf "%s (%d loops):\n" set.name set.param;
-    run_and_show_set set);
-  if run_loop_incr then (
-    let set = suite.loop_incr_benchmark number_of_loops in
-    Printf.printf "%s (%d loops):\n" set.name set.param;
-    run_and_show_set set);
-  if run_loop_incr' then
-    List.iter
-      (fun n ->
-        let set = suite.loop_incr'_benchmark n in
-        Printf.printf "%s (%d loops):\n" set.name set.param;
-        run_and_show_set set)
-      [ number_of_loops; 2 * number_of_loops ];
-  if run_loop_state then (
-    let set = suite.loop_state_benchmark number_of_loops in
-    Printf.printf "%s (%d loops):\n" set.name set.param;
-    run_and_show_set set);
-  if run_queens_one then (
-    let set = suite.queens_one_cps_benchmark number_of_queens in
-    Printf.printf "%s (%d queens):\n" set.name set.param;
-    run_and_show_set set);
-  if run_queens_one then (
-    let set = suite.queens_one_benchmark number_of_queens in
-    Printf.printf "%s (%d queens):\n" set.name set.param;
-    run_and_show_set set);
-  if run_queens_all then (
-    let set = suite.queens_all_benchmark number_of_queens in
-    Printf.printf "%s (%d queens):\n" set.name set.param;
-    run_and_show_set set);
-  if run_interp then
-    List.iter
-      (fun n ->
-        let set = suite.interpreter_benchmark n in
-        Printf.printf "%s (size: %d):\n" set.name set.param;
-        run_and_show_set set)
-      [
-        size_of_interp_expression;
-        2 * size_of_interp_expression;
-        4 * size_of_interp_expression;
-        8 * size_of_interp_expression;
-      ];
-  if run_interp_state then
-    List.iter
-      (fun n ->
-        let set = suite.interpreter_state_benchmark n in
-        Printf.printf "%s (size: %d):\n" set.name set.param;
-        run_and_show_set set)
-      [
-        size_of_interp_expression;
-        2 * size_of_interp_expression;
-        4 * size_of_interp_expression;
-        8 * size_of_interp_expression;
-      ];
-  if run_range then (
-    let set = suite.range_benchmarks number_of_range in
-    Printf.printf "%s :\n" set.name;
-    run_and_show_set set);
-  if run_tree then
-    List.iter
-      (fun n ->
-        let set = suite.tree_benchmark n in
-        Printf.printf "%s (leaf_val: %d):\n" set.name set.param;
-        run_and_show_set set)
-      [
-        number_of_tree;
-        2 * number_of_tree;
-        4 * number_of_tree;
-        8 * number_of_tree;
-      ];
-  if run_state_tree then
-    List.iter
-      (fun n ->
-        let set = suite.state_tree_benchmark n in
-        Printf.printf "%s (leaf_val: %d):\n" set.name set.param;
-        run_and_show_set set)
-      [
-        number_of_tree;
-        2 * number_of_tree;
-        4 * number_of_tree;
-        8 * number_of_tree;
-      ];
-  if run_state_update_tree then
-    List.iter
-      (fun n ->
-        let set = suite.state_with_update_tree_benchmark n in
-        Printf.printf "%s (leaf_val: %d):\n" set.name set.param;
-        run_and_show_set set)
-      [
-        number_of_tree;
-        2 * number_of_tree;
-        4 * number_of_tree;
-        8 * number_of_tree;
-      ];
-  if run_count_benchmarks then
-    List.iter
-      (fun n ->
-        let set = suite.count_benchmark n in
-        Printf.printf "%s (N: %d):\n" set.name set.param;
-        run_and_show_set set)
-      [
-        number_of_count;
-        2 * number_of_count;
-        4 * number_of_count;
-        8 * number_of_count;
-      ];
-  if run_generator_benchmarks then
-    List.iter
-      (fun n ->
-        let set = suite.generator_benchmark n in
-        Printf.printf "%s (N: %d):\n" set.name set.param;
-        run_and_show_set set)
-      [
-        number_of_generator;
-        2 * number_of_generator;
-        4 * number_of_generator;
-        8 * number_of_generator;
-      ];
-  if run_queen_capabilty_benchmarks then
-    List.iter
-      (fun n ->
-        let set = suite.queen_capabilty_benchmarks n in
-        Printf.printf "%s (N: %d):\n" set.name set.param;
-        run_and_show_set set)
-      [ number_of_queen_capability ];
-  Printf.printf "Full suite took: %f s\n" (Sys.time () -. start_time)
+  run_benchmarks suite.loop_benchmarks;
+
+  run_benchmarks suite.loop_latent_benchmarks;
+
+  run_benchmarks suite.loop_incr_benchmark;
+
+  run_benchmarks suite.loop_incr'_benchmark;
+
+  run_benchmarks suite.loop_state_benchmark;
+
+  run_benchmarks suite.queens_one_cps_benchmark;
+
+  run_benchmarks suite.queens_one_benchmark;
+
+  run_benchmarks suite.queens_all_benchmark;
+
+  run_benchmarks suite.interpreter_benchmark;
+
+  run_benchmarks suite.interpreter_state_benchmark;
+
+  run_benchmarks suite.range_benchmarks;
+
+  run_benchmarks suite.tree_benchmark;
+
+  run_benchmarks suite.state_tree_benchmark;
+
+  run_benchmarks suite.state_with_update_tree_benchmark;
+
+  run_benchmarks suite.count_benchmark;
+
+  run_benchmarks suite.generator_benchmark;
+
+  run_benchmarks suite.queen_capabilty_benchmarks

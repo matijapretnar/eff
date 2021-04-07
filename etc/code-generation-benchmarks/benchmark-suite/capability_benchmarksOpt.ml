@@ -247,7 +247,7 @@ let _testGenerator_571 (_n_572 : int) =
                  (a -> (b -> _) -> _) ->
               match eff with
               | GeneratorPut ->
-                  fun (_s'_581: int) _l_602 ->
+                  fun (_s'_581 : int) _l_602 ->
                     Value
                       (fun (_s_583 : int) ->
                         coer_arrow coer_refl_ty force_unsafe _l_602 () _s'_581)

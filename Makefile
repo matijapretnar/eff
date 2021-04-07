@@ -30,6 +30,10 @@ benchmark:
 	dune build @benchmark --auto-promote
 .PHONY: benchmark 
 
+graphs: 
+	cd etc/code-generation-benchmarks/generate-graphs && dune build . --auto-promote && ./graphs.exe
+.PHONY: graphs
+
 install: release
 	dune install
 .PHONY: install
