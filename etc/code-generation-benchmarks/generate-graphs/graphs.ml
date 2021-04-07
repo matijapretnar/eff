@@ -3,9 +3,9 @@ open Toolkit
 
 let instance = Instance.monotonic_clock
 
-let limit = 50
+let limit = 500
 
-let second_quota = 0.05
+let second_quota = 1.0
 
 module StringMap = Map.Make (String)
 module IntMap = Map.Make (Int)
@@ -87,60 +87,58 @@ let measure_benchmark_set
   in
   transpose_nested_map results_by_param
 
-let display_benchmark_set_results set_label benchmark_results =
+let display_benchmark_set_results
+    (set : 'a Benchmark_suite.Benchmark_config.benchmark_set) benchmark_results
+    =
   StringMap.iter
     (fun test_label test_results ->
       let chan =
-        open_out (Printf.sprintf "tables/%s-%s.table" set_label test_label)
+        open_out (Printf.sprintf "tables/%s-%s.table" set.filename test_label)
       in
-      Printf.fprintf chan "# %s\n" test_label;
+      Printf.fprintf chan "# %s: %s\n" set.name test_label;
       IntMap.iter
         (fun param param_result ->
           Printf.fprintf chan "%d %d\n" param
             (int_of_float (100. *. param_result)))
         test_results;
       close_out chan)
-    benchmark_results
+    benchmark_results;
+  print_newline ()
 
 let run_benchmark_set (set : 'a Benchmark_suite.Benchmark_config.benchmark_set)
     =
   print_endline set.name;
   let results = measure_benchmark_set set in
-  display_benchmark_set_results set.name results
+  display_benchmark_set_results set results
 
 let suite = Benchmark_suite.Benchmark_config.default_test_suite
 
-let () =
-  run_benchmark_set suite.loop_benchmarks;
+(* let _ = run_benchmark_set suite.loop_benchmarks *)
 
-  run_benchmark_set suite.loop_latent_benchmarks;
+(* let _ = run_benchmark_set suite.loop_latent_benchmarks *)
 
-  run_benchmark_set suite.loop_incr_benchmark;
+(* let _ = run_benchmark_set suite.loop_incr_benchmark *)
 
-  run_benchmark_set suite.loop_incr'_benchmark;
+(* let _ = run_benchmark_set suite.loop_incr'_benchmark *)
 
-  run_benchmark_set suite.loop_state_benchmark;
+(* let _ = run_benchmark_set suite.loop_state_benchmark *)
 
-  run_benchmark_set suite.queens_one_cps_benchmark;
+let _ = run_benchmark_set suite.queens_one_benchmark
 
-  run_benchmark_set suite.queens_one_benchmark;
+(* let _ = run_benchmark_set suite.queens_all_benchmark *)
 
-  run_benchmark_set suite.queens_all_benchmark;
+(* let _ = run_benchmark_set suite.interpreter_benchmark *)
 
-  run_benchmark_set suite.interpreter_benchmark;
+(* let _ = run_benchmark_set suite.interpreter_state_benchmark *)
 
-  run_benchmark_set suite.interpreter_state_benchmark;
+(* let _ = run_benchmark_set suite.range_benchmarks *)
 
-  run_benchmark_set suite.range_benchmarks;
+(* let _ = run_benchmark_set suite.tree_benchmark *)
 
-  run_benchmark_set suite.tree_benchmark;
+(* let _ = run_benchmark_set suite.state_tree_benchmark *)
 
-  run_benchmark_set suite.state_tree_benchmark;
+(* let _ = run_benchmark_set suite.state_with_update_tree_benchmark *)
 
-  run_benchmark_set suite.state_with_update_tree_benchmark;
+(* let _ = run_benchmark_set suite.count_benchmark *)
 
-  run_benchmark_set suite.count_benchmark;
-
-  run_benchmark_set suite.generator_benchmark;
-
-  run_benchmark_set suite.queen_capabilty_benchmarks
+(* let _ = run_benchmark_set suite.generator_benchmark *)

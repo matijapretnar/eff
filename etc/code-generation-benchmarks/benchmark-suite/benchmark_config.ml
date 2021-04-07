@@ -1,5 +1,6 @@
 type 'a benchmark_set = {
   name : string;
+  filename : string;
   benchmarks : (string * (int -> 'a)) list;
   parameter_unit : string;
   parameters : int list;
@@ -15,7 +16,6 @@ type test_suite = {
   loop_incr_benchmark : int benchmark_set;
   loop_incr'_benchmark : int benchmark_set;
   loop_state_benchmark : int benchmark_set;
-  queens_one_cps_benchmark : unit benchmark_set;
   queens_one_benchmark : unit benchmark_set;
   queens_all_benchmark : unit benchmark_set;
   interpreter_benchmark : int benchmark_set;
@@ -26,222 +26,198 @@ type test_suite = {
   state_with_update_tree_benchmark : int benchmark_set;
   count_benchmark : int benchmark_set;
   generator_benchmark : unit benchmark_set;
-  queen_capabilty_benchmarks : unit benchmark_set;
 }
 
 let loop_benchmarks =
   {
     name = "LOOP PURE BENCHMARK";
+    filename = "loop_benchmarks";
     benchmarks =
-      [
-        ("Generated, optimized", LoopOpt.test_pure);
-        ("Native", LoopNative.test_pure);
-      ];
-    parameters = [ 1000 ];
+      [ ("native", LoopNative.test_pure); ("generated", LoopOpt.test_pure) ];
+    parameters = [ 1000; 2000; 3000; 4000; 5000; 6000; 7000; 8000; 9000; 10000 ];
     parameter_unit = "loops";
   }
 
 let loop_latent_benchmarks =
   {
     name = "LOOP LATENT BENCHMARK";
+    filename = "loop_latent_benchmarks";
     benchmarks =
       [
-        ("Generated, optimized", extract_value LoopOpt.test_latent);
-        ("Native", LoopNative.test_latent);
+        ("native", LoopNative.test_latent);
+        ("generated", extract_value LoopOpt.test_latent);
       ];
-    parameters = [ 1000 ];
+    parameters = [ 1000; 2000; 3000; 4000; 5000; 6000; 7000; 8000; 9000; 10000 ];
     parameter_unit = "loops";
   }
 
 let loop_incr_benchmark =
   {
     name = "LOOP INCR BENCHMARK";
+    filename = "loop_incr";
     benchmarks =
-      [
-        ("Generated, optimized", LoopOpt.test_incr);
-        ("Native", LoopNative.test_incr);
-      ];
-    parameters = [ 1000 ];
+      [ ("native", LoopNative.test_incr); ("generated", LoopOpt.test_incr) ];
+    parameters = [ 1000; 2000; 3000; 4000; 5000; 6000; 7000; 8000; 9000; 10000 ];
     parameter_unit = "loops";
   }
 
 let loop_incr'_benchmark =
   {
     name = "LOOP INCR' BENCHMARK";
+    filename = "loop_incr'";
     benchmarks =
-      [
-        ("Generated, optimized", LoopOpt.test_incr');
-        ("Native", LoopNative.test_incr');
-      ];
-    parameters = [ 1000 ];
+      [ ("native", LoopNative.test_incr'); ("generated", LoopOpt.test_incr') ];
+    parameters = [ 1000; 2000; 3000; 4000; 5000; 6000; 7000; 8000; 9000; 10000 ];
     parameter_unit = "loops";
   }
 
 let loop_state_benchmark =
   {
     name = "LOOP STATE BENCHMARK";
+    filename = "loop_state";
     benchmarks =
-      [
-        ("Generated, optimized", LoopOpt.test_state);
-        ("Native", LoopNative.test_state);
-      ];
-    parameters = [ 1000 ];
+      [ ("native", LoopNative.test_state); ("generated", LoopOpt.test_state) ];
+    parameters = [ 1000; 2000; 3000; 4000; 5000; 6000; 7000; 8000; 9000; 10000 ];
     parameter_unit = "loops";
-  }
-
-let queens_one_cps_benchmark =
-  {
-    name = "QUEENS ONE CPS BENCHMARK";
-    benchmarks =
-      [
-        ("Generated, optimized", ignore_value QueensOpt.queens_one_cps);
-        ("Native", ignore_value QueensNative.queens_one_cps);
-      ];
-    parameters = [ 8 ];
-    parameter_unit = "queens";
   }
 
 let queens_one_benchmark =
   {
-    name = "QUEENS ONE OPTION BENCHMARK";
+    name = "QUEENS ONE SOLUTION BENCHMARK";
+    filename = "queens_one";
     benchmarks =
       [
-        ("Generated, optimized", ignore_value QueensOpt.queens_one_option);
-        ("Native", ignore_value QueensNative.queens_one_option);
+        ("native-option", ignore_value QueensNative.queens_one_option);
+        ("generated-option", ignore_value QueensOpt.queens_one_option);
+        ("native-cps", ignore_value QueensNative.queens_one_cps);
+        ("generated-cps", ignore_value QueensOpt.queens_one_cps);
+        ("native-cap", ignore_value Capability_benchmarks_native.findSolution);
+        ( "capabilities",
+          ignore_value Capability_benchmarks_cps_paper.findSolution_generated );
       ];
-    parameters = [ 8 ];
+    parameters = [ 8; 10; 12; 14; 16; 18 ];
     parameter_unit = "queens";
   }
 
 let queens_all_benchmark =
   {
     name = "QUEENS ALL BENCHMARK";
+    filename = "queens_all";
     benchmarks =
       [
-        ("Generated, optimized", ignore_value QueensOpt.queens_all);
-        ("Native", ignore_value QueensNative.queens_all);
+        ("native", ignore_value QueensNative.queens_all);
+        ("generated", ignore_value QueensOpt.queens_all);
       ];
-    parameters = [ 8 ];
+    parameters = [ 8; 9; 10; 11; 12 ];
     parameter_unit = "queens";
   }
 
 let interpreter_benchmark =
   {
     name = "INTERPRETER BENCHMARK";
+    filename = "interpreter";
     benchmarks =
       [
-        ("Generated, optimized", InterpOpt.bigTest);
-        ("Native exception", InterpNative.bigTestException);
-        ("Native option", InterpNative.bigTestOption);
+        ("native-pure", InterpNative.bigTestOption);
+        ("native-exception", InterpNative.bigTestException);
+        ("generated", InterpOpt.bigTest);
       ];
-    parameters = [ 200; 2 * 200; 4 * 200; 8 * 200 ];
+    parameters = [ 200; 2 * 200; 4 * 200; 8 * 200; 16 * 200; 32 * 200 ];
     parameter_unit = "size";
   }
 
 let interpreter_state_benchmark =
   {
     name = "INTERPRETER STATE BENCHMARK";
+    filename = "interpreter_state";
     benchmarks =
-      [
-        ("Generated, optimized", InterpOpt.testState);
-        ("Native pure", InterpNative.testState);
-      ];
-    parameters = [ 200; 2 * 200; 4 * 200; 8 * 200 ];
+      [ ("native", InterpNative.testState); ("generated", InterpOpt.testState) ];
+    parameters = [ 200; 2 * 200; 4 * 200; 8 * 200; 16 * 200; 32 * 200 ];
     parameter_unit = "size";
   }
 
 let range_benchmarks =
   {
     name = "RANGE BENCHMARK";
+    filename = "range_benchmarks";
     benchmarks =
       [
-        ("Generated, optimized", ignore_value RangeOpt.test);
-        ("Native", ignore_value RangeNative.test);
+        ("native", ignore_value RangeNative.test);
+        ("generated", ignore_value RangeOpt.test);
       ];
-    parameters = [ 100 ];
+    parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "";
   }
 
 let tree_benchmark =
   {
     name = "TREE BENCHMARK";
+    filename = "tree";
     benchmarks =
       [
-        ("Generated, optimized", TreeOpt.test_general);
-        ("Native", TreeNative.test_general);
+        ("native", TreeNative.test_general); ("generated", TreeOpt.test_general);
       ];
-    parameters = [ 100; 2 * 100; 4 * 100; 8 * 100 ];
+    parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";
   }
 
 let state_tree_benchmark =
   {
     name = "STATE TREE BENCHMARK";
+    filename = "state_tree";
     benchmarks =
       [
-        ("Generated, optimized", TreeOpt.test_leaf_state);
-        ("Native", TreeNative.test_leaf_state);
-        ("Native pure state", TreeNative.test_leaf_pure_state);
+        ("native-pure", TreeNative.test_leaf_pure_state);
+        ("native-ref", TreeNative.test_leaf_state);
+        ("generated", TreeOpt.test_leaf_state);
       ];
-    parameters = [ 100; 2 * 100; 4 * 100; 8 * 100 ];
+    parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";
   }
 
 let state_with_update_tree_benchmark =
   {
     name = "STATE TREE BENCHMARK";
+    filename = "state_with_update_tree";
     benchmarks =
       [
-        ("Generated, optimized", TreeOpt.test_leaf_state_update);
-        ( "Generated, optimized merged",
-          TreeOpt.test_leaf_state_update_merged_handler );
-        ("Native", TreeNative.test_leaf_state_update);
+        ("native", TreeNative.test_leaf_state_update);
+        ("generated", TreeOpt.test_leaf_state_update);
+        ("generated-merged", TreeOpt.test_leaf_state_update_merged_handler);
       ];
-    parameters = [ 100; 2 * 100; 4 * 100; 8 * 100 ];
+    parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";
   }
 
 let count_benchmark =
   {
     name = "COUNT BENCHMARK";
+    filename = "count";
     benchmarks =
       [
-        ("Generated, optimized", Capability_benchmarksOpt.testCount);
-        ("Native", Capability_benchmarks_native.testCount);
-        ("CPS paper", Capability_benchmarks_cps_paper.handledCount_generated);
+        ("native", Capability_benchmarks_native.testCount);
+        ("generated", Capability_benchmarksOpt.testCount);
+        ("capabilities", Capability_benchmarks_cps_paper.handledCount_generated);
       ];
-    parameters = [ 1_000_000; 2 * 1_000_000; 4 * 1_000_000; 8 * 1_000_000 ];
+    parameters =
+      [ 1_000_000; 2 * 1_000_000; 4 * 1_000_000; 8 * 1_000_000; 16 * 1_000_000 ];
     parameter_unit = "N";
   }
 
 let generator_benchmark =
   {
     name = "GENERATOR BENCHMARK";
+    filename = "generator";
     benchmarks =
       [
-        ( "Generated, optimized",
-          ignore_value Capability_benchmarksOpt.testGenerator );
-        ("Native", ignore_value Capability_benchmarks_native.testGenerator);
-        ( "CPS paper",
+        ("native", ignore_value Capability_benchmarks_native.testGenerator);
+        ("generated", ignore_value Capability_benchmarksOpt.testGenerator);
+        ( "capabilities",
           ignore_value
             Capability_benchmarks_cps_paper.handledGenerator_generated );
       ];
-    parameters = [ 1_000_000; 2 * 1_000_000; 4 * 1_000_000; 8 * 1_000_000 ];
-    parameter_unit = "N";
-  }
-
-let queen_capabilty_benchmarks =
-  {
-    name = "QUEEN CAPABILTY BENCHMARK";
-    benchmarks =
-      [
-        ( "Generated, optimized",
-          ignore_value Capability_benchmarksOpt.queens_all );
-        ("Native", ignore_value Capability_benchmarks_native.findSolution);
-        ( "CPS paper",
-          ignore_value Capability_benchmarks_cps_paper.findSolution_generated );
-      ];
-    parameters = [ 16 ];
+    parameters =
+      [ 1_000_000; 2 * 1_000_000; 4 * 1_000_000; 8 * 1_000_000; 16 * 1_000_000 ];
     parameter_unit = "N";
   }
 
@@ -252,7 +228,6 @@ let default_test_suite =
     loop_incr_benchmark;
     loop_incr'_benchmark;
     loop_state_benchmark;
-    queens_one_cps_benchmark;
     queens_one_benchmark;
     queens_all_benchmark;
     interpreter_benchmark;
@@ -263,5 +238,4 @@ let default_test_suite =
     state_with_update_tree_benchmark;
     count_benchmark;
     generator_benchmark;
-    queen_capabilty_benchmarks;
   }

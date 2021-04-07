@@ -271,8 +271,6 @@ let () =
 
   run_benchmarks suite.loop_state_benchmark;
 
-  run_benchmarks suite.queens_one_cps_benchmark;
-
   run_benchmarks suite.queens_one_benchmark;
 
   run_benchmarks suite.queens_all_benchmark;
@@ -291,6 +289,4 @@ let () =
 
   run_benchmarks suite.count_benchmark;
 
-  run_benchmarks suite.generator_benchmark;
-
-  run_benchmarks suite.queen_capabilty_benchmarks
+  run_benchmarks suite.generator_benchmark
