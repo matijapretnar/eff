@@ -1,4 +1,44 @@
-(* Triple -> Unknown *)
+(* Triple *)
+
+effect TripleFlip : unit -> bool
+effect TripleFail: unit -> empty
+;;
+type triple_int_list = TripleCons of ((int*int*int) * triple_int_list) | TripleNil
+
+let rec ( @ ) xs ys =
+  match xs with
+  | TripleNil -> ys
+  | TripleCons (x, xs) -> TripleCons (x, xs @ ys)
+
+let testTriple n s = 
+  let absurd void = (match void with) in
+  let absurd1 void = (match void with) in
+  let rec choice n =
+    if (n < 1)
+      then (absurd (perform (TripleFail ())))
+      else if (perform (TripleFlip ()))
+        then n
+        else choice (n - 1)
+  in
+  let triple n s =
+    let i = choice n in
+    let j = choice (i - 1) in
+    let k = choice (j - 1) in
+    if (i + j + k = s)
+      then (i, j, k)
+      else (absurd1 (perform (TripleFail ())))
+  in
+  handle 
+  (let r = triple n s in TripleCons(r, TripleNil)
+  ) with 
+  | effect (TripleFail _) k -> TripleNil
+  | effect (TripleFlip ()) k -> (
+    let xs = k true in 
+    let ys = k false in 
+    xs @ ys 
+  )
+
+let handleTripleWrap (x, y) = testTriple x y
 
 (* Queens *)
 
@@ -69,7 +109,7 @@ let rec count () =
 
 let testCount m = 
   let monad_state = handler 
-  | y -> (fun _ -> y)
+  | y -> (fun x -> x)
   | effect (CountGet ()) k -> (
     fun s -> (k s) s
   )
@@ -84,8 +124,49 @@ let testCount m =
 
 effect GeneratorPut: int -> unit
 effect GeneratorGet: unit -> int 
-effect GeneratorProduce: int -> int
+effect GeneratorYield: int -> unit
 ;;
+
+let testGenerator n = 
+  let rec generateFromTo (l,u) = 
+    if l > u then ()
+    else ( 
+      (* perform (GeneratorPut (perform (GeneratorGet ())));   *)
+      perform (GeneratorYield l); generateFromTo ((l+1) , u))
+  in
+  ( handle (handle (generateFromTo (1,n)) with 
+    | effect (GeneratorYield e) k -> (
+      (perform (GeneratorPut (perform (GeneratorGet ()) + e)));
+      k ()
+    )
+  ) with 
+  | x -> (fun s -> (s,x))   
+  | effect (GeneratorPut s') k -> (fun s ->  k () s')
+  | effect (GeneratorGet _) k -> (fun s -> k s s)
+  ) 0 
+
+(* 
+
+
+let testGenerator n = 
+  let rec generateFromTo u = 
+    if u = 0 then ()
+    else ( 
+      (* perform (GeneratorPut (perform (GeneratorGet ())));   *)
+      perform (GeneratorYield u); generateFromTo ( u-1))
+  in
+  ( handle (handle (generateFromTo (n)) with 
+    | effect (GeneratorYield e) k -> (
+      (perform (GeneratorPut e));
+      k ()
+    )
+  ) with 
+  | x -> (fun s -> (s,x))   
+  | effect (GeneratorPut s') k -> k ()
+  | effect (GeneratorGet _) k -> (fun s -> k s s)
+  ) *)
+
+(*
 let testGenerator m = 
   let n = 42 in
   let rec sum i = 
@@ -108,5 +189,6 @@ let testGenerator m =
   in
   (with monad_state handle (
     with produce_handler handle (sum m) 
-  )) m
+  )) m 
+*)
   

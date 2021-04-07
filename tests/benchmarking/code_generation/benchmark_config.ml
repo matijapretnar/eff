@@ -260,6 +260,9 @@ let count_benchmark number =
         ( "Native",
           forget_value Capability_benchmarks_native.testCount,
           always_true Capability_benchmarks_native.testCount );
+        ( "CPS paper",
+          forget_value Capability_benchmarks_cps_paper.handledCount_generated,
+          always_true Capability_benchmarks_cps_paper.handledCount_generated );
       ];
     param = number;
   }
@@ -272,12 +275,12 @@ let generator_benchmark number =
         ( "Generated, optimized",
           forget_value Capability_benchmarksOpt.testGenerator,
           always_true Capability_benchmarksOpt.testGenerator );
-        (* ( "Generated, lambda lift by hand", (* Lambda lift *)
-           forget_value Capability_benchmarksOpt.testGenerator2,
-           always_true Capability_benchmarksOpt.testGenerator2 ); *)
         ( "Native",
           forget_value Capability_benchmarks_native.testGenerator,
           always_true Capability_benchmarks_native.testGenerator );
+        ( "CPS paper",
+          forget_value Capability_benchmarks_cps_paper.handledGenerator_generated,
+          always_true Capability_benchmarks_cps_paper.handledGenerator_generated );
       ];
     param = number;
   }
@@ -290,6 +293,12 @@ let queen_capabilty_benchmarks number =
         ( "Generated, optimized",
           forget_value Capability_benchmarksOpt.queens_all,
           always_true Capability_benchmarksOpt.queens_all );
+        ( "Native",
+          forget_value Capability_benchmarks_native.findSolution,
+          always_true Capability_benchmarks_native.findSolution );
+        ( "CPS paper",
+          forget_value Capability_benchmarks_cps_paper.findSolution_generated,
+          always_true Capability_benchmarks_cps_paper.findSolution_generated );
       ];
     param = number;
   }
