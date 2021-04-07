@@ -31,7 +31,7 @@ benchmark:
 .PHONY: benchmark 
 
 graphs: 
-	cd etc/code-generation-benchmarks/generate-graphs && dune build . --auto-promote && ./graphs.exe
+	cd misc/code-generation-benchmarks/generate-graphs && dune build . --auto-promote && ./graphs.exe
 .PHONY: graphs
 
 install: release

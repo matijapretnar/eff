@@ -1,4 +1,0 @@
-<queens/**>: include
-<delimcc/**>: include
-true:package(core, core_bench, delimcc)
-true:thread

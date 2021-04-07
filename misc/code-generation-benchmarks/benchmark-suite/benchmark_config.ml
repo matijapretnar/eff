@@ -94,6 +94,10 @@ let queens_one_benchmark =
         ("native-cap", ignore_value Capability_benchmarks_native.findSolution);
         ( "capabilities",
           ignore_value Capability_benchmarks_cps_paper.findSolution_generated );
+        ("eio-cps", ignore_value QueensEffInOcaml.queens_one_cps);
+        ("eio-opt", ignore_value QueensEffInOcaml.queens_one_option);
+        ("hia-cps", ignore_value QueensHandlersInAction.queens_one_cps);
+        ("hia-opt", ignore_value QueensHandlersInAction.queens_one_option);
       ];
     parameters = [ 8; 10; 12; 14; 16; 18 ];
     parameter_unit = "queens";
@@ -107,6 +111,8 @@ let queens_all_benchmark =
       [
         ("native", ignore_value QueensNative.queens_all);
         ("generated", ignore_value QueensOpt.queens_all);
+        ("eio", ignore_value QueensEffInOcaml.queens_all);
+        ("eio", ignore_value QueensHandlersInAction.queens_all);
       ];
     parameters = [ 8; 9; 10; 11; 12 ];
     parameter_unit = "queens";

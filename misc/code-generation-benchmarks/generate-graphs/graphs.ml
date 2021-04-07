@@ -125,7 +125,7 @@ let suite = Benchmark_suite.Benchmark_config.default_test_suite
 
 let _ = run_benchmark_set suite.queens_one_benchmark
 
-(* let _ = run_benchmark_set suite.queens_all_benchmark *)
+let _ = run_benchmark_set suite.queens_all_benchmark
 
 (* let _ = run_benchmark_set suite.interpreter_benchmark *)
 

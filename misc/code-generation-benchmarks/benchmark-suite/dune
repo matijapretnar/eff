@@ -9,6 +9,7 @@
   (:standard \ generate_benchmark_rules))
  (libraries
   bechamel
+  delimcc
   ocamlHeader
   (select
    config.ml

@@ -16,5 +16,5 @@ docs/try/jseff.bc.js
 # Dune takes care of merlin
 .merlin
 
-etc/code-generation-benchmarks/generate-graphs/tables/*.table
+misc/code-generation-benchmarks/generate-graphs/tables/*.table
 graphs.exe
