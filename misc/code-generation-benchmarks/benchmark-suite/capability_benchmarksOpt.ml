@@ -146,77 +146,70 @@ let _available_427 (_x_428 : int) (_qs_429 : queen_list) (_l_430 : intlist) =
 let available = _available_427
 
 let _find_solution_435 (_n_436 : int) =
-  let rec _init_450 _x_477 (_acc_501 : intlist) =
-    if _x_477 = 0 then _acc_501
-    else _init_450 (_x_477 - 1) (Lst (_x_477, _acc_501))
+  let rec _init_450 _x_475 (_acc_497 : intlist) =
+    if _x_475 = 0 then _acc_497
+    else _init_450 (_x_475 - 1) (Lst (_x_475, _acc_497))
   in
-  let rec _place_460 _x_480 (_qs_488 : queen_list) =
-    if _x_480 = _n_436 + 1 then Value (Some _qs_488)
+  let _l_458 = _init_450 _n_436 End in
+  let rec _place_460 (_x_461, _qs_462) =
+    if _x_461 = _n_436 + 1 then Value (Some _qs_462)
     else
       Call
         ( Select,
-          _available_427 _x_480 _qs_488 (_init_450 _n_436 End),
-          fun (_y_496 : int) ->
-            _place_460 (_x_480 + 1) (Cons ((_x_480, _y_496), _qs_488)) )
+          _available_427 _x_461 _qs_462 _l_458,
+          fun (_y_480 : int) ->
+            _place_460 (_x_461 + 1, Cons ((_x_461, _y_480), _qs_462)) )
   in
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_id_448 : option) -> Value _id_448);
-          effect_clauses =
-            (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                 (a -> (b -> _) -> _) ->
-              match eff with
-              | Select ->
-                  fun _lst_437 _l_476 ->
-                    Value
-                      (let rec _loop_439 _x_475 (_x_508 : intlist) =
-                         match _x_508 with
-                         | End -> None
-                         | Lst (_x_510, _xs_509) -> (
-                             match _x_475 _x_510 with
-                             | None -> _loop_439 _x_475 _xs_509
-                             | Some _x_513 -> Some _x_513)
-                       in
-                       _loop_439
-                         (coer_arrow coer_refl_ty force_unsafe _l_476)
-                         _lst_437)
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        })
-       (_place_460 1 Nil))
+  let rec _place_510 (_x_461, _qs_462) =
+    if _x_461 = _n_436 + 1 then Some _qs_462
+    else
+      let rec _loop_523 _x_524 (_x_525 : intlist) =
+        match _x_525 with
+        | End -> None
+        | Lst (_x_527, _xs_526) -> (
+            match _x_524 _x_527 with
+            | None -> _loop_523 _x_524 _xs_526
+            | Some _x_530 -> Some _x_530)
+      in
+      _loop_523
+        (fun (_y_532 : int) ->
+          _place_510 (_x_461 + 1, Cons ((_x_461, _y_532), _qs_462)))
+        (_available_427 _x_461 _qs_462 _l_458)
+  in
+  _place_510 (1, Nil)
 
 let find_solution = _find_solution_435
 
-let _queens_all_514 (_number_of_queens_515 : int) =
-  _find_solution_435 _number_of_queens_515
+let _queens_all_535 (_number_of_queens_536 : int) =
+  _find_solution_435 _number_of_queens_536
 
-let queens_all = _queens_all_514
+let queens_all = _queens_all_535
 
 type (_, _) eff_internal_effect += CountPut : (int, unit) eff_internal_effect
 
 type (_, _) eff_internal_effect += CountGet : (unit, int) eff_internal_effect
 
-let rec _count_516 _x_526 =
+let rec _count_537 _x_547 =
   Call
     ( CountGet,
       (),
-      fun (_y_530 : int) ->
-        if _y_530 = 0 then Value _y_530
-        else Call (CountPut, _y_530 - 1, fun (_y_528 : unit) -> _count_516 ())
+      fun (_y_551 : int) ->
+        if _y_551 = 0 then Value _y_551
+        else Call (CountPut, _y_551 - 1, fun (_y_549 : unit) -> _count_537 ())
     )
 
-let count = _count_516
+let count = _count_537
 
-let _testCount_531 (_m_532 : int) =
-  (let rec _count_549 _x_526 (_s_562 : int) =
-     (if _s_562 = 0 then fun (_x_567 : int) -> _x_567
-     else fun (_ : int) -> _count_549 () (_s_562 - 1))
-       _s_562
+let _testCount_552 (_m_553 : int) =
+  (let rec _count_570 _x_547 (_s_583 : int) =
+     (if _s_583 = 0 then fun (_x_588 : int) -> _x_588
+     else fun (_ : int) -> _count_570 () (_s_583 - 1))
+       _s_583
    in
-   _count_549 ())
-    _m_532
+   _count_570 ())
+    _m_553
 
-let testCount = _testCount_531
+let testCount = _testCount_552
 
 type (_, _) eff_internal_effect +=
   | GeneratorPut : (int, unit) eff_internal_effect
@@ -227,58 +220,50 @@ type (_, _) eff_internal_effect +=
 type (_, _) eff_internal_effect +=
   | GeneratorYield : (int, unit) eff_internal_effect
 
-let _testGenerator_571 (_n_572 : int) =
-  let rec _generateFromTo_573 (_l_574, _u_575) =
-    if _l_574 > _u_575 then Value ()
+let _testGenerator_592 (_n_593 : int) =
+  let rec _generateFromTo_594 (_l_595, _u_596) =
+    if _l_595 > _u_596 then Value ()
     else
       Call
-        ( GeneratorYield,
-          _l_574,
-          fun (_y_617 : unit) -> _generateFromTo_573 (_l_574 + 1, _u_575) )
+        ( GeneratorGet,
+          (),
+          fun (_y_647 : int) ->
+            Call
+              ( GeneratorPut,
+                _y_647,
+                fun (_y_649 : unit) ->
+                  Call
+                    ( GeneratorYield,
+                      _l_595,
+                      fun (_y_643 : unit) ->
+                        _generateFromTo_594 (_l_595 + 1, _u_596) ) ) )
   in
-  force_unsafe
-    ((handler
-        {
-          value_clause =
-            (fun (_x_588 : unit) ->
-              Value (fun (_s_615 : int) -> (_s_615, _x_588)));
-          effect_clauses =
-            (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                 (a -> (b -> _) -> _) ->
-              match eff with
-              | GeneratorPut ->
-                  fun (_s'_581 : int) _l_602 ->
-                    Value
-                      (fun (_s_583 : int) ->
-                        coer_arrow coer_refl_ty force_unsafe _l_602 () _s'_581)
-              | GeneratorGet ->
-                  fun _ _l_603 ->
-                    Value
-                      (fun (_s_586 : int) ->
-                        coer_arrow coer_refl_ty force_unsafe _l_603 _s_586
-                          _s_586)
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        })
-       ((handler
-           {
-             value_clause = (fun (_id_597 : unit) -> Value _id_597);
-             effect_clauses =
-               (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                    (a -> (b -> _) -> _) ->
-                 match eff with
-                 | GeneratorYield ->
-                     fun _e_592 _l_608 ->
-                       Call
-                         ( GeneratorGet,
-                           (),
-                           fun (_y_612 : int) ->
-                             Call
-                               ( GeneratorPut,
-                                 _y_612 + _e_592,
-                                 fun (_y_610 : unit) -> _l_608 () ) )
-                 | eff' -> fun arg k -> Call (eff', arg, k));
-           })
-          (_generateFromTo_573 (1, _n_572))))
+  (let rec _generateFromTo_659 (_l_595, _u_596) =
+     if _l_595 > _u_596 then Value ()
+     else
+       Call
+         ( GeneratorGet,
+           (),
+           fun (_y_647 : int) ->
+             Call
+               ( GeneratorPut,
+                 _y_647,
+                 fun (_y_649 : unit) ->
+                   Call
+                     ( GeneratorGet,
+                       (),
+                       fun (_y_667 : int) ->
+                         Call
+                           ( GeneratorPut,
+                             _y_667 + _l_595,
+                             fun (_y_670 : unit) ->
+                               _generateFromTo_659 (_l_595 + 1, _u_596) ) ) ) )
+   in
+   let rec _generateFromTo_673 (_l_595, _u_596) (_x_0 : int) =
+     if _l_595 > _u_596 then (_x_0, ())
+     else _generateFromTo_673 (_l_595 + 1, _u_596) (_x_0 + _l_595)
+   in
+   _generateFromTo_673 (1, _n_593))
     0
 
-let testGenerator = _testGenerator_571
+let testGenerator = _testGenerator_592
