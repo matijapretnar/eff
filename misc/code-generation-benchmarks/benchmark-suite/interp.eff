@@ -79,7 +79,7 @@ let testState n =
     let y = interp r in
     let x = interp l in
     begin match y with
-    | 0 -> perform (Get ())
+    | 0 -> perform (Get: {Set} ())
     | _ -> x / y
     end
   in

@@ -138,34 +138,9 @@ let _testState_140 (_n_141 : int) =
                _interp_225
                  ( _l_215,
                    fun (_x_217 : int) ->
-                     force_unsafe
-                       ((handler
-                           {
-                             value_clause =
-                               (fun (_x_226 : int) -> Value (_k_227 _x_226));
-                             effect_clauses =
-                               (fun (type a b)
-                                    (eff : (a, b) eff_internal_effect) :
-                                    (a -> (b -> _) -> _) ->
-                                 match eff with
-                                 | Get ->
-                                     fun () _l_184 ->
-                                       Value
-                                         (fun (_s_169 : int) ->
-                                           coer_arrow coer_refl_ty force_unsafe
-                                             _l_184 _s_169 _s_169)
-                                 | Set ->
-                                     fun _s_171 _l_185 ->
-                                       Value
-                                         (fun (_ : int) ->
-                                           coer_arrow coer_refl_ty force_unsafe
-                                             _l_185 () _s_171)
-                                 | eff' -> fun arg k -> Call (eff', arg, k));
-                           })
-                          (match _y_216 with
-                          | 0 ->
-                              Call (Get, (), fun (_y_218 : int) -> Value _y_218)
-                          | _ -> Value (_x_217 / _y_216))) ) )
+                     match _y_216 with
+                     | 0 -> fun (_s_235 : int) -> _k_227 _s_235 _s_235
+                     | _ -> _k_227 (_x_217 / _y_216) ) )
    in
    _interp_225 (_createCase_61 _n_141, fun (_x_174 : int) (_ : int) -> _x_174))
     _n_141
