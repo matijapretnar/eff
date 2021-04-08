@@ -250,7 +250,7 @@ let run_and_show_set
           benchmark_set.benchmarks);
   Printf.printf "\n\n"
 
-let suite = Benchmark_suite.Benchmark_config.default_test_suite
+let suite = Benchmark_suite.Config.test_suite
 
 let run_benchmarks set =
   List.iter

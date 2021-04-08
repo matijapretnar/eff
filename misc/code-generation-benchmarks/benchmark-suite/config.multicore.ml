@@ -1,143 +1,86 @@
 open NativeMulticore
 open Benchmark_config
 
-let add_benchmark b (benchmark_set : 'a -> 'a benchmark_set) n =
-  let benchmark_set = benchmark_set n in
+let add_benchmark b benchmark_set =
   { benchmark_set with benchmarks = benchmark_set.benchmarks @ [ b ] }
 
 let test_suite =
   let base_suite = default_test_suite in
   let interpreter_benchmark =
     add_benchmark
-      ( "Multicore",
-        forget_value InterpMulticore.bigTest,
-        fun n -> InterpMulticore.bigTest n = -1 )
+      ("Multicore", InterpMulticore.bigTest)
       base_suite.interpreter_benchmark
   in
   let interpreter_state_benchmark =
     add_benchmark
-      ( "Multicore",
-        forget_value InterpMulticore.testState,
-        fun n -> InterpMulticore.testState n = -1 )
+      ("Multicore", InterpMulticore.testState)
       base_suite.interpreter_state_benchmark
   in
 
   let range_benchmarks =
     base_suite.range_benchmarks
-    |> add_benchmark
-         ( "Multicore",
-           forget_value RangeMulticore.test,
-           always_true RangeMulticore.test )
+    |> add_benchmark ("Multicore", fun n -> ignore (RangeMulticore.test n))
     |> add_benchmark
          ( "Multicore custom list type",
-           forget_value RangeMulticoreCustomList.test,
-           always_true RangeMulticoreCustomList.test )
+           fun n -> ignore (RangeMulticoreCustomList.test n) )
   in
   let loop_benchmarks =
     base_suite.loop_benchmarks
-    |> add_benchmark
-         ( "Multicore",
-           forget_value LoopMulticore.test_pure,
-           fun n -> LoopMulticore.test_pure n = () )
+    |> add_benchmark ("Multicore", LoopMulticore.test_pure)
   in
   let loop_latent_benchmarks =
     base_suite.loop_latent_benchmarks
-    |> add_benchmark
-         ( "Multicore",
-           forget_value LoopMulticore.loop_latent,
-           fun n -> LoopMulticore.loop_latent n = () )
+    |> add_benchmark ("Multicore", LoopMulticore.loop_latent)
   in
   let loop_incr_benchmark =
     base_suite.loop_incr_benchmark
-    |> add_benchmark
-         ( "Multicore",
-           forget_value LoopMulticore.test_incr,
-           fun n -> LoopMulticore.test_incr n = n )
+    |> add_benchmark ("Multicore", LoopMulticore.test_incr)
   in
   let loop_incr'_benchmark =
     base_suite.loop_incr'_benchmark
-    |> add_benchmark
-         ( "Multicore",
-           forget_value LoopMulticore.test_incr',
-           fun n -> LoopMulticore.test_incr' n = n )
+    |> add_benchmark ("Multicore", LoopMulticore.test_incr')
   in
   let loop_state_benchmark =
     base_suite.loop_state_benchmark
-    |> add_benchmark
-         ( "Multicore",
-           forget_value LoopMulticore.test_state,
-           fun n -> LoopMulticore.test_state n = n )
+    |> add_benchmark ("Multicore", LoopMulticore.test_state)
   in
   let queens_one_benchmark =
     base_suite.queens_one_benchmark
     |> add_benchmark
-         ( "Multicore translated",
-           forget_value QueensMulticoreTranslated.queens_one_option,
-           always_true QueensMulticoreTranslated.queens_one_option )
+         ("Multicore translated", (fun n -> ignore (QueensMulticoreTranslated.queens_one_option n)))
   in
-  let queens_one_cps_benchmark =
-    base_suite.queens_one_cps_benchmark
+  let queens_one_benchmark =
+    base_suite.queens_one_benchmark
     |> add_benchmark
-         ( "Multicore translated",
-           forget_value QueensMulticoreTranslated.queens_one_cps,
-           always_true QueensMulticoreTranslated.queens_one_cps )
+         ("Multicore translated", fun n -> ignore (QueensMulticoreTranslated.queens_one_cps n))
   in
   let queens_all_benchmark =
     base_suite.queens_all_benchmark
+    |> add_benchmark ("Multicore", fun n -> ignore (QueensMulticore.queens_all n))
     |> add_benchmark
-         ( "Multicore",
-           forget_value QueensMulticore.queens_all,
-           always_true QueensMulticore.queens_all )
-    |> add_benchmark
-         ( "Multicore translated",
-           forget_value QueensMulticoreTranslated.queens_all,
-           always_true QueensMulticoreTranslated.queens_all )
+         ("Multicore translated", fun n -> ignore (QueensMulticoreTranslated.queens_all n))
   in
   let tree_benchmark =
     base_suite.tree_benchmark
-    |> add_benchmark
-         ( "Multicore",
-           forget_value TreeMulticore.test_general,
-           always_true TreeMulticore.test_general )
+    |> add_benchmark ("Multicore", TreeMulticore.test_general)
   in
   let state_tree_benchmark =
     base_suite.state_tree_benchmark
+    |> add_benchmark ("Multicore", TreeMulticore.test_leaf_state)
     |> add_benchmark
-         ( "Multicore",
-           forget_value TreeMulticore.test_leaf_state,
-           always_true TreeMulticore.test_leaf_state )
-    |> add_benchmark
-         ( "Multicore state handler",
-           forget_value TreeMulticore.test_leaf_state_effect,
-           always_true TreeMulticore.test_leaf_state_effect )
+         ("Multicore state handler", TreeMulticore.test_leaf_state_effect)
   in
   let state_with_update_tree_benchmark =
     base_suite.state_with_update_tree_benchmark
-    |> add_benchmark
-         ( "Multicore",
-           forget_value TreeMulticore.test_leaf_state_update,
-           always_true TreeMulticore.test_leaf_state_update )
+    |> add_benchmark ("Multicore", TreeMulticore.test_leaf_state_update)
   in
   let count_benchmark =
     base_suite.count_benchmark
-    |> add_benchmark
-         ( "Multicore",
-           forget_value CapabilityBenchmarks.testCount,
-           always_true CapabilityBenchmarks.testCount )
+    |> add_benchmark ("Multicore", CapabilityBenchmarks.testCount)
   in
   let generator_benchmark =
     base_suite.generator_benchmark
-    |> add_benchmark
-         ( "Multicore",
-           forget_value CapabilityBenchmarks.testGenerator,
-           always_true CapabilityBenchmarks.testGenerator )
-  in
-  let queen_capabilty_benchmarks =
-    base_suite.queen_capabilty_benchmarks
-    |> add_benchmark
-         ( "Multicore",
-           forget_value CapabilityBenchmarks.queens_all,
-           always_true CapabilityBenchmarks.queens_all )
+    |> add_benchmark ("Multicore", fun n -> ignore(CapabilityBenchmarks.testGenerator n))
   in
   {
     base_suite with
@@ -151,11 +94,9 @@ let test_suite =
     loop_state_benchmark;
     queens_all_benchmark;
     queens_one_benchmark;
-    queens_one_cps_benchmark;
     tree_benchmark;
     state_tree_benchmark;
     state_with_update_tree_benchmark;
     count_benchmark;
     generator_benchmark;
-    queen_capabilty_benchmarks;
   }
