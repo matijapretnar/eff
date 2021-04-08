@@ -26,7 +26,7 @@ let testTriple n s =
     let k = choice (j - 1) in
     if (i + j + k = s)
       then (i, j, k)
-      else (absurd1 (perform (TripleFail ())))
+      else (absurd1 (perform (TripleFail : {TripleFlip} ())))
   in
   handle 
   (let r = triple n s in TripleCons(r, TripleNil)
@@ -66,8 +66,8 @@ let rec forall p = function
 let no_attack (x,y) (x',y') =
   x <> x' && y <> y' && abs (x - x') <> abs (y - y')
 
-let available x qs l =
-  filter (fun y -> forall (no_attack (x,y)) qs) l
+  let available x qs l =
+    filter (fun y -> forall (no_attack (x,y)) qs) l
 
 let find_solution n =
   handle
