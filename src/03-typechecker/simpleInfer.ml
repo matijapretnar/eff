@@ -348,7 +348,7 @@ and infer_expr st { it = e; at = loc } =
     | Untyped.Lambda a ->
         let t1, t2, st = infer_abstraction st a in
         (T.Arrow (t1, t2), st)
-    | Untyped.Effect op -> (
+    | Untyped.Effect (op, _) -> (
         match infer_effect st op with
         | None ->
             Error.typing ~loc "Unbound operation %t" (CoreTypes.Effect.print op)

@@ -225,45 +225,28 @@ let _testGenerator_592 (_n_593 : int) =
     if _l_595 > _u_596 then Value ()
     else
       Call
-        ( GeneratorGet,
-          (),
-          fun (_y_647 : int) ->
-            Call
-              ( GeneratorPut,
-                _y_647,
-                fun (_y_649 : unit) ->
-                  Call
-                    ( GeneratorYield,
-                      _l_595,
-                      fun (_y_643 : unit) ->
-                        _generateFromTo_594 (_l_595 + 1, _u_596) ) ) )
+        ( GeneratorYield,
+          _l_595,
+          fun (_y_638 : unit) -> _generateFromTo_594 (_l_595 + 1, _u_596) )
   in
-  (let rec _generateFromTo_659 (_l_595, _u_596) =
+  (let rec _generateFromTo_646 (_l_595, _u_596) =
      if _l_595 > _u_596 then Value ()
      else
        Call
          ( GeneratorGet,
            (),
-           fun (_y_647 : int) ->
+           fun (_y_654 : int) ->
              Call
                ( GeneratorPut,
-                 _y_647,
-                 fun (_y_649 : unit) ->
-                   Call
-                     ( GeneratorGet,
-                       (),
-                       fun (_y_667 : int) ->
-                         Call
-                           ( GeneratorPut,
-                             _y_667 + _l_595,
-                             fun (_y_670 : unit) ->
-                               _generateFromTo_659 (_l_595 + 1, _u_596) ) ) ) )
+                 _y_654 + _l_595,
+                 fun (_y_657 : unit) -> _generateFromTo_646 (_l_595 + 1, _u_596)
+               ) )
    in
-   let rec _generateFromTo_673 (_l_595, _u_596) (_x_0 : int) =
+   let rec _generateFromTo_660 (_l_595, _u_596) (_x_0 : int) =
      if _l_595 > _u_596 then (_x_0, ())
-     else _generateFromTo_673 (_l_595 + 1, _u_596) (_x_0 + _l_595)
+     else _generateFromTo_660 (_l_595 + 1, _u_596) (_x_0 + _l_595)
    in
-   _generateFromTo_673 (1, _n_593))
+   _generateFromTo_660 (1, _n_593))
     0
 
 let testGenerator = _testGenerator_592

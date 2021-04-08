@@ -32,7 +32,7 @@ and plain_expression =
   | Record of (field, expression) Assoc.t
   | Variant of label * expression option
   | Lambda of abstraction
-  | Effect of effect
+  | Effect of effect * effect list
   | Handler of handler
 
 and computation = plain_computation located

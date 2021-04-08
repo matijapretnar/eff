@@ -272,6 +272,11 @@ let desugar_pattern state ?(initial_forbidden = []) p =
 
 (* Desugaring functions below return a list of bindings and the desugared form. *)
 
+let desugar_effect ~loc state eff =
+  match Assoc.lookup eff state.effect_symbols with
+  | Some eff' -> eff'
+  | None -> Error.typing ~loc "Unknown operation %s" eff
+
 let rec desugar_expression state { it = t; at = loc } =
   let state', w, e =
     match t with
@@ -380,13 +385,12 @@ and desugar_computation state { it = t; at = loc } =
         let state', w1, e1 = desugar_expression state t1 in
         let state'', w2, e2 = desugar_expression state' t2 in
         (state'', w1 @ w2, Untyped.Apply (e1, e2))
-    | Sugared.Effect (eff, t) -> (
-        match Assoc.lookup eff state.effect_symbols with
-        | Some eff' ->
-            let state', w, e = desugar_expression state t in
-            let loc_eff = add_loc (Untyped.Effect eff') loc in
-            (state', w, Untyped.Apply (loc_eff, e))
-        | None -> Error.typing ~loc "Unknown operation %s" eff)
+    | Sugared.Effect (eff, effs, t) ->
+        let eff' = desugar_effect ~loc state eff in
+        let effs' = List.map (desugar_effect ~loc state) effs in
+        let state', w, e = desugar_expression state t in
+        let loc_eff = add_loc (Untyped.Effect (eff', effs')) loc in
+        (state', w, Untyped.Apply (loc_eff, e))
     | Sugared.Match (t, cs) -> match_constructor state loc t cs
     | Sugared.Handle (t1, t2) ->
         let state', w1, e1 = desugar_expression state t1 in

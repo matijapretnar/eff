@@ -116,7 +116,7 @@ and veval state e =
   | Untyped.Variant (lbl, None) -> V.Variant (lbl, None)
   | Untyped.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval state e))
   | Untyped.Lambda a -> V.Closure (eval_closure state a)
-  | Untyped.Effect eff ->
+  | Untyped.Effect (eff, _) ->
       V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
   | Untyped.Handler h -> V.Handler (eval_handler state h)
 

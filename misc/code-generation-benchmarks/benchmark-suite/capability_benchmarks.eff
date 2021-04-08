@@ -131,8 +131,7 @@ let testGenerator n =
   let rec generateFromTo (l,u) = 
     if l > u then ()
     else ( 
-      perform (GeneratorPut (perform (GeneratorGet ())));   (* Cheat to inline handler *)
-      perform (GeneratorYield l); generateFromTo ((l+1) , u))
+      perform (GeneratorYield : {GeneratorPut, GeneratorGet} l); generateFromTo ((l+1) , u))
   in
   ( handle (handle (generateFromTo (1,n)) with 
     | effect (GeneratorYield e) k -> (

@@ -297,10 +297,11 @@ and tcLambda state abs =
   let abs', cnstrs = tcAbstraction state abs in
   ((Term.Lambda abs', Type.Arrow abs'.ty), cnstrs)
 
-and tcEffect state (eff : Untyped.effect) : tcExprOutput' =
+and tcEffect state ((eff : Untyped.effect), (effs : Untyped.effect list)) :
+    tcExprOutput' =
   (* GEORGE: NOTE: This is verbatim copied from the previous implementation *)
   let in_ty, out_ty = Term.EffectMap.find eff state.effects
-  and s = Type.EffectSet.singleton eff in
+  and s = Type.EffectSet.of_list (eff :: effs) in
   let out_drty = (out_ty, Type.closed_dirt s) in
   let x_pat, x_var = Term.fresh_variable "x" in_ty
   and y_pat, y_var = Term.fresh_variable "y" out_ty in
@@ -435,7 +436,7 @@ and tcExpr' state : Untyped.plain_expression -> tcExprOutput' = function
   | Untyped.Record lst -> tcRecord state lst
   | Untyped.Variant (lbl, mbe) -> tcVariant state (lbl, mbe)
   | Untyped.Lambda abs -> tcLambda state abs
-  | Untyped.Effect eff -> tcEffect state eff
+  | Untyped.Effect (eff, effs) -> tcEffect state (eff, effs)
   | Untyped.Handler hand -> tcHandler state hand
 
 (* Type inference for a located value (expression) *)

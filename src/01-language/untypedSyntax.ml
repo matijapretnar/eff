@@ -33,7 +33,7 @@ and plain_expression =
   | Record of (field, expression) Assoc.t
   | Variant of label * expression option
   | Lambda of abstraction
-  | Effect of effect
+  | Effect of effect * effect list
   | Handler of handler
 
 and computation = plain_computation located
@@ -134,7 +134,7 @@ and print_expression ?max_level e ppf =
       print "{effect_clauses = %t; value_clause = (%t)}"
         (Print.sequence " | " effect_clause (Assoc.to_list h.effect_clauses))
         (abstraction h.value_clause)
-  | Effect eff -> print "%t" (CoreTypes.Effect.print eff)
+  | Effect (eff, _) -> print "%t" (CoreTypes.Effect.print eff)
 
 and abstraction (p, c) ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)
