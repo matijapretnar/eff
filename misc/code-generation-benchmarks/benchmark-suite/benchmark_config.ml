@@ -116,7 +116,7 @@ let queens_all_benchmark =
         (* ("eio", ignore_value QueensEffInOcaml.queens_all); *)
         (* ("eio", ignore_value QueensHandlersInAction.queens_all); *)
       ];
-    parameters = [ 8; 9; 10; 11; 12; 13; 14; 15; 16 ];
+    parameters = [ 8; 9; 10; 11; 12; 13 ];
     parameter_unit = "queens";
   }
 

@@ -67,7 +67,9 @@ let findSolution n =
   handledQueens !l n
 
 (* Count *)
-let testCount n =
+
+(* This is slower than pure version *)
+let testCountImpure n =
   let state = ref n in
   let rec count () =
     let i = !state in
@@ -78,9 +80,17 @@ let testCount n =
   in
   count ()
 
+let testCount n = 
+  let rec count i = 
+    if i = 0 then i
+    else count (i-1)
+  in
+  count n 
+
 (* Generator *)
 
-let testGenerator n =
+(* This is slower than pure version *)
+let testGeneratorImpure n =
   let state = ref 0 in
   let rec generateFromTo l u =
     if l > u then ()
@@ -90,3 +100,10 @@ let testGenerator n =
   in
   generateFromTo 1 n;
   !state
+
+let testGenerator n =
+  let rec generateFromTo l u s =
+    if l > u then s else generateFromTo (l + 1) u (s + l)
+  in
+  generateFromTo 1 n 0
+
