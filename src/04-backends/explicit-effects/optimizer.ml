@@ -47,20 +47,28 @@ type inlinability =
   | NotInlinable
 
 let abstraction_inlinability { term = pat, cmp; _ } =
-  let free_vars_cmp = Term.free_vars_comp cmp in
-  let rec check_variables = function
-    | [] -> NotPresent
-    | x :: xs -> (
-        let occ =
-          Term.VariableMap.find_opt x free_vars_cmp |> Option.value ~default:0
-        in
-        if occ > 1 then NotInlinable
-        else
-          match check_variables xs with
-          | NotPresent -> if occ = 0 then NotPresent else Inlinable
-          | inlinability -> inlinability)
-  in
-  check_variables (Term.pattern_vars pat)
+  match pat.term with
+  | Term.PVar v
+    when Term.CoreTypes.Variable.fold
+           (fun v _ -> String.length v >= 3 && String.sub v 0 3 = "___")
+           v.term ->
+      NotInlinable
+  | _ ->
+      let free_vars_cmp = Term.free_vars_comp cmp in
+      let rec check_variables = function
+        | [] -> NotPresent
+        | x :: xs -> (
+            let occ =
+              Term.VariableMap.find_opt x free_vars_cmp
+              |> Option.value ~default:0
+            in
+            if occ > 1 then NotInlinable
+            else
+              match check_variables xs with
+              | NotPresent -> if occ = 0 then NotPresent else Inlinable
+              | inlinability -> inlinability)
+      in
+      check_variables (Term.pattern_vars pat)
 
 let keep_used_bindings defs cmp =
   (* Do proper call graph analysis *)
@@ -369,12 +377,21 @@ and reduce_computation' state comp =
       | [] -> c'
       | defs' -> Term.letRec (Assoc.of_list defs', c'))
   | Term.Bind (cmp, abs) -> bind_computation state cmp abs
-  | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) -> (
+  | Term.Handle ({ term = Term.Handler hnd; ty = hnd_ty }, cmp) -> (
+      Print.debug "Handling: %t :: %t;; :: %t ::: %t"
+        (Term.print_expression' (Term.Handler hnd))
+        (Type.print_ty hnd_ty)
+        (Term.print_computation cmp)
+        (Type.print_dirty cmp.ty);
       let fingerprint = hnd.term.effect_clauses.fingerprint in
       let drty_in, _ = hnd.ty in
+      Print.debug "Drty_in: %t" (Type.print_dirty drty_in);
       let unspecialized_declared_functions =
         List.filter
           (fun (f, { ty = _, drty_out; _ }) ->
+            Print.debug "Drty_out: %t :~: %t"
+              (Language.CoreTypes.Variable.print f)
+              (Type.print_dirty drty_out);
             Type.equal_dirty drty_in drty_out
             && Option.is_none
                  (Assoc.lookup (fingerprint, f) state.specialized_functions))
@@ -459,6 +476,7 @@ and reduce_computation' state comp =
              (fun (f, _) -> (f, FixedReturnClause hnd.term.value_clause))
              unspecialized_declared_functions)
       in
+      Print.debug "Len: %d" (List.length spec_rec_defs);
       let cmp' = handle_computation state' hnd cmp in
       match keep_used_bindings (Assoc.of_list spec_rec_defs) cmp' with
       | [] -> cmp'

@@ -18,20 +18,27 @@ type inlinability =
   | NotInlinable
 
 let abstraction_inlinability (pat, cmp) =
-  let vars = NoEff.free_vars cmp in
-  let rec check_variables = function
-    | [] -> NotPresent
-    | x :: xs -> (
-        let occ =
-          SyntaxNoEff.VariableMap.find_opt x vars |> Option.value ~default:0
-        in
-        if occ > 1 then NotInlinable
-        else
-          match check_variables xs with
-          | NotPresent -> if occ = 0 then NotPresent else Inlinable
-          | inlinability -> inlinability)
-  in
-  check_variables (NoEff.pattern_vars pat)
+  match pat with
+  | NoEff.PNVar v
+    when NoEff.Variable.fold
+           (fun v _ -> String.length v >= 3 && String.sub v 0 3 = "___")
+           v ->
+      NotInlinable
+  | _ ->
+      let vars = NoEff.free_vars cmp in
+      let rec check_variables = function
+        | [] -> NotPresent
+        | x :: xs -> (
+            let occ =
+              SyntaxNoEff.VariableMap.find_opt x vars |> Option.value ~default:0
+            in
+            if occ > 1 then NotInlinable
+            else
+              match check_variables xs with
+              | NotPresent -> if occ = 0 then NotPresent else Inlinable
+              | inlinability -> inlinability)
+      in
+      check_variables (NoEff.pattern_vars pat)
 
 let is_fun = function NoEff.NFun _ -> true | _ -> false
 
@@ -217,6 +224,8 @@ and reduce_term' state (n_term : NoEff.n_term) =
   | NCast (t, NCoerRefl) -> t
   | NBind (NReturn t, c) -> beta_reduce state c t
   | NLet (e, a) -> beta_reduce state a e
+  (* | NFun (p, ty, c) when not (is_fun c) ->
+      NoEff.NFun (p, ty, naive_lambda_lift c) *)
   | NLetRec (defs, t) ->
       let defs =
         Assoc.kmap
