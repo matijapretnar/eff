@@ -91,16 +91,17 @@ let queens_one_benchmark =
         ("generated-option", ignore_value QueensOpt.queens_one_option);
         ("native-cps", ignore_value QueensNative.queens_one_cps);
         ("generated-cps", ignore_value QueensOpt.queens_one_cps);
-        ("generated capabilities code", ignore_value Capability_benchmarksOpt.queens_all);
+        ( "generated capabilities code",
+          ignore_value Capability_benchmarksOpt.queens_all );
         ("native-cap", ignore_value Capability_benchmarks_native.findSolution);
         ( "capabilities",
-           ignore_value Capability_benchmarks_cps_paper.findSolution_generated );
+          ignore_value Capability_benchmarks_cps_paper.findSolution_generated );
         (* ("eio-cps", ignore_value QueensEffInOcaml.queens_one_cps); *)
         (* ("eio-opt", ignore_value QueensEffInOcaml.queens_one_option); *)
         (* ("hia-cps", ignore_value QueensHandlersInAction.queens_one_cps); *)
         (* ("hia-opt", ignore_value QueensHandlersInAction.queens_one_option); *)
       ];
-    parameters = [ 8; 10; 12; 14; 16; 18 ];
+    parameters = [ 8; 9; 10; 11; 12; 13; 14; 15; 16; 17; 18; 19; 20 ];
     parameter_unit = "queens";
   }
 
@@ -115,7 +116,7 @@ let queens_all_benchmark =
         (* ("eio", ignore_value QueensEffInOcaml.queens_all); *)
         (* ("eio", ignore_value QueensHandlersInAction.queens_all); *)
       ];
-    parameters = [ 2; 4; 6; 8; 9; 10; 11; 12 ];
+    parameters = [ 8; 9; 10; 11; 12; 13; 14; 15; 16 ];
     parameter_unit = "queens";
   }
 

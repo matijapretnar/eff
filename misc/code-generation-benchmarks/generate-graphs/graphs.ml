@@ -111,34 +111,34 @@ let run_benchmark_set (set : 'a Benchmark_suite.Benchmark_config.benchmark_set)
   let results = measure_benchmark_set set in
   display_benchmark_set_results set results
 
-let suite = Benchmark_suite.Benchmark_config.default_test_suite
+let suite = Benchmark_suite.Config.test_suite
 
-let _ = run_benchmark_set suite.loop_benchmarks 
+let _ = run_benchmark_set suite.loop_benchmarks
 
- let _ = run_benchmark_set suite.loop_latent_benchmarks 
+let _ = run_benchmark_set suite.loop_latent_benchmarks
 
- let _ = run_benchmark_set suite.loop_incr_benchmark 
+let _ = run_benchmark_set suite.loop_incr_benchmark
 
- let _ = run_benchmark_set suite.loop_incr'_benchmark 
+let _ = run_benchmark_set suite.loop_incr'_benchmark
 
- let _ = run_benchmark_set suite.loop_state_benchmark 
+let _ = run_benchmark_set suite.loop_state_benchmark
 
- let _ = run_benchmark_set suite.queens_one_benchmark 
+let _ = run_benchmark_set suite.queens_one_benchmark
 
- let _ = run_benchmark_set suite.queens_all_benchmark 
+let _ = run_benchmark_set suite.queens_all_benchmark
 
- let _ = run_benchmark_set suite.interpreter_benchmark 
+let _ = run_benchmark_set suite.interpreter_benchmark
 
- let _ = run_benchmark_set suite.interpreter_state_benchmark 
+let _ = run_benchmark_set suite.interpreter_state_benchmark
 
- let _ = run_benchmark_set suite.range_benchmarks 
+let _ = run_benchmark_set suite.range_benchmarks
 
- let _ = run_benchmark_set suite.tree_benchmark 
+let _ = run_benchmark_set suite.tree_benchmark
 
- let _ = run_benchmark_set suite.state_tree_benchmark 
+let _ = run_benchmark_set suite.state_tree_benchmark
 
- let _ = run_benchmark_set suite.state_with_update_tree_benchmark 
+let _ = run_benchmark_set suite.state_with_update_tree_benchmark
 
- let _ = run_benchmark_set suite.count_benchmark
+let _ = run_benchmark_set suite.count_benchmark
 
 let _ = run_benchmark_set suite.generator_benchmark
