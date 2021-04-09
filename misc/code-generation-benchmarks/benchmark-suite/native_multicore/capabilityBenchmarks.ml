@@ -76,28 +76,26 @@ let testCount m =
 
 effect GeneratorPut: int -> unit
 effect GeneratorGet: unit -> int 
-effect GeneratorProduce: int -> int
+effect GeneratorYield: int -> unit
 ;;
-let testGenerator m = 
-  let n = 42 in
-  let rec sum i = 
-    if i = 0 then perform (GeneratorGet ())
-    else 
-      (perform (GeneratorPut ( (perform (GeneratorGet ())) + (perform (GeneratorProduce i))));
-      sum (i-1))
-  in 
-  (match (match (sum m) with
-  | x -> x
-  | effect (GeneratorProduce i) k -> continue k (i mod n)
+
+let testGenerator n =
+  let rec generateFromTo l u =
+    if (l > u)
+      then ()
+  else (
+      perform (GeneratorYield l);
+      generateFromTo (l + 1) u
   )
-  with
-    | y -> (fun _ -> y)
-    | effect (GeneratorGet ()) k -> (
-      fun (s: int) -> (continue k s) s
-    )
-    | effect (GeneratorPut s) k -> (
-      fun (_: int) -> (continue k ()) s
-    )
-  ) m
+  in
+  let comp =
+    match (
+        try (generateFromTo 1 n) with
+        | effect (GeneratorYield e) k -> (perform (GeneratorPut (perform (GeneratorGet ()) + e)); continue k ())
+    ) with
+    | x -> (fun s -> s)
+    | effect (GeneratorPut s') k -> (fun s -> continue k () s')
+    | effect (GeneratorGet _) k -> (fun s -> continue k s s)
+  in comp 0
   
     

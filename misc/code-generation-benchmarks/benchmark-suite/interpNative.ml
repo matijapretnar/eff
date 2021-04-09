@@ -43,7 +43,11 @@ let bigTestException num =
         if y = 0 then raise DivByZero else x / y
   in
   let finalCase = createCase num in
-  try interp finalCase with DivByZero -> -1
+  let rec looper k s =
+    if k = 0 then s
+    else looper (k - 1) (s + try interp finalCase with DivByZero -> -1)
+  in
+  looper 100 0
 
 let bigTestOption num =
   let rec interp = function
@@ -79,7 +83,12 @@ let bigTestOption num =
             | Some x -> if y = 0 then None else Some (x / y)))
   in
   let finalCase = createCase num in
-  match interp finalCase with None -> -1 | Some x -> x
+  let rec looper k s =
+    if k = 0 then s
+    else
+      looper (k - 1) (s + match interp finalCase with None -> -1 | Some x -> x)
+  in
+  looper 100 0
 
 let testState n =
   let rec interp b = function
@@ -102,7 +111,10 @@ let testState n =
         if y = 0 then (b, b) else (x / y, b)
   in
   let finalCase = createCase n in
-  fst (interp n finalCase)
+  let rec looper k s =
+    if k = 0 then s else looper (k - 1) (s + fst (interp n finalCase))
+  in
+  looper 100 0
 
 (*
 

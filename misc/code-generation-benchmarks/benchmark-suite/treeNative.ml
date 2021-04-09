@@ -36,15 +36,18 @@ let test_general m =
     | Empty -> [ 0 ]
     | Node (left, x, right) -> List.map (op x) (explore left @ explore right)
   in
-  List.fold_left max 0 (explore t)
+  let rec looper k s =
+    if k = 0 then s else looper (k - 1) (s + List.fold_left max 0 (explore t))
+  in
+  looper 100 0
 
 let rec count_leafs = function
   | Node (l, _, r) -> count_leafs l + count_leafs r
   | Empty -> 1
 
 let test_leaf_state m =
-  let leafs = ref (List.init 154 (fun i -> i * 3)) in
   let rec maxl l = List.fold_left max 0 l in
+  let leafs = ref [] in
   let t = tester m in
   let rec explore t =
     match t with
@@ -58,7 +61,13 @@ let test_leaf_state m =
         let lef = explore left in
         List.map (op x) (lef @ explore right)
   in
-  List.fold_left max 0 (explore t)
+  let rec looper k s =
+    if k = 0 then s
+    else (
+      leafs := List.init 154 (fun i -> i * 3);
+      looper (k - 1) (s + List.fold_left max 0 (explore t)))
+  in
+  looper 100 0
 
 let k = List.map
 
@@ -74,7 +83,11 @@ let test_leaf_pure_state m =
         let rig, leafs = explore right leafs in
         (List.map (op x) (lef @ rig), leafs)
   in
-  List.fold_left max 0 (fst (explore t leafs))
+  let rec looper k s =
+    if k = 0 then s
+    else looper (k - 1) (s + List.fold_left max 0 (fst (explore t leafs)))
+  in
+  looper 100 0
 
 let test_leaf_state_update m =
   let rec maxl l = List.fold_left max 0 l in
@@ -87,7 +100,11 @@ let test_leaf_state_update m =
         let rig, state = explore right state in
         (List.map (op x) (lef @ rig), state)
   in
-  List.fold_left max 0 (fst (explore t (-1)))
+  let rec looper k s =
+    if k = 0 then s
+    else looper (k - 1) (s + List.fold_left max 0 (fst (explore t (-1))))
+  in
+  looper 100 0
 
 (* 
 # test_leaf_state 100;;

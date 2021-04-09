@@ -91,13 +91,14 @@ let queens_one_benchmark =
         ("generated-option", ignore_value QueensOpt.queens_one_option);
         ("native-cps", ignore_value QueensNative.queens_one_cps);
         ("generated-cps", ignore_value QueensOpt.queens_one_cps);
+        ("generated capabilities code", ignore_value Capability_benchmarksOpt.queens_all);
         ("native-cap", ignore_value Capability_benchmarks_native.findSolution);
         ( "capabilities",
-          ignore_value Capability_benchmarks_cps_paper.findSolution_generated );
-        ("eio-cps", ignore_value QueensEffInOcaml.queens_one_cps);
-        ("eio-opt", ignore_value QueensEffInOcaml.queens_one_option);
-        ("hia-cps", ignore_value QueensHandlersInAction.queens_one_cps);
-        ("hia-opt", ignore_value QueensHandlersInAction.queens_one_option);
+           ignore_value Capability_benchmarks_cps_paper.findSolution_generated );
+        (* ("eio-cps", ignore_value QueensEffInOcaml.queens_one_cps); *)
+        (* ("eio-opt", ignore_value QueensEffInOcaml.queens_one_option); *)
+        (* ("hia-cps", ignore_value QueensHandlersInAction.queens_one_cps); *)
+        (* ("hia-opt", ignore_value QueensHandlersInAction.queens_one_option); *)
       ];
     parameters = [ 8; 10; 12; 14; 16; 18 ];
     parameter_unit = "queens";
@@ -111,10 +112,10 @@ let queens_all_benchmark =
       [
         ("native", ignore_value QueensNative.queens_all);
         ("generated", ignore_value QueensOpt.queens_all);
-        ("eio", ignore_value QueensEffInOcaml.queens_all);
-        ("eio", ignore_value QueensHandlersInAction.queens_all);
+        (* ("eio", ignore_value QueensEffInOcaml.queens_all); *)
+        (* ("eio", ignore_value QueensHandlersInAction.queens_all); *)
       ];
-    parameters = [ 8; 9; 10; 11; 12 ];
+    parameters = [ 2; 4; 6; 8; 9; 10; 11; 12 ];
     parameter_unit = "queens";
   }
 
@@ -126,7 +127,8 @@ let interpreter_benchmark =
       [
         ("native-pure", InterpNative.bigTestOption);
         ("native-exception", InterpNative.bigTestException);
-        ("generated", InterpOpt.bigTest);
+        (* ("generated", InterpOpt.bigTest); *)
+        ("generated loop 100", InterpOpt.bigTestLoop);
       ];
     parameters = [ 200; 2 * 200; 4 * 200; 8 * 200; 16 * 200; 32 * 200 ];
     parameter_unit = "size";
@@ -137,7 +139,11 @@ let interpreter_state_benchmark =
     name = "INTERPRETER STATE BENCHMARK";
     filename = "interpreter_state";
     benchmarks =
-      [ ("native", InterpNative.testState); ("generated", InterpOpt.testState) ];
+      [
+        ("native", InterpNative.testState);
+        (* ("generated", InterpOpt.testState); *)
+        ("generated loop 100", InterpOpt.testStateLoop);
+      ];
     parameters = [ 200; 2 * 200; 4 * 200; 8 * 200; 16 * 200; 32 * 200 ];
     parameter_unit = "size";
   }
@@ -161,7 +167,9 @@ let tree_benchmark =
     filename = "tree";
     benchmarks =
       [
-        ("native", TreeNative.test_general); ("generated", TreeOpt.test_general);
+        ("native", TreeNative.test_general);
+        (* ("generated", TreeOpt.test_general); *)
+        ("generated loop", TreeOpt.test_general_loop);
       ];
     parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";
@@ -175,7 +183,8 @@ let state_tree_benchmark =
       [
         ("native-pure", TreeNative.test_leaf_pure_state);
         ("native-ref", TreeNative.test_leaf_state);
-        ("generated", TreeOpt.test_leaf_state);
+        (* ("generated", TreeOpt.test_leaf_state); *)
+        ("generated loop", TreeOpt.test_leaf_state_loop);
       ];
     parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";
@@ -188,8 +197,11 @@ let state_with_update_tree_benchmark =
     benchmarks =
       [
         ("native", TreeNative.test_leaf_state_update);
-        ("generated", TreeOpt.test_leaf_state_update);
-        ("generated-merged", TreeOpt.test_leaf_state_update_merged_handler);
+        (* ("generated", TreeOpt.test_leaf_state_update); *)
+        ("generated loop", TreeOpt.test_leaf_state_update_loop);
+        (* ("generated-merged", TreeOpt.test_leaf_state_update_merged_handler); *)
+        ( "generated-merged loop",
+          TreeOpt.test_leaf_state_update_merged_handler_loop );
       ];
     parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";

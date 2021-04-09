@@ -197,26 +197,26 @@ let _testGenerator_505 (_n_506 : int) =
       Call
         ( GeneratorYield,
           _l_508,
-          fun (_y_551 : unit) -> _generateFromTo_507 (_l_508 + 1, _u_509) )
+          fun (_y_549 : unit) -> _generateFromTo_507 (_l_508 + 1, _u_509) )
   in
-  (let rec _generateFromTo_559 (_l_508, _u_509) =
+  (let rec _generateFromTo_557 (_l_508, _u_509) =
      if _l_508 > _u_509 then Value ()
      else
        Call
          ( GeneratorGet,
            (),
-           fun (_y_567 : int) ->
+           fun (_y_565 : int) ->
              Call
                ( GeneratorPut,
-                 _y_567 + _l_508,
-                 fun (_y_570 : unit) -> _generateFromTo_559 (_l_508 + 1, _u_509)
+                 _y_565 + _l_508,
+                 fun (_y_568 : unit) -> _generateFromTo_557 (_l_508 + 1, _u_509)
                ) )
    in
-   let rec _generateFromTo_573 (_l_508, _u_509) (_x_0 : int) =
-     if _l_508 > _u_509 then (_x_0, ())
-     else _generateFromTo_573 (_l_508 + 1, _u_509) (_x_0 + _l_508)
+   let rec _generateFromTo_571 (_l_508, _u_509) (_x_0 : int) =
+     if _l_508 > _u_509 then _x_0
+     else _generateFromTo_571 (_l_508 + 1, _u_509) (_x_0 + _l_508)
    in
-   _generateFromTo_573 (1, _n_506))
+   _generateFromTo_571 (1, _n_506))
     0
 
 let testGenerator = _testGenerator_505

@@ -50,11 +50,14 @@ let bigTest num =
     end
   in
   let finalCase = createCase num in
-  match 
+  let rec looper k s = 
+    if k = 0 then s else looper (k-1) (s + (match 
     interp finalCase
   with 
   | effect (DivByZero ()) k -> -1
-  | x -> x
+  | x -> x))
+  in
+  looper 100 0
 
 
 effect Get: unit -> int
@@ -86,15 +89,19 @@ let testState num =
     end
   in
   let finalCase = createCase num in
-  (match interp finalCase with
-  | y -> (fun _ -> y)
-  | effect (Get ()) k -> (
-    fun (s: int) -> 
-      (continue k s) s
-    )
-  | effect (Set s) k -> (
-    fun _ -> (continue k ()) s
-  ) ) (num)
+  let rec looper k s = 
+    if k = 0 then s else looper (k-1) (s + ((match interp finalCase with
+    | y -> (fun _ -> y)
+    | effect (Get ()) k -> (
+      fun (s: int) -> 
+        (continue k s) s
+      )
+    | effect (Set s) k -> (
+      fun _ -> (continue k ()) s
+    ) ) (num)))
+  in
+  looper 100 0
+  
 
 (*
 

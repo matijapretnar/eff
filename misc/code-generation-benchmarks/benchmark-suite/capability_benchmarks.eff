@@ -139,7 +139,7 @@ let testGenerator n =
       k ()
     )
   ) with 
-  | x -> (fun s -> (s,x))   
+  | x -> (fun s -> s)   
   | effect (GeneratorPut s') k -> (fun s ->  k () s')
   | effect (GeneratorGet _) k -> (fun s -> k s s)
   ) 0 

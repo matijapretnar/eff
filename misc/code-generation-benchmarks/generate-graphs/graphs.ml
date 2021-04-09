@@ -3,9 +3,9 @@ open Toolkit
 
 let instance = Instance.monotonic_clock
 
-let limit = 500
+let limit = 5000
 
-let second_quota = 1.0
+let second_quota = 10.0
 
 module StringMap = Map.Make (String)
 module IntMap = Map.Make (Int)
@@ -113,32 +113,32 @@ let run_benchmark_set (set : 'a Benchmark_suite.Benchmark_config.benchmark_set)
 
 let suite = Benchmark_suite.Benchmark_config.default_test_suite
 
-(* let _ = run_benchmark_set suite.loop_benchmarks *)
+let _ = run_benchmark_set suite.loop_benchmarks 
 
-(* let _ = run_benchmark_set suite.loop_latent_benchmarks *)
+ let _ = run_benchmark_set suite.loop_latent_benchmarks 
 
-(* let _ = run_benchmark_set suite.loop_incr_benchmark *)
+ let _ = run_benchmark_set suite.loop_incr_benchmark 
 
-(* let _ = run_benchmark_set suite.loop_incr'_benchmark *)
+ let _ = run_benchmark_set suite.loop_incr'_benchmark 
 
-(* let _ = run_benchmark_set suite.loop_state_benchmark *)
+ let _ = run_benchmark_set suite.loop_state_benchmark 
 
-let _ = run_benchmark_set suite.queens_one_benchmark
+ let _ = run_benchmark_set suite.queens_one_benchmark 
 
-let _ = run_benchmark_set suite.queens_all_benchmark
+ let _ = run_benchmark_set suite.queens_all_benchmark 
 
-(* let _ = run_benchmark_set suite.interpreter_benchmark *)
+ let _ = run_benchmark_set suite.interpreter_benchmark 
 
-(* let _ = run_benchmark_set suite.interpreter_state_benchmark *)
+ let _ = run_benchmark_set suite.interpreter_state_benchmark 
 
-(* let _ = run_benchmark_set suite.range_benchmarks *)
+ let _ = run_benchmark_set suite.range_benchmarks 
 
-(* let _ = run_benchmark_set suite.tree_benchmark *)
+ let _ = run_benchmark_set suite.tree_benchmark 
 
-(* let _ = run_benchmark_set suite.state_tree_benchmark *)
+ let _ = run_benchmark_set suite.state_tree_benchmark 
 
-(* let _ = run_benchmark_set suite.state_with_update_tree_benchmark *)
+ let _ = run_benchmark_set suite.state_with_update_tree_benchmark 
 
-(* let _ = run_benchmark_set suite.count_benchmark *)
+ let _ = run_benchmark_set suite.count_benchmark
 
-(* let _ = run_benchmark_set suite.generator_benchmark *)
+let _ = run_benchmark_set suite.generator_benchmark

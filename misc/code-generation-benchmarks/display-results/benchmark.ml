@@ -9,7 +9,7 @@ let benchmark test =
   let instances =
     Instance.[ minor_allocated; major_allocated; monotonic_clock; promoted ]
   in
-  let cfg = Benchmark.cfg ~limit:50 ~quota:(Time.second 0.5) () in
+  let cfg = Benchmark.cfg ~limit:5000 ~quota:(Time.second 5.0) () in
   let raw_results = Benchmark.all cfg instances test in
   let results =
     List.map (fun instance -> Analyze.all ols instance raw_results) instances
@@ -263,30 +263,27 @@ let run_benchmarks set =
 let () =
   run_benchmarks suite.loop_benchmarks;
 
-  run_benchmarks suite.loop_latent_benchmarks;
+    run_benchmarks suite.loop_latent_benchmarks;
 
-  run_benchmarks suite.loop_incr_benchmark;
+    run_benchmarks suite.loop_incr_benchmark;
 
-  run_benchmarks suite.loop_incr'_benchmark;
+    run_benchmarks suite.loop_incr'_benchmark;
 
-  run_benchmarks suite.loop_state_benchmark;
+    run_benchmarks suite.loop_state_benchmark;
+  
+   run_benchmarks suite.queens_one_benchmark; 
 
-  run_benchmarks suite.queens_one_benchmark;
+   run_benchmarks suite.queens_all_benchmark 
+   run_benchmarks suite.interpreter_benchmark; 
 
-  run_benchmarks suite.queens_all_benchmark;
+   run_benchmarks suite.interpreter_state_benchmark; 
 
-  run_benchmarks suite.interpreter_benchmark;
-
-  run_benchmarks suite.interpreter_state_benchmark;
-
-  run_benchmarks suite.range_benchmarks;
-
-  run_benchmarks suite.tree_benchmark;
+   run_benchmarks suite.range_benchmarks; 
+   run_benchmarks suite.tree_benchmark; 
 
   run_benchmarks suite.state_tree_benchmark;
 
   run_benchmarks suite.state_with_update_tree_benchmark;
 
-  run_benchmarks suite.count_benchmark;
-
-  run_benchmarks suite.generator_benchmark
+run_benchmarks suite.count_benchmark;
+run_benchmarks suite.generator_benchmark

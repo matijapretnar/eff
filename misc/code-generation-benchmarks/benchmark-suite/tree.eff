@@ -71,6 +71,28 @@ let test_general m =
   in
   maxl 0 (with h handle explore t)
 
+let test_general_loop m = 
+  let rec maxl acc = function
+    | Nil -> acc
+    | Cons(x, xs) -> maxl (max x acc ) xs
+  in
+  let ___t = tester m in
+  let rec explore t = match t with
+    | Empty -> 0
+    | Node (left, x, right) -> 
+      let next = if (perform (Choose ())) then (op x (explore left)) else op x (explore right) in
+      next
+  in
+  let h = handler 
+  | x -> Cons(x, Nil)
+  | effect (Choose ()) k -> (k true) @ (k false) 
+  in
+  let rec looper k s = 
+    if k = 0 then s else
+      looper (k-1) (s + maxl 0 (with h handle explore ___t))
+  in
+  looper 100 0
+
 
 effect Get: unit -> int
 
@@ -109,6 +131,42 @@ let test_leaf_state m =
   in
   maxl 0 ((with monad_state handle ((with h handle explore t))) leafs)
 
+let test_leaf_state_loop m = 
+  let rec maxl acc = function
+  | Nil -> acc
+  | Cons(x, xs) -> maxl (max x acc ) xs
+  in
+  let rec populate_leafs i n = 
+    if i = n then Nil else 
+    Cons(i*3, (populate_leafs (i+1) n))
+  in
+  let ___leafs = populate_leafs 0 154 in
+  let ___t = tester m in
+  let rec explore t = match t with
+    | Empty -> perform (Get ())
+    | Node (left, x, right) -> 
+      let next = if (perform (Choose ())) then left else right in
+      (op x (explore next))
+  in
+  let h = handler 
+  | x -> Cons(x, Nil)
+  | effect (Choose ()) k -> (k true) @ (k false) 
+  in
+  let monad_state = handler
+  | y -> (fun _ -> y)
+  | effect (Get ()) k -> (
+    fun s -> (match s with 
+    | Cons(x, rest) -> (k x) rest
+    | Nil -> Nil
+    )
+  )
+  in
+  let rec looper k s = 
+    if k = 0 then s else
+      looper (k-1) (s + maxl 0 ((with monad_state handle ((with h handle explore ___t))) ___leafs))
+  in
+  looper 100 0
+
 
 effect Set: int -> unit
 
@@ -140,30 +198,91 @@ let test_leaf_state_update m =
   in
   maxl 0 ((with monad_state handle ((with h handle explore t))) (-1))
 
-  let test_leaf_state_update_merged_handler m = 
-    let rec maxl acc = function
-    | Nil -> acc
-    | Cons(x, xs) -> maxl (max x acc) xs
-    in
-    let t = tester m in
-    let rec explore t = match t with
-      | Empty -> perform (Get ())
-      | Node (left, x, right) -> 
-        perform (Set (x*x));
-        let next = if (perform (Choose ())) then left else right in
-        (op x (explore next))
-    in
-    let monad_state = handler
-    | y -> (fun _ -> Cons(y, Nil))
-    | effect (Get ()) k -> (
-      fun s -> (k s) s
-      )
-    | effect (Set s) k -> (
-      fun _ -> (k ()) s
+let test_leaf_state_update_loop m = 
+  let rec maxl acc = function
+  | Nil -> acc
+  | Cons(x, xs) -> maxl (max x acc) xs
+  in
+  let ___t = tester m in
+  let rec explore t = match t with
+    | Empty -> perform (Get ())
+    | Node (left, x, right) -> 
+      perform (Set (x*x));
+      let next = if (perform (Choose ())) then left else right in
+      (op x (explore next))
+  in
+  let h = handler 
+  | x -> Cons(x, Nil)
+  | effect (Choose ()) k -> (k true) @ (k false) 
+  in
+  let monad_state = handler
+  | y -> (fun _ -> y)
+  | effect (Get ()) k -> (
+    fun s -> (k s) s
     )
-    | effect (Choose ()) k -> (fun s -> ((k true) s) @ ((k false) s) )
-    in
-    maxl 0 ((with monad_state handle (( explore t))) (-1))
+  | effect (Set s) k -> (
+    fun _ -> (k ()) s
+  )
+  in
+  let rec looper k s = 
+    if k = 0 then s else
+      looper (k-1) (s + maxl 0 ((with monad_state handle ((with h handle explore ___t))) (-1)))
+  in
+  looper 100 0
+  
+let test_leaf_state_update_merged_handler m = 
+  let rec maxl acc = function
+  | Nil -> acc
+  | Cons(x, xs) -> maxl (max x acc) xs
+  in
+  let t = tester m in
+  let rec explore t = match t with
+    | Empty -> perform (Get ())
+    | Node (left, x, right) -> 
+      perform (Set (x*x));
+      let next = if (perform (Choose ())) then left else right in
+      (op x (explore next))
+  in
+  let monad_state = handler
+  | y -> (fun _ -> Cons(y, Nil))
+  | effect (Get ()) k -> (
+    fun s -> (k s) s
+    )
+  | effect (Set s) k -> (
+    fun _ -> (k ()) s
+  )
+  | effect (Choose ()) k -> (fun s -> ((k true) s) @ ((k false) s) )
+  in
+  maxl 0 ((with monad_state handle (( explore t))) (-1))
+
+let test_leaf_state_update_merged_handler_loop m = 
+  let rec maxl acc = function
+  | Nil -> acc
+  | Cons(x, xs) -> maxl (max x acc) xs
+  in
+  let ___t = tester m in
+  let rec explore t = match t with
+    | Empty -> perform (Get ())
+    | Node (left, x, right) -> 
+      perform (Set (x*x));
+      let next = if (perform (Choose ())) then left else right in
+      (op x (explore next))
+  in
+  let monad_state = handler
+  | y -> (fun _ -> Cons(y, Nil))
+  | effect (Get ()) k -> (
+    fun s -> (k s) s
+    )
+  | effect (Set s) k -> (
+    fun _ -> (k ()) s
+  )
+  | effect (Choose ()) k -> (fun s -> ((k true) s) @ ((k false) s) )
+  in
+  let rec looper k s = 
+    if k = 0 then s else
+      looper (k-1) (s + maxl 0 ((with monad_state handle (( explore ___t))) (-1)))
+  in
+  looper 100 0
   
 
 (* 

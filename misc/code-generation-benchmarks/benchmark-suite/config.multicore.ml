@@ -47,18 +47,22 @@ let test_suite =
   let queens_one_benchmark =
     base_suite.queens_one_benchmark
     |> add_benchmark
-         ("Multicore translated", (fun n -> ignore (QueensMulticoreTranslated.queens_one_option n)))
+         ( "Multicore translated",
+           fun n -> ignore (QueensMulticoreTranslated.queens_one_option n) )
   in
   let queens_one_benchmark =
     base_suite.queens_one_benchmark
     |> add_benchmark
-         ("Multicore translated", fun n -> ignore (QueensMulticoreTranslated.queens_one_cps n))
+         ( "Multicore translated",
+           fun n -> ignore (QueensMulticoreTranslated.queens_one_cps n) )
   in
   let queens_all_benchmark =
     base_suite.queens_all_benchmark
-    |> add_benchmark ("Multicore", fun n -> ignore (QueensMulticore.queens_all n))
     |> add_benchmark
-         ("Multicore translated", fun n -> ignore (QueensMulticoreTranslated.queens_all n))
+         ("Multicore", fun n -> ignore (QueensMulticore.queens_all n))
+    |> add_benchmark
+         ( "Multicore translated",
+           fun n -> ignore (QueensMulticoreTranslated.queens_all n) )
   in
   let tree_benchmark =
     base_suite.tree_benchmark
@@ -80,7 +84,8 @@ let test_suite =
   in
   let generator_benchmark =
     base_suite.generator_benchmark
-    |> add_benchmark ("Multicore", fun n -> ignore(CapabilityBenchmarks.testGenerator n))
+    |> add_benchmark
+         ("Multicore", fun n -> ignore (CapabilityBenchmarks.testGenerator n))
   in
   {
     base_suite with
