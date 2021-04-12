@@ -210,12 +210,23 @@ and beta_reduce state ((_, trm1) as abs) trm2 =
   match (abstraction_inlinability abs, trm2) with
   | Inlinable, _
   (* Inline constants and variables anyway *)
-  | NotInlinable, (NoEff.NVar _ | NoEff.NConst _) -> (
+  (* Always inline handlers to optimize them *)
+  | NotInlinable, (NoEff.NVar _ | NoEff.NConst _ | NoEff.NHandler _) -> (
       match NoEff.beta_reduce abs trm2 with
       | Some trm -> optimize_term state trm
       | None -> NoEff.NLet (trm2, abs))
   | NotPresent, _ -> trm1
   | NotInlinable, _ -> NoEff.NLet (trm2, abs)
+
+and is_letrec_unused _state defs t =
+  let vars = NoEff.free_vars t in
+  if
+    List.for_all
+      (fun v ->
+        NoEff.VariableMap.find_opt v vars |> Option.value ~default:0 = 0)
+      (Assoc.keys_of defs)
+  then true
+  else false
 
 and reduce_term' state (n_term : NoEff.n_term) =
   (* Print.debug "Reducing noeff term: %t" (NoEff.print_term n_term); *)
@@ -233,7 +244,7 @@ and reduce_term' state (n_term : NoEff.n_term) =
             if is_fun c then (v, (p, c)) else (v, (p, naive_lambda_lift c)))
           defs
       in
-      NLetRec (defs, t)
+      if is_letrec_unused state defs t then t else NoEff.NLetRec (defs, t)
   | _ -> n_term
 
 and reduce_term state n_term =

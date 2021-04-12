@@ -18,19 +18,6 @@ let rec _op_42 (* @ *) _x_49 (_ys_51 : triple_int_list) =
 let _op_42 (* @ *) = _op_42 (* @ *)
 
 let _testTriple_56 (_n_57 : int) (_s_58 : int) =
-  let rec _choice_236 _x_237 =
-    if _x_237 < 1 then
-      Call
-        ( TripleFail,
-          (),
-          fun (_y_240 : empty) -> Value (match _y_240 with _ -> assert false) )
-    else
-      Call
-        ( TripleFlip,
-          (),
-          fun (_y_241 : bool) ->
-            if _y_241 then Value _x_237 else _choice_236 (_x_237 - 1) )
-  in
   let rec _choice_244 _x_245 =
     if _x_245 < 1 then TripleNil
     else
@@ -120,16 +107,7 @@ let _find_solution_348 (_n_349 : int) =
     if _x_388 = 0 then _acc_410
     else _init_363 (_x_388 - 1) (Lst (_x_388, _acc_410))
   in
-  let _l_371 = _init_363 _n_349 End in
-  let rec _place_373 (_x_374, _qs_375) =
-    if _x_374 = _n_349 + 1 then Value (Some _qs_375)
-    else
-      Call
-        ( Select,
-          _available_340 _x_374 _qs_375 _l_371,
-          fun (_y_393 : int) ->
-            _place_373 (_x_374 + 1, Cons ((_x_374, _y_393), _qs_375)) )
-  in
+  let ____l_371 = _init_363 _n_349 End in
   let rec _place_423 (_x_374, _qs_375) =
     if _x_374 = _n_349 + 1 then Some _qs_375
     else
@@ -144,7 +122,7 @@ let _find_solution_348 (_n_349 : int) =
       _loop_436
         (fun (_y_445 : int) ->
           _place_423 (_x_374 + 1, Cons ((_x_374, _y_445), _qs_375)))
-        (_available_340 _x_374 _qs_375 _l_371)
+        (_available_340 _x_374 _qs_375 ____l_371)
   in
   _place_423 (1, Nil)
 
@@ -191,28 +169,7 @@ type (_, _) eff_internal_effect +=
   | GeneratorYield : (int, unit) eff_internal_effect
 
 let _testGenerator_505 (_n_506 : int) =
-  let rec _generateFromTo_507 (_l_508, _u_509) =
-    if _l_508 > _u_509 then Value ()
-    else
-      Call
-        ( GeneratorYield,
-          _l_508,
-          fun (_y_549 : unit) -> _generateFromTo_507 (_l_508 + 1, _u_509) )
-  in
-  (let rec _generateFromTo_557 (_l_508, _u_509) =
-     if _l_508 > _u_509 then Value ()
-     else
-       Call
-         ( GeneratorGet,
-           (),
-           fun (_y_565 : int) ->
-             Call
-               ( GeneratorPut,
-                 _y_565 + _l_508,
-                 fun (_y_568 : unit) -> _generateFromTo_557 (_l_508 + 1, _u_509)
-               ) )
-   in
-   let rec _generateFromTo_571 (_l_508, _u_509) (_x_0 : int) =
+  (let rec _generateFromTo_571 (_l_508, _u_509) (_x_0 : int) =
      if _l_508 > _u_509 then _x_0
      else _generateFromTo_571 (_l_508 + 1, _u_509) (_x_0 + _l_508)
    in

@@ -84,13 +84,6 @@ let queens = _queens_138
 
 let _queens_one_option_162 (_number_of_queens_163 : int) =
   let rec _queens_176 _number_of_queens_139 =
-    let rec _place_140 (_x_141, _qs_142) =
-      if _x_141 > _number_of_queens_139 then Value _qs_142
-      else
-        _choose_116 (_available_90 _number_of_queens_139 _x_141 _qs_142)
-        >> fun _y_145 ->
-        _place_140 (_x_141 + 1, SolutionPlace ((_x_141, _y_145), _qs_142))
-    in
     let rec _place_177 (_x_141, _qs_142) =
       if _x_141 > _number_of_queens_139 then Some _qs_142
       else
@@ -118,13 +111,6 @@ let queens_one_option = _queens_one_option_162
 
 let _queens_all_183 (_number_of_queens_184 : int) =
   let rec _queens_198 _number_of_queens_139 =
-    let rec _place_140 (_x_141, _qs_142) =
-      if _x_141 > _number_of_queens_139 then Value _qs_142
-      else
-        _choose_116 (_available_90 _number_of_queens_139 _x_141 _qs_142)
-        >> fun _y_145 ->
-        _place_140 (_x_141 + 1, SolutionPlace ((_x_141, _y_145), _qs_142))
-    in
     let rec _place_199 (_x_141, _qs_142) =
       if _x_141 > _number_of_queens_139 then
         SolutionsCons (_qs_142, SolutionsNil)
@@ -151,13 +137,6 @@ let queens_all = _queens_all_183
 
 let _queens_one_cps_205 (_number_of_queens_206 : int) =
   (let rec _queens_242 _number_of_queens_243 =
-     let rec _place_244 (_x_246, _qs_245) =
-       if _x_246 > _number_of_queens_243 then Value _qs_245
-       else
-         _choose_116 (_available_90 _number_of_queens_243 _x_246 _qs_245)
-         >> fun _y_252 ->
-         _place_244 (_x_246 + 1, SolutionPlace ((_x_246, _y_252), _qs_245))
-     in
      let rec _place_255 (_x_257, _qs_256) =
        if _x_257 > _number_of_queens_243 then
          coer_arrow coer_refl_ty (coer_return coer_refl_ty)

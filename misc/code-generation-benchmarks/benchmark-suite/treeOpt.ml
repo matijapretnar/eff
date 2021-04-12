@@ -29,19 +29,6 @@ let _max_88 (_a_89 : int) (_b_90 : int) = if _a_89 > _b_90 then _a_89 else _b_90
 let max = _max_88
 
 let _effect_max_93 (_m_94 : int) =
-  let rec _find_max_95 _x_115 =
-    match _x_115 with
-    | Empty -> Value 0
-    | Node (Empty, _x_123, Empty) -> Value _x_123
-    | Node (_left_126, _x_125, _right_124) ->
-        Call
-          ( Choose,
-            (),
-            fun (_y_127 : bool) ->
-              (if _y_127 then _find_max_95 _left_126
-              else _find_max_95 _right_124)
-              >> fun _next_128 -> Value (_x_125 + _next_128) )
-  in
   let rec _find_max_133 (_x_115, _k_135) =
     match _x_115 with
     | Empty -> _k_135 0
@@ -89,22 +76,6 @@ let _test_general_165 (_m_166 : int) =
     | Nil -> _x_197
     | Cons (_x_234, _xs_233) -> _maxl_167 (_max_146 _x_234 _x_197) _xs_233
   in
-  let rec _explore_176 _x_200 =
-    match _x_200 with
-    | Empty -> Value 0
-    | Node (_left_216, _x_215, _right_214) ->
-        Call
-          ( Choose,
-            (),
-            fun (_y_217 : bool) ->
-              (if _y_217 then
-               _explore_176 _left_216 >> fun _b_220 ->
-               Value (_op_140 _x_215 _b_220)
-              else
-                _explore_176 _right_214 >> fun _b_222 ->
-                Value (_op_140 _x_215 _b_222))
-              >> fun _next_218 -> Value _next_218 )
-  in
   _maxl_167 0
     (let rec _explore_226 (_x_200, _k_228) =
        match _x_200 with
@@ -133,22 +104,6 @@ let _test_general_loop_238 (_m_239 : int) =
     | Cons (_x_344, _xs_343) -> _maxl_240 (_max_146 _x_344 _x_282) _xs_343
   in
   let ____t_248 = _tester_42 _m_239 in
-  let rec _explore_249 _x_285 =
-    match _x_285 with
-    | Empty -> Value 0
-    | Node (_left_326, _x_325, _right_324) ->
-        Call
-          ( Choose,
-            (),
-            fun (_y_327 : bool) ->
-              (if _y_327 then
-               _explore_249 _left_326 >> fun _b_330 ->
-               Value (_op_140 _x_325 _b_330)
-              else
-                _explore_249 _right_324 >> fun _b_332 ->
-                Value (_op_140 _x_325 _b_332))
-              >> fun _next_328 -> Value _next_328 )
-  in
   let rec _looper_302 _x_303 (_s_304 : int) =
     if _x_303 = 0 then _s_304
     else
@@ -195,17 +150,6 @@ let _test_leaf_state_350 (_m_351 : int) =
   let rec _populate_leafs_360 _x_404 (_n_474 : int) =
     if _x_404 = _n_474 then Nil
     else Cons (_x_404 * 3, _populate_leafs_360 (_x_404 + 1) _n_474)
-  in
-  let rec _explore_374 _x_409 =
-    match _x_409 with
-    | Empty -> Call (Get, (), fun (_y_434 : int) -> Value _y_434)
-    | Node (_left_437, _x_436, _right_435) ->
-        Call
-          ( Choose,
-            (),
-            fun (_y_438 : bool) ->
-              _explore_374 (if _y_438 then _left_437 else _right_435)
-              >> fun _b_441 -> Value (_op_140 _x_436 _b_441) )
   in
   _maxl_352 0
     ((let rec _explore_444 (_x_409, _k_446) =
@@ -323,17 +267,6 @@ let _test_leaf_state_loop_1088 (_m_1089 : int) =
   in
   let ____leafs_1109 = _populate_leafs_1098 0 154 in
   let ____t_1111 = _tester_42 _m_1089 in
-  let rec _explore_1112 _x_1159 =
-    match _x_1159 with
-    | Empty -> Call (Get, (), fun (_y_1222 : int) -> Value _y_1222)
-    | Node (_left_1225, _x_1224, _right_1223) ->
-        Call
-          ( Choose,
-            (),
-            fun (_y_1226 : bool) ->
-              _explore_1112 (if _y_1226 then _left_1225 else _right_1223)
-              >> fun _b_1229 -> Value (_op_140 _x_1224 _b_1229) )
-  in
   let rec _looper_1195 _x_1196 (_s_1197 : int) =
     if _x_1196 = 0 then _s_1197
     else
@@ -467,21 +400,6 @@ let _test_leaf_state_update_1876 (_m_1877 : int) =
     | Nil -> _x_1920
     | Cons (_x_2294, _xs_2293) -> _maxl_1878 (_max_146 _x_2294 _x_1920) _xs_2293
   in
-  let rec _explore_1887 _x_1927 =
-    match _x_1927 with
-    | Empty -> Call (Get, (), fun (_y_1958 : int) -> Value _y_1958)
-    | Node (_left_1961, _x_1960, _right_1959) ->
-        Call
-          ( Set,
-            _x_1960 * _x_1960,
-            fun (_y_1964 : unit) ->
-              Call
-                ( Choose,
-                  (),
-                  fun (_y_1965 : bool) ->
-                    _explore_1887 (if _y_1965 then _left_1961 else _right_1959)
-                    >> fun _b_1968 -> Value (_op_140 _x_1960 _b_1968) ) )
-  in
   _maxl_1878 0
     ((let rec _explore_1971 (_x_1927, _k_1973) =
         match _x_1927 with
@@ -608,22 +526,6 @@ let _test_leaf_state_update_loop_10985 (_m_10986 : int) =
         _maxl_10987 (_max_146 _x_11454 _x_11041) _xs_11453
   in
   let ____t_10995 = _tester_42 _m_10986 in
-  let rec _explore_10996 _x_11048 =
-    match _x_11048 with
-    | Empty -> Call (Get, (), fun (_y_11118 : int) -> Value _y_11118)
-    | Node (_left_11121, _x_11120, _right_11119) ->
-        Call
-          ( Set,
-            _x_11120 * _x_11120,
-            fun (_y_11124 : unit) ->
-              Call
-                ( Choose,
-                  (),
-                  fun (_y_11125 : bool) ->
-                    _explore_10996
-                      (if _y_11125 then _left_11121 else _right_11119)
-                    >> fun _b_11128 -> Value (_op_140 _x_11120 _b_11128) ) )
-  in
   let rec _looper_11087 _x_11088 (_s_11089 : int) =
     if _x_11088 = 0 then _s_11089
     else
@@ -766,22 +668,6 @@ let _test_leaf_state_update_merged_handler_20145 (_m_20146 : int) =
     | Cons (_x_20258, _xs_20257) ->
         _maxl_20147 (_max_146 _x_20258 _x_20188) _xs_20257
   in
-  let rec _explore_20156 _x_20195 =
-    match _x_20195 with
-    | Empty -> Call (Get, (), fun (_y_20213 : int) -> Value _y_20213)
-    | Node (_left_20216, _x_20215, _right_20214) ->
-        Call
-          ( Set,
-            _x_20215 * _x_20215,
-            fun (_y_20219 : unit) ->
-              Call
-                ( Choose,
-                  (),
-                  fun (_y_20220 : bool) ->
-                    _explore_20156
-                      (if _y_20220 then _left_20216 else _right_20214)
-                    >> fun _b_20223 -> Value (_op_140 _x_20215 _b_20223) ) )
-  in
   _maxl_20147 0
     ((let rec _explore_20231 (_x_20195, _k_20233) (_x_2 : int) =
         match _x_20195 with
@@ -815,22 +701,6 @@ let _test_leaf_state_update_merged_handler_loop_20262 (_m_20263 : int) =
         _maxl_20264 (_max_146 _x_20414 _x_20317) _xs_20413
   in
   let ____t_20272 = _tester_42 _m_20263 in
-  let rec _explore_20273 _x_20324 =
-    match _x_20324 with
-    | Empty -> Call (Get, (), fun (_y_20369 : int) -> Value _y_20369)
-    | Node (_left_20372, _x_20371, _right_20370) ->
-        Call
-          ( Set,
-            _x_20371 * _x_20371,
-            fun (_y_20375 : unit) ->
-              Call
-                ( Choose,
-                  (),
-                  fun (_y_20376 : bool) ->
-                    _explore_20273
-                      (if _y_20376 then _left_20372 else _right_20370)
-                    >> fun _b_20379 -> Value (_op_140 _x_20371 _b_20379) ) )
-  in
   let rec _looper_20345 _x_20346 (_s_20347 : int) =
     if _x_20346 = 0 then _s_20347
     else
