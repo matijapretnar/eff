@@ -296,16 +296,12 @@ and handle_computation state hnd comp =
             ( Term.var f',
               Term.tuple [ exp; Term.lambda hnd.term.Term.value_clause ] )
       | None -> assert false)
-  | Bind (cmp, abs) -> (
-      match recast_computation hnd cmp with
-      | Some comp' ->
-          bind_computation state comp' (handle_abstraction state hnd abs)
-      | None ->
-          let hnd' =
-            Term.handler_with_new_value_clause hnd
-              (handle_abstraction state hnd abs)
-          in
-          handle_computation state hnd' cmp)
+  | Bind (cmp, abs) ->
+      let hnd' =
+        Term.handler_with_new_value_clause hnd
+          (handle_abstraction state hnd abs)
+      in
+      handle_computation state hnd' cmp
   | _ -> (
       match recast_computation hnd comp with
       | Some comp' -> bind_computation state comp' hnd.term.Term.value_clause
