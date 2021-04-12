@@ -21,7 +21,7 @@ let test_suite =
     base_suite.range_benchmarks
     |> add_benchmark ("multicore", fun n -> ignore (RangeMulticore.test n))
     |> add_benchmark
-         ( "multicore custom list type",
+         ( "multicore-custom-list-type",
            fun n -> ignore (RangeMulticoreCustomList.test n) )
   in
   let loop_benchmarks =
@@ -47,13 +47,13 @@ let test_suite =
   let queens_one_benchmark =
     base_suite.queens_one_benchmark
     |> add_benchmark
-         ( "multicore translated",
+         ( "multicore-translated",
            fun n -> ignore (QueensMulticoreTranslated.queens_one_option n) )
   in
   let queens_one_benchmark =
     base_suite.queens_one_benchmark
     |> add_benchmark
-         ( "multicore translated",
+         ( "multicore-translated",
            fun n -> ignore (QueensMulticoreTranslated.queens_one_cps n) )
   in
   let queens_all_benchmark =
@@ -61,7 +61,7 @@ let test_suite =
     (* |> add_benchmark
          ("multicore", fun n -> ignore (QueensMulticore.queens_all n)) *)
     |> add_benchmark
-         ( "multicore translated",
+         ( "multicore-translated",
            fun n -> ignore (QueensMulticoreTranslated.queens_all n) )
   in
   let tree_benchmark =
@@ -72,7 +72,7 @@ let test_suite =
     base_suite.state_tree_benchmark
     |> add_benchmark ("multicore", TreeMulticore.test_leaf_state)
     |> add_benchmark
-         ("multicore state handler", TreeMulticore.test_leaf_state_effect)
+         ("multicore-state-handler", TreeMulticore.test_leaf_state_effect)
   in
   let state_with_update_tree_benchmark =
     base_suite.state_with_update_tree_benchmark
