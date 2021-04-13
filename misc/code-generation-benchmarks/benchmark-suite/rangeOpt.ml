@@ -25,10 +25,9 @@ type (_, _) eff_internal_effect +=
   | GeneratorProduce : (int, int) eff_internal_effect
 
 let _testGenerator_83 (_m_84 : int) =
-  (let rec _sum_226 _x_227 (_x_0 : int) =
-     if _x_227 = 0 then _x_0 else _sum_226 (_x_227 - 1) (_x_0 + (_x_227 mod 42))
-   in
-   _sum_226 _m_84)
-    _m_84
+  let rec _sum_226 _x_227 (_x_0 : int) =
+    if _x_227 = 0 then _x_0 else _sum_226 (_x_227 - 1) (_x_0 + (_x_227 mod 42))
+  in
+  _sum_226 _m_84 _m_84
 
 let testGenerator = _testGenerator_83

@@ -34,11 +34,10 @@ let rec _loop_incr_81 _x_89 =
 let loop_incr = _loop_incr_81
 
 let _test_incr_98 (_n_99 : int) =
-  (let rec _loop_incr_114 _x_89 (_x_0 : int) =
-     if _x_89 = 0 then _x_0 else _loop_incr_114 (_x_89 - 1) (_x_0 + 1)
-   in
-   _loop_incr_114 _n_99)
-    0
+  let rec _loop_incr_114 _x_89 (_x_0 : int) =
+    if _x_89 = 0 then _x_0 else _loop_incr_114 (_x_89 - 1) (_x_0 + 1)
+  in
+  _loop_incr_114 _n_99 0
 
 let test_incr = _test_incr_98
 
@@ -51,16 +50,15 @@ let rec _loop_incr'_120 _x_128 =
 let loop_incr' = _loop_incr'_120
 
 let _test_incr'_137 (_n_138 : int) =
-  (let rec _loop_incr'_164 (_x_128, _k_167) =
-     if _x_128 = 0 then _k_167 ()
-     else
-       _loop_incr'_164
-         (_x_128 - 1, fun (_ : unit) (_x_171 : int) -> _k_167 () (_x_171 + 1))
-   and _loop_incr_165 _x_89 (_x_1 : int) =
-     if _x_89 = 0 then _x_1 else _loop_incr_165 (_x_89 - 1) (_x_1 + 1)
-   in
-   _loop_incr'_164 (_n_138, fun (_x_145 : unit) (_x_147 : int) -> _x_147))
-    0
+  let rec _loop_incr'_164 (_x_128, _k_167) =
+    if _x_128 = 0 then _k_167 ()
+    else
+      _loop_incr'_164
+        (_x_128 - 1, fun (_ : unit) (_x_171 : int) -> _k_167 () (_x_171 + 1))
+  and _loop_incr_165 _x_89 (_x_1 : int) =
+    if _x_89 = 0 then _x_1 else _loop_incr_165 (_x_89 - 1) (_x_1 + 1)
+  in
+  _loop_incr'_164 (_n_138, fun (_x_145 : unit) (_x_147 : int) -> _x_147) 0
 
 let test_incr' = _test_incr'_137
 
@@ -83,10 +81,9 @@ let rec _loop_state_181 _x_194 =
 let loop_state = _loop_state_181
 
 let _test_state_209 (_n_210 : int) =
-  (let rec _loop_state_227 _x_194 (_x_2 : int) =
-     if _x_194 = 0 then _x_2 else _loop_state_227 (_x_194 - 1) (_x_2 + 1)
-   in
-   _loop_state_227 _n_210)
-    0
+  let rec _loop_state_227 _x_194 (_x_2 : int) =
+    if _x_194 = 0 then _x_2 else _loop_state_227 (_x_194 - 1) (_x_2 + 1)
+  in
+  _loop_state_227 _n_210 0
 
 let test_state = _test_state_209

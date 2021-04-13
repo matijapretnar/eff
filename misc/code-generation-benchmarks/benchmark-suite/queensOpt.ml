@@ -136,29 +136,29 @@ let _queens_all_183 (_number_of_queens_184 : int) =
 let queens_all = _queens_all_183
 
 let _queens_one_cps_205 (_number_of_queens_206 : int) =
-  (let rec _queens_242 _number_of_queens_243 =
-     let rec _place_255 (_x_257, _qs_256) =
-       if _x_257 > _number_of_queens_243 then
-         coer_arrow coer_refl_ty (coer_return coer_refl_ty)
-           (fun (_ : unit -> solution computation) -> _qs_256)
-       else
-         let rec _choose_263 _x_264 (_x_0 : unit -> solution computation) =
-           match _x_264 with
-           | RowsEmpty -> _x_0 ()
-           | RowsCons (_x_267, _xs'_266) ->
-               let _l_268 (_y_272 : bool) =
-                 if _y_272 then
-                   _place_255
-                     (_x_257 + 1, SolutionPlace ((_x_257, _x_267), _qs_256))
-                 else _choose_263 _xs'_266
-               in
-               _l_268 true (fun (_ : unit) -> _l_268 false _x_0)
-         in
-         _choose_263 (_available_90 _number_of_queens_243 _x_257 _qs_256)
-     in
-     _place_255 (1, SolutionEmpty)
-   in
-   _queens_242 _number_of_queens_206) (fun (() : unit) ->
+  let rec _queens_242 _number_of_queens_243 =
+    let rec _place_255 (_x_257, _qs_256) =
+      if _x_257 > _number_of_queens_243 then
+        coer_arrow coer_refl_ty (coer_return coer_refl_ty)
+          (fun (_ : unit -> solution computation) -> _qs_256)
+      else
+        let rec _choose_263 _x_264 (_x_0 : unit -> solution computation) =
+          match _x_264 with
+          | RowsEmpty -> _x_0 ()
+          | RowsCons (_x_267, _xs'_266) ->
+              let _l_268 (_y_272 : bool) =
+                if _y_272 then
+                  _place_255
+                    (_x_257 + 1, SolutionPlace ((_x_257, _x_267), _qs_256))
+                else _choose_263 _xs'_266
+              in
+              _l_268 true (fun (_ : unit) -> _l_268 false _x_0)
+        in
+        _choose_263 (_available_90 _number_of_queens_243 _x_257 _qs_256)
+    in
+    _place_255 (1, SolutionEmpty)
+  in
+  _queens_242 _number_of_queens_206 (fun (() : unit) ->
       Call
         ( Fail,
           (),

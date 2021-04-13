@@ -246,6 +246,7 @@ and reduce_term' state (n_term : NoEff.n_term) =
       in
       if is_letrec_unused state defs t then t else NoEff.NLetRec (defs, t)
   | NApplyTerm (NFun (p, _, c), t) -> beta_reduce state (p, c) t
+  | NApplyTerm (NLetRec (e, t), t2) -> NLetRec (e, NApplyTerm (t, t2))
   | NMatch _ -> naive_lambda_lift n_term
   | _ -> n_term
 
