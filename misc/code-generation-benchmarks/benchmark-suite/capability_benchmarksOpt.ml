@@ -150,9 +150,7 @@ let count = _count_450
 
 let _testCount_465 (_m_466 : int) =
   (let rec _count_483 _x_460 (_s_496 : int) =
-     (if _s_496 = 0 then fun (_x_501 : int) -> _x_501
-     else fun (_ : int) -> _count_483 () (_s_496 - 1))
-       _s_496
+     if _s_496 = 0 then _s_496 else _count_483 () (_s_496 - 1)
    in
    _count_483 ())
     _m_466
@@ -169,9 +167,9 @@ type (_, _) eff_internal_effect +=
   | GeneratorYield : (int, unit) eff_internal_effect
 
 let _testGenerator_505 (_n_506 : int) =
-  (let rec _generateFromTo_571 (_l_508, _u_509) (_x_0 : int) =
-     if _l_508 > _u_509 then _x_0
-     else _generateFromTo_571 (_l_508 + 1, _u_509) (_x_0 + _l_508)
+  (let rec _generateFromTo_571 (_l_508, _u_509) (_x_1 : int) =
+     if _l_508 > _u_509 then _x_1
+     else _generateFromTo_571 (_l_508 + 1, _u_509) (_x_1 + _l_508)
    in
    _generateFromTo_571 (1, _n_506))
     0
