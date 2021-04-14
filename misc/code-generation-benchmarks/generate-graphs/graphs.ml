@@ -135,10 +135,10 @@ let _ = run_benchmark_set suite.range_benchmarks
 
 let _ = run_benchmark_set suite.tree_benchmark
 
-let _ = run_benchmark_set suite.state_tree_benchmark
+let _ = run_benchmark_set suite.loop_pure_optimizer
 
-let _ = run_benchmark_set suite.state_with_update_tree_benchmark
+let _ = run_benchmark_set suite.loop_incr_optimizer
 
-let _ = run_benchmark_set suite.count_benchmark
+let _ = run_benchmark_set suite.loop_latent_optimizer
 
-let _ = run_benchmark_set suite.generator_benchmark
+let _ = run_benchmark_set suite.loop_state_optimizer

@@ -26,7 +26,120 @@ type test_suite = {
   state_with_update_tree_benchmark : int benchmark_set;
   count_benchmark : int benchmark_set;
   generator_benchmark : unit benchmark_set;
+  (* partially optimized versions *)
+  loop_pure_optimizer : unit benchmark_set;
+  loop_latent_optimizer : unit benchmark_set;
+  loop_incr_optimizer : int benchmark_set;
+  loop_state_optimizer : int benchmark_set;
 }
+
+let loop_pure_optimizer =
+  {
+    name = "LOOP PURE PARTIAL OPTIMIZED BENCHMARK";
+    filename = "loop_pure_optimizer";
+    benchmarks =
+      [
+        ("native", Partial_optimizations.loop_pure__native);
+        ("no-opts", Partial_optimizations.loop_pure__direct);
+        ("purity-aware", Partial_optimizations.loop_pure__purity_aware);
+        ("full-opt", Partial_optimizations.loop_pure__opt);
+      ];
+    parameters =
+      [
+        10_000;
+        20_000;
+        30_000;
+        40_000;
+        50_000;
+        60_000;
+        70_000;
+        80_000;
+        90_000;
+        100_000;
+      ];
+    parameter_unit = "loops";
+  }
+
+let loop_latent_optimizer =
+  {
+    name = "LOOP LATENT PARTIAL OPTIMIZED BENCHMARK";
+    filename = "loop_latent_optimizer";
+    benchmarks =
+      [
+        ("native", Partial_optimizations.loop_latent__native);
+        ("no-opts", Partial_optimizations.loop_latent__direct);
+        ("purity-aware", Partial_optimizations.loop_latent__purity_aware);
+        ("full-opt", Partial_optimizations.loop_latent__opt);
+      ];
+    parameters =
+      [
+        10_000;
+        20_000;
+        30_000;
+        40_000;
+        50_000;
+        60_000;
+        70_000;
+        80_000;
+        90_000;
+        100_000;
+      ];
+    parameter_unit = "loops";
+  }
+
+let loop_incr_optimizer =
+  {
+    name = "LOOP INCR PARTIAL OPTIMIZED BENCHMARK";
+    filename = "loop_incr_optimizer";
+    benchmarks =
+      [
+        ("native", Partial_optimizations.loop_incr__native);
+        ("no-opts", Partial_optimizations.loop_incr__direct);
+        ("purity-aware", Partial_optimizations.loop_incr__purity_aware);
+        ("full-opt", Partial_optimizations.loop_incr__opt);
+      ];
+    parameters =
+      [
+        10_000;
+        20_000;
+        30_000;
+        40_000;
+        50_000;
+        60_000;
+        70_000;
+        80_000;
+        90_000;
+        100_000;
+      ];
+    parameter_unit = "loops";
+  }
+
+let loop_state_optimizer =
+  {
+    name = "LOOP STATE PARTIAL OPTIMIZED BENCHMARK";
+    filename = "loop_state_optimizer";
+    benchmarks =
+      [
+        ("native", Partial_optimizations.loop_state__native);
+        ("no-opts", Partial_optimizations.loop_state__direct);
+        ("purity-aware", Partial_optimizations.loop_state__purity_aware);
+        ("full-opt", Partial_optimizations.loop_state__opt);
+      ];
+    parameters =
+      [
+        10_000;
+        20_000;
+        30_000;
+        40_000;
+        50_000;
+        60_000;
+        70_000;
+        80_000;
+        90_000;
+        100_000;
+      ];
+    parameter_unit = "loops";
+  }
 
 let loop_benchmarks =
   {
@@ -257,4 +370,8 @@ let default_test_suite =
     state_with_update_tree_benchmark;
     count_benchmark;
     generator_benchmark;
+    loop_pure_optimizer;
+    loop_latent_optimizer;
+    loop_incr_optimizer;
+    loop_state_optimizer;
   }
