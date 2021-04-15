@@ -32,12 +32,12 @@ let incr s = Call (Incr, s, fun _y_52 -> Value _y_52)
 
 let loop_pure__direct n =
   let rec loop n =
-    equal n >> fun f ->
-    f 0 >> fun b ->
+    equal n >>= fun f ->
+    f 0 >>= fun b ->
     if b then return ()
     else
-      minus n >> fun h ->
-      h 1 >> fun n' -> loop n'
+      minus n >>= fun h ->
+      h 1 >>= fun n' -> loop n'
   in
   force_unsafe (loop n)
 
@@ -69,16 +69,16 @@ let less_than = binary_fun ( < )
 
 let loop_latent__direct n =
   let rec loop n =
-    equal n >> fun f ->
-    f 0 >> fun b ->
+    equal n >>= fun f ->
+    f 0 >>= fun b ->
     if b then return ()
     else
-      less_than n >> fun f ->
-      f (-1) >> fun b ->
-      if b then fail () >> fun x -> Value (match x with _ -> assert false)
+      less_than n >>= fun f ->
+      f (-1) >>= fun b ->
+      if b then fail () >>= fun x -> Value (match x with _ -> assert false)
       else
-        minus n >> fun h ->
-        h 1 >> fun n' -> loop n'
+        minus n >>= fun h ->
+        h 1 >>= fun n' -> loop n'
   in
   force_unsafe (loop n)
 
@@ -90,7 +90,7 @@ let loop_latent__purity_aware n =
     else
       let f = ( < ) n in
       let b = f (-1) in
-      if b then fail () >> fun x -> Value (match x with _ -> assert false)
+      if b then fail () >>= fun x -> Value (match x with _ -> assert false)
       else
         let h = ( - ) n in
         let n' = h 1 in
@@ -149,13 +149,13 @@ let loop_incr__direct n =
       }
   in
   let rec loop n =
-    equal n >> fun f ->
-    f 0 >> fun b ->
+    equal n >>= fun f ->
+    f 0 >>= fun b ->
     if b then return ()
     else
-      incr () >> fun _ ->
-      minus n >> fun h ->
-      h 1 >> fun n' -> loop n'
+      incr () >>= fun _ ->
+      minus n >>= fun h ->
+      h 1 >>= fun n' -> loop n'
   in
   force_unsafe (_incr_handler_53 (loop n)) 0
 
@@ -192,7 +192,7 @@ let loop_incr__purity_aware n =
     let b = f 0 in
     if b then return ()
     else
-      incr () >> fun _ ->
+      incr () >>= fun _ ->
       let h = ( - ) n in
       let n' = h 1 in
       loop n'
@@ -214,16 +214,16 @@ let loop_incr__native n =
 (* loop, we call this loop_state *)
 let loop_state__direct n =
   let rec loop n =
-    equal n >> fun f ->
-    f 0 >> fun b ->
+    equal n >>= fun f ->
+    f 0 >>= fun b ->
     if b then return ()
     else
-      get () >> fun s ->
-      plus s >> fun g ->
-      g 1 >> fun s' ->
-      put s' >> fun _ ->
-      minus n >> fun h ->
-      h 1 >> fun n' -> loop n'
+      get () >>= fun s ->
+      plus s >>= fun g ->
+      g 1 >>= fun s' ->
+      put s' >>= fun _ ->
+      minus n >>= fun h ->
+      h 1 >>= fun n' -> loop n'
   in
   let state_handler =
     handler
@@ -252,7 +252,7 @@ let loop_state__direct n =
         value_clause = (fun _ -> return (fun s -> return s));
       }
   in
-  force_unsafe (state_handler (loop n) >> fun f -> f 0)
+  force_unsafe (state_handler (loop n) >>= fun f -> f 0)
 
 let loop_state__purity_aware n =
   let rec loop n =
@@ -260,10 +260,10 @@ let loop_state__purity_aware n =
     let b = f 0 in
     if b then return ()
     else
-      get () >> fun s ->
+      get () >>= fun s ->
       let g = ( + ) s in
       let s' = g 1 in
-      put s' >> fun _ ->
+      put s' >>= fun _ ->
       let h = ( - ) n in
       let n' = h 1 in
       loop n'
@@ -295,7 +295,7 @@ let loop_state__purity_aware n =
         value_clause = (fun _ -> return (fun s -> return s));
       }
   in
-  force_unsafe (state_handler (loop n) >> fun f -> f 0)
+  force_unsafe (state_handler (loop n) >>= fun f -> f 0)
 
 let loop_state__native n =
   let rec loop_state n' state =
