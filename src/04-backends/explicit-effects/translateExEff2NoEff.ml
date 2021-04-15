@@ -175,7 +175,6 @@ and elab_expression' exp =
           NoEff.NHandler
             {
               return_clause = (p, ty, c);
-              (* Filip: Not sure if this needs NReturn *)
               effect_clauses =
                 Assoc.map_of_list elab_effect_clause
                   (Assoc.to_list h.term.effect_clauses.effect_part);

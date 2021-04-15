@@ -243,7 +243,7 @@ let isLocatedVarPat (pat : Untyped.pattern) : bool =
 (* ************************************************************************* *)
 
 (* Lookup the type of a term variable in the local and the global contexts
- * (local first, global after). George: I wish we had monads.. *)
+ * (local first, global after). *)
 let lookupTmVar state x = TypingEnv.lookup state.variables x
 
 (* Term Variables *)
