@@ -161,8 +161,8 @@ let _test_leaf_state_350 (_m_351 : int) =
                ( (if _y_438 then _left_437 else _right_435),
                  fun (_b_441 : int) -> _k_446 (_op_140 _x_436 _b_441) )
            in
-           _l_410 true >> fun _b_386 ->
-           _l_410 false >> fun _b_387 -> Value (_op_151 (* @ *) _b_386 _b_387)
+           _l_410 true >>= fun _b_386 ->
+           _l_410 false >>= fun _b_387 -> Value (_op_151 (* @ *) _b_386 _b_387)
      in
      let rec _explore_448 (_x_409, _k_446) =
        match _x_409 with
@@ -283,8 +283,8 @@ let _test_leaf_state_loop_1088 (_m_1089 : int) =
                          fun (_b_1229 : int) ->
                            _k_1234 (_op_140 _x_1224 _b_1229) )
                    in
-                   _l_1160 true >> fun _b_1124 ->
-                   _l_1160 false >> fun _b_1125 ->
+                   _l_1160 true >>= fun _b_1124 ->
+                   _l_1160 false >>= fun _b_1125 ->
                    Value (_op_151 (* @ *) _b_1124 _b_1125)
              in
              let rec _explore_1236 (_x_1159, _k_1234) =
@@ -415,8 +415,8 @@ let _test_leaf_state_update_1876 (_m_1877 : int) =
                        fun (_b_1968 : int) -> _k_1973 (_op_140 _x_1960 _b_1968)
                      )
                  in
-                 _l_1928 true >> fun _b_1901 ->
-                 _l_1928 false >> fun _b_1902 ->
+                 _l_1928 true >>= fun _b_1901 ->
+                 _l_1928 false >>= fun _b_1902 ->
                  Value (_op_151 (* @ *) _b_1901 _b_1902) )
      in
      let rec _explore_1975 (_x_1927, _k_1973) (_x_0 : int) =
@@ -546,8 +546,8 @@ let _test_leaf_state_update_loop_10985 (_m_10986 : int) =
                                fun (_b_11128 : int) ->
                                  _k_11133 (_op_140 _x_11120 _b_11128) )
                          in
-                         _l_11049 true >> fun _b_11010 ->
-                         _l_11049 false >> fun _b_11011 ->
+                         _l_11049 true >>= fun _b_11010 ->
+                         _l_11049 false >>= fun _b_11011 ->
                          Value (_op_151 (* @ *) _b_11010 _b_11011) )
              in
              let rec _explore_11135 (_x_11048, _k_11133) (_x_1 : int) =

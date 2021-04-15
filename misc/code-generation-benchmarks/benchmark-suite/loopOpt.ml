@@ -44,7 +44,7 @@ let test_incr = _test_incr_98
 let rec _loop_incr'_120 _x_128 =
   if _x_128 = 0 then Value ()
   else
-    _loop_incr'_120 (_x_128 - 1) >> fun _ ->
+    _loop_incr'_120 (_x_128 - 1) >>= fun _ ->
     Call (Incr, (), fun (_y_136 : unit) -> Value _y_136)
 
 let loop_incr' = _loop_incr'_120

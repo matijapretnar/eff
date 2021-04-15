@@ -75,7 +75,7 @@ let _queens_138 (_number_of_queens_139 : int) =
     if _x_141 > _number_of_queens_139 then Value _qs_142
     else
       _choose_116 (_available_90 _number_of_queens_139 _x_141 _qs_142)
-      >> fun _y_145 ->
+      >>= fun _y_145 ->
       _place_140 (_x_141 + 1, SolutionPlace ((_x_141, _y_145), _qs_142))
   in
   _place_140 (1, SolutionEmpty)

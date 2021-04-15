@@ -222,7 +222,7 @@ let rec pp_term ?max_level state noEff_term ppf =
         (pp_term state t)
         (pp_abs_with_ty state abs_ty)
   | NBind (t, abs) ->
-      print ~at_level:2 "@[<hov 2>%t >> (fun %t)@]"
+      print ~at_level:2 "@[<hov 2>%t >>= (fun %t)@]"
         (pp_term state ~max_level:1 t)
         (pp_abs state abs)
   | NHandle (t1, t2) ->

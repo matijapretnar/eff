@@ -358,7 +358,7 @@ let rec print_term ?max_level t ppf =
         (print_term ~max_level:0 t)
         (print_abstraction_with_param_ty abs)
   | NBind (t, abs) ->
-      print ~at_level:2 "@[<hov>%t@ >>@ @[fun %t@]@]"
+      print ~at_level:2 "@[<hov>%t@ >>=@ @[fun %t@]@]"
         (print_term ~max_level:0 t)
         (print_abstraction abs)
   | NHandle (t, h) ->

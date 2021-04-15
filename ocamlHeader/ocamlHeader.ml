@@ -18,10 +18,10 @@ type ('a, 'b) handler_clauses = {
   effect_clauses : 'eff_arg 'eff_res. ('eff_arg, 'eff_res, 'b) effect_clauses;
 }
 
-let rec ( >> ) (c : 'a computation) (f : 'a -> 'b computation) =
+let rec ( >>= ) (c : 'a computation) (f : 'a -> 'b computation) =
   match c with
   | Value x -> f x
-  | Call (eff, arg, k) -> Call (eff, arg, fun y -> k y >> f)
+  | Call (eff, arg, k) -> Call (eff, arg, fun y -> k y >>= f)
 
 let handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
   let rec handler = function
