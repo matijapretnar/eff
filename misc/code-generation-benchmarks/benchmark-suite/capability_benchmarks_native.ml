@@ -80,12 +80,9 @@ let testCountImpure n =
   in
   count ()
 
-let testCount n = 
-  let rec count i = 
-    if i = 0 then i
-    else count (i-1)
-  in
-  count n 
+let testCount n =
+  let rec count i = if i = 0 then i else count (i - 1) in
+  count n
 
 (* Generator *)
 
@@ -106,4 +103,3 @@ let testGenerator n =
     if l > u then s else generateFromTo (l + 1) u (s + l)
   in
   generateFromTo 1 n 0
-

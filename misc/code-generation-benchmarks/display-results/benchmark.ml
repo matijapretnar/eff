@@ -263,24 +263,29 @@ let run_benchmarks set =
 let () =
   run_benchmarks suite.loop_benchmarks;
 
-    run_benchmarks suite.loop_latent_benchmarks;
+  run_benchmarks suite.loop_latent_benchmarks;
 
-    run_benchmarks suite.loop_incr_benchmark;
+  run_benchmarks suite.loop_incr_benchmark;
 
-    run_benchmarks suite.loop_incr'_benchmark;
+  run_benchmarks suite.loop_incr'_benchmark;
 
-    run_benchmarks suite.loop_state_benchmark;
-  
-   run_benchmarks suite.queens_one_benchmark; 
+  run_benchmarks suite.loop_state_benchmark;
 
-   run_benchmarks suite.queens_all_benchmark 
-   run_benchmarks suite.interpreter_benchmark; 
+  run_benchmarks suite.queens_one_benchmark;
 
-   run_benchmarks suite.interpreter_state_benchmark; 
+  run_benchmarks suite.queens_all_benchmark;
 
-let () = run_benchmarks suite.loop_pure_optimizer
+  run_benchmarks suite.interpreter_benchmark;
+
+  run_benchmarks suite.interpreter_state_benchmark
+
+let () =
+  run_benchmarks suite.loop_pure_optimizer;
 
   run_benchmarks suite.loop_pure_optimizer;
+
   run_benchmarks suite.loop_incr_optimizer;
+
   run_benchmarks suite.loop_latent_optimizer;
+
   run_benchmarks suite.loop_state_optimizer
