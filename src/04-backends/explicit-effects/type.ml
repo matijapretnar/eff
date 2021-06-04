@@ -340,10 +340,3 @@ let rec source_to_target tctx_st ty =
       Handler (source_to_dirty tctx_st dirty1, source_to_dirty tctx_st dirty2)
 
 and source_to_dirty tctx_st ty = (source_to_target tctx_st ty, empty_dirt)
-
-let constructor_signature tctx_st lbl =
-  match TypeContext.infer_variant lbl tctx_st with
-  | None -> assert false
-  | Some (ty_out, ty_in) ->
-      ( Option.map (source_to_target tctx_st) ty_in,
-        source_to_target tctx_st ty_out )

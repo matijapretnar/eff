@@ -1533,6 +1533,45 @@
  (deps
  %{bin:eff}
   (source_tree .))
+   (target "test21.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 0 1 2)
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./test21.eff")))))
+
+(rule
+ (deps "test21.eff.out")
+ (target "test21.eff.out.formatted")
+  (action
+   (with-outputs-to "%{target}"
+    (with-accepted-exit-codes (or 0 1 2)
+     (run ocamlformat test21.eff.out)))))
+
+(rule
+ (deps "test21.eff.out.formatted" ocaml_header.tmp)
+ (target "test21.eff.out.formatted.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - test21.eff.out.formatted)))))
+
+(rule
+ (deps "test21.eff.out.formatted.ocaml_with_header")
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "test21.eff.out.formatted.ocaml_with_header"))))
+
+(rule
+ (deps "test21.eff.out.formatted")
+  (alias runtest)
+   (action
+    (diff "test21.eff.ref" "test21.eff.out.formatted")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
    (target "test3.eff.out")
     (action
      (with-outputs-to "%{target}"
