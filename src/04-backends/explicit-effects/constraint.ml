@@ -30,7 +30,6 @@ type omega_ct =
   | TyOmega of (Type.TyCoercionParam.t * Type.ct_ty)
   | DirtOmega of (Type.DirtCoercionParam.t * Type.ct_dirt)
   | SkelEq of Type.skeleton * Type.skeleton
-  | TyParamHasSkel of (CoreTypes.TyParam.t * Type.skeleton)
 
 let is_trivial_ty_coercion omega =
   let ty1, ty2 = omega.ty in
@@ -144,26 +143,24 @@ and print_omega_ct ?max_level c ppf =
         (Type.print_dirt ty1) (Type.print_dirt ty2)
   | SkelEq (sk1, sk2) ->
       print "%t ~ %t" (Type.print_skeleton sk1) (Type.print_skeleton sk2)
-  | TyParamHasSkel (tp, sk1) ->
-      print "%t : %t" (CoreTypes.TyParam.print tp) (Type.print_skeleton sk1)
 
 let print_constraints cs = Print.sequence ";" print_omega_ct cs
 
+let fresh_skel () =
+  let skel_var = Type.SkelParam.fresh () in
+  Type.SkelParam skel_var
+
 let fresh_ty_with_skel skel =
   let ty_var = CoreTypes.TyParam.fresh () in
-  (Type.TyParam (ty_var, skel), TyParamHasSkel (ty_var, skel))
+  Type.TyParam (ty_var, skel)
 
 let fresh_dirty_with_skel skel =
-  let ty, cons = fresh_ty_with_skel skel in
-  (Type.make_dirty ty, cons)
+  let ty = fresh_ty_with_skel skel in
+  Type.make_dirty ty
 
-let fresh_ty_with_fresh_skel () =
-  let skel_var = Type.SkelParam.fresh () in
-  fresh_ty_with_skel (Type.SkelParam skel_var)
+let fresh_ty_with_fresh_skel () = fresh_ty_with_skel (fresh_skel ())
 
-let fresh_dirty_with_fresh_skel () =
-  let skel_var = Type.SkelParam.fresh () in
-  fresh_dirty_with_skel (Type.SkelParam skel_var)
+let fresh_dirty_with_fresh_skel () = fresh_dirty_with_skel (fresh_skel ())
 
 let fresh_ty_coer cons =
   let param = Type.TyCoercionParam.fresh () in
@@ -189,7 +186,6 @@ let free_params_constraint = function
       Type.FreeParams.union
         (Type.free_params_skeleton sk1)
         (Type.free_params_skeleton sk2)
-  | TyParamHasSkel (_t, sk) -> Type.free_params_skeleton sk
 
 let free_params_constraints = Type.FreeParams.union_map free_params_constraint
 
@@ -228,25 +224,3 @@ and free_params_dirty_coercion { term = tc, dc; _ } =
   Type.FreeParams.union
     (free_params_ty_coercion tc)
     (free_params_dirt_coercion dc)
-
-let rec get_skel_vars_from_constraints = function
-  | [] -> []
-  | TyParamHasSkel (_, Type.SkelParam sv) :: xs ->
-      sv :: get_skel_vars_from_constraints xs
-  | _ :: xs -> get_skel_vars_from_constraints xs
-
-(* Get all constraints of the form (alpha : skelvar) from a bag of constraints *)
-(* (CoreTypes.TyParam.t, Type.SkelParam.t) *)
-let rec getSkelVarAnnotationsFromCs = function
-  | [] -> []
-  | TyParamHasSkel (alpha, Type.SkelParam sv) :: cs ->
-      (alpha, sv) :: getSkelVarAnnotationsFromCs cs
-  | _ :: cs -> getSkelVarAnnotationsFromCs cs
-
-(* Get all constraints of the form (alpha : skeleton) from a bag of constraints *)
-(* (CoreTypes.TyParam.t, skeleton) *)
-let rec getSkelAnnotationsFromCs = function
-  | [] -> []
-  | TyParamHasSkel (alpha, skeleton) :: cs ->
-      (alpha, skeleton) :: getSkelAnnotationsFromCs cs
-  | _ :: cs -> getSkelAnnotationsFromCs cs

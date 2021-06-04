@@ -293,8 +293,6 @@ let apply_sub1 subs cons =
   | Constraint.DirtOmega (coer_p, (drt1, drt2)) ->
       Constraint.DirtOmega
         (coer_p, (apply_sub_dirt subs drt1, apply_sub_dirt subs drt2))
-  | Constraint.TyParamHasSkel (tv, sp) ->
-      Constraint.TyParamHasSkel (tv, apply_sub_skel subs sp)
   | _ -> cons
 
 let apply_substitutions_to_constraints subs c_list =

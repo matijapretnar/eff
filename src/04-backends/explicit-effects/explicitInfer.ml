@@ -201,16 +201,16 @@ let rec infer_pattern state (pat : Untyped.pattern) :
 and infer_pattern' state pat =
   match pat.it with
   | Untyped.PVar x ->
-      let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
+      let alpha = Constraint.fresh_ty_with_fresh_skel () in
       let x = Term.variable x alpha in
-      (Term.PVar x, alpha, extend_var state x.term alpha, [ alphaSkel ])
+      (Term.PVar x, alpha, extend_var state x.term alpha, [])
   | Untyped.PAnnotated (p, ty) ->
       let ty' = Type.source_to_target state.tydefs ty in
       let p', state' = check_pattern state ty' p in
       (p'.term, ty', state', [])
   | Untyped.PNonbinding ->
-      let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
-      (Term.PNonbinding, alpha, state, [ alphaSkel ])
+      let alpha = Constraint.fresh_ty_with_fresh_skel () in
+      (Term.PNonbinding, alpha, state, [])
   | Untyped.PConst c -> (Term.PConst c, Type.type_const c, state, [])
   | Untyped.PTuple ps ->
       let fold p (ps', state, cnstrs) =
@@ -339,7 +339,7 @@ and tcOpCase state
   let tyAi, tyBi = Term.EffectMap.find eff state.effects in
 
   (* 2: Generate fresh variables for the type of the codomain of the continuation *)
-  let dirtyi, alphaiSkel = Constraint.fresh_dirty_with_fresh_skel () in
+  let dirtyi = Constraint.fresh_dirty_with_fresh_skel () in
 
   (* 3: Typecheck the clause *)
   let abs2, csi (* GEORGE: I don't like the unused types *) =
@@ -373,16 +373,14 @@ and tcOpCase state
   in
 
   (* 7: Combine the results *)
-  let outCs = (alphaiSkel :: omegaCt34i) @ (omegaCt5i :: csi) in
+  let outCs = omegaCt34i @ (omegaCt5i :: csi) in
   (outExpr, outCs)
 
 (* Handlers *)
 and tcHandler state (h : Untyped.handler) : tcExprOutput' =
   (* 1: Generate fresh variables for the input and output types *)
   let deltaIn = Type.fresh_dirt () in
-  let ((_, deltaOut) as dirtyOut), alphaOutSkel =
-    Constraint.fresh_dirty_with_fresh_skel ()
-  in
+  let ((_, deltaOut) as dirtyOut) = Constraint.fresh_dirty_with_fresh_skel () in
 
   (* 2: Process the return and the operation clauses *)
   let trgRet, cs1 = tcAbstraction state h.value_clause in
@@ -422,7 +420,7 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
       in
       let outExpr = Term.CastExp ({ term = handler; ty = handTy }, handlerCo) in
       let outType = Type.Handler ((ty_ret_in, deltaIn), dirtyOut) in
-      let outCs = ((omegaCt7 :: alphaOutSkel :: cnstr_ret) @ cs1) @ cs2 in
+      let outCs = ((omegaCt7 :: cnstr_ret) @ cs1) @ cs2 in
       (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)
       ((outExpr, outType), outCs)
   | _ -> assert false
@@ -552,13 +550,13 @@ and infer_let_rec state defs =
   let defs' =
     List.map
       (fun (x, abs) ->
-        let alpha, alphaSkel = Constraint.fresh_ty_with_fresh_skel () in
-        let betadelta, betaSkel = Constraint.fresh_dirty_with_fresh_skel () in
+        let alpha = Constraint.fresh_ty_with_fresh_skel () in
+        let betadelta = Constraint.fresh_dirty_with_fresh_skel () in
         ( Term.variable x (Type.Arrow (alpha, betadelta)),
           abs,
           alpha,
           betadelta,
-          [ alphaSkel; betaSkel ] ))
+          [] ))
       defs
   in
   let state' =
@@ -623,7 +621,7 @@ and tcNonEmptyMatch state (scr : Untyped.expression) alts : tcCompOutput' =
   assert (List.length alts > 0);
 
   (* 1: Generate fresh variables for the result *)
-  let dirtyOut, alphaOutSkel = Constraint.fresh_dirty_with_fresh_skel () in
+  let dirtyOut = Constraint.fresh_dirty_with_fresh_skel () in
 
   (* 2: Infer a type for the patterns *)
   let cases, patTy, cs2 = infer_cases state dirtyOut alts in
@@ -637,20 +635,20 @@ and tcNonEmptyMatch state (scr : Untyped.expression) alts : tcCompOutput' =
 
   (* 6: Combine the results *)
   let outExpr = Term.Match (matchExp, cases) in
-  let outCs = (alphaOutSkel :: omegaCtScr :: cs1) @ cs2 in
+  let outCs = (omegaCtScr :: cs1) @ cs2 in
   ((outExpr, dirtyOut), outCs)
 
 (* Typecheck an empty case expression *)
 and tcEmptyMatch state (scr : Untyped.expression) : tcCompOutput' =
   (* 1: Generate fresh variables for the result *)
-  let dirtyOut, alphaOutSkel = Constraint.fresh_dirty_with_fresh_skel () in
+  let dirtyOut = Constraint.fresh_dirty_with_fresh_skel () in
 
   (* 2: Typecheck the scrutinee *)
   let trgScr, cs1 = tcExpr state scr in
 
   (* 3: Combine the results *)
   let outExpr = Term.Match (trgScr, []) in
-  let outCs = alphaOutSkel :: cs1 in
+  let outCs = cs1 in
   ((outExpr, dirtyOut), outCs)
 
 (* Typecheck a function application *)
@@ -661,14 +659,14 @@ and tcApply state (val1 : Untyped.expression) (val2 : Untyped.expression) :
   let trgVal2, cs2 = tcExpr state val2 in
 
   (* Generate fresh variables for the result *)
-  let outType, alphaSkel = Constraint.fresh_dirty_with_fresh_skel () in
+  let outType = Constraint.fresh_dirty_with_fresh_skel () in
 
   (* Create the constraint and the cast elaborated expression *)
   let castVal1, omegaCt =
     Term.cast_expression trgVal1 (Type.Arrow (trgVal2.ty, outType))
   in
   let outExpr = Term.Apply (castVal1, trgVal2) in
-  let outCs = (alphaSkel :: omegaCt :: cs1) @ cs2 in
+  let outCs = (omegaCt :: cs1) @ cs2 in
   ((outExpr, outType), outCs)
 
 (* Typecheck a handle-computation *)
@@ -682,8 +680,8 @@ and tcHandle state (hand : Untyped.expression) (cmp : Untyped.computation) :
   (* Typecheck the computation *)
 
   (* Generate fresh variables *)
-  let dirty1, alphaSkel1 = Constraint.fresh_dirty_with_fresh_skel () in
-  let dirty2, alphaSkel2 = Constraint.fresh_dirty_with_fresh_skel () in
+  let dirty1 = Constraint.fresh_dirty_with_fresh_skel () in
+  let dirty2 = Constraint.fresh_dirty_with_fresh_skel () in
 
   (* Create all constraints *)
   let castHand, omegaCt1 =
@@ -693,7 +691,7 @@ and tcHandle state (hand : Untyped.expression) (cmp : Untyped.computation) :
 
   (* Combine all the outputs *)
   let outExpr = Term.Handle (castHand, castCmp) in
-  let outCs = (alphaSkel1 :: alphaSkel2 :: omegaCt1 :: omegaCt23) @ cs1 @ cs2 in
+  let outCs = (omegaCt1 :: omegaCt23) @ cs1 @ cs2 in
   ((outExpr, dirty2), outCs)
 
 (* Typecheck a "Check" expression (GEORGE does not know what this means yet *)
@@ -744,6 +742,14 @@ let monomorphize free_ty_params cnstrs =
       (fun sk ->
         Constraint.SkelEq (Type.SkelParam sk, Type.SkelBasic Const.FloatTy))
       (Type.SkelParamSet.elements free_params.skel_params)
+  and monomorphize_tys =
+    List.map
+      (fun t ->
+        Constraint.TyOmega
+          ( Type.TyCoercionParam.fresh (),
+            ( Type.TyParam (t, Constraint.fresh_skel ()),
+              Type.TyBasic Const.FloatTy ) ))
+      (Type.TyParamSet.elements free_params.ty_params)
   and monomorphize_dirts =
     List.map
       (fun d ->
@@ -753,7 +759,8 @@ let monomorphize free_ty_params cnstrs =
       (Type.DirtParamSet.elements free_params.dirt_params)
   in
   let sub, residuals =
-    Unification.solve (monomorphize_skeletons @ monomorphize_dirts @ cnstrs)
+    Unification.solve
+      (monomorphize_skeletons @ monomorphize_tys @ monomorphize_dirts @ cnstrs)
   in
   (* After zapping, there should be no more constraints left to solve. *)
   assert (residuals = []);

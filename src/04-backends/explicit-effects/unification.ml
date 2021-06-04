@@ -1,87 +1,30 @@
 open Utils
 open Type
 
-let ty_param_has_skel_step sub paused cons rest_queue tvar skel =
+let fresh_ty_with_skel skel =
   match skel with
   (* α : ς *)
-  | SkelParam _ -> (sub, Constraint.add_to_constraints cons paused, rest_queue)
+  | SkelParam _ -> assert false
   (* α : int *)
-  | SkelBasic ps ->
-      let k = tvar in
-      let v = Type.TyBasic ps in
-      let sub1 = Substitution.add_type_substitution_e k v in
-      ( Substitution.add_type_substitution tvar (Type.TyBasic ps) sub,
-        [],
-        Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.add_list_to_constraints paused rest_queue) )
+  | SkelBasic ps -> Type.TyBasic ps
   (* α : τ₁ -> τ₂ *)
   | SkelArrow (sk1, sk2) ->
-      let tvar1, cons1 = Constraint.fresh_ty_with_skel sk1
-      and dtvar2, cons2 = Constraint.fresh_dirty_with_skel sk2 in
-      let k = tvar in
-      let v = Type.Arrow (tvar1, dtvar2) in
-      let sub1 = Substitution.add_type_substitution_e k v in
-      let cons_subbed =
-        Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.add_list_to_constraints paused rest_queue)
-      in
-      ( Substitution.add_type_substitution k v sub,
-        [],
-        Constraint.add_to_constraints cons1 cons_subbed
-        |> Constraint.add_to_constraints cons2 )
+      let tvar1 = Constraint.fresh_ty_with_skel sk1
+      and dtvar2 = Constraint.fresh_dirty_with_skel sk2 in
+      Type.Arrow (tvar1, dtvar2)
   (* α : τ₁ x τ₂ ... *)
   | SkelTuple sks ->
-      let tvars, conss =
-        List.fold_right
-          (fun sk (tvars, conss) ->
-            let tvar, cons = Constraint.fresh_ty_with_skel sk in
-            (tvar :: tvars, cons :: conss))
-          sks ([], [])
-      in
-      let k = tvar in
-      let v = Type.Tuple tvars in
-      let sub1 = Substitution.add_type_substitution_e k v in
-      let cons_subbed =
-        Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.add_list_to_constraints paused rest_queue)
-      in
-      ( Substitution.add_type_substitution k v sub,
-        [],
-        Constraint.add_list_to_constraints cons_subbed conss )
+      let tvars = List.map Constraint.fresh_ty_with_skel sks in
+      Type.Tuple tvars
   (* α : ty_name (τ₁, τ₂, ...) *)
   | SkelApply (ty_name, sks) ->
-      let tvars, conss =
-        List.fold_right
-          (fun sk (tvars, conss) ->
-            let tvar, cons = Constraint.fresh_ty_with_skel sk in
-            (tvar :: tvars, cons :: conss))
-          sks ([], [])
-      in
-      let k = tvar in
-      let v = Type.Apply (ty_name, tvars) in
-      let sub1 = Substitution.add_type_substitution_e k v in
-      let cons_subbed =
-        Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.add_list_to_constraints paused rest_queue)
-      in
-      ( Substitution.add_type_substitution k v sub,
-        [],
-        Constraint.add_list_to_constraints cons_subbed conss )
+      let tvars = List.map Constraint.fresh_ty_with_skel sks in
+      Type.Apply (ty_name, tvars)
   (* α : τ₁ => τ₂ *)
   | SkelHandler (sk1, sk2) ->
-      let dtvar1, cons1 = Constraint.fresh_dirty_with_skel sk1
-      and dtvar2, cons2 = Constraint.fresh_dirty_with_skel sk2 in
-      let k = tvar in
-      let v = Type.Handler (dtvar1, dtvar2) in
-      let sub1 = Substitution.add_type_substitution_e k v in
-      let cons_subbed =
-        Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.add_list_to_constraints paused rest_queue)
-      in
-      ( Substitution.add_type_substitution k v sub,
-        [],
-        Constraint.add_to_constraints cons1 cons_subbed
-        |> Constraint.add_to_constraints cons2 )
+      let dtvar1 = Constraint.fresh_dirty_with_skel sk1
+      and dtvar2 = Constraint.fresh_dirty_with_skel sk2 in
+      Type.Handler (dtvar1, dtvar2)
 
 let process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a =
   let k = sp1 in
@@ -198,7 +141,8 @@ let ty_omega_step sub paused cons rest_queue omega = function
         paused,
         dirty_cons1 @ dirty_cons2 @ rest_queue )
   (* ω : α <= A /  ω : A <= α *)
-  | Type.TyParam (_, skel_tv), a | a, Type.TyParam (_, skel_tv) ->
+  | Type.TyParam (_, (SkelParam _ as skel_tv)), a
+  | a, Type.TyParam (_, (SkelParam _ as skel_tv)) ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
       let skel_a = Type.skeleton_of_ty a in
       if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
@@ -208,6 +152,14 @@ let ty_omega_step sub paused cons rest_queue omega = function
           Constraint.add_to_constraints
             (Constraint.SkelEq (skel_tv, skel_a))
             rest_queue )
+  | Type.TyParam (tv, skel), _ | _, Type.TyParam (tv, skel) ->
+      let ty = fresh_ty_with_skel skel in
+      let sub1 = Substitution.add_type_substitution_e tv ty in
+      let cons_subbed =
+        Substitution.apply_substitutions_to_constraints sub1
+          (Constraint.add_list_to_constraints paused (cons :: rest_queue))
+      in
+      (Substitution.add_type_substitution tv ty sub, [], cons_subbed)
   | _, _ -> assert false
 
 let dirt_omega_step sub paused cons rest_queue omega dcons =
@@ -304,9 +256,6 @@ let rec unify (sub, paused, queue) =
   | cons :: rest_queue ->
       let new_state =
         match cons with
-        (* α : τ *)
-        | Constraint.TyParamHasSkel (tvar, skel) ->
-            ty_param_has_skel_step sub paused cons rest_queue tvar skel
         (* τ₁ = τ₂ *)
         | Constraint.SkelEq (sk1, sk2) ->
             skel_eq_step sub paused rest_queue sk1 sk2
