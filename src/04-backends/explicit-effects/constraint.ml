@@ -87,6 +87,41 @@ let unionDirt (effs, dcoer) =
     ty = (Type.add_effects effs drt, Type.add_effects effs drt');
   }
 
+type resolved = {
+  ty_constraints :
+    (Type.TyCoercionParam.t
+    * CoreTypes.TyParam.t
+    * CoreTypes.TyParam.t
+    * Type.SkelParam.t)
+    list;
+  dirt_constraints : (Type.DirtCoercionParam.t * Type.ct_dirt) list;
+}
+
+let unresolve resolved =
+  List.map
+    (fun (omega, a, b, skel) ->
+      TyOmega
+        ( omega,
+          ( Type.TyParam (a, Type.SkelParam skel),
+            Type.TyParam (b, Type.SkelParam skel) ) ))
+    resolved.ty_constraints
+  @ List.map
+      (fun (omega, ct) -> DirtOmega (omega, ct))
+      resolved.dirt_constraints
+
+let return_resolved resolved queue = unresolve resolved @ queue
+
+let empty_resolved = { ty_constraints = []; dirt_constraints = [] }
+
+let resolve_ty_constraint resolved omega ty1 ty2 skel =
+  {
+    resolved with
+    ty_constraints = (omega, ty1, ty2, skel) :: resolved.ty_constraints;
+  }
+
+let resolve_dirt_constraint resolved omega ct =
+  { resolved with dirt_constraints = (omega, ct) :: resolved.dirt_constraints }
+
 (* ************************************************************************* *)
 (*                         COERCION VARIABLES OF                             *)
 (* ************************************************************************* *)
@@ -198,6 +233,24 @@ let free_params_constraint = function
         (Type.free_params_skeleton sk2)
 
 let free_params_constraints = Type.FreeParams.union_map free_params_constraint
+
+let free_params_resolved (res : resolved) =
+  let free_params_ty =
+    Type.FreeParams.union_map
+      (fun (_, ty1, ty2, skel) ->
+        Type.FreeParams.union
+          {
+            Type.FreeParams.empty with
+            ty_params = Type.TyParamSet.of_list [ ty1; ty2 ];
+          }
+          (Type.FreeParams.skel_singleton skel))
+      res.ty_constraints
+  and free_params_dirt =
+    Type.FreeParams.union_map
+      (fun (_, dt) -> Type.free_params_ct_dirt dt)
+      res.dirt_constraints
+  in
+  Type.FreeParams.union free_params_ty free_params_dirt
 
 (* ************************************************************************* *)
 

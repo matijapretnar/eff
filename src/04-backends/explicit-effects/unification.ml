@@ -26,17 +26,20 @@ let fresh_ty_with_skel skel =
       and dtvar2 = Constraint.fresh_dirty_with_skel sk2 in
       Type.Handler (dtvar1, dtvar2)
 
-let process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a =
+let process_skeleton_parameter_equality sub (paused : Constraint.resolved)
+    rest_queue sp1 sk2a =
   let k = sp1 in
   let v = sk2a in
   let sub1 = Substitution.add_skel_param_substitution_e k v in
   let cons_subbed =
     Substitution.apply_substitutions_to_constraints sub1
-      (Constraint.add_list_to_constraints paused rest_queue)
+      (Constraint.return_resolved paused rest_queue)
   in
-  (Substitution.add_skel_param_substitution k v sub, [], cons_subbed)
+  ( Substitution.add_skel_param_substitution k v sub,
+    Constraint.empty_resolved,
+    cons_subbed )
 
-let skel_eq_step sub paused rest_queue sk1 sk2 =
+let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
   match (sk1, sk2) with
   (* ς = ς *)
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
@@ -80,7 +83,8 @@ let skel_eq_step sub paused rest_queue sk1 sk2 =
       (* Print.debug "%t = %t" (Type.print_skeleton sk1) (Type.print_skeleton sk2); *)
       assert false
 
-let ty_omega_step sub paused cons rest_queue omega = function
+and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
+  function
   (* ω : A <= A *)
   | x, y when Type.equal_ty x y ->
       let k = omega in
@@ -141,33 +145,38 @@ let ty_omega_step sub paused cons rest_queue omega = function
         paused,
         dirty_cons1 @ dirty_cons2 @ rest_queue )
   (* ω : α <= A /  ω : A <= α *)
+  | Type.TyParam (p1, SkelParam s1), Type.TyParam (p2, SkelParam s2)
+    when s1 = s2 ->
+      (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
+      (sub, Constraint.resolve_ty_constraint paused omega p1 p2 s1, rest_queue)
   | Type.TyParam (_, (SkelParam _ as skel_tv)), a
   | a, Type.TyParam (_, (SkelParam _ as skel_tv)) ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
       let skel_a = Type.skeleton_of_ty a in
-      if skel_tv = skel_a then (sub, cons :: paused, rest_queue)
-      else
-        ( sub,
-          Constraint.add_to_constraints cons paused,
-          Constraint.add_to_constraints
-            (Constraint.SkelEq (skel_tv, skel_a))
-            rest_queue )
+      ( sub,
+        paused,
+        Constraint.add_to_constraints
+          (Constraint.SkelEq (skel_tv, skel_a))
+          (Constraint.add_to_constraints cons rest_queue) )
   | Type.TyParam (tv, skel), _ | _, Type.TyParam (tv, skel) ->
       let ty = fresh_ty_with_skel skel in
       let sub1 = Substitution.add_type_substitution_e tv ty in
       let cons_subbed =
         Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.add_list_to_constraints paused (cons :: rest_queue))
+          (Constraint.return_resolved paused (cons :: rest_queue))
       in
-      (Substitution.add_type_substitution tv ty sub, [], cons_subbed)
+      ( Substitution.add_type_substitution tv ty sub,
+        Constraint.empty_resolved,
+        cons_subbed )
   | _, _ -> assert false
 
-let dirt_omega_step sub paused cons rest_queue omega dcons =
+and dirt_omega_step sub paused rest_queue omega dcons =
   match dcons with
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = s1; row = ParamRow v1 },
       { effect_set = s2; row = ParamRow v2 } ) ->
-      if Type.EffectSet.is_empty s1 then (sub, cons :: paused, rest_queue)
+      if Type.EffectSet.is_empty s1 then
+        (sub, Constraint.resolve_dirt_constraint paused omega dcons, rest_queue)
       else
         let omega' = Type.DirtCoercionParam.fresh () in
         let diff_set = Type.EffectSet.diff s1 s2 in
@@ -191,9 +200,9 @@ let dirt_omega_step sub paused cons rest_queue omega dcons =
         in
         let new_cons = Constraint.DirtOmega (omega', omega_ty') in
         ( Substitution.merge sub sub',
-          [],
+          Constraint.empty_resolved,
           Substitution.apply_substitutions_to_constraints sub'
-            (Constraint.add_list_to_constraints paused rest_queue
+            (Constraint.return_resolved paused rest_queue
             |> Constraint.add_to_constraints new_cons) )
   (* ω : Ø <= Δ₂ *)
   | { effect_set = s1; row = EmptyRow }, d when Type.EffectSet.is_empty s1 ->
@@ -212,9 +221,9 @@ let dirt_omega_step sub paused cons rest_queue omega dcons =
         |> Substitution.add_dirt_substitution k1' v1'
       in
       ( Substitution.merge sub sub1,
-        [],
+        Constraint.empty_resolved,
         Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.add_list_to_constraints paused rest_queue) )
+          (Constraint.return_resolved paused rest_queue) )
   (* ω : O₁ <= O₂ *)
   | { effect_set = s1; row = EmptyRow }, { effect_set = s2; row = EmptyRow } ->
       assert (Type.EffectSet.subset s1 s2);
@@ -242,10 +251,10 @@ let dirt_omega_step sub paused cons rest_queue omega dcons =
         |> Substitution.add_dirt_substitution k1 v1
       in
       ( Substitution.merge sub sub1,
-        [],
+        Constraint.empty_resolved,
         Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.add_list_to_constraints paused rest_queue) )
-  | _ -> (sub, cons :: paused, rest_queue)
+          (Constraint.return_resolved paused rest_queue) )
+  | _ -> (sub, Constraint.resolve_dirt_constraint paused omega dcons, rest_queue)
 
 let rec unify (sub, paused, queue) =
   (* Print.debug "SUB: %t" (Substitution.print_substitutions sub); *)
@@ -264,13 +273,15 @@ let rec unify (sub, paused, queue) =
             ty_omega_step sub paused cons rest_queue omega tycons
         (* ω : Δ₁ <= Δ₂ *)
         | Constraint.DirtOmega (omega, dcons) ->
-            dirt_omega_step sub paused cons rest_queue omega dcons
+            dirt_omega_step sub paused rest_queue omega dcons
       in
       unify new_state
 
 let solve constraints =
   (* Print.debug "constraints: %t" (Constraint.print_constraints constraints); *)
-  let sub, solved = unify (Substitution.empty, [], constraints) in
+  let solved =
+    unify (Substitution.empty, Constraint.empty_resolved, constraints)
+  in
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
-  (sub, solved)
+  solved

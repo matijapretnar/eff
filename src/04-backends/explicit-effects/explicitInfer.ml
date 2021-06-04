@@ -773,7 +773,7 @@ and check_abstraction2 state (pat1, pat2, cmp) patTy1 patTy2 :
 (* ************************************************************************* *)
 
 let monomorphize free_ty_params cnstrs =
-  let free_cnstrs_params = Constraint.free_params_constraints cnstrs in
+  let free_cnstrs_params = Constraint.free_params_resolved cnstrs in
   let free_params = Type.FreeParams.union free_ty_params free_cnstrs_params in
   let monomorphize_skeletons =
     List.map
@@ -798,10 +798,11 @@ let monomorphize free_ty_params cnstrs =
   in
   let sub, residuals =
     Unification.solve
-      (monomorphize_skeletons @ monomorphize_tys @ monomorphize_dirts @ cnstrs)
+      (monomorphize_skeletons @ monomorphize_tys @ monomorphize_dirts
+      @ Constraint.unresolve cnstrs)
   in
   (* After zapping, there should be no more constraints left to solve. *)
-  assert (residuals = []);
+  assert (Constraint.unresolve residuals = []);
   sub
 
 let infer_computation state comp =

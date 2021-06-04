@@ -35,6 +35,7 @@ end))
 module EffectSet = Set.Make (CoreTypes.Effect)
 module SkelParamSet = Set.Make (SkelParam)
 module TyParamSet = Set.Make (CoreTypes.TyParam)
+module TyParamMap = Map.Make (CoreTypes.TyParam)
 module DirtParamSet = Set.Make (DirtParam)
 
 type effect_set = EffectSet.t
