@@ -95,11 +95,11 @@ let rec print_ty ?max_level ty ppf =
         (CoreTypes.TyParam.print p)
         (print_skeleton skel)
   | Arrow (t1, (t2, drt)) when is_empty_dirt drt ->
-      print ~at_level:5 "%t → %t" (print_ty ~max_level:4 t1)
-        (print_ty ~max_level:5 t2)
+      print ~at_level:3 "%t → %t" (print_ty ~max_level:2 t1)
+        (print_ty ~max_level:3 t2)
   | Arrow (t1, (t2, drt)) ->
-      print ~at_level:5 "%t -%t→ %t" (print_ty ~max_level:4 t1)
-        (print_dirt drt) (print_ty ~max_level:5 t2)
+      print ~at_level:3 "%t -%t→ %t" (print_ty ~max_level:2 t1)
+        (print_dirt drt) (print_ty ~max_level:3 t2)
   | Apply (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | Apply (t, [ s ]) ->
       print ~at_level:1 "%t %t" (print_ty ~max_level:1 s)
@@ -112,7 +112,9 @@ let rec print_ty ?max_level ty ppf =
   | Tuple tys ->
       print ~at_level:2 "%t" (Print.sequence "×" (print_ty ~max_level:1) tys)
   | Handler (drty1, drty2) ->
-      print ~at_level:6 "%t ⇛ %t" (print_dirty drty1) (print_dirty drty2)
+      print ~at_level:3 "%t ⇛ %t"
+        (print_dirty ~max_level:2 drty1)
+        (print_dirty ~max_level:2 drty2)
   | TyBasic p -> print "%t" (Const.print_ty p)
 
 and print_skeleton ?max_level sk ppf =
@@ -152,9 +154,10 @@ and print_dirt ?max_level drt ppf =
 and print_effect_set effect_set =
   Print.sequence "," CoreTypes.Effect.print (EffectSet.elements effect_set)
 
-and print_dirty (t1, drt1) ppf =
-  let print ?at_level = Print.print ?at_level ppf in
-  print ~at_level:1 "%t!%t" (print_ty ~max_level:0 t1) (print_dirt drt1)
+and print_dirty ?max_level (t1, drt1) ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  print ~at_level:2 "%t!%t" (print_ty ~max_level:0 t1)
+    (print_dirt ~max_level:0 drt1)
 
 and print_ct_ty (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in

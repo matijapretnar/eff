@@ -98,10 +98,15 @@ let rec print_ty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.term with
   | ReflTy -> print "⟨%t⟩" (Type.print_ty (fst c.ty))
-  | ArrowCoercion (tc, dc) ->
-      print "%t → %t" (print_ty_coercion tc) (print_dirty_coercion dc)
+  | ArrowCoercion (tc1, { term = tc2, dc2; _ }) ->
+      print ~at_level:3 "%t -{%t}→ %t"
+        (print_ty_coercion ~max_level:2 tc1)
+        (print_dirt_coercion dc2)
+        (print_ty_coercion ~max_level:3 tc2)
   | HandlerCoercion (dc1, dc2) ->
-      print "%t ⇛ %t" (print_dirty_coercion dc1) (print_dirty_coercion dc2)
+      print "%t ⇛ %t"
+        (print_dirty_coercion ~max_level:2 dc1)
+        (print_dirty_coercion ~max_level:2 dc2)
   | TyCoercionVar tcp -> print "%t" (Type.TyCoercionParam.print tcp)
   | ApplyCoercion (t, []) -> print "%t" (CoreTypes.TyName.print t)
   | ApplyCoercion (t, [ c ]) ->
@@ -119,16 +124,21 @@ let rec print_ty_coercion ?max_level c ppf =
 
 and print_dirty_coercion ?max_level { term = tc, dirtc; _ } ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  print "%t!%t" (print_ty_coercion ~max_level:0 tc) (print_dirt_coercion dirtc)
+  print ~at_level:2 "%t!%t"
+    (print_ty_coercion ~max_level:0 tc)
+    (print_dirt_coercion ~max_level:0 dirtc)
 
 and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.term with
   | ReflDirt -> print "⟨%t⟩" (Type.print_dirt (fst c.ty))
   | DirtCoercionVar tcp -> print "%t" (Type.DirtCoercionParam.print tcp)
-  | Empty -> print "∅↪︎%t" (Type.print_dirt ~max_level:0 (snd c.ty))
+  | Empty ->
+      print ~at_level:1 "∅↪︎%t" (Type.print_dirt ~max_level:0 (snd c.ty))
   | UnionDirt (eset, dc) ->
-      print "{%t}∪%t" (Type.print_effect_set eset) (print_dirt_coercion dc)
+      print ~at_level:2 "{%t}∪%t"
+        (Type.print_effect_set eset)
+        (print_dirt_coercion ~max_level:2 dc)
 
 and print_omega_ct ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
