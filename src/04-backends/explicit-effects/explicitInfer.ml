@@ -272,8 +272,6 @@ let isLocatedVarPat (pat : Untyped.pattern) : bool =
 (*                             VALUE TYPING                                  *)
 (* ************************************************************************* *)
 
-let lookupTmVar state x = TypingEnv.lookup state.variables x
-
 (* Term Variables *)
 let rec tcVar state (x : Untyped.variable) : tcExprOutput' =
   let var, cnstrs = TypingEnv.lookup state.variables x in
@@ -767,13 +765,15 @@ let monomorphize free_ty_params cnstrs =
         Constraint.SkelEq (Type.SkelParam sk, Type.SkelBasic Const.FloatTy))
       (Type.SkelParamSet.elements free_params.skel_params)
   and monomorphize_tys =
-    List.map
-      (fun t ->
-        Constraint.TyOmega
-          ( Type.TyCoercionParam.fresh (),
-            ( Type.TyParam (t, Constraint.fresh_skel ()),
-              Type.TyBasic Const.FloatTy ) ))
-      (Type.TyParamSet.elements free_params.ty_params)
+    List.concat_map
+      (fun (t, skels) ->
+        List.map
+          (fun skel ->
+            Constraint.TyOmega
+              ( Type.TyCoercionParam.fresh (),
+                (Type.TyParam (t, skel), Type.TyBasic Const.FloatTy) ))
+          skels)
+      (Type.TyParamMap.bindings free_params.ty_params)
   and monomorphize_dirts =
     List.map
       (fun d ->
@@ -792,9 +792,31 @@ let monomorphize free_ty_params cnstrs =
   sub
 
 let generalize ty cnstrs =
-  let sub = monomorphize (Type.free_params_ty ty) cnstrs in
-  let ty' = Substitution.apply_substitutions_to_type sub ty in
-  Type.monotype ty'
+  let free_ty_params = Type.free_params_ty ty
+  and free_cnstrs_params = Constraint.free_params_resolved cnstrs in
+  let free_params = Type.FreeParams.union free_ty_params free_cnstrs_params in
+  Type.
+    {
+      monotype = ty;
+      skeleton_params = SkelParamSet.elements free_params.skel_params;
+      ty_params =
+        List.map
+          (fun (t, skels) ->
+            match skels with
+            | [] -> assert false
+            | skel :: skels ->
+                assert (List.for_all (( = ) skel) skels);
+                (t, skel))
+          (TyParamMap.bindings free_params.ty_params);
+      dirt_params = DirtParamSet.elements free_params.dirt_params;
+      ty_constraints =
+        List.map
+          (fun (_, t1, t2, skel) ->
+            (TyParam (t1, SkelParam skel), TyParam (t2, SkelParam skel)))
+          cnstrs.ty_constraints;
+      dirt_constraints =
+        List.map (fun (_, ct_drt) -> ct_drt) cnstrs.dirt_constraints;
+    }
 
 let infer_computation state comp =
   let comp', cnstrs = tcComp state comp in

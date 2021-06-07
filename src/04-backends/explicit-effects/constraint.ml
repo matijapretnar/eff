@@ -241,7 +241,13 @@ let free_params_resolved (res : resolved) =
         Type.FreeParams.union
           {
             Type.FreeParams.empty with
-            ty_params = Type.TyParamSet.of_list [ ty1; ty2 ];
+            ty_params =
+              Type.TyParamMap.of_seq
+                (List.to_seq
+                   [
+                     (ty1, [ Type.SkelParam skel ]);
+                     (ty2, [ Type.SkelParam skel ]);
+                   ]);
           }
           (Type.FreeParams.skel_singleton skel))
       res.ty_constraints

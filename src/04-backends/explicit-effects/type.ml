@@ -34,9 +34,11 @@ end))
 
 module EffectSet = Set.Make (CoreTypes.Effect)
 module SkelParamSet = Set.Make (SkelParam)
+module SkelParamMap = Map.Make (SkelParam)
 module TyParamSet = Set.Make (CoreTypes.TyParam)
 module TyParamMap = Map.Make (CoreTypes.TyParam)
 module DirtParamSet = Set.Make (DirtParam)
+module DirtParamMap = Map.Make (DirtParam)
 
 type effect_set = EffectSet.t
 
@@ -257,19 +259,20 @@ let add_effects effect_set drt =
 
 module FreeParams = struct
   type t = {
-    ty_params : TyParamSet.t;
+    ty_params : skeleton list TyParamMap.t;
     dirt_params : DirtParamSet.t;
     skel_params : SkelParamSet.t;
   }
 
   let empty =
     {
-      ty_params = TyParamSet.empty;
+      ty_params = TyParamMap.empty;
       dirt_params = DirtParamSet.empty;
       skel_params = SkelParamSet.empty;
     }
 
-  let ty_singleton p = { empty with ty_params = TyParamSet.singleton p }
+  let ty_singleton p skel =
+    { empty with ty_params = TyParamMap.singleton p [ skel ] }
 
   let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
 
@@ -277,7 +280,10 @@ module FreeParams = struct
 
   let union fp1 fp2 =
     {
-      ty_params = TyParamSet.union fp1.ty_params fp2.ty_params;
+      ty_params =
+        TyParamMap.union
+          (fun _ skels1 skels2 -> Some (skels1 @ skels2))
+          fp1.ty_params fp2.ty_params;
       dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
       skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
     }
@@ -302,7 +308,9 @@ let rec free_params_skeleton = function
 (* Compute the free variables of a target value type *)
 let rec free_params_ty = function
   | TyParam (p, skel) ->
-      FreeParams.union (FreeParams.ty_singleton p) (free_params_skeleton skel)
+      FreeParams.union
+        (FreeParams.ty_singleton p skel)
+        (free_params_skeleton skel)
   | Arrow (vty, cty) ->
       FreeParams.union (free_params_ty vty) (free_params_dirty cty)
   | Tuple vtys -> FreeParams.union_map free_params_ty vtys
@@ -336,6 +344,79 @@ and free_params_dirt (dirt : dirt) =
   match dirt.row with
   | ParamRow p -> FreeParams.dirt_singleton p
   | EmptyRow -> FreeParams.empty
+
+(* ************************************************************************* *)
+
+module Renaming = struct
+  type t = {
+    ty_params : CoreTypes.TyParam.t TyParamMap.t;
+    dirt_params : DirtParam.t DirtParamMap.t;
+    skel_params : SkelParam.t SkelParamMap.t;
+  }
+
+  let empty =
+    {
+      ty_params = TyParamMap.empty;
+      dirt_params = DirtParamMap.empty;
+      skel_params = SkelParamMap.empty;
+    }
+end
+
+let rec rename_skeleton (sbst : Renaming.t) = function
+  | SkelParam p ->
+      SkelParam
+        (SkelParamMap.find_opt p sbst.skel_params |> Option.value ~default:p)
+  | SkelBasic _ as skel -> skel
+  | SkelApply (ty_name, sks) ->
+      SkelApply (ty_name, List.map (rename_skeleton sbst) sks)
+  | SkelArrow (sk1, sk2) ->
+      SkelArrow (rename_skeleton sbst sk1, rename_skeleton sbst sk2)
+  | SkelHandler (sk1, sk2) ->
+      SkelHandler (rename_skeleton sbst sk1, rename_skeleton sbst sk2)
+  | SkelTuple sks -> SkelTuple (List.map (rename_skeleton sbst) sks)
+
+(* Compute the free variables of a target value type *)
+let rec rename_ty (sbst : Renaming.t) = function
+  | TyParam (p, skel) ->
+      TyParam
+        ( TyParamMap.find_opt p sbst.ty_params |> Option.value ~default:p,
+          rename_skeleton sbst skel )
+  | Arrow (vty, cty) -> Arrow (rename_ty sbst vty, rename_dirty sbst cty)
+  | Tuple vtys -> Tuple (List.map (rename_ty sbst) vtys)
+  | Handler (cty1, cty2) ->
+      Handler (rename_dirty sbst cty1, rename_dirty sbst cty2)
+  | TyBasic _ as ty -> ty
+  | Apply (ty_name, vtys) -> Apply (ty_name, List.map (rename_ty sbst) vtys)
+
+(* Compute the free dirt variables of a target computation type *)
+and rename_dirty sbst (ty, dirt) = (rename_ty sbst ty, rename_dirt sbst dirt)
+
+(* Compute the free dirt variables of a target computation type *)
+and rename_abstraction_ty sbst (ty_in, drty_out) =
+  (rename_ty sbst ty_in, rename_dirty sbst drty_out)
+
+(* Compute the free dirt variables of a value type inequality *)
+and rename_ct_ty sbst (vty1, vty2) = (rename_ty sbst vty1, rename_ty sbst vty2)
+
+(* Compute the free dirt variables of a computation type inequality *)
+and rename_ct_dirty sbst (cty1, cty2) =
+  (rename_dirty sbst cty1, rename_dirty sbst cty2)
+
+(* Compute the free dirt variables of a dirt inequality *)
+and rename_ct_dirt sbst (dirt1, dirt2) =
+  (rename_dirt sbst dirt1, rename_dirt sbst dirt2)
+
+(* Compute the free dirt variables of a dirt *)
+and rename_dirt (sbst : Renaming.t) dirt =
+  match dirt.row with
+  | EmptyRow -> dirt
+  | ParamRow p ->
+      {
+        dirt with
+        row =
+          ParamRow
+            (DirtParamMap.find_opt p sbst.dirt_params |> Option.value ~default:p);
+      }
 
 (* ************************************************************************* *)
 

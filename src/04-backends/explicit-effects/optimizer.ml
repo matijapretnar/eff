@@ -269,16 +269,13 @@ and bind_abstraction state { term = pat, cmp; _ } bind =
 
 and handle_computation state hnd comp =
   match comp.term with
-  | Term.Apply
-      ({ term = Var { variable = f; ty_coercions; dirt_coercions }; _ }, exp)
+  | Term.Apply ({ term = Var { variable = f; _ }; _ }, exp)
     when Option.is_some
            (Assoc.lookup
               (hnd.term.Term.effect_clauses.fingerprint, f.term)
               state.specialized_functions)
          && state.config.specialize_functions -> (
       let value_clause = hnd.term.Term.value_clause in
-      assert (ty_coercions = []);
-      assert (dirt_coercions = []);
       match
         Assoc.lookup
           (hnd.term.Term.effect_clauses.fingerprint, f.term)

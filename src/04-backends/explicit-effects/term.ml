@@ -52,6 +52,9 @@ type expression = (expression', Type.ty) typed
 and expression' =
   | Var of {
       variable : variable;
+      skeletons : Type.skeleton list;
+      dirts : Type.dirt list;
+      tys : Type.ty list;
       ty_coercions : Constraint.ty_coercion list;
       dirt_coercions : Constraint.dirt_coercion list;
     }
@@ -101,12 +104,25 @@ and abstraction2 =
 
 let mono_var x =
   {
-    term = Var { variable = x; ty_coercions = []; dirt_coercions = [] };
+    term =
+      Var
+        {
+          variable = x;
+          skeletons = [];
+          tys = [];
+          dirts = [];
+          ty_coercions = [];
+          dirt_coercions = [];
+        };
     ty = x.ty;
   }
 
-let poly_var x ty_coercions dirt_coercions =
-  { term = Var { variable = x; ty_coercions; dirt_coercions }; ty = x.ty }
+let poly_var x skeletons tys dirts ty_coercions dirt_coercions =
+  {
+    term =
+      Var { variable = x; skeletons; tys; dirts; ty_coercions; dirt_coercions };
+    ty = x.ty;
+  }
 
 let fresh_variable x ty =
   let x' = { term = CoreTypes.Variable.fresh x; ty } in
