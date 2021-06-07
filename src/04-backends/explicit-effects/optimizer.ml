@@ -278,14 +278,12 @@ and handle_computation state hnd comp =
           in
           beta_reduce state (Term.abstraction (p1, comp')) exp
       | None -> Term.call (eff, exp, handled_abs))
-  | Apply ({ term = Var { variable = f; ty_coercions; dirt_coercions }; _ }, exp)
+  | Apply ({ term = Var { variable = f; _ }; _ }, exp)
     when Option.is_some
            (Assoc.lookup
               (hnd.term.Term.effect_clauses.fingerprint, f.term)
               state.specialized_functions) -> (
       let value_clause = hnd.term.Term.value_clause in
-      assert (ty_coercions = []);
-      assert (dirt_coercions = []);
       match
         Assoc.lookup
           (hnd.term.Term.effect_clauses.fingerprint, f.term)
