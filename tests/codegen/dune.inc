@@ -831,6 +831,45 @@
  (deps
  %{bin:eff}
   (source_tree .))
+   (target "poly_bind.eff.out")
+    (action
+     (with-outputs-to "%{target}"
+      (with-accepted-exit-codes
+       (or 0 0 1 2)
+       (run eff --no-stdlib --compile-plain-ocaml --no-header "./poly_bind.eff")))))
+
+(rule
+ (deps "poly_bind.eff.out")
+ (target "poly_bind.eff.out.formatted")
+  (action
+   (with-outputs-to "%{target}"
+    (with-accepted-exit-codes (or 0 1 2)
+     (run ocamlformat poly_bind.eff.out)))))
+
+(rule
+ (deps "poly_bind.eff.out.formatted" ocaml_header.tmp)
+ (target "poly_bind.eff.out.formatted.ocaml_with_header")
+  (action
+   (with-outputs-to "%{target}"
+    (pipe-outputs (run echo ";;") (run cat ocaml_header.tmp - poly_bind.eff.out.formatted)))))
+
+(rule
+ (deps "poly_bind.eff.out.formatted.ocaml_with_header")
+ (alias runtest)
+ (action
+  (with-accepted-exit-codes 0
+   (run ocaml "poly_bind.eff.out.formatted.ocaml_with_header"))))
+
+(rule
+ (deps "poly_bind.eff.out.formatted")
+  (alias runtest)
+   (action
+    (diff "poly_bind.eff.ref" "poly_bind.eff.out.formatted")))
+
+(rule
+ (deps
+ %{bin:eff}
+  (source_tree .))
    (target "rec1.eff.out")
     (action
      (with-outputs-to "%{target}"

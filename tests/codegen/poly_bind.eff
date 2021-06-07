@@ -1,0 +1,5 @@
+let f _ = 
+    handle
+        1 + 2
+    with
+    | _ -> 5
