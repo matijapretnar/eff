@@ -122,7 +122,7 @@ let rec pp_coercion ?max_level coer ppf =
   (* The cases not matched here should be handled in pp_term *)
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match coer with
-  | NCoerVar v -> print "%t" (Type.TyCoercionParam.print v)
+  | NCoerVar v -> print "%t" (Type.TyCoercionParam.print ~safe:true v)
   | NCoerRefl -> print "coer_refl_ty"
   | NCoerArrow (w1, w2) ->
       print ~at_level:1 "coer_arrow %t %t"
@@ -162,7 +162,8 @@ let pp_lets keyword pp_let_def lst ppf =
       print ppf "@[<hv 2>%s %t@] @,%t" keyword (pp_let_def let_def)
         (pp_sequence " " pp_and_let tl)
 
-let pp_coercion_vars ws = Print.sequence " " Type.TyCoercionParam.print ws
+let pp_coercion_vars ws =
+  Print.sequence " " (Type.TyCoercionParam.print ~safe:true) ws
 
 let rec pp_term ?max_level state noEff_term ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

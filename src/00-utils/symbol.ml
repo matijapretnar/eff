@@ -19,11 +19,13 @@ end
 module Parameter (Param : PARAMETER) : Annotation with type t = unit = struct
   type t = unit
 
-  let print _ _ n ppf =
-    let symbol =
-      if !Config.ascii then Param.ascii_symbol else Param.utf8_symbol
-    in
-    Print.print ppf "%s%s" symbol (Symbols.subscript (Some (n + 1)))
+  let print safe _ n ppf =
+    if safe then Format.fprintf ppf "_%s_%d" Param.ascii_symbol n
+    else
+      let symbol =
+        if !Config.ascii then Param.ascii_symbol else Param.utf8_symbol
+      in
+      Print.print ppf "%s%s" symbol (Symbols.subscript (Some (n + 1)))
 end
 
 module String : Annotation with type t = string = struct
