@@ -875,23 +875,15 @@ let process_top_let state defs =
 
 let process_top_let_rec state defs =
   let defs, residuals = infer_rec_abstraction state (Assoc.to_list defs) in
-  let defs = Assoc.map (fun abs -> ([], abs)) defs in
-  (* Print.debug "TERM: %t" (Term.print_abstraction abs); *)
-  (* Print.debug "TYPE: %t" (Type.print_abs_ty abs.ty); *)
-  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
-  let free_params = Term.free_params_definitions defs in
-  let mono_sub = monomorphize free_params residuals in
-  let mono_defs = Substitution.apply_sub_definitions mono_sub defs in
-  (* Print.debug "MONO TERM: %t" (Term.print_abstraction mono_abs); *)
-  (* Print.debug "MONO TYPE: %t" (Type.print_abs_ty abs.ty); *)
-  (* We assume that all free variables in the term already appeared in its type or constraints *)
-  (* assert (Type.FreeParams.is_empty (Term.free_params_abstraction mono_abs)); *)
-  let state' =
-    Assoc.fold_left
-      (fun state (f, (_ws, abs)) -> extend_var state f.term (Type.Arrow abs.ty))
-      state mono_defs
+  let state', defs' =
+    Assoc.fold_right
+      (fun (f, abs) (state, defs) ->
+        let ws, ty_scheme = generalize (Type.Arrow abs.ty) residuals in
+        let state' = extend_poly_var state f.term ty_scheme in
+        (state', (f, (ws, abs)) :: defs))
+      defs (state, [])
   in
-  (state', mono_defs)
+  (state', Assoc.of_list defs')
 
 let add_type_definitions state tydefs =
   {
