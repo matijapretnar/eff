@@ -53,7 +53,7 @@ and expression' =
   | Var of {
       variable : variable;
       skeletons : Type.skeleton list;
-      dirts : Type.dirt list;
+      dirts : (Type.DirtParam.t * Type.dirt) list;
       tys : Type.ty list;
       ty_coercions : Constraint.ty_coercion list;
       dirt_coercions : Constraint.dirt_coercion list;

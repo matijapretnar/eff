@@ -39,7 +39,7 @@ let lookup ctx x =
       and dirts =
         List.map
           (fun p ->
-            Type.no_effect_dirt (Type.DirtParamMap.find p sbst.dirt_params))
+            (p, Type.no_effect_dirt (Type.DirtParamMap.find p sbst.dirt_params)))
           ty_scheme.Type.dirt_params
       and ty_coercions, ty_constraints =
         ty_scheme.Type.ty_constraints

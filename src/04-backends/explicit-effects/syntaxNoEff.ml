@@ -57,7 +57,7 @@ let rec pattern_vars pat =
   | PNNonbinding -> []
 
 type n_term =
-  | NVar of variable
+  | NVar of { variable : variable; coercions : n_coercion list }
   | NTuple of n_term list
   | NFun of n_abstraction_with_param_ty
   | NApplyTerm of n_term * n_term
@@ -102,7 +102,7 @@ type cmd =
 
 let rec subs_var_in_term par subs term =
   match term with
-  | NVar v -> if v = par then subs else term
+  | NVar v -> if v.variable = par then subs else term
   | NTuple ls -> NTuple (List.map (subs_var_in_term par subs) ls)
   | NFun abs -> NFun (subs_var_in_abs_with_ty par subs abs)
   | NApplyTerm (t1, t2) ->
@@ -175,7 +175,12 @@ let pattern_match p e =
 
 let rec substitute_term sbst n_term =
   match n_term with
-  | NVar x -> ( match Assoc.lookup x sbst with Some e' -> e' | None -> n_term)
+  | NVar x -> (
+      match Assoc.lookup x.variable sbst with
+      | Some e' ->
+          assert (x.coercions = []);
+          e'
+      | None -> n_term)
   | NTuple t -> NTuple (List.map (substitute_term sbst) t)
   | NFun a -> NFun (substitute_abstraction_with_ty sbst a)
   | NApplyTerm (t1, t2) ->
@@ -234,7 +239,7 @@ let ( --- ) occur bound =
 let concat_vars vars = List.fold_right ( @@@ ) vars VariableMap.empty
 
 let rec free_vars = function
-  | NVar v -> VariableMap.singleton v 1
+  | NVar v -> VariableMap.singleton v.variable 1
   | NTuple l -> concat_vars (List.map free_vars l)
   | NFun abs -> free_vars_abs_with_ty abs
   | NHandle (t1, t2) | NApplyTerm (t1, t2) -> free_vars t1 @@@ free_vars t2
@@ -333,7 +338,7 @@ let rec print_pattern ?max_level p ppf =
 let rec print_term ?max_level t ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match t with
-  | NVar x -> print "%t" (print_variable x)
+  | NVar x -> print "%t" (print_variable x.variable)
   | NTuple ts -> Print.tuple print_term ts ppf
   | NFun abs -> print_abstraction_with_param_ty abs ppf
   | NApplyTerm (t1, t2) ->

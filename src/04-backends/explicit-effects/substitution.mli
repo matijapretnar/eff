@@ -40,6 +40,8 @@ val add_dirt_substitution : Type.DirtParam.t -> Type.dirt -> t -> t
 val add_dirt_substitution_e : Type.DirtParam.t -> Type.dirt -> t
 (** [add_dirt_substitution var dirt] Add dirt variable ([dirt_var]) to [dirt] substitution to empty substitution *)
 
+val empty_dirt_substitution : Type.DirtParamSet.t -> t
+
 val add_skel_param_substitution : Type.SkelParam.t -> Type.skeleton -> t -> t
 (** [add_type_substitution parameter skel sub] Add skeleton [parameter] to [skel] substitution to [sub] *)
 
