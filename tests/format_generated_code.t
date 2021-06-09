@@ -186,6 +186,16 @@
   
   let testGenerator = _testGenerator
   ======================================================================
+  codegen/compose.eff
+  ----------------------------------------------------------------------
+  let _compose_42 _tycoer_5 _tycoer_3 _tycoer_4 _tycoer_2
+      (_f_43 : 'ty17 -> 'ty18 computation) (_g_44 : 'ty15 -> 'ty16 computation)
+      (_x_45 : 'ty12) =
+    coer_computation _tycoer_3 (_g_44 (_tycoer_2 _x_45)) >>= fun _b_46 ->
+    coer_computation _tycoer_5 (_f_43 (_tycoer_4 _b_46))
+  
+  let compose = _compose_42
+  ======================================================================
   codegen/constant_folding_match.eff
   ----------------------------------------------------------------------
   type a = Nil | Cons of (int * a)
