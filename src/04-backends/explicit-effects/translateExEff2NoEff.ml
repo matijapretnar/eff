@@ -405,7 +405,7 @@ and elab_computation' c =
       NoEff.NCast (coelab, elabc)
 
 and elab_rec_definitions defs =
-  Assoc.kmap (fun (x, abs) -> (x.term, elab_abstraction abs)) defs
+  Assoc.kmap (fun (x, (ws, abs)) -> (x.term, (ws, elab_abstraction abs))) defs
 
 let rec elab_source_ty = function
   | Language.Type.Apply (name, ts) ->

@@ -254,7 +254,8 @@ and apply_sub_pat' sub pat =
   | PConst _ -> pat
   | PNonbinding -> pat
 
-and apply_sub_definitions sub defs = Assoc.map (apply_sub_abs sub) defs
+and apply_sub_definitions sub defs =
+  Assoc.map (fun (ws, abs) -> (ws, apply_sub_abs sub abs)) defs
 
 and apply_sub_abs2 sub abs2 =
   { term = apply_sub_abs2' sub abs2.term; ty = apply_sub_abs2_ty sub abs2.ty }

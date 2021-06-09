@@ -86,7 +86,8 @@ and n_abstraction_with_param_ty = n_pattern * n_type * n_term
 
 and n_abstraction_2_args = n_pattern * n_pattern * n_term
 
-and n_rec_definitions = (variable, n_abstraction) Assoc.t
+and n_rec_definitions =
+  (variable, Type.TyCoercionParam.t list * n_abstraction) Assoc.t
 
 type n_tydef =
   | TyDefRecord of (CoreTypes.Field.t, n_type) Assoc.t
@@ -95,7 +96,7 @@ type n_tydef =
 
 type cmd =
   | Term of n_term
-  | TopLet of (variable, n_term) Assoc.t
+  | TopLet of (variable, Type.TyCoercionParam.t list * n_term) Assoc.t
   | TopLetRec of n_rec_definitions
   | DefEffect of n_effect
   | TyDef of (CoreTypes.TyName.t * (CoreTypes.TyParam.t list * n_tydef)) list
@@ -122,7 +123,8 @@ let rec subs_var_in_term par subs term =
   | NConst c -> NConst c
   | NLetRec (abss, t) ->
       NLetRec
-        (Assoc.map (subs_var_in_abs par subs) abss, subs_var_in_term par subs t)
+        ( Assoc.map (fun (w, abs) -> (w, subs_var_in_abs par subs abs)) abss,
+          subs_var_in_term par subs t )
   | NMatch (t, abss) ->
       NMatch
         (subs_var_in_term par subs t, List.map (subs_var_in_abs par subs) abss)
@@ -199,7 +201,8 @@ let rec substitute_term sbst n_term =
   | NConst _ -> n_term
   | NLetRec (lst, t) ->
       NLetRec
-        (Assoc.map (substitute_abstraction sbst) lst, (substitute_term sbst) t)
+        ( Assoc.map (fun (ws, abs) -> (ws, substitute_abstraction sbst abs)) lst,
+          (substitute_term sbst) t )
   | NMatch (t, abs) ->
       NMatch
         ((substitute_term sbst) t, List.map (substitute_abstraction sbst) abs)
@@ -253,7 +256,8 @@ let rec free_vars = function
   | NLetRec (li, c1) ->
       let xs, vars =
         List.fold_right
-          (fun (x, abs) (xs, vars) -> (x :: xs, free_vars_abs abs @@@ vars))
+          (fun (x, (_ws, abs)) (xs, vars) ->
+            (x :: xs, free_vars_abs abs @@@ vars))
           (Assoc.to_list li)
           ([], free_vars c1)
       in
@@ -385,7 +389,9 @@ let rec print_term ?max_level t ppf =
   | NDirectPrimitive p ->
       print "DirectPrimitive (%s)" (Language.Primitives.primitive_name p)
 
-and print_let_rec_abstraction (f, abs) ppf =
+and print_let_rec_abstraction (f, (ws, abs)) ppf =
+  (* We're printing only local let-recs *)
+  assert (ws = []);
   Format.fprintf ppf "%t %t" (print_variable f) (print_let_abstraction abs)
 
 and print_let_abstraction (t1, t2) ppf =

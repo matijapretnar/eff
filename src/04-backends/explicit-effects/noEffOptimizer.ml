@@ -194,7 +194,7 @@ and optimize_handler state (hnd : NoEff.n_handler) =
   }
 
 and optimize_rec_definitions state defs =
-  Assoc.map (optimize_abstraction state) defs
+  Assoc.map (fun (ws, abs) -> (ws, optimize_abstraction state abs)) defs
 
 and optimize_abstraction state ((pat, term) : NoEff.n_abstraction) =
   (pat, optimize_term state term)
@@ -242,8 +242,9 @@ and reduce_term' state (n_term : NoEff.n_term) =
   | NLetRec (defs, t) ->
       let defs =
         Assoc.kmap
-          (fun (v, (p, c)) ->
-            if is_fun c then (v, (p, c)) else (v, (p, naive_lambda_lift c)))
+          (fun (v, (ws, (p, c))) ->
+            if is_fun c then (v, (ws, (p, c)))
+            else (v, (ws, (p, naive_lambda_lift c))))
           defs
       in
       if is_letrec_unused state defs t then t else NoEff.NLetRec (defs, t)
