@@ -54,15 +54,19 @@ let add_dirt_var_coercion dirt_var dc sub =
 let add_dirt_var_coercion_e dirt_var dc =
   add_to_empty add_dirt_var_coercion dirt_var dc
 
-let add_dirt_substitution dirt_var t_coercion sub =
+let add_dirt_substitution dirt_var dirt sub =
   {
     sub with
-    dirt_var_to_dirt_subs =
-      Assoc.update dirt_var t_coercion sub.dirt_var_to_dirt_subs;
+    dirt_var_to_dirt_subs = Assoc.update dirt_var dirt sub.dirt_var_to_dirt_subs;
   }
 
-let add_dirt_substitution_e dirt_var t_coercion =
-  add_to_empty add_dirt_substitution dirt_var t_coercion
+let add_dirt_substitution_e dirt_var dirt =
+  add_to_empty add_dirt_substitution dirt_var dirt
+
+let empty_dirt_substitution empty_dirt_params =
+  Type.DirtParamSet.fold
+    (fun t sbst -> add_dirt_substitution t Type.empty_dirt sbst)
+    empty_dirt_params empty
 
 let add_skel_param_substitution param skel sub =
   {

@@ -155,7 +155,7 @@ let rec pp_coercion ?max_level coer ppf =
 let rec pp_term ?max_level state noEff_term ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match noEff_term with
-  | NVar v -> print "%t" (pp_variable state v)
+  | NVar v -> print "%t" (pp_variable state v.variable)
   | NConst c -> print "%t" (Const.print c)
   | NTuple ts -> print "%t" (pp_tuple (pp_term state ~max_level:1) ts)
   | NRecord rcd -> print "%t" (pp_record (pp_term state) "=" rcd)

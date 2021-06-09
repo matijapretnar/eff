@@ -113,6 +113,136 @@ and elab_dirty_coercion state { term = tcoer, dcoer; _ } =
   else if not (is_empty_dirt d2) then NoEff.NCoerComp tyelab
   else failwith "Ill-typed bang coercion"
 
+let rec value_coercion_from_impure_dirt empty_dirt_params ty =
+  match ty with
+  | ExEffTypes.TyParam (_, _) -> NoEff.NCoerRefl
+  | ExEffTypes.Apply (_, _) -> NoEff.NCoerRefl
+  | ExEffTypes.Arrow (ty1, drty2) ->
+      NoEff.NCoerArrow
+        ( value_coercion_to_impure_dirt empty_dirt_params ty1,
+          computation_coercion_from_impure_dirt empty_dirt_params drty2 )
+  | ExEffTypes.Tuple tys ->
+      NoEff.NCoerTuple
+        (List.map (value_coercion_from_impure_dirt empty_dirt_params) tys)
+  | ExEffTypes.Handler ((ty1, drt1), (ty2, drt2)) -> (
+      if is_empty_dirt drt1 then
+        NoEff.NCoerArrow
+          ( value_coercion_to_impure_dirt empty_dirt_params ty1,
+            computation_coercion_from_impure_dirt empty_dirt_params (ty2, drt2)
+          )
+      else
+        match drt1.row with
+        | ParamRow d ->
+            if
+              ExEffTypes.DirtParamSet.mem d empty_dirt_params
+              && ExEffTypes.EffectSet.is_empty drt1.effect_set
+            then
+              let coer1 = value_coercion_to_impure_dirt empty_dirt_params ty1 in
+              let coer2 =
+                value_coercion_from_impure_dirt empty_dirt_params ty2
+              in
+              if
+                is_empty_dirt
+                  (Substitution.apply_substitutions_to_dirt
+                     (Substitution.empty_dirt_substitution empty_dirt_params)
+                     drt2)
+              then NoEff.NCoerHandToFun (coer1, NoEff.NCoerUnsafe coer2)
+              else NoEff.NCoerHandToFun (coer1, NoEff.NCoerComp coer2)
+            else
+              NoEff.NCoerHandler
+                ( computation_coercion_to_impure_dirt empty_dirt_params
+                    (ty1, drt1),
+                  computation_coercion_from_impure_dirt empty_dirt_params
+                    (ty2, ExEffTypes.fresh_dirt ()) )
+        | EmptyRow ->
+            NoEff.NCoerHandler
+              ( computation_coercion_to_impure_dirt empty_dirt_params (ty1, drt1),
+                computation_coercion_from_impure_dirt empty_dirt_params
+                  (ty2, ExEffTypes.fresh_dirt ()) ))
+  | ExEffTypes.TyBasic _ -> NoEff.NCoerRefl
+
+and computation_coercion_from_impure_dirt empty_dirt_params (ty1, drt) =
+  let noeff_coer = value_coercion_from_impure_dirt empty_dirt_params ty1 in
+  match drt with
+  | _ when is_empty_dirt drt -> noeff_coer
+  | { effect_set; row = ParamRow p }
+    when ExEffTypes.DirtParamSet.mem p empty_dirt_params
+         && EffectSet.is_empty effect_set ->
+      NoEff.NCoerUnsafe noeff_coer
+  | _ ->
+      assert (
+        not
+          (is_empty_dirt
+             (Substitution.apply_substitutions_to_dirt
+                (Substitution.empty_dirt_substitution empty_dirt_params)
+                drt)));
+      NoEff.NCoerComp noeff_coer
+
+and value_coercion_to_impure_dirt empty_dirt_params ty =
+  match ty with
+  | ExEffTypes.TyParam (_, _) -> NoEff.NCoerRefl
+  | ExEffTypes.Apply (_, _) -> NoEff.NCoerRefl
+  | ExEffTypes.Arrow (ty1, drty2) ->
+      NoEff.NCoerArrow
+        ( value_coercion_from_impure_dirt empty_dirt_params ty1,
+          computation_coercion_to_impure_dirt empty_dirt_params drty2 )
+  | ExEffTypes.Tuple tys ->
+      NoEff.NCoerTuple
+        (List.map (value_coercion_to_impure_dirt empty_dirt_params) tys)
+  | ExEffTypes.Handler ((ty1, drt1), (ty2, drt2)) -> (
+      if is_empty_dirt drt1 then
+        NoEff.NCoerArrow
+          ( value_coercion_from_impure_dirt empty_dirt_params ty1,
+            computation_coercion_to_impure_dirt empty_dirt_params (ty2, drt2) )
+      else
+        match drt1.row with
+        | ParamRow d ->
+            if
+              ExEffTypes.DirtParamSet.mem d empty_dirt_params
+              && ExEffTypes.EffectSet.is_empty drt1.effect_set
+            then
+              let coer1 =
+                value_coercion_from_impure_dirt empty_dirt_params ty1
+              in
+              let coer2 = value_coercion_to_impure_dirt empty_dirt_params ty2 in
+              if
+                is_empty_dirt
+                  (Substitution.apply_substitutions_to_dirt
+                     (Substitution.empty_dirt_substitution empty_dirt_params)
+                     drt2)
+              then NoEff.NCoerFunToHand (coer1, NoEff.NCoerReturn coer2)
+              else NoEff.NCoerFunToHand (coer1, NoEff.NCoerComp coer2)
+            else
+              NoEff.NCoerHandler
+                ( computation_coercion_from_impure_dirt empty_dirt_params
+                    (ty1, drt1),
+                  computation_coercion_to_impure_dirt empty_dirt_params
+                    (ty2, ExEffTypes.fresh_dirt ()) )
+        | EmptyRow ->
+            NoEff.NCoerHandler
+              ( computation_coercion_from_impure_dirt empty_dirt_params
+                  (ty1, drt1),
+                computation_coercion_to_impure_dirt empty_dirt_params
+                  (ty2, ExEffTypes.fresh_dirt ()) ))
+  | ExEffTypes.TyBasic _ -> NoEff.NCoerRefl
+
+and computation_coercion_to_impure_dirt empty_dirt_params (ty1, drt) =
+  let noeff_coer = value_coercion_to_impure_dirt empty_dirt_params ty1 in
+  match drt with
+  | _ when is_empty_dirt drt -> noeff_coer
+  | { effect_set; row = ParamRow p }
+    when ExEffTypes.DirtParamSet.mem p empty_dirt_params
+         && EffectSet.is_empty effect_set ->
+      NoEff.NCoerReturn noeff_coer
+  | _ ->
+      assert (
+        not
+          (is_empty_dirt
+             (Substitution.apply_substitutions_to_dirt
+                (Substitution.empty_dirt_substitution empty_dirt_params)
+                drt)));
+      NoEff.NCoerComp noeff_coer
+
 let rec elab_pattern state p =
   match p.term with
   | PVar x -> PNVar x.term
@@ -124,11 +254,26 @@ let rec elab_pattern state p =
   | PVariant (l, Some p) -> NoEff.PNVariant (l, Some (elab_pattern state p))
   | PNonbinding -> PNNonbinding
 
-let rec elab_expression (state : state) exp = elab_expression' state exp.term
+let rec elab_expression (state : state) exp = elab_expression' state exp
 
 and elab_expression' state exp =
-  match exp with
-  | ExEff.Var x -> NoEff.NVar x.variable.term
+  match exp.term with
+  | ExEff.Var x ->
+      let empty_dirt_params =
+        x.dirts
+        |> List.filter (fun (_, drt) -> is_empty_dirt drt)
+        |> List.fold_left
+             (fun empty_dirt_params (param, _) ->
+               Type.DirtParamSet.add param empty_dirt_params)
+             Type.DirtParamSet.empty
+      in
+      NoEff.NCast
+        ( NoEff.NVar
+            {
+              variable = x.variable.term;
+              coercions = List.map (elab_ty_coercion state) x.ty_coercions;
+            },
+          value_coercion_from_impure_dirt empty_dirt_params exp.ty )
   | ExEff.Const c -> NoEff.NConst c
   | ExEff.Tuple vs -> NoEff.NTuple (List.map (elab_expression state) vs)
   | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty state abs)
@@ -154,7 +299,7 @@ and elab_expression' state exp =
                     NReturn
                       (subs_var_in_term x
                          (NCast
-                            ( NVar x,
+                            ( NVar { variable = x; coercions = [] },
                               NoEff.NCoerArrow
                                 ( NoEff.NCoerRefl,
                                   NoEff.NCoerUnsafe NoEff.NCoerRefl ) ))
