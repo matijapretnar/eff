@@ -413,7 +413,9 @@ and elab_computation' state c _is_empty =
       NoEff.NCast (coelab, elabc)
 
 and elab_rec_definitions state defs =
-  Assoc.kmap (fun (x, abs) -> (x.term, elab_abstraction state abs)) defs
+  Assoc.kmap
+    (fun (x, (ws, abs)) -> (x.term, (ws, elab_abstraction state abs)))
+    defs
 
 let rec elab_source_ty = function
   | Language.Type.Apply (name, ts) ->

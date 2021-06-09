@@ -608,7 +608,7 @@ and tcLetRecNoGen state defs (c2 : Untyped.computation) : tcCompOutput' =
   let trgC2, cs2 = tcComp state' c2 in
 
   (* 5: Combine the results *)
-  let outExpr = Term.LetRec (defs', trgC2) in
+  let outExpr = Term.LetRec (Assoc.map (fun abs -> ([], abs)) defs', trgC2) in
 
   let outCs = cs1 @ cs2 in
   ((outExpr, trgC2.ty), outCs)
@@ -795,28 +795,32 @@ let generalize ty cnstrs =
   let free_ty_params = Type.free_params_ty ty
   and free_cnstrs_params = Constraint.free_params_resolved cnstrs in
   let free_params = Type.FreeParams.union free_ty_params free_cnstrs_params in
-  Type.
-    {
-      monotype = ty;
-      skeleton_params = SkelParamSet.elements free_params.skel_params;
-      ty_params =
-        List.map
-          (fun (t, skels) ->
-            match skels with
-            | [] -> assert false
-            | skel :: skels ->
-                assert (List.for_all (( = ) skel) skels);
-                (t, skel))
-          (TyParamMap.bindings free_params.ty_params);
-      dirt_params = DirtParamSet.elements free_params.dirt_params;
-      ty_constraints =
-        List.map
-          (fun (_, t1, t2, skel) ->
-            (TyParam (t1, SkelParam skel), TyParam (t2, SkelParam skel)))
-          cnstrs.ty_constraints;
-      dirt_constraints =
-        List.map (fun (_, ct_drt) -> ct_drt) cnstrs.dirt_constraints;
-    }
+  let ty_cnstrs_params =
+    List.map (fun (w, _, _, _) -> w) cnstrs.ty_constraints
+  in
+  ( ty_cnstrs_params,
+    Type.
+      {
+        monotype = ty;
+        skeleton_params = SkelParamSet.elements free_params.skel_params;
+        ty_params =
+          List.map
+            (fun (t, skels) ->
+              match skels with
+              | [] -> assert false
+              | skel :: skels ->
+                  assert (List.for_all (( = ) skel) skels);
+                  (t, skel))
+            (TyParamMap.bindings free_params.ty_params);
+        dirt_params = DirtParamSet.elements free_params.dirt_params;
+        ty_constraints =
+          List.map
+            (fun (_, t1, t2, skel) ->
+              (TyParam (t1, SkelParam skel), TyParam (t2, SkelParam skel)))
+            cnstrs.ty_constraints;
+        dirt_constraints =
+          List.map (fun (_, ct_drt) -> ct_drt) cnstrs.dirt_constraints;
+      } )
 
 let infer_computation state comp =
   let comp', cnstrs = tcComp state comp in
@@ -831,7 +835,8 @@ let infer_expression state expr =
 let infer_rec_abstraction state defs =
   let defs', cnstrs = infer_let_rec state defs in
   let sub, residuals = Unification.solve cnstrs in
-  (Substitution.apply_sub_definitions sub defs', residuals)
+  ( Assoc.map (Substitution.apply_substitutions_to_abstraction sub) defs',
+    residuals )
 
 (* Typecheck a top-level expression *)
 let process_computation state comp =
@@ -852,17 +857,17 @@ let process_computation state comp =
 (* Typecheck a top-level expression *)
 let process_expression state expr =
   let expr, residuals = infer_expression state expr in
-  let ty_scheme = generalize expr.ty residuals in
-  (expr, ty_scheme)
+  let coercion_params, ty_scheme = generalize expr.ty residuals in
+  (coercion_params, expr, ty_scheme)
 
 let process_top_let state defs =
   let fold (p, c) (state', defs) =
     match (p.it, c.it) with
     | Language.UntypedSyntax.PVar x, Language.UntypedSyntax.Value v ->
-        let e', ty_scheme = process_expression state v in
+        let coercion_params, e', ty_scheme = process_expression state v in
         let x' = Term.variable x ty_scheme in
         let state'' = extend_poly_var state' x ty_scheme in
-        (state'', (x', e') :: defs)
+        (state'', (x', (coercion_params, e')) :: defs)
     | _ -> failwith __LOC__
   in
   let state', defs' = List.fold_right fold defs (state, []) in
@@ -870,6 +875,7 @@ let process_top_let state defs =
 
 let process_top_let_rec state defs =
   let defs, residuals = infer_rec_abstraction state (Assoc.to_list defs) in
+  let defs = Assoc.map (fun abs -> ([], abs)) defs in
   (* Print.debug "TERM: %t" (Term.print_abstraction abs); *)
   (* Print.debug "TYPE: %t" (Type.print_abs_ty abs.ty); *)
   (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
@@ -882,7 +888,7 @@ let process_top_let_rec state defs =
   (* assert (Type.FreeParams.is_empty (Term.free_params_abstraction mono_abs)); *)
   let state' =
     Assoc.fold_left
-      (fun state (f, abs) -> extend_var state f.term (Type.Arrow abs.ty))
+      (fun state (f, (_ws, abs)) -> extend_var state f.term (Type.Arrow abs.ty))
       state mono_defs
   in
   (state', mono_defs)

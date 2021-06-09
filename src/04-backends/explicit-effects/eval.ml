@@ -92,7 +92,7 @@ and extend_let_rec state defs =
   let state' = ref state in
   let state =
     Assoc.fold_right
-      (fun (f, a) state ->
+      (fun (f, (_ws, a)) state ->
         let p, c = a.term in
         let g = V.Closure (fun v -> ceval (extend p v !state') c) in
         update f.term g state)

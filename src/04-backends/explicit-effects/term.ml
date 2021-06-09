@@ -96,7 +96,8 @@ and effect_clauses = {
 and abstraction = (pattern * computation, Type.ty * Type.dirty) typed
 (** Abstractions that take one argument. *)
 
-and rec_definitions = (variable, abstraction) Assoc.t
+and rec_definitions =
+  (variable, Type.TyCoercionParam.t list * abstraction) Assoc.t
 
 and abstraction2 =
   (pattern * pattern * computation, Type.ty * Type.ty * Type.dirty) typed
@@ -345,7 +346,7 @@ and print_abstraction2 { term = p1, p2, c; _ } ppf =
 and print_let_abstraction { term = p, c; _ } ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
 
-and print_let_rec_abstraction (f, abs) ppf =
+and print_let_rec_abstraction (f, (_ws, abs)) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)
     (Type.print_ty (Type.Arrow abs.ty))
     (print_let_abstraction abs)
@@ -423,7 +424,7 @@ and refresh_computation' sbst = function
           (fun (x', abs) -> (x', abs))
           (List.combine new_xs
              (List.map
-                (fun (_, abs) -> refresh_abstraction sbst' abs)
+                (fun (_, (ws, abs)) -> (ws, refresh_abstraction sbst' abs))
                 (Assoc.to_list li)))
       in
       LetRec (Assoc.of_list li', refresh_computation sbst' c1)
@@ -486,7 +487,10 @@ and subst_comp' sbst = function
   | LetVal (e1, abs) ->
       (* XXX Should we check that x does not appear in sbst? *)
       LetVal (subst_expr sbst e1, subst_abs sbst abs)
-  | LetRec (li, c1) -> LetRec (Assoc.map (subst_abs sbst) li, subst_comp sbst c1)
+  | LetRec (li, c1) ->
+      LetRec
+        ( Assoc.map (fun (ws, abs) -> (ws, subst_abs sbst abs)) li,
+          subst_comp sbst c1 )
   | Match (e, li) -> Match (subst_expr sbst e, List.map (subst_abs sbst) li)
   | Apply (e1, e2) -> Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) -> Handle (subst_expr sbst e, subst_comp sbst c)
@@ -581,7 +585,7 @@ let rec free_vars_comp c =
   | LetRec (li, c1) ->
       let xs, vars =
         List.fold_right
-          (fun (x, abs) (xs, vars) ->
+          (fun (x, (_ws, abs)) (xs, vars) ->
             (x.term :: xs, free_vars_abs abs @@@ vars))
           (Assoc.to_list li)
           ([], free_vars_comp c1)
@@ -714,5 +718,5 @@ and free_params_abstraction' (_, c) = free_params_computation c
 
 and free_params_definitions defs =
   Type.FreeParams.union_map
-    (fun (_, abs) -> free_params_abstraction abs)
+    (fun (_, (_, abs)) -> free_params_abstraction abs)
     (Assoc.to_list defs)

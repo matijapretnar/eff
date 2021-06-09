@@ -152,10 +152,26 @@ let rec pp_coercion ?max_level coer ppf =
         (pp_tuple pp_coercion cs)
   | NCoerApply (_t, _cs) -> print "ApplyCoercion"
 
+let pp_lets keyword pp_let_def lst ppf =
+  let pp_and_let let_def ppf =
+    print ppf "@[<hv 2>and %t@]" (pp_let_def let_def)
+  in
+  match lst with
+  | [] -> ()
+  | let_def :: tl ->
+      print ppf "@[<hv 2>%s %t@] @,%t" keyword (pp_let_def let_def)
+        (pp_sequence " " pp_and_let tl)
+
+let pp_coercion_vars ws = Print.sequence " " Type.TyCoercionParam.print ws
+
 let rec pp_term ?max_level state noEff_term ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match noEff_term with
-  | NVar v -> print "%t" (pp_variable state v.variable)
+  | NVar v when v.coercions = [] -> print "%t" (pp_variable state v.variable)
+  | NVar v ->
+      print ~at_level:1 "%t %t"
+        (pp_variable state v.variable)
+        (Print.sequence " " (pp_coercion ~max_level:0) v.coercions)
   | NConst c -> print "%t" (Const.print c)
   | NTuple ts -> print "%t" (pp_tuple (pp_term state ~max_level:1) ts)
   | NRecord rcd -> print "%t" (pp_record (pp_term state) "=" rcd)
@@ -247,16 +263,19 @@ and pp_abs_with_ty state (p, ty, t) ppf =
     (pp_term state t)
 
 and pp_let_rec state lst ppf =
-  let pp_var_ty_abs (v, (p, t)) ppf =
-    print ppf "@[<hv 2>and %t %t = @, %t@]" (pp_variable state v)
+  let pp_let_rec_def (x, (ws, (p, t))) ppf =
+    assert (ws = []);
+    print ppf "%t %t = @,%t" (pp_variable state x) (pp_pattern state p)
+      (pp_term state t)
+  in
+  pp_lets "let rec" pp_let_rec_def (Assoc.to_list lst) ppf
+
+and pp_top_let_rec state lst ppf =
+  let pp_top_let_rec_def (x, (ws, (p, t))) ppf =
+    print ppf "%t %t %t = @,%t" (pp_variable state x) (pp_coercion_vars ws)
       (pp_pattern state p) (pp_term state t)
   in
-  match Assoc.to_list lst with
-  | [] -> ()
-  | (v, (p, t)) :: tl ->
-      print ppf "@[<hv 2>let rec %t %t = @, %t@] @,%t" (pp_variable state v)
-        (pp_pattern state p) (pp_term state t)
-        (pp_sequence " " pp_var_ty_abs tl)
+  pp_lets "let rec" pp_top_let_rec_def lst ppf
 
 and pp_effect_cls state eff_cls ppf =
   let pp_effect_abs2 (eff, (pat1, pat2, t)) ppf =
@@ -279,16 +298,9 @@ let pp_def_effect (eff, (ty1, ty2)) ppf =
     (CoreTypes.Effect.print eff)
     (pp_type ty1) (pp_type ty2)
 
-let pp_lets state lst ppf =
-  let pp_one_let (p, t) ppf =
-    print ppf "@[<hv 2>and %t = @,%t@]" (pp_variable state p) (pp_term state t)
-  in
-  match lst with
-  | [] -> ()
-  | (p, t) :: tl ->
-      print ppf "@[<hv 2>let %t = @,%t@] @,%t" (pp_variable state p)
-        (pp_term state t)
-        (pp_sequence " " pp_one_let tl)
+let pp_let_def state (p, (ws, t)) ppf =
+  print ppf "%t %t = @,%t" (pp_variable state p) (pp_coercion_vars ws)
+    (pp_term state t)
 
 let pp_external state name symbol_name ppf =
   print ppf "let %t = ( %s )@.;;" (pp_variable state name) symbol_name
@@ -322,7 +334,7 @@ let pp_cmd state cmd ppf =
   | DefEffect e -> pp_def_effect e ppf
   | TopLet defs ->
       print ppf "%t@.;; let %t = %t@.;;"
-        (pp_lets state (Assoc.to_list defs))
+        (pp_lets "let" (pp_let_def state) (Assoc.to_list defs))
         (Print.sequence ","
            (fun (f, _) -> pp_variable state ~safe:false f)
            (Assoc.to_list defs))
@@ -330,7 +342,8 @@ let pp_cmd state cmd ppf =
            (fun (f, _) -> pp_variable state f)
            (Assoc.to_list defs))
   | TopLetRec defs ->
-      print ppf "%t@.;; let %t = %t@.;;" (pp_let_rec state defs)
+      print ppf "%t@.;; let %t = %t@.;;"
+        (pp_top_let_rec state (Assoc.to_list defs))
         (Print.sequence ","
            (fun (f, _) -> pp_variable state ~safe:false f)
            (Assoc.to_list defs))

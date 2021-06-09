@@ -14,7 +14,9 @@ module type ExplicitBackend = sig
   val process_def_effect : state -> Term.effect -> state
 
   val process_top_let :
-    state -> (Term.poly_variable, Term.expression) Assoc.t -> state
+    state ->
+    (Term.poly_variable, Type.TyCoercionParam.t list * Term.expression) Assoc.t ->
+    state
 
   val process_top_let_rec : state -> Term.rec_definitions -> state
 
@@ -165,7 +167,7 @@ module Evaluate : Language.BackendSignature.T = Make (struct
   let process_top_let state defs =
     match Assoc.to_list defs with
     | [] -> state
-    | [ ((x : Term.poly_variable), exp) ] ->
+    | [ ((x : Term.poly_variable), (_ws, exp)) ] ->
         let v = Eval.eval_expression state.evaluation_state exp in
         Format.fprintf !Config.output_formatter "@[%t : %t = %t@]@."
           (Language.CoreTypes.Variable.print x.term)
@@ -175,7 +177,7 @@ module Evaluate : Language.BackendSignature.T = Make (struct
 
   let process_top_let_rec state defs =
     Assoc.iter
-      (fun (f, abs) ->
+      (fun (f, (_ws, abs)) ->
         Format.fprintf !Config.output_formatter "@[%t : %t = <fun>@]@."
           (Language.CoreTypes.Variable.print f.term)
           (Type.print_ty (Type.Arrow abs.ty)))
@@ -271,11 +273,13 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   let process_top_let state defs =
     let defs' =
       Assoc.kmap
-        (fun (x, e) ->
+        (fun (x, (ws, e)) ->
           Print.debug "%t" (Term.print_expression e);
           ( x.term,
-            optimize_term state
-            @@ TranslateExEff2NoEff.elab_expression translate_exeff_config e ))
+            ( ws,
+              optimize_term state
+              @@ TranslateExEff2NoEff.elab_expression translate_exeff_config e
+            ) ))
         defs
     in
     { state with prog = SyntaxNoEff.TopLet defs' :: state.prog }

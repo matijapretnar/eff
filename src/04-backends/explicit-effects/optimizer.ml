@@ -16,7 +16,9 @@ type optimization_config = {
 
 type state = {
   declared_functions :
-    (Language.CoreTypes.Variable.t, Term.abstraction) Assoc.t;
+    ( Language.CoreTypes.Variable.t,
+      Type.TyCoercionParam.t list * Term.abstraction )
+    Assoc.t;
   fuel : int;
   (* Cache of already specialized functions *)
   specialized_functions :
@@ -84,7 +86,7 @@ let keep_used_bindings defs cmp =
   (* Do proper call graph analysis *)
   let free_vars_cmp = Term.free_vars_comp cmp in
   let free_vars_defs =
-    List.map (fun (_, a) -> Term.free_vars_abs a) (Assoc.to_list defs)
+    List.map (fun (_, (_ws, a)) -> Term.free_vars_abs a) (Assoc.to_list defs)
   in
   let free_vars = Term.concat_vars (free_vars_cmp :: free_vars_defs) in
   List.filter
@@ -221,7 +223,7 @@ and optimize_abstraction2' state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)
 
 and optimize_rec_definitions state defs =
-  Assoc.map (optimize_abstraction state) defs
+  Assoc.map (fun (ws, abs) -> (ws, optimize_abstraction state abs)) defs
 
 and cast_expression state exp coer =
   match (exp.term, coer.term) with
@@ -415,7 +417,7 @@ and reduce_computation' state comp =
       Print.debug "Drty_in: %t" (Type.print_dirty drty_in);
       let unspecialized_declared_functions =
         List.filter
-          (fun (f, { ty = _, drty_out; _ }) ->
+          (fun (f, (_ws, { ty = _, drty_out; _ })) ->
             Print.debug "Drty_out: %t :~: %t"
               (Language.CoreTypes.Variable.print f)
               (Type.print_dirty drty_out);
@@ -425,7 +427,7 @@ and reduce_computation' state comp =
           (Assoc.to_list state.declared_functions)
       in
       let attempt_specialization ret_clause_kinds =
-        let add_specialized specialized (f, abs) =
+        let add_specialized specialized (f, (_ws, abs)) =
           let f' = Language.CoreTypes.Variable.refresh f in
           let ret_clause_kind =
             match Assoc.lookup f ret_clause_kinds with
@@ -455,10 +457,10 @@ and reduce_computation' state comp =
         (* TODO: specialize only functions that are used, not just all with matching types *)
         let spec_rec_defs =
           List.map
-            (fun (f, ({ term = pat, cmp; _ } as abs)) ->
+            (fun (f, (ws, ({ term = pat, cmp; _ } as abs))) ->
               match Assoc.lookup (fingerprint, f) specialized_functions' with
               | Some (f', FixedReturnClause _) ->
-                  (f', handle_abstraction state' hnd abs)
+                  (f', (ws, handle_abstraction state' hnd abs))
               | Some (f', VaryingReturnClause) -> (
                   match f'.ty with
                   | Type.Arrow
@@ -481,7 +483,7 @@ and reduce_computation' state comp =
                       let abs' =
                         Term.abstraction (Term.pTuple [ pat; k_pat ], cmp)
                       in
-                      (f', handle_abstraction state' hnd' abs')
+                      (f', (ws, handle_abstraction state' hnd' abs'))
                   | _ -> assert false)
               | _ -> assert false)
             unspecialized_declared_functions
@@ -500,7 +502,7 @@ and reduce_computation' state comp =
       let state', spec_rec_defs =
         find_best_specializations
           (Assoc.map_of_list
-             (fun (f, _) -> (f, FixedReturnClause hnd.term.value_clause))
+             (fun (f, (_ws, _)) -> (f, FixedReturnClause hnd.term.value_clause))
              unspecialized_declared_functions)
       in
       Print.debug "Len: %d" (List.length spec_rec_defs);
@@ -538,12 +540,14 @@ let process_computation state comp =
 
 let process_top_let state defs =
   if !Config.enable_optimization then
-    let defs' = Assoc.map (optimize_expression state) defs in
+    let defs' =
+      Assoc.map (fun (ws, e) -> (ws, optimize_expression state e)) defs
+    in
     let state' =
       Assoc.fold_left
-        (fun state (f, e) ->
+        (fun state (f, (ws, e)) ->
           match e.term with
-          | Term.Lambda abs -> add_function state f abs
+          | Term.Lambda abs -> add_function state f (ws, abs)
           | _ -> state)
         state defs'
     in
