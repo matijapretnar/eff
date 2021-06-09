@@ -1,6 +1,0 @@
-type (_, _) eff_internal_effect += Op1 : (int, int) eff_internal_effect
-
-type (_, _) eff_internal_effect += Op2 : (int, int) eff_internal_effect
-
-;;
-1

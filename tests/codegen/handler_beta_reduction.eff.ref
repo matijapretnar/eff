@@ -1,4 +1,0 @@
-type (_, _) eff_internal_effect += Eff : (int, int) eff_internal_effect
-
-;;
-1 + 3 + 2 + 4

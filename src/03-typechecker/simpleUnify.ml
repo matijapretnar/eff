@@ -36,6 +36,11 @@ let solve cstr type_context =
         | Type.Inline t -> unify loc t2 t subst
         | Type.Sum _ | Type.Record _ ->
             assert false (* None of these are transparent *))
+    | Type.Apply (p1, _l1), Type.Apply (p2, _l2) when p1 <> p2 ->
+        let t1, t2 = Type.beautify2 t1 t2 in
+        Error.typing ~loc
+          "This expression has type %t but it should have type %t."
+          (Type.print t1) (Type.print t2)
     | t1, (Type.Apply _ as t2) -> unify loc t2 t1 subst
     | Type.Handler h1, Type.Handler h2 ->
         subst

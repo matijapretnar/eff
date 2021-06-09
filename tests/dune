@@ -1,3 +1,4 @@
-(executable
- (name generate_dune_rules)
- (modules generate_dune_rules))
+(cram
+ (deps
+  ../eff.exe
+  (source_tree .)))
