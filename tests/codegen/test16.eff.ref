@@ -1,9 +1,0 @@
-type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
-
-type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
-
-;;
-let rec _loop_85 _x_66 (_x_0 : int) =
-  if 0 < _x_66 then _loop_85 (_x_66 - 1) (_x_0 + 1) else ()
-in
-_loop_85 10 0

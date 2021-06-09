@@ -1,6 +1,0 @@
-type integer = int
-
-type (_, _) eff_internal_effect += Op : (unit, int) eff_internal_effect
-
-;;
-fun (_y_43 : int) -> Call (Op, (), fun (_y_49 : int) -> Value (_y_49 + _y_43))

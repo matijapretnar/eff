@@ -1,4 +1,0 @@
-type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
-
-;;
-Call (Print, "hello\n", fun (_y_47 : unit) -> Value (match _y_47 with _ -> 42))

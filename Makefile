@@ -14,13 +14,9 @@ clean:
 	dune clean
 .PHONY: clean
 
-test: generate_tests
+test: default
 	dune runtest
 .PHONY: test
-
-generate_tests: 
-	dune build @generate_tests --auto-promote
-.PHONY: generate_tests 
 
 generate_benchmarks: 
 	dune build @generate_benchmarks --auto-promote

@@ -1,5 +1,0 @@
-type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
-
-;;
-let _l_53 (_y_64 : bool) = if _y_64 then 10 else 20 in
-_l_53 true + _l_53 false

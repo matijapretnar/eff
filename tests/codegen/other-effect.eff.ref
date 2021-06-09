@@ -1,5 +1,0 @@
-type (_, _) eff_internal_effect += WriteInt : (int, unit) eff_internal_effect
-
-;;
-let rec _f_67 _x_58 = _x_58 + if _x_58 = 0 then 0 else _f_67 (_x_58 - 1) in
-_f_67 10

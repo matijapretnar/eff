@@ -1,3 +1,0 @@
-let _decide_func_42 (_bl_43 : bool) = if _bl_43 then 10 else 20
-
-let decide_func = _decide_func_42

@@ -1,9 +1,0 @@
-type (_, _) eff_internal_effect += Ping : (unit, unit) eff_internal_effect
-
-let _test_simple_42 (_x_43 : float) = ((), 1)
-
-let test_simple = _test_simple_42
-
-let _test_simple2_60 (() : unit) = ()
-
-let test_simple2 = _test_simple2_60

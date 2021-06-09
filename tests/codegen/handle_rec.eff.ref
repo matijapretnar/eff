@@ -1,9 +1,0 @@
-type (_, _) eff_internal_effect += Eff : (unit, unit) eff_internal_effect
-
-;;
-let rec _f_65 _x_55 = if _x_55 = 0 then 1 else _f_65 (_x_55 - 1) * 2 in
-_f_65 5
-
-;;
-let rec _g_70 _x_81 = if _x_81 = 0 then 1 else _g_70 (_x_81 - 1) in
-_g_70 5

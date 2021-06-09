@@ -1,3 +1,0 @@
-val h : 'a => 'a = <handler>
-val g : 'a => 'a = <handler>
-Runtime error: invalid comparison with <
