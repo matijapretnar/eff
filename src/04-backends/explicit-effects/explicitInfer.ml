@@ -791,36 +791,37 @@ let monomorphize free_ty_params cnstrs =
   assert (Constraint.unresolve residuals = []);
   sub
 
-let generalize ty cnstrs =
-  let free_ty_params = Type.free_params_ty ty
-  and free_cnstrs_params = Constraint.free_params_resolved cnstrs in
-  let free_params = Type.FreeParams.union free_ty_params free_cnstrs_params in
+let generalize free_params cnstrs =
+  let free_cnstrs_params = Constraint.free_params_resolved cnstrs in
+  let free_params = Type.FreeParams.union free_params free_cnstrs_params in
   let ty_cnstrs_params =
     List.map (fun (w, _, _, _) -> w) cnstrs.ty_constraints
   in
-  ( ty_cnstrs_params,
-    Type.
-      {
-        monotype = ty;
-        skeleton_params = SkelParamSet.elements free_params.skel_params;
-        ty_params =
-          List.map
-            (fun (t, skels) ->
-              match skels with
-              | [] -> assert false
-              | skel :: skels ->
-                  assert (List.for_all (( = ) skel) skels);
-                  (t, skel))
-            (TyParamMap.bindings free_params.ty_params);
-        dirt_params = DirtParamSet.elements free_params.dirt_params;
-        ty_constraints =
-          List.map
-            (fun (_, t1, t2, skel) ->
-              (TyParam (t1, SkelParam skel), TyParam (t2, SkelParam skel)))
-            cnstrs.ty_constraints;
-        dirt_constraints =
-          List.map (fun (_, ct_drt) -> ct_drt) cnstrs.dirt_constraints;
-      } )
+  fun ty ->
+    assert (Type.FreeParams.subset (Type.free_params_ty ty) free_params);
+    ( ty_cnstrs_params,
+      Type.
+        {
+          monotype = ty;
+          skeleton_params = SkelParamSet.elements free_params.skel_params;
+          ty_params =
+            List.map
+              (fun (t, skels) ->
+                match skels with
+                | [] -> assert false
+                | skel :: skels ->
+                    assert (List.for_all (( = ) skel) skels);
+                    (t, skel))
+              (TyParamMap.bindings free_params.ty_params);
+          dirt_params = DirtParamSet.elements free_params.dirt_params;
+          ty_constraints =
+            List.map
+              (fun (_, t1, t2, skel) ->
+                (TyParam (t1, SkelParam skel), TyParam (t2, SkelParam skel)))
+              cnstrs.ty_constraints;
+          dirt_constraints =
+            List.map (fun (_, ct_drt) -> ct_drt) cnstrs.dirt_constraints;
+        } )
 
 let infer_computation state comp =
   let comp', cnstrs = tcComp state comp in
@@ -857,7 +858,8 @@ let process_computation state comp =
 (* Typecheck a top-level expression *)
 let process_expression state expr =
   let expr, residuals = infer_expression state expr in
-  let coercion_params, ty_scheme = generalize expr.ty residuals in
+  let free_params = Type.free_params_ty expr.ty in
+  let coercion_params, ty_scheme = generalize free_params residuals expr.ty in
   (coercion_params, expr, ty_scheme)
 
 let process_top_let state defs =
@@ -875,15 +877,47 @@ let process_top_let state defs =
 
 let process_top_let_rec state defs =
   let defs, residuals = infer_rec_abstraction state (Assoc.to_list defs) in
+  let free_params =
+    Term.free_params_definitions (Assoc.map (fun def -> ([], def)) defs)
+  in
   let state', defs' =
     Assoc.fold_right
       (fun (f, abs) (state, defs) ->
-        let ws, ty_scheme = generalize (Type.Arrow abs.ty) residuals in
+        let ws, ty_scheme =
+          generalize free_params residuals (Type.Arrow abs.ty)
+        in
         let state' = extend_poly_var state f.term ty_scheme in
         (state', (f, (ws, abs)) :: defs))
       defs (state, [])
   in
-  (state', Assoc.of_list defs')
+  let subst =
+    List.map
+      (fun (f, (ws, _)) ->
+        ( f,
+          {
+            term =
+              Term.Var
+                {
+                  variable = f;
+                  ty_coercions =
+                    List.map
+                      (fun p ->
+                        Constraint.tyCoercionVar p (Type.Tuple [], Type.Tuple []))
+                      ws;
+                  dirts = [];
+                  skeletons = [];
+                  tys = [];
+                  dirt_coercions = [];
+                };
+            ty = f.ty;
+          } ))
+      defs'
+    |> Assoc.of_list
+  in
+  let defs'' =
+    List.map (fun (f, (ws, abs)) -> (f, (ws, Term.subst_abs subst abs))) defs'
+  in
+  (state', Assoc.of_list defs'')
 
 let add_type_definitions state tydefs =
   {

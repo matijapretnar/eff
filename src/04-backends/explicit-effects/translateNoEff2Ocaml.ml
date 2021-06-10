@@ -105,9 +105,14 @@ let rec pp_pattern state pat ppf =
       print ppf "%t as %t" (pp_pattern state p) (pp_variable state v)
   | PNTuple pats -> print ppf "%t" (pp_tuple (pp_pattern state) pats)
   | PNRecord rcd -> print ppf "%t" (pp_record (pp_pattern state) "=" rcd)
-  | PNVariant (l, None) -> print ppf "%t" (pp_label l)
-  | PNVariant (l, Some p) ->
-      print ppf "%t (@[<hov>%t@])" (pp_label l) (pp_pattern state p)
+  | PNVariant (lbl, None) when lbl = CoreTypes.nil -> print ppf "[]"
+  | PNVariant (lbl, None) -> print ppf "%t" (CoreTypes.Label.print lbl)
+  | PNVariant (lbl, Some (PNTuple [ v1; v2 ])) when lbl = CoreTypes.cons ->
+      print ppf "(%t :: %t)" (pp_pattern state v1) (pp_pattern state v2)
+  | PNVariant (lbl, Some p) ->
+      print ppf "(%t @[<hov>%t@])"
+        (CoreTypes.Label.print lbl)
+        (pp_pattern state p)
   | PNConst c -> print ppf "%t" (Const.print c)
   | PNNonbinding -> print ppf "_"
 
@@ -150,7 +155,9 @@ let rec pp_coercion ?max_level coer ppf =
   | NCoerTuple cs ->
       print ~at_level:1 "coer_tuple_%d %t" (List.length cs)
         (pp_tuple pp_coercion cs)
-  | NCoerApply (_t, _cs) -> print "ApplyCoercion"
+  | NCoerApply (t, cs) ->
+      print ~at_level:1 "coer_%t %t" (CoreTypes.TyName.print t)
+        (Print.sequence " " (pp_coercion ~max_level:0) cs)
 
 let pp_lets keyword pp_let_def lst ppf =
   let pp_and_let let_def ppf =
@@ -176,10 +183,11 @@ let rec pp_term ?max_level state noEff_term ppf =
   | NConst c -> print "%t" (Const.print c)
   | NTuple ts -> print "%t" (pp_tuple (pp_term state ~max_level:1) ts)
   | NRecord rcd -> print "%t" (pp_record (pp_term state) "=" rcd)
-  | NVariant (l, Some (NTuple [ hd; tl ])) when l = CoreTypes.cons ->
-      print ~at_level:1 "@[<hov>(%t::%t)@]"
-        (pp_term state ~max_level:0 hd)
-        (pp_term state ~max_level:0 tl)
+  (* Note that t is not necessarily a pair, it can be coerced *)
+  | NVariant (l, Some t) when l = CoreTypes.cons ->
+      print ~at_level:1 "@[<hov>(fun (x, xs) -> (x :: xs)) (%t)@]"
+        (pp_term state ~max_level:0 t)
+  | NVariant (l, None) when l = CoreTypes.nil -> print "[]"
   | NVariant (l, None) -> print "%t" (pp_label l)
   | NVariant (l, Some t1) ->
       print ~at_level:1 "%t @[<hov>%t@]" (pp_label l)
