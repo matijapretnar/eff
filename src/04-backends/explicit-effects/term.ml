@@ -7,11 +7,9 @@ module Const = Language.Const
 module EffectMap = Map.Make (CoreTypes.Effect)
 module VariableMap = Map.Make (CoreTypes.Variable)
 
-type variable = (CoreTypes.Variable.t, Type.ty) typed
+type variable = CoreTypes.Variable.t
 
 type poly_variable = (CoreTypes.Variable.t, Type.ty_scheme) typed
-
-let variable x ty = { term = x; ty }
 
 module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
 
@@ -30,15 +28,15 @@ and pattern' =
   | PConst of Language.Const.t
   | PNonbinding
 
-let pVar p = { term = PVar p; ty = p.ty }
+let pVar p ty = { term = PVar p; ty }
 
 let pTuple ps =
   { term = PTuple ps; ty = Type.Tuple (List.map (fun x -> x.ty) ps) }
 
 let rec pattern_vars pat =
   match pat.term with
-  | PVar x -> [ x.term ]
-  | PAs (p, x) -> x.term :: pattern_vars p
+  | PVar x -> [ x ]
+  | PAs (p, x) -> x :: pattern_vars p
   | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
   | PRecord lst -> Assoc.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
   | PVariant (_, None) -> []
@@ -53,8 +51,8 @@ and expression' =
   | Var of {
       variable : variable;
       skeletons : Type.skeleton list;
-      dirts : (Type.DirtParam.t * Type.dirt) list;
       tys : Type.ty list;
+      dirts : (Type.DirtParam.t * Type.dirt) list;
       ty_coercions : Constraint.ty_coercion list;
       dirt_coercions : Constraint.dirt_coercion list;
     }
@@ -96,14 +94,13 @@ and effect_clauses = {
 and abstraction = (pattern * computation, Type.ty * Type.dirty) typed
 (** Abstractions that take one argument. *)
 
-and rec_definitions =
-  (variable, Type.TyCoercionParam.t list * abstraction) Assoc.t
+and rec_definitions = (variable, Type.parameters * abstraction) Assoc.t
 
 and abstraction2 =
   (pattern * pattern * computation, Type.ty * Type.ty * Type.dirty) typed
 (** Abstractions that take two arguments. *)
 
-let mono_var x =
+let mono_var x ty =
   {
     term =
       Var
@@ -115,19 +112,37 @@ let mono_var x =
           ty_coercions = [];
           dirt_coercions = [];
         };
-    ty = x.ty;
+    ty;
   }
 
-let poly_var x skeletons tys dirts ty_coercions dirt_coercions =
+let poly_var x skeletons tys dirts ty_coercions dirt_coercions ty =
   {
     term =
       Var { variable = x; skeletons; tys; dirts; ty_coercions; dirt_coercions };
-    ty = x.ty;
+    ty;
   }
 
+let poly_var_with_parameters x parameters ty =
+  let skeletons =
+    List.map (fun p -> Type.SkelParam p) parameters.Type.skeleton_params
+  and tys =
+    List.map (fun (p, skel) -> Type.TyParam (p, skel)) parameters.Type.ty_params
+  and dirts =
+    List.map (fun p -> (p, Type.no_effect_dirt p)) parameters.Type.dirt_params
+  and ty_coercions =
+    List.map
+      (fun (p, ct) -> Constraint.tyCoercionVar p ct)
+      parameters.Type.ty_constraints
+  and dirt_coercions =
+    List.map
+      (fun (p, dt) -> Constraint.dirtCoercionVar p dt)
+      parameters.Type.dirt_constraints
+  in
+  poly_var x skeletons tys dirts ty_coercions dirt_coercions ty
+
 let fresh_variable x ty =
-  let x' = { term = CoreTypes.Variable.fresh x; ty } in
-  (pVar x', mono_var x')
+  let x' = CoreTypes.Variable.fresh x in
+  (pVar x' ty, mono_var x' ty)
 
 let const (c : Language.Const.t) : expression =
   { term = Const c; ty = Type.TyBasic (Const.infer_ty c) }
@@ -245,7 +260,7 @@ let abstraction2 (p1, p2, c) : abstraction2 =
 let print_effect (eff, _) ppf =
   Print.print ppf "%t" (CoreTypes.Effect.print eff)
 
-let print_variable x = CoreTypes.Variable.print ~safe:true x.term
+let print_variable x = CoreTypes.Variable.print ~safe:true x
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -351,7 +366,7 @@ and print_let_rec_abstraction (f, (_ws, abs)) ppf =
     (Type.print_ty (Type.Arrow abs.ty))
     (print_let_abstraction abs)
 
-let refresh_variable x = { x with term = CoreTypes.Variable.refresh x.term }
+let refresh_variable x = CoreTypes.Variable.refresh x
 
 let rec refresh_pattern sbst pat =
   let sbst', pat' = refresh_pattern' sbst pat.term in
@@ -586,7 +601,7 @@ let rec free_vars_comp c =
       let xs, vars =
         List.fold_right
           (fun (x, (_ws, abs)) (xs, vars) ->
-            (x.term :: xs, free_vars_abs abs @@@ vars))
+            (x :: xs, free_vars_abs abs @@@ vars))
           (Assoc.to_list li)
           ([], free_vars_comp c1)
       in
@@ -601,7 +616,7 @@ let rec free_vars_comp c =
 
 and free_vars_expr e =
   match e.term with
-  | Var v -> VariableMap.singleton v.variable.term 1
+  | Var v -> VariableMap.singleton v.variable 1
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs a
   | Handler h -> free_vars_handler h

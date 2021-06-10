@@ -16,14 +16,12 @@ type optimization_config = {
 
 type state = {
   declared_functions :
-    ( Language.CoreTypes.Variable.t,
-      Type.TyCoercionParam.t list * Term.abstraction )
-    Assoc.t;
+    (Language.CoreTypes.Variable.t, Type.parameters * Term.abstraction) Assoc.t;
   fuel : int;
   (* Cache of already specialized functions *)
   specialized_functions :
     ( Term.EffectFingerprint.t * Language.CoreTypes.Variable.t,
-      Term.variable * return_clause_kind )
+      Term.variable * Type.ty * return_clause_kind )
     Assoc.t;
   config : optimization_config;
 }
@@ -43,7 +41,7 @@ let reduce_if_fuel reduce_term state term =
 let add_function state x abs =
   {
     state with
-    declared_functions = Assoc.update x.term abs state.declared_functions;
+    declared_functions = Assoc.update x abs state.declared_functions;
   }
 
 (* Optimization functions *)
@@ -63,7 +61,7 @@ let abstraction_inlinability { term = pat, cmp; _ } =
   | Term.PVar v
     when Term.CoreTypes.Variable.fold
            (fun v _ -> String.length v >= 3 && String.sub v 0 3 = "___")
-           v.term ->
+           v ->
       NotInlinable
   | _ ->
       let free_vars_cmp = Term.free_vars_comp cmp in
@@ -90,7 +88,7 @@ let keep_used_bindings defs cmp =
   in
   let free_vars = Term.concat_vars (free_vars_cmp :: free_vars_defs) in
   List.filter
-    (fun (x, _) -> not (Term.does_not_occur x.term free_vars))
+    (fun (x, _) -> not (Term.does_not_occur x free_vars))
     (Assoc.to_list defs)
 
 let rec extract_cast_value comp =
@@ -210,9 +208,8 @@ and optimize_abstraction' state (pat, cmp) =
   let cmp' = optimize_computation state cmp in
   match (pat.term, cmp'.term) with
   | Term.PVar v, Term.Match ({ term = Var v'; _ }, [ abs ])
-  | Term.PVar v, Term.LetVal ({ term = Term.Var v'; _ }, abs)
-    when v.term = v'.variable.term
-         && Term.does_not_occur v.term (Term.free_vars_abs abs) ->
+  | Term.PVar v, Term.LetVal ({ term = Var v'; _ }, abs)
+    when v = v'.variable && Term.does_not_occur v (Term.free_vars_abs abs) ->
       abs.term
   | _ -> (pat, cmp')
 
@@ -274,21 +271,22 @@ and handle_computation state hnd comp =
   | Term.Apply ({ term = Var { variable = f; _ }; _ }, exp)
     when Option.is_some
            (Assoc.lookup
-              (hnd.term.Term.effect_clauses.fingerprint, f.term)
+              (hnd.term.Term.effect_clauses.fingerprint, f)
               state.specialized_functions)
          && state.config.specialize_functions -> (
       let value_clause = hnd.term.Term.value_clause in
       match
         Assoc.lookup
-          (hnd.term.Term.effect_clauses.fingerprint, f.term)
+          (hnd.term.Term.effect_clauses.fingerprint, f)
           state.specialized_functions
       with
-      | Some (f', FixedReturnClause value_clause') ->
-          if value_clause = value_clause' then Term.apply (Term.mono_var f', exp)
-          else raise (ReturnClauseNotFixed f.term)
-      | Some (f', VaryingReturnClause) ->
+      | Some (f', ty, FixedReturnClause value_clause') ->
+          if value_clause = value_clause' then
+            Term.apply (Term.mono_var f' ty, exp)
+          else raise (ReturnClauseNotFixed f)
+      | Some (f', ty, VaryingReturnClause) ->
           Term.apply
-            ( Term.mono_var f',
+            ( Term.mono_var f' ty,
               Term.tuple [ exp; Term.lambda hnd.term.Term.value_clause ] )
       | None -> assert false)
   | _ when not state.config.handler_reductions ->
@@ -443,9 +441,7 @@ and reduce_computation' state comp =
                   (Type.Tuple [ ty_arg; Type.Arrow (ty_in, drty_out) ], drty_out)
           in
 
-          Assoc.update (fingerprint, f)
-            (Term.variable f' ty', ret_clause_kind)
-            specialized
+          Assoc.update (fingerprint, f) (f', ty', ret_clause_kind) specialized
         in
         let specialized_functions' =
           List.fold_left add_specialized state.specialized_functions
@@ -459,10 +455,10 @@ and reduce_computation' state comp =
           List.map
             (fun (f, (ws, ({ term = pat, cmp; _ } as abs))) ->
               match Assoc.lookup (fingerprint, f) specialized_functions' with
-              | Some (f', FixedReturnClause _) ->
+              | Some (f', _ty, FixedReturnClause _) ->
                   (f', (ws, handle_abstraction state' hnd abs))
-              | Some (f', VaryingReturnClause) -> (
-                  match f'.ty with
+              | Some (f', ty, VaryingReturnClause) -> (
+                  match ty with
                   | Type.Arrow
                       (Type.Tuple [ _; (Type.Arrow (ty_in, _) as ty_cont) ], _)
                     ->

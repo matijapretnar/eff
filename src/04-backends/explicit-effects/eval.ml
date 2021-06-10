@@ -10,17 +10,17 @@ let initial_state = RuntimeEnv.empty
 
 let update x = RuntimeEnv.add x
 
-let lookup x state = RuntimeEnv.find_opt x.term state
+let lookup x state = RuntimeEnv.find_opt x state
 
 exception PatternMatch of Location.t
 
 let rec extend_value p v state =
   match (p.term, v) with
-  | Term.PVar x, v -> update x.term v state
+  | Term.PVar x, v -> update x v state
   (* | Term.PAnnotated (p, _t), v -> extend_value p v state *)
   | Term.PAs (p, x), v ->
       let state = extend_value p v state in
-      update x.term v state
+      update x v state
   | Term.PNonbinding, _ -> state
   | Term.PTuple ps, V.Tuple vs -> List.fold_right2 extend_value ps vs state
   | Term.PRecord ps, V.Record vs -> (
@@ -95,7 +95,7 @@ and extend_let_rec state defs =
       (fun (f, (_ws, a)) state ->
         let p, c = a.term in
         let g = V.Closure (fun v -> ceval (extend p v !state') c) in
-        update f.term g state)
+        update f g state)
       defs state
   in
   state' := state;
@@ -108,7 +108,7 @@ and veval state e =
       | Some v -> v
       | None ->
           Error.runtime "Name %t is not defined."
-            (CoreTypes.Variable.print x.variable.term))
+            (CoreTypes.Variable.print x.variable))
   | Term.Const c -> V.Const c
   (* | Term.Annotated (t, _ty) -> veval state t *)
   | Term.Tuple es -> V.Tuple (List.map (veval state) es)

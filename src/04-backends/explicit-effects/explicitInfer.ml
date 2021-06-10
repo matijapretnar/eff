@@ -190,9 +190,7 @@ let rec check_pattern state ty (pat : Untyped.pattern) : Term.pattern * state =
 
 and check_pattern' state ty pat =
   match pat.it with
-  | Untyped.PVar x ->
-      let x' = { term = x; ty } in
-      (Term.PVar x', extend_var state x'.term ty)
+  | Untyped.PVar x -> (Term.PVar x, extend_var state x ty)
   | Untyped.PAnnotated (p, ty') when Type.source_to_target state.tydefs ty' = ty
     ->
       let p', state = check_pattern state ty p in
@@ -232,8 +230,7 @@ and infer_pattern' state pat =
   match pat.it with
   | Untyped.PVar x ->
       let alpha = Constraint.fresh_ty_with_fresh_skel () in
-      let x = Term.variable x alpha in
-      (Term.PVar x, alpha, extend_var state x.term alpha, [])
+      (Term.PVar x, alpha, extend_var state x alpha, [])
   | Untyped.PAnnotated (p, ty) ->
       let ty' = Type.source_to_target state.tydefs ty in
       let p', state' = check_pattern state ty' p in
@@ -574,17 +571,13 @@ and infer_let_rec state defs =
       (fun (x, abs) ->
         let alpha = Constraint.fresh_ty_with_fresh_skel () in
         let betadelta = Constraint.fresh_dirty_with_fresh_skel () in
-        ( Term.variable x (Type.Arrow (alpha, betadelta)),
-          abs,
-          alpha,
-          betadelta,
-          [] ))
+        (x, abs, alpha, betadelta, []))
       defs
   in
   let state' =
     List.fold_left
       (fun state (x, _, alpha, betadelta, _) ->
-        extend_var state x.term (Type.Arrow (alpha, betadelta)))
+        extend_var state x (Type.Arrow (alpha, betadelta)))
       state defs'
   in
   let defs'', cnstrs =
@@ -601,14 +594,17 @@ and tcLetRecNoGen state defs (c2 : Untyped.computation) : tcCompOutput' =
   let defs', cs1 = infer_let_rec state defs in
   let state' =
     List.fold_left
-      (fun state (x, abs) -> extend_var state x.term (Type.Arrow abs.ty))
+      (fun state (x, abs) -> extend_var state x (Type.Arrow abs.ty))
       state (Assoc.to_list defs')
   in
   (* 3: Typecheck c2 *)
   let trgC2, cs2 = tcComp state' c2 in
 
   (* 5: Combine the results *)
-  let outExpr = Term.LetRec (Assoc.map (fun abs -> ([], abs)) defs', trgC2) in
+  let outExpr =
+    Term.LetRec
+      (Assoc.map (fun abs -> (Type.empty_parameters, abs)) defs', trgC2)
+  in
 
   let outCs = cs1 @ cs2 in
   ((outExpr, trgC2.ty), outCs)
@@ -794,34 +790,35 @@ let monomorphize free_ty_params cnstrs =
 let generalize free_params cnstrs =
   let free_cnstrs_params = Constraint.free_params_resolved cnstrs in
   let free_params = Type.FreeParams.union free_params free_cnstrs_params in
-  let ty_cnstrs_params =
-    List.map (fun (w, _, _, _) -> w) cnstrs.ty_constraints
+  let skeleton_params = Type.SkelParamSet.elements free_params.skel_params
+  and ty_params =
+    List.map
+      (fun (t, skels) ->
+        match skels with
+        | [] -> assert false
+        | skel :: skels ->
+            Print.debug "%t"
+              (Print.sequence "," Type.print_skeleton (skel :: skels));
+            (* assert (List.for_all (( = ) skel) skels); *)
+            (t, skel))
+      (Type.TyParamMap.bindings free_params.ty_params)
+  and dirt_params = Type.DirtParamSet.elements free_params.dirt_params
+  and ty_constraints =
+    List.map
+      (fun (w, t1, t2, skel) ->
+        ( w,
+          (Type.TyParam (t1, SkelParam skel), Type.TyParam (t2, SkelParam skel))
+        ))
+      cnstrs.ty_constraints
   in
-  fun ty ->
-    assert (Type.FreeParams.subset (Type.free_params_ty ty) free_params);
-    ( ty_cnstrs_params,
-      Type.
-        {
-          monotype = ty;
-          skeleton_params = SkelParamSet.elements free_params.skel_params;
-          ty_params =
-            List.map
-              (fun (t, skels) ->
-                match skels with
-                | [] -> assert false
-                | skel :: skels ->
-                    assert (List.for_all (( = ) skel) skels);
-                    (t, skel))
-              (TyParamMap.bindings free_params.ty_params);
-          dirt_params = DirtParamSet.elements free_params.dirt_params;
-          ty_constraints =
-            List.map
-              (fun (_, t1, t2, skel) ->
-                (TyParam (t1, SkelParam skel), TyParam (t2, SkelParam skel)))
-              cnstrs.ty_constraints;
-          dirt_constraints =
-            List.map (fun (_, ct_drt) -> ct_drt) cnstrs.dirt_constraints;
-        } )
+  Type.
+    {
+      skeleton_params;
+      ty_params;
+      dirt_params;
+      ty_constraints;
+      dirt_constraints = cnstrs.dirt_constraints;
+    }
 
 let infer_computation state comp =
   let comp', cnstrs = tcComp state comp in
@@ -855,21 +852,16 @@ let process_computation state comp =
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
   mono_comp
 
-(* Typecheck a top-level expression *)
-let process_expression state expr =
-  let expr, residuals = infer_expression state expr in
-  let free_params = Type.free_params_ty expr.ty in
-  let coercion_params, ty_scheme = generalize free_params residuals expr.ty in
-  (coercion_params, expr, ty_scheme)
-
 let process_top_let state defs =
   let fold (p, c) (state', defs) =
     match (p.it, c.it) with
     | Language.UntypedSyntax.PVar x, Language.UntypedSyntax.Value v ->
-        let coercion_params, e', ty_scheme = process_expression state v in
-        let x' = Term.variable x ty_scheme in
+        let expr, residuals = infer_expression state v in
+        let free_params = Type.free_params_ty expr.ty in
+        let parameters = generalize free_params residuals in
+        let ty_scheme = { Type.parameters; monotype = expr.ty } in
         let state'' = extend_poly_var state' x ty_scheme in
-        (state'', (x', (coercion_params, e')) :: defs)
+        (state'', (x, (parameters, expr)) :: defs)
     | _ -> failwith __LOC__
   in
   let state', defs' = List.fold_right fold defs (state, []) in
@@ -878,39 +870,22 @@ let process_top_let state defs =
 let process_top_let_rec state defs =
   let defs, residuals = infer_rec_abstraction state (Assoc.to_list defs) in
   let free_params =
-    Term.free_params_definitions (Assoc.map (fun def -> ([], def)) defs)
+    Term.free_params_definitions
+      (Assoc.map (fun def -> (Type.empty_parameters, def)) defs)
   in
   let state', defs' =
     Assoc.fold_right
       (fun (f, abs) (state, defs) ->
-        let ws, ty_scheme =
-          generalize free_params residuals (Type.Arrow abs.ty)
-        in
-        let state' = extend_poly_var state f.term ty_scheme in
-        (state', (f, (ws, abs)) :: defs))
+        let parameters = generalize free_params residuals in
+        let ty_scheme = { Type.parameters; monotype = Type.Arrow abs.ty } in
+        let state' = extend_poly_var state f ty_scheme in
+        (state', (f, (parameters, abs)) :: defs))
       defs (state, [])
   in
   let subst =
     List.map
-      (fun (f, (ws, _)) ->
-        ( f,
-          {
-            term =
-              Term.Var
-                {
-                  variable = f;
-                  ty_coercions =
-                    List.map
-                      (fun p ->
-                        Constraint.tyCoercionVar p (Type.Tuple [], Type.Tuple []))
-                      ws;
-                  dirts = [];
-                  skeletons = [];
-                  tys = [];
-                  dirt_coercions = [];
-                };
-            ty = f.ty;
-          } ))
+      (fun (f, (ws, abs)) ->
+        (f, Term.poly_var_with_parameters f ws (Type.Arrow abs.ty)))
       defs'
     |> Assoc.of_list
   in

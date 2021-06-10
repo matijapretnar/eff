@@ -14,9 +14,7 @@ module type ExplicitBackend = sig
   val process_def_effect : state -> Term.effect -> state
 
   val process_top_let :
-    state ->
-    (Term.poly_variable, Type.TyCoercionParam.t list * Term.expression) Assoc.t ->
-    state
+    state -> (Term.variable, Type.parameters * Term.expression) Assoc.t -> state
 
   val process_top_let_rec : state -> Term.rec_definitions -> state
 
@@ -119,9 +117,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
     let type_system_state' =
       ExplicitInfer.extend_var state.type_system_state x ty
     in
-    let backend_state' =
-      ExBackend.load_primitive state.backend_state (Term.variable x ty) prim
-    in
+    let backend_state' = ExBackend.load_primitive state.backend_state x prim in
     {
       state with
       type_system_state = type_system_state';
@@ -167,19 +163,19 @@ module Evaluate : Language.BackendSignature.T = Make (struct
   let process_top_let state defs =
     match Assoc.to_list defs with
     | [] -> state
-    | [ ((x : Term.poly_variable), (_ws, exp)) ] ->
+    | [ (x, (_ws, exp)) ] ->
         let v = Eval.eval_expression state.evaluation_state exp in
         Format.fprintf !Config.output_formatter "@[%t : %t = %t@]@."
-          (Language.CoreTypes.Variable.print x.term)
+          (Language.CoreTypes.Variable.print x)
           (Type.print_ty exp.ty) (V.print_value v);
-        { evaluation_state = Eval.update x.term v state.evaluation_state }
+        { evaluation_state = Eval.update x v state.evaluation_state }
     | _ -> failwith __LOC__
 
   let process_top_let_rec state defs =
     Assoc.iter
       (fun (f, (_ws, abs)) ->
         Format.fprintf !Config.output_formatter "@[%t : %t = <fun>@]@."
-          (Language.CoreTypes.Variable.print f.term)
+          (Language.CoreTypes.Variable.print f)
           (Type.print_ty (Type.Arrow abs.ty)))
       defs;
     { evaluation_state = Eval.extend_let_rec state.evaluation_state defs }
@@ -275,8 +271,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
       Assoc.kmap
         (fun (x, (ws, e)) ->
           Print.debug "%t" (Term.print_expression e);
-          ( x.term,
-            ( ws,
+          ( x,
+            ( List.map fst ws.Type.ty_constraints,
               optimize_term state
               @@ TranslateExEff2NoEff.elab_expression translate_exeff_config e
             ) ))
@@ -292,7 +288,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     { state with prog = SyntaxNoEff.TopLetRec defs' :: state.prog }
 
   let load_primitive state x prim =
-    { state with primitives = Assoc.update x.term prim state.primitives }
+    { state with primitives = Assoc.update x prim state.primitives }
 
   let process_tydef state tydefs =
     let converter (ty_params, tydef) =

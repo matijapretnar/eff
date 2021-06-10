@@ -245,8 +245,8 @@ and computation_coercion_to_impure_dirt empty_dirt_params (ty1, drt) =
 
 let rec elab_pattern state p =
   match p.term with
-  | PVar x -> PNVar x.term
-  | PAs (p, x) -> PNAs (elab_pattern state p, x.term)
+  | PVar x -> PNVar x
+  | PAs (p, x) -> PNAs (elab_pattern state p, x)
   | PTuple ps -> PNTuple (List.map (elab_pattern state) ps)
   | PConst c -> PNConst c
   | PRecord recs -> NoEff.PNRecord (Assoc.map (elab_pattern state) recs)
@@ -270,7 +270,7 @@ and elab_expression' state exp =
       NoEff.NCast
         ( NoEff.NVar
             {
-              variable = x.variable.term;
+              variable = x.variable;
               coercions = List.map (elab_ty_coercion state) x.ty_coercions;
             },
           value_coercion_from_impure_dirt empty_dirt_params exp.ty )
@@ -292,7 +292,7 @@ and elab_expression' state exp =
             let elab2 = elab_ty state ty2 in
             let elabcomp = elab_computation state comp in
             match p2.term with
-            | PVar { term = x; _ } ->
+            | PVar x ->
                 ( (eff, (elab1, elab2)),
                   ( elab_pattern state p1,
                     elab_pattern state p2,
@@ -414,7 +414,8 @@ and elab_computation' state c _is_empty =
 
 and elab_rec_definitions state defs =
   Assoc.kmap
-    (fun (x, (ws, abs)) -> (x.term, (ws, elab_abstraction state abs)))
+    (fun (x, (ws, abs)) ->
+      (x, (List.map fst ws.ty_constraints, elab_abstraction state abs)))
     defs
 
 let rec elab_source_ty = function
