@@ -201,16 +201,6 @@ and print_abs_ty (ty1, drty2) ppf =
 (*                       PREDICATES ON ty                             *)
 (* ************************************************************************* *)
 
-(* Check if a target type is a monotype. That is, no universal quantification
- * and no qualified constraints, at the top-level or in nested positions. *)
-let rec isMonoTy : ty -> bool = function
-  | TyParam _ -> true
-  | Apply (_, tys) -> List.for_all isMonoTy tys
-  | Arrow (ty1, (ty2, _)) -> isMonoTy ty1 && isMonoTy ty2
-  | Tuple tys -> List.for_all isMonoTy tys
-  | Handler ((ty1, _), (ty2, _)) -> isMonoTy ty1 && isMonoTy ty2
-  | TyBasic _ -> true
-
 let rec equal_ty type1 type2 =
   match (type1, type2) with
   | TyParam (tv1, _skel1), TyParam (tv2, _skel2) -> tv1 = tv2
@@ -227,19 +217,10 @@ let rec equal_ty type1 type2 =
   | TyBasic ptya, TyBasic ptyb -> ptya = ptyb
   | _ -> false
 
-(*       Error.typing ~loc:Location.unknown "%t <> %t" (print_ty ty1)
-        (print_ty ty2)
- *)
 and equal_dirty (ty1, d1) (ty2, d2) = equal_ty ty1 ty2 && equal_dirt d1 d2
 
 and equal_dirt d1 d2 =
   EffectSet.equal d1.effect_set d2.effect_set && d1.row = d2.row
-
-and equal_ty_constraint (ty1, ty2) (ty3, ty4) =
-  equal_ty ty1 ty3 && equal_ty ty2 ty4
-
-and equal_dirt_constraint (d1, d2) (d3, d4) =
-  equal_dirt d1 d3 && equal_dirt d2 d4
 
 let no_effect_dirt dirt_param =
   { effect_set = EffectSet.empty; row = ParamRow dirt_param }
@@ -316,7 +297,6 @@ let rec free_params_skeleton = function
       FreeParams.union (free_params_skeleton sk1) (free_params_skeleton sk2)
   | SkelTuple sks -> FreeParams.union_map free_params_skeleton sks
 
-(* Compute the free variables of a target value type *)
 let rec free_params_ty = function
   | TyParam (p, skel) ->
       FreeParams.union
@@ -330,27 +310,21 @@ let rec free_params_ty = function
   | TyBasic _prim_ty -> FreeParams.empty
   | Apply (_, vtys) -> FreeParams.union_map free_params_ty vtys
 
-(* Compute the free dirt variables of a target computation type *)
 and free_params_dirty (ty, dirt) =
   FreeParams.union (free_params_ty ty) (free_params_dirt dirt)
 
-(* Compute the free dirt variables of a target computation type *)
 and free_params_abstraction_ty (ty_in, drty_out) =
   FreeParams.union (free_params_ty ty_in) (free_params_dirty drty_out)
 
-(* Compute the free dirt variables of a value type inequality *)
 and free_params_ct_ty (vty1, vty2) =
   FreeParams.union (free_params_ty vty1) (free_params_ty vty2)
 
-(* Compute the free dirt variables of a computation type inequality *)
 and free_params_ct_dirty (cty1, cty2) =
   FreeParams.union (free_params_dirty cty1) (free_params_dirty cty2)
 
-(* Compute the free dirt variables of a dirt inequality *)
 and free_params_ct_dirt (dirt1, dirt2) =
   FreeParams.union (free_params_dirt dirt1) (free_params_dirt dirt2)
 
-(* Compute the free dirt variables of a dirt *)
 and free_params_dirt (dirt : dirt) =
   match dirt.row with
   | ParamRow p -> FreeParams.dirt_singleton p
@@ -377,6 +351,30 @@ module Renaming = struct
     }
 end
 
+let parameters_renaming parameters : Renaming.t =
+  {
+    skel_params =
+      parameters.skeleton_params
+      |> List.map (fun p -> (p, SkelParam.refresh p))
+      |> List.to_seq |> SkelParamMap.of_seq;
+    ty_params =
+      parameters.ty_params
+      |> List.map (fun (p, _skel) -> (p, Language.CoreTypes.TyParam.refresh p))
+      |> List.to_seq |> TyParamMap.of_seq;
+    dirt_params =
+      parameters.dirt_params
+      |> List.map (fun p -> (p, DirtParam.refresh p))
+      |> List.to_seq |> DirtParamMap.of_seq;
+    ty_coercion_params =
+      parameters.ty_constraints
+      |> List.map (fun (p, _) -> (p, TyCoercionParam.refresh p))
+      |> List.to_seq |> TyCoercionParamMap.of_seq;
+    dirt_coercion_params =
+      parameters.dirt_constraints
+      |> List.map (fun (p, _) -> (p, DirtCoercionParam.refresh p))
+      |> List.to_seq |> DirtCoercionParamMap.of_seq;
+  }
+
 let rec rename_skeleton (sbst : Renaming.t) = function
   | SkelParam p ->
       SkelParam
@@ -390,7 +388,6 @@ let rec rename_skeleton (sbst : Renaming.t) = function
       SkelHandler (rename_skeleton sbst sk1, rename_skeleton sbst sk2)
   | SkelTuple sks -> SkelTuple (List.map (rename_skeleton sbst) sks)
 
-(* Compute the free variables of a target value type *)
 let rec rename_ty (sbst : Renaming.t) = function
   | TyParam (p, skel) ->
       TyParam
@@ -403,25 +400,19 @@ let rec rename_ty (sbst : Renaming.t) = function
   | TyBasic _ as ty -> ty
   | Apply (ty_name, vtys) -> Apply (ty_name, List.map (rename_ty sbst) vtys)
 
-(* Compute the free dirt variables of a target computation type *)
 and rename_dirty sbst (ty, dirt) = (rename_ty sbst ty, rename_dirt sbst dirt)
 
-(* Compute the free dirt variables of a target computation type *)
 and rename_abstraction_ty sbst (ty_in, drty_out) =
   (rename_ty sbst ty_in, rename_dirty sbst drty_out)
 
-(* Compute the free dirt variables of a value type inequality *)
 and rename_ct_ty sbst (vty1, vty2) = (rename_ty sbst vty1, rename_ty sbst vty2)
 
-(* Compute the free dirt variables of a computation type inequality *)
 and rename_ct_dirty sbst (cty1, cty2) =
   (rename_dirty sbst cty1, rename_dirty sbst cty2)
 
-(* Compute the free dirt variables of a dirt inequality *)
 and rename_ct_dirt sbst (dirt1, dirt2) =
   (rename_dirt sbst dirt1, rename_dirt sbst dirt2)
 
-(* Compute the free dirt variables of a dirt *)
 and rename_dirt (sbst : Renaming.t) dirt =
   match dirt.row with
   | EmptyRow -> dirt
@@ -472,6 +463,10 @@ let rename_ty_scheme sbst ty_scheme =
     parameters = rename_parameters sbst ty_scheme.parameters;
     monotype = rename_ty sbst ty_scheme.monotype;
   }
+
+let refresh_ty_scheme ty_scheme =
+  let sbst = parameters_renaming ty_scheme.parameters in
+  rename_ty_scheme sbst ty_scheme
 
 (* ************************************************************************* *)
 
