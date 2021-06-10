@@ -39,6 +39,8 @@ module TyParamSet = Set.Make (CoreTypes.TyParam)
 module TyParamMap = Map.Make (CoreTypes.TyParam)
 module DirtParamSet = Set.Make (DirtParam)
 module DirtParamMap = Map.Make (DirtParam)
+module TyCoercionParamMap = Map.Make (TyCoercionParam)
+module DirtCoercionParamMap = Map.Make (DirtCoercionParam)
 
 type effect_set = EffectSet.t
 
@@ -72,24 +74,26 @@ and ct_dirt = dirt * dirt
 
 and ct_dirty = dirty * dirty
 
-type ty_scheme = {
+type parameters = {
   skeleton_params : SkelParam.t list;
   dirt_params : DirtParam.t list;
   ty_params : (CoreTypes.TyParam.t * skeleton) list;
-  ty_constraints : ct_ty list;
-  dirt_constraints : ct_dirt list;
-  monotype : ty;
+  ty_constraints : (TyCoercionParam.t * ct_ty) list;
+  dirt_constraints : (DirtCoercionParam.t * ct_dirt) list;
 }
 
-let monotype ty =
+let empty_parameters =
   {
     skeleton_params = [];
     dirt_params = [];
     ty_params = [];
     ty_constraints = [];
     dirt_constraints = [];
-    monotype = ty;
   }
+
+type ty_scheme = { parameters : parameters; monotype : ty }
+
+let monotype ty = { parameters = empty_parameters; monotype = ty }
 
 let type_const c = TyBasic (Const.infer_ty c)
 
@@ -359,6 +363,8 @@ module Renaming = struct
     ty_params : CoreTypes.TyParam.t TyParamMap.t;
     dirt_params : DirtParam.t DirtParamMap.t;
     skel_params : SkelParam.t SkelParamMap.t;
+    ty_coercion_params : TyCoercionParam.t TyCoercionParamMap.t;
+    dirt_coercion_params : DirtCoercionParam.t DirtCoercionParamMap.t;
   }
 
   let empty =
@@ -366,6 +372,8 @@ module Renaming = struct
       ty_params = TyParamMap.empty;
       dirt_params = DirtParamMap.empty;
       skel_params = SkelParamMap.empty;
+      ty_coercion_params = TyCoercionParamMap.empty;
+      dirt_coercion_params = DirtCoercionParamMap.empty;
     }
 end
 
@@ -424,6 +432,46 @@ and rename_dirt (sbst : Renaming.t) dirt =
           ParamRow
             (DirtParamMap.find_opt p sbst.dirt_params |> Option.value ~default:p);
       }
+
+let rename_parameters (sbst : Renaming.t) parameters =
+  {
+    skeleton_params =
+      List.map
+        (fun p ->
+          SkelParamMap.find_opt p sbst.skel_params |> Option.value ~default:p)
+        parameters.skeleton_params;
+    ty_params =
+      List.map
+        (fun (p, skel) ->
+          ( TyParamMap.find_opt p sbst.ty_params |> Option.value ~default:p,
+            rename_skeleton sbst skel ))
+        parameters.ty_params;
+    dirt_params =
+      List.map
+        (fun p ->
+          DirtParamMap.find_opt p sbst.dirt_params |> Option.value ~default:p)
+        parameters.dirt_params;
+    ty_constraints =
+      List.map
+        (fun (p, ct) ->
+          ( TyCoercionParamMap.find_opt p sbst.ty_coercion_params
+            |> Option.value ~default:p,
+            rename_ct_ty sbst ct ))
+        parameters.ty_constraints;
+    dirt_constraints =
+      List.map
+        (fun (p, dt) ->
+          ( DirtCoercionParamMap.find_opt p sbst.dirt_coercion_params
+            |> Option.value ~default:p,
+            rename_ct_dirt sbst dt ))
+        parameters.dirt_constraints;
+  }
+
+let rename_ty_scheme sbst ty_scheme =
+  {
+    parameters = rename_parameters sbst ty_scheme.parameters;
+    monotype = rename_ty sbst ty_scheme.monotype;
+  }
 
 (* ************************************************************************* *)
 
