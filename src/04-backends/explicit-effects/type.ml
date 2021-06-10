@@ -52,8 +52,10 @@ type skeleton =
   | SkelHandler of skeleton * skeleton
   | SkelTuple of skeleton list
 
-and ty =
-  | TyParam of CoreTypes.TyParam.t * skeleton
+type ty = (ty', skeleton) typed
+
+and ty' =
+  | TyParam of CoreTypes.TyParam.t
   | Apply of CoreTypes.TyName.t * ty list
   | Arrow of abs_ty
   | Tuple of ty list
@@ -73,6 +75,40 @@ and ct_ty = ty * ty
 and ct_dirt = dirt * dirt
 
 and ct_dirty = dirty * dirty
+
+let skeleton_of_ty ty = ty.ty
+
+let skeleton_of_dirty (ty, _) = skeleton_of_ty ty
+
+let tyParam t skel = { term = TyParam t; ty = skel }
+
+let arrow (ty1, drty2) =
+  {
+    term = Arrow (ty1, drty2);
+    ty = SkelArrow (skeleton_of_ty ty1, skeleton_of_dirty drty2);
+  }
+
+let apply (ty_name, tys) =
+  {
+    term = Apply (ty_name, tys);
+    ty = SkelApply (ty_name, List.map (fun ty -> skeleton_of_ty ty) tys);
+  }
+
+let tuple tup =
+  {
+    term = Tuple tup;
+    ty = SkelTuple (List.map (fun ty -> skeleton_of_ty ty) tup);
+  }
+
+let handler (drty1, drty2) =
+  {
+    term = Handler (drty1, drty2);
+    ty = SkelHandler (skeleton_of_dirty drty1, skeleton_of_dirty drty2);
+  }
+
+let tyBasic pt = { term = TyBasic pt; ty = SkelBasic pt }
+
+and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
 
 type parameters = {
   skeleton_params : SkelParam.t list;
@@ -95,31 +131,18 @@ type ty_scheme = { parameters : parameters; monotype : ty }
 
 let monotype ty = { parameters = empty_parameters; monotype = ty }
 
-let type_const c = TyBasic (Const.infer_ty c)
+let type_const c = tyBasic (Const.infer_ty c)
 
 let is_empty_dirt dirt =
   EffectSet.is_empty dirt.effect_set && dirt.row = EmptyRow
 
-let rec skeleton_of_ty tty =
-  match tty with
-  | TyParam (_, skel) -> skel
-  | Arrow (ty1, drty2) -> SkelArrow (skeleton_of_ty ty1, skeleton_of_dirty drty2)
-  | Apply (ty_name, tys) ->
-      SkelApply (ty_name, List.map (fun ty -> skeleton_of_ty ty) tys)
-  | Tuple tup -> SkelTuple (List.map (fun ty -> skeleton_of_ty ty) tup)
-  | Handler (drty1, drty2) ->
-      SkelHandler (skeleton_of_dirty drty1, skeleton_of_dirty drty2)
-  | TyBasic pt -> SkelBasic pt
-
-and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
-
 let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match ty with
-  | TyParam (p, skel) ->
+  match ty.term with
+  | TyParam p ->
       print ~at_level:4 "%t:%t"
         (CoreTypes.TyParam.print p)
-        (print_skeleton skel)
+        (print_skeleton ty.ty)
   | Arrow (t1, (t2, drt)) when is_empty_dirt drt ->
       print ~at_level:3 "%t → %t" (print_ty ~max_level:2 t1)
         (print_ty ~max_level:3 t2)
@@ -202,8 +225,8 @@ and print_abs_ty (ty1, drty2) ppf =
 (* ************************************************************************* *)
 
 let rec equal_ty type1 type2 =
-  match (type1, type2) with
-  | TyParam (tv1, _skel1), TyParam (tv2, _skel2) -> tv1 = tv2
+  match (type1.term, type2.term) with
+  | TyParam tv1, TyParam tv2 -> tv1 = tv2
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
       equal_ty ttya1 ttyb1 && equal_dirty dirtya1 dirtyb1
   | Tuple tys1, Tuple tys2 ->
@@ -297,11 +320,9 @@ let rec free_params_skeleton = function
       FreeParams.union (free_params_skeleton sk1) (free_params_skeleton sk2)
   | SkelTuple sks -> FreeParams.union_map free_params_skeleton sks
 
-let rec free_params_ty = function
-  | TyParam (p, skel) ->
-      FreeParams.union
-        (FreeParams.ty_singleton p skel)
-        (free_params_skeleton skel)
+let rec free_params_ty ty =
+  match ty.term with
+  | TyParam p -> FreeParams.ty_singleton p ty.ty
   | Arrow (vty, cty) ->
       FreeParams.union (free_params_ty vty) (free_params_dirty cty)
   | Tuple vtys -> FreeParams.union_map free_params_ty vtys
@@ -388,11 +409,12 @@ let rec rename_skeleton (sbst : Renaming.t) = function
       SkelHandler (rename_skeleton sbst sk1, rename_skeleton sbst sk2)
   | SkelTuple sks -> SkelTuple (List.map (rename_skeleton sbst) sks)
 
-let rec rename_ty (sbst : Renaming.t) = function
-  | TyParam (p, skel) ->
-      TyParam
-        ( TyParamMap.find_opt p sbst.ty_params |> Option.value ~default:p,
-          rename_skeleton sbst skel )
+let rec rename_ty (sbst : Renaming.t) ty =
+  { term = rename_ty' sbst ty.term; ty = rename_skeleton sbst ty.ty }
+
+and rename_ty' sbst = function
+  | TyParam p ->
+      TyParam (TyParamMap.find_opt p sbst.ty_params |> Option.value ~default:p)
   | Arrow (vty, cty) -> Arrow (rename_ty sbst vty, rename_dirty sbst cty)
   | Tuple vtys -> Tuple (List.map (rename_ty sbst) vtys)
   | Handler (cty1, cty2) ->
@@ -481,13 +503,13 @@ let rec source_to_target tctx_st ty =
       (* Other cases should not be transparent *)
       | LangType.Record _ | LangType.Sum _ -> assert false)
   | LangType.Apply (ty_name, args) ->
-      Apply (ty_name, List.map (source_to_target tctx_st) args)
-  | LangType.TyParam p -> TyParam (p, SkelParam (SkelParam.fresh ()))
-  | LangType.Basic s -> TyBasic s
-  | LangType.Tuple l -> Tuple (List.map (source_to_target tctx_st) l)
+      apply (ty_name, List.map (source_to_target tctx_st) args)
+  | LangType.TyParam p -> tyParam p (SkelParam (SkelParam.fresh ()))
+  | LangType.Basic s -> tyBasic s
+  | LangType.Tuple l -> tuple (List.map (source_to_target tctx_st) l)
   | LangType.Arrow (ty, dirty) ->
-      Arrow ((source_to_target tctx_st) ty, source_to_dirty tctx_st dirty)
+      arrow ((source_to_target tctx_st) ty, source_to_dirty tctx_st dirty)
   | LangType.Handler { LangType.value = dirty1; finally = dirty2 } ->
-      Handler (source_to_dirty tctx_st dirty1, source_to_dirty tctx_st dirty2)
+      handler (source_to_dirty tctx_st dirty1, source_to_dirty tctx_st dirty2)
 
 and source_to_dirty tctx_st ty = (source_to_target tctx_st ty, empty_dirt)

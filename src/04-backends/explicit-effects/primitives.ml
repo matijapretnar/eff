@@ -1,16 +1,16 @@
 open Type
 
-let pure_arrow t1 t2 = Type.Arrow (t1, pure_ty t2)
+let pure_arrow t1 t2 = Type.arrow (t1, pure_ty t2)
 
-let binary_op_ty t1 t2 ty = Type.Arrow (t1, pure_ty (pure_arrow t2 ty))
+let binary_op_ty t1 t2 ty = Type.arrow (t1, pure_ty (pure_arrow t2 ty))
 
-let int_ty = Type.TyBasic Const.IntegerTy
+let int_ty = Type.tyBasic Const.IntegerTy
 
-let float_ty = Type.TyBasic Const.FloatTy
+let float_ty = Type.tyBasic Const.FloatTy
 
-let bool_ty = Type.TyBasic Const.BooleanTy
+let bool_ty = Type.tyBasic Const.BooleanTy
 
-let string_ty = Type.TyBasic Const.StringTy
+let string_ty = Type.tyBasic Const.StringTy
 
 let unary_integer_op_ty = pure_arrow int_ty int_ty
 
