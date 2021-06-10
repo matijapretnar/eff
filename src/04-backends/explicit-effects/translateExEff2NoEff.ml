@@ -19,8 +19,8 @@ let typefail str =
   failwith message
 
 let rec elab_ty state (ty : ExEffTypes.ty) =
-  match ty with
-  | ExEffTypes.TyParam (x, _skel) -> NoEff.NTyParam x
+  match ty.term with
+  | ExEffTypes.TyParam x -> NoEff.NTyParam x
   | ExEffTypes.Apply (name, lst) ->
       NoEff.NTyApply (name, List.map (elab_ty state) lst)
   | ExEffTypes.Arrow (t, dirty) ->
@@ -114,8 +114,8 @@ and elab_dirty_coercion state { term = tcoer, dcoer; _ } =
   else failwith "Ill-typed bang coercion"
 
 let rec value_coercion_from_impure_dirt empty_dirt_params ty =
-  match ty with
-  | ExEffTypes.TyParam (_, _) -> NoEff.NCoerRefl
+  match ty.term with
+  | ExEffTypes.TyParam _ -> NoEff.NCoerRefl
   | ExEffTypes.Apply (_, _) -> NoEff.NCoerRefl
   | ExEffTypes.Arrow (ty1, drty2) ->
       NoEff.NCoerArrow
@@ -179,8 +179,8 @@ and computation_coercion_from_impure_dirt empty_dirt_params (ty1, drt) =
       NoEff.NCoerComp noeff_coer
 
 and value_coercion_to_impure_dirt empty_dirt_params ty =
-  match ty with
-  | ExEffTypes.TyParam (_, _) -> NoEff.NCoerRefl
+  match ty.term with
+  | ExEffTypes.TyParam _ -> NoEff.NCoerRefl
   | ExEffTypes.Apply (_, _) -> NoEff.NCoerRefl
   | ExEffTypes.Arrow (ty1, drty2) ->
       NoEff.NCoerArrow
@@ -380,7 +380,7 @@ and elab_computation' state c _is_empty =
       and elabc = elab_computation state comp
       and vtype = value.ty
       and velab = elab_expression state value in
-      match vtype with
+      match vtype.term with
       | ExEffTypes.Handler ((vty1, _vdirt1), (_vty2, vdirt2)) when ctype = vty1
         ->
           if Type.is_empty_dirt cdirt (* Handle - Case 1 *) then

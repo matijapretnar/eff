@@ -31,7 +31,7 @@ and pattern' =
 let pVar p ty = { term = PVar p; ty }
 
 let pTuple ps =
-  { term = PTuple ps; ty = Type.Tuple (List.map (fun x -> x.ty) ps) }
+  { term = PTuple ps; ty = Type.tuple (List.map (fun x -> x.ty) ps) }
 
 let rec pattern_vars pat =
   match pat.term with
@@ -126,7 +126,7 @@ let poly_var_with_parameters x parameters ty =
   let skeletons =
     List.map (fun p -> Type.SkelParam p) parameters.Type.skeleton_params
   and tys =
-    List.map (fun (p, skel) -> Type.TyParam (p, skel)) parameters.Type.ty_params
+    List.map (fun (p, skel) -> Type.tyParam p skel) parameters.Type.ty_params
   and dirts =
     List.map (fun p -> (p, Type.no_effect_dirt p)) parameters.Type.dirt_params
   and ty_coercions =
@@ -145,17 +145,17 @@ let fresh_variable x ty =
   (pVar x' ty, mono_var x' ty)
 
 let const (c : Language.Const.t) : expression =
-  { term = Const c; ty = Type.TyBasic (Const.infer_ty c) }
+  { term = Const c; ty = Type.tyBasic (Const.infer_ty c) }
 
 let tuple es =
-  { term = Tuple es; ty = Type.Tuple (List.map (fun e -> e.ty) es) }
+  { term = Tuple es; ty = Type.tuple (List.map (fun e -> e.ty) es) }
 
 let record (_ : (CoreTypes.Field.t, expression) Assoc.t) : expression =
   failwith __LOC__
 
 let variant (lbl, e) ty = { term = Variant (lbl, e); ty }
 
-let lambda abs = { term = Lambda abs; ty = Type.Arrow abs.ty }
+let lambda abs = { term = Lambda abs; ty = Type.arrow abs.ty }
 
 let handler_clauses (value_clause : abstraction) effect_part drt_in =
   (* TODO: Check that input dirt is either handled or covered in output dirt *)
@@ -165,7 +165,7 @@ let handler_clauses (value_clause : abstraction) effect_part drt_in =
   let check_effect_clause ((_eff, (ty1, ty2)), abs) =
     let pty1, pty2, drty = abs.ty in
     assert (Type.equal_ty ty1 pty1);
-    assert (Type.equal_ty (Type.Arrow (ty2, drty_out)) pty2);
+    assert (Type.equal_ty (Type.arrow (ty2, drty_out)) pty2);
     assert (Type.equal_dirty drty_out drty)
   in
   Assoc.iter check_effect_clause effect_part;
@@ -187,7 +187,7 @@ let handler_with_smaller_input_dirt hnd dcoer =
 
 let handler h =
   let drty1, drty2 = h.ty in
-  { term = Handler h; ty = Type.Handler (drty1, drty2) }
+  { term = Handler h; ty = Type.handler (drty1, drty2) }
 
 let castExp (exp, coer) =
   let ty1 = exp.ty and ty1', ty2 = coer.ty in
@@ -218,14 +218,14 @@ let letRec (defs, comp) = { term = LetRec (defs, comp); ty = comp.ty }
 let match_ (e, cases) drty = { term = Match (e, cases); ty = drty }
 
 let apply (exp1, exp2) =
-  match exp1.ty with
+  match exp1.ty.term with
   | Type.Arrow (ty1, drty2) ->
       assert (Type.equal_ty exp2.ty ty1);
       { term = Apply (exp1, exp2); ty = drty2 }
   | _ -> assert false
 
 let handle (exp, comp) =
-  match exp.ty with
+  match exp.ty.term with
   | Type.Handler (drty1, drty2) ->
       assert (Type.equal_dirty comp.ty drty1);
       { term = Handle (exp, comp); ty = drty2 }
@@ -363,7 +363,7 @@ and print_let_abstraction { term = p, c; _ } ppf =
 
 and print_let_rec_abstraction (f, (_ws, abs)) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)
-    (Type.print_ty (Type.Arrow abs.ty))
+    (Type.print_ty (Type.arrow abs.ty))
     (print_let_abstraction abs)
 
 let refresh_variable x = CoreTypes.Variable.refresh x

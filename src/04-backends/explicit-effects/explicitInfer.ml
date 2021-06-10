@@ -99,11 +99,9 @@ let subInDirtCt sub (d1, d2) = (subInDirt sub d1, subInDirt sub d2)
 (* ************************************************************************* *)
 
 let rec unifier_ty type1 type2 =
-  match (type1, type2) with
-  | Type.TyParam (tv1, _skel), ty2 ->
-      Substitution.add_type_substitution_e tv1 ty2
-  | ty1, Type.TyParam (tv2, _skel) ->
-      Substitution.add_type_substitution_e tv2 ty1
+  match (type1.term, type2.term) with
+  | Type.TyParam tv1, _ -> Substitution.add_type_substitution_e tv1 type2
+  | _, Type.TyParam tv2 -> Substitution.add_type_substitution_e tv2 type1
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
       Substitution.merge (unifier_ty ttya1 ttyb1)
         (unifier_dirty dirtya1 dirtyb1)
@@ -198,7 +196,7 @@ and check_pattern' state ty pat =
   | Untyped.PNonbinding -> (Term.PNonbinding, state)
   | Untyped.PConst c when ty = Type.type_const c -> (Term.PConst c, state)
   | Untyped.PTuple ps -> (
-      match ty with
+      match ty.term with
       | Type.Tuple tys ->
           let fold p ty (ps', state) =
             let p', state' = check_pattern state ty p in
@@ -288,7 +286,7 @@ and tcAnnotated (_state : state)
 (* Tuples *)
 and tcTuple state (es : Untyped.expression list) : tcExprOutput' =
   let (es, tys), cs = tcMany state es tcExpr in
-  ((Term.Tuple es, Type.Tuple tys), cs)
+  ((Term.Tuple es, Type.tuple tys), cs)
 
 (* Records *)
 and tcRecord (_state : state) (_lst : (field, Untyped.expression) Assoc.t) :
@@ -317,7 +315,7 @@ and tcAbstraction state (pat, cmp) =
 (* Lambda Abstractions *)
 and tcLambda state abs =
   let abs', cnstrs = tcAbstraction state abs in
-  ((Term.Lambda abs', Type.Arrow abs'.ty), cnstrs)
+  ((Term.Lambda abs', Type.arrow abs'.ty), cnstrs)
 
 and tcEffect state (eff : Untyped.effect) : tcExprOutput' =
   (* GEORGE: NOTE: This is verbatim copied from the previous implementation *)
@@ -334,7 +332,7 @@ and tcEffect state (eff : Untyped.effect) : tcExprOutput' =
            Term.call
              ((eff, (in_ty, out_ty)), x_var, Term.abstraction (y_pat, ret)) ))
   in
-  let outType = Type.Arrow (in_ty, out_drty) in
+  let outType = Type.arrow (in_ty, out_drty) in
   ((outVal, outType), cnstrs)
 
 (* Handlers(Op Cases) *)
@@ -364,7 +362,7 @@ and tcOpCase state
 
   (* 3: Typecheck the clause *)
   let abs2, csi (* GEORGE: I don't like the unused types *) =
-    check_abstraction2 state abs2 tyAi (Type.Arrow (tyBi, dirtyi))
+    check_abstraction2 state abs2 tyAi (Type.arrow (tyBi, dirtyi))
   in
 
   let (xop, kop, trgCop), (_, _, (tyBOpi, dirtDOpi)) = (abs2.term, abs2.ty) in
@@ -381,8 +379,8 @@ and tcOpCase state
   let omega34i, omegaCt34i =
     Constraint.fresh_dirty_coer ((tyBOpi, dirtDOpi), dirtyOut)
   in
-  let leftty = Type.Arrow (tyBi, dirtyOut) in
-  let rightty = Type.Arrow (tyBi, dirtyi) in
+  let leftty = Type.arrow (tyBi, dirtyOut) in
+  let rightty = Type.arrow (tyBi, dirtyi) in
 
   (* 6: Create the elaborated clause *)
   let l_pat, l_var = Term.fresh_variable "l" leftty in
@@ -433,12 +431,12 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
         Constraint.reflDirty dirtyOut )
   in
   let handTy, _ = handlerCo.ty in
-  match handTy with
+  match handTy.term with
   | Type.Handler ((_, drt_in), _) ->
       let trgRet', cnstr_ret = Term.cast_abstraction trgRet dirtyOut in
       let handler = Term.Handler (Term.handler_clauses trgRet' trgCls drt_in) in
       let outExpr = Term.CastExp ({ term = handler; ty = handTy }, handlerCo) in
-      let outType = Type.Handler ((ty_ret_in, deltaIn), dirtyOut) in
+      let outType = Type.handler ((ty_ret_in, deltaIn), dirtyOut) in
       let outCs = ((omegaCt7 :: cnstr_ret) @ cs1) @ cs2 in
       (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)
       ((outExpr, outType), outCs)
@@ -577,7 +575,7 @@ and infer_let_rec state defs =
   let state' =
     List.fold_left
       (fun state (x, _, alpha, betadelta, _) ->
-        extend_var state x (Type.Arrow (alpha, betadelta)))
+        extend_var state x (Type.arrow (alpha, betadelta)))
       state defs'
   in
   let defs'', cnstrs =
@@ -594,7 +592,7 @@ and tcLetRecNoGen state defs (c2 : Untyped.computation) : tcCompOutput' =
   let defs', cs1 = infer_let_rec state defs in
   let state' =
     List.fold_left
-      (fun state (x, abs) -> extend_var state x (Type.Arrow abs.ty))
+      (fun state (x, abs) -> extend_var state x (Type.arrow abs.ty))
       state (Assoc.to_list defs')
   in
   (* 3: Typecheck c2 *)
@@ -681,7 +679,7 @@ and tcApply state (val1 : Untyped.expression) (val2 : Untyped.expression) :
 
   (* Create the constraint and the cast elaborated expression *)
   let castVal1, omegaCt =
-    Term.cast_expression trgVal1 (Type.Arrow (trgVal2.ty, outType))
+    Term.cast_expression trgVal1 (Type.arrow (trgVal2.ty, outType))
   in
   let outExpr = Term.Apply (castVal1, trgVal2) in
   let outCs = (omegaCt :: cs1) @ cs2 in
@@ -703,7 +701,7 @@ and tcHandle state (hand : Untyped.expression) (cmp : Untyped.computation) :
 
   (* Create all constraints *)
   let castHand, omegaCt1 =
-    Term.cast_expression trgHand (Type.Handler (dirty1, dirty2))
+    Term.cast_expression trgHand (Type.handler (dirty1, dirty2))
   in
   let castCmp, omegaCt23 = Term.cast_computation trgCmp dirty1 in
 
@@ -767,7 +765,7 @@ let monomorphize free_ty_params cnstrs =
           (fun skel ->
             Constraint.TyOmega
               ( Type.TyCoercionParam.fresh (),
-                (Type.TyParam (t, skel), Type.TyBasic Const.FloatTy) ))
+                (Type.tyParam t skel, Type.tyBasic Const.FloatTy) ))
           skels)
       (Type.TyParamMap.bindings free_params.ty_params)
   and monomorphize_dirts =
@@ -807,8 +805,8 @@ let generalize free_params cnstrs =
     List.map
       (fun (w, t1, t2, skel) ->
         ( w,
-          (Type.TyParam (t1, SkelParam skel), Type.TyParam (t2, SkelParam skel))
-        ))
+          ( Type.tyParam t1 (Type.SkelParam skel),
+            Type.tyParam t2 (Type.SkelParam skel) ) ))
       cnstrs.ty_constraints
   in
   Type.
@@ -877,7 +875,7 @@ let process_top_let_rec state defs =
     Assoc.fold_right
       (fun (f, abs) (state, defs) ->
         let parameters = generalize free_params residuals in
-        let ty_scheme = { Type.parameters; monotype = Type.Arrow abs.ty } in
+        let ty_scheme = { Type.parameters; monotype = Type.arrow abs.ty } in
         let state' = extend_poly_var state f ty_scheme in
         (state', (f, (parameters, abs)) :: defs))
       defs (state, [])

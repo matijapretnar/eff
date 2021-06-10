@@ -6,25 +6,25 @@ let fresh_ty_with_skel skel =
   (* α : ς *)
   | SkelParam _ -> assert false
   (* α : int *)
-  | SkelBasic ps -> Type.TyBasic ps
+  | SkelBasic ps -> Type.tyBasic ps
   (* α : τ₁ -> τ₂ *)
   | SkelArrow (sk1, sk2) ->
       let tvar1 = Constraint.fresh_ty_with_skel sk1
       and dtvar2 = Constraint.fresh_dirty_with_skel sk2 in
-      Type.Arrow (tvar1, dtvar2)
+      Type.arrow (tvar1, dtvar2)
   (* α : τ₁ x τ₂ ... *)
   | SkelTuple sks ->
       let tvars = List.map Constraint.fresh_ty_with_skel sks in
-      Type.Tuple tvars
+      Type.tuple tvars
   (* α : ty_name (τ₁, τ₂, ...) *)
   | SkelApply (ty_name, sks) ->
       let tvars = List.map Constraint.fresh_ty_with_skel sks in
-      Type.Apply (ty_name, tvars)
+      Type.apply (ty_name, tvars)
   (* α : τ₁ => τ₂ *)
   | SkelHandler (sk1, sk2) ->
       let dtvar1 = Constraint.fresh_dirty_with_skel sk1
       and dtvar2 = Constraint.fresh_dirty_with_skel sk2 in
-      Type.Handler (dtvar1, dtvar2)
+      Type.handler (dtvar1, dtvar2)
 
 let process_skeleton_parameter_equality sub (paused : Constraint.resolved)
     rest_queue sp1 sk2a =
@@ -86,12 +86,13 @@ let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
 and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
   function
   (* ω : A <= A *)
-  | x, y when Type.equal_ty x y ->
+  | ty1, ty2 when Type.equal_ty ty1 ty2 ->
       let k = omega in
-      let v = Constraint.reflTy x in
+      let v = Constraint.reflTy ty1 in
       (Substitution.add_type_coercion k v sub, paused, rest_queue)
   (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
-  | Type.Arrow (a1, dirty1), Type.Arrow (a2, dirty2) ->
+  | { term = Type.Arrow (a1, dirty1); _ }, { term = Type.Arrow (a2, dirty2); _ }
+    ->
       let new_ty_coercion_var_coer, ty_cons = Constraint.fresh_ty_coer (a2, a1)
       and dirty_coercion_c, dirty_cnstrs =
         Constraint.fresh_dirty_coer (dirty1, dirty2)
@@ -104,7 +105,8 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
         paused,
         Constraint.add_to_constraints ty_cons (rest_queue @ dirty_cnstrs) )
   (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
-  | Type.Tuple tys, Type.Tuple tys' when List.length tys = List.length tys' ->
+  | { term = Type.Tuple tys; _ }, { term = Type.Tuple tys'; _ }
+    when List.length tys = List.length tys' ->
       let coercions, conss =
         List.fold_right2
           (fun ty ty' (coercions, conss) ->
@@ -119,7 +121,8 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
         Constraint.add_list_to_constraints conss rest_queue )
   (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
   (* we assume that all type parameters are positive *)
-  | Type.Apply (ty_name1, tys1), Type.Apply (ty_name2, tys2)
+  | ( { term = Type.Apply (ty_name1, tys1); _ },
+      { term = Type.Apply (ty_name2, tys2); _ } )
     when ty_name1 = ty_name2 && List.length tys1 = List.length tys2 ->
       let coercions, conss =
         List.fold_right2
@@ -134,7 +137,8 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
         paused,
         Constraint.add_list_to_constraints conss rest_queue )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
-  | Type.Handler (drty11, drty12), Type.Handler (drty21, drty22) ->
+  | ( { term = Type.Handler (drty11, drty12); _ },
+      { term = Type.Handler (drty21, drty22); _ } ) ->
       let drty_coer1, dirty_cons1 = Constraint.fresh_dirty_coer (drty21, drty11)
       and drty_coer2, dirty_cons2 =
         Constraint.fresh_dirty_coer (drty12, drty22)
@@ -145,12 +149,13 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
         paused,
         dirty_cons1 @ dirty_cons2 @ rest_queue )
   (* ω : α <= A /  ω : A <= α *)
-  | Type.TyParam (p1, SkelParam s1), Type.TyParam (p2, SkelParam s2)
+  | ( { term = Type.TyParam p1; ty = SkelParam s1 },
+      { term = Type.TyParam p2; ty = SkelParam s2 } )
     when s1 = s2 ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
       (sub, Constraint.resolve_ty_constraint paused omega p1 p2 s1, rest_queue)
-  | Type.TyParam (_, (SkelParam _ as skel_tv)), a
-  | a, Type.TyParam (_, (SkelParam _ as skel_tv)) ->
+  | { term = Type.TyParam _; ty = SkelParam _ as skel_tv }, a
+  | a, { term = Type.TyParam _; ty = SkelParam _ as skel_tv } ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
       let skel_a = Type.skeleton_of_ty a in
       ( sub,
@@ -158,7 +163,8 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
         Constraint.add_to_constraints
           (Constraint.SkelEq (skel_tv, skel_a))
           (Constraint.add_to_constraints cons rest_queue) )
-  | Type.TyParam (tv, skel), _ | _, Type.TyParam (tv, skel) ->
+  | { term = Type.TyParam tv; ty = skel }, _
+  | _, { term = Type.TyParam tv; ty = skel } ->
       let ty = fresh_ty_with_skel skel in
       let sub1 = Substitution.add_type_substitution_e tv ty in
       let cons_subbed =
@@ -259,7 +265,7 @@ and dirt_omega_step sub paused rest_queue omega dcons =
 let rec unify (sub, paused, queue) =
   (* Print.debug "SUB: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "PAUSED: %t" (Constraint.print_constraints paused); *)
-  (* Print.debug "QUEUE: %t" (Constraint.print_constraints queue); *)
+  Print.debug "QUEUE: %t" (Constraint.print_constraints queue);
   match queue with
   | [] -> (sub, paused)
   | cons :: rest_queue ->

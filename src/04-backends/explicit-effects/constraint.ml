@@ -49,25 +49,25 @@ let arrowCoercion (tcoer1, dtcoer2) =
   let ty1, ty1' = tcoer1.ty and drty2, drty2' = dtcoer2.ty in
   {
     term = ArrowCoercion (tcoer1, dtcoer2);
-    ty = (Type.Arrow (ty1', drty2), Type.Arrow (ty1, drty2'));
+    ty = (Type.arrow (ty1', drty2), Type.arrow (ty1, drty2'));
   }
 
 let tupleCoercion tcoers =
   let tys, tys' = tcoers |> List.map (fun tcoer -> tcoer.ty) |> List.split in
-  { term = TupleCoercion tcoers; ty = (Type.Tuple tys, Type.Tuple tys') }
+  { term = TupleCoercion tcoers; ty = (Type.tuple tys, Type.tuple tys') }
 
 let applyCoercion (tyname, tcoers) =
   let tys, tys' = tcoers |> List.map (fun tcoer -> tcoer.ty) |> List.split in
   {
     term = ApplyCoercion (tyname, tcoers);
-    ty = (Type.Apply (tyname, tys), Type.Apply (tyname, tys'));
+    ty = (Type.apply (tyname, tys), Type.apply (tyname, tys'));
   }
 
 let handlerCoercion (dtcoer1, dtcoer2) =
   let drty1, drty1' = dtcoer1.ty and drty2, drty2' = dtcoer2.ty in
   {
     term = HandlerCoercion (dtcoer1, dtcoer2);
-    ty = (Type.Handler (drty1', drty2), Type.Handler (drty1, drty2'));
+    ty = (Type.handler (drty1', drty2), Type.handler (drty1, drty2'));
   }
 
 let bangCoercion ((ty_coer : ty_coercion), (drt_coer : dirt_coercion)) =
@@ -102,8 +102,8 @@ let unresolve resolved =
     (fun (omega, a, b, skel) ->
       TyOmega
         ( omega,
-          ( Type.TyParam (a, Type.SkelParam skel),
-            Type.TyParam (b, Type.SkelParam skel) ) ))
+          ( Type.tyParam a (Type.SkelParam skel),
+            Type.tyParam b (Type.SkelParam skel) ) ))
     resolved.ty_constraints
   @ List.map
       (fun (omega, ct) -> DirtOmega (omega, ct))
@@ -197,7 +197,7 @@ let fresh_skel () =
 
 let fresh_ty_with_skel skel =
   let ty_var = CoreTypes.TyParam.fresh () in
-  Type.TyParam (ty_var, skel)
+  Type.tyParam ty_var skel
 
 let fresh_dirty_with_skel skel =
   let ty = fresh_ty_with_skel skel in

@@ -435,10 +435,10 @@ and reduce_computation' state comp =
           let (ty_arg, _), ((ty_in, _), drty_out) = (abs.ty, hnd.ty) in
           let ty' =
             match ret_clause_kind with
-            | FixedReturnClause _ -> Type.Arrow (ty_arg, drty_out)
+            | FixedReturnClause _ -> Type.arrow (ty_arg, drty_out)
             | VaryingReturnClause ->
-                Type.Arrow
-                  (Type.Tuple [ ty_arg; Type.Arrow (ty_in, drty_out) ], drty_out)
+                Type.arrow
+                  (Type.tuple [ ty_arg; Type.arrow (ty_in, drty_out) ], drty_out)
           in
 
           Assoc.update (fingerprint, f) (f', ty', ret_clause_kind) specialized
@@ -459,9 +459,22 @@ and reduce_computation' state comp =
                   (f', (ws, handle_abstraction state' hnd abs))
               | Some (f', ty, VaryingReturnClause) -> (
                   match ty with
-                  | Type.Arrow
-                      (Type.Tuple [ _; (Type.Arrow (ty_in, _) as ty_cont) ], _)
-                    ->
+                  | {
+                   term =
+                     Type.Arrow
+                       ( {
+                           term =
+                             Type.Tuple
+                               [
+                                 _;
+                                 ({ term = Type.Arrow (ty_in, _); _ } as
+                                 ty_cont);
+                               ];
+                           _;
+                         },
+                         _ );
+                   _;
+                  } ->
                       let x_pat, x_var = Term.fresh_variable "x" ty_in
                       and k_pat, k_var = Term.fresh_variable "k" ty_cont in
                       let hnd' =

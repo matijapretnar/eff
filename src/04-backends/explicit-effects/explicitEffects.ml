@@ -176,7 +176,7 @@ module Evaluate : Language.BackendSignature.T = Make (struct
       (fun (f, (_ws, abs)) ->
         Format.fprintf !Config.output_formatter "@[%t : %t = <fun>@]@."
           (Language.CoreTypes.Variable.print f)
-          (Type.print_ty (Type.Arrow abs.ty)))
+          (Type.print_ty (Type.arrow abs.ty)))
       defs;
     { evaluation_state = Eval.extend_let_rec state.evaluation_state defs }
 

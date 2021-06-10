@@ -121,20 +121,26 @@ let rec apply_sub_skel sub skeleton =
   | SkelApply (t, l) -> SkelApply (t, List.map (apply_sub_skel sub) l)
   | SkelTuple skels -> SkelTuple (List.map (apply_sub_skel sub) skels)
 
-let rec apply_sub_ty sub = function
-  | TyParam (typ1, skel) -> (
+let rec apply_sub_ty sub ty =
+  let ty' = apply_sub_ty' sub ty in
+  { ty' with ty = apply_sub_skel sub ty'.ty }
+
+and apply_sub_ty' sub ty =
+  match ty.term with
+  | TyParam typ1 -> (
       match Assoc.lookup typ1 sub.type_param_to_type_subs with
       | Some ttype ->
           apply_sub_ty sub ttype
           (* We don't assume that substitutions are fully expanded *)
-      | None -> TyParam (typ1, apply_sub_skel sub skel))
+      | None -> ty)
   | Arrow (tty1, tty2) ->
-      Arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
-  | Apply (ty_name, tys) -> Apply (ty_name, List.map (apply_sub_ty sub) tys)
-  | Tuple ttyl -> Tuple (List.map (fun x -> apply_sub_ty sub x) ttyl)
+      arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
+  | Apply (ty_name, tys) -> Type.apply (ty_name, List.map (apply_sub_ty sub) tys)
+  | Tuple ttyl -> Type.tuple (List.map (fun x -> apply_sub_ty sub x) ttyl)
   | Handler (tydrty1, tydrty2) ->
-      Handler (apply_sub_dirty_ty sub tydrty1, apply_sub_dirty_ty sub tydrty2)
-  | TyBasic p -> TyBasic p
+      Type.handler
+        (apply_sub_dirty_ty sub tydrty1, apply_sub_dirty_ty sub tydrty2)
+  | TyBasic p -> tyBasic p
 
 and apply_sub_dirty_ty sub (ty, drt) =
   (apply_sub_ty sub ty, apply_sub_dirt sub drt)
