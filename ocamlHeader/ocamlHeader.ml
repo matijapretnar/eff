@@ -99,3 +99,5 @@ let rec coer_fun_to_hand coer1 coer2 f comp =
   | Value t -> coer2 (f (coer1 t))
   | Call (eff, arg, k) ->
       Call (eff, arg, fun x -> coer_fun_to_hand coer1 coer2 f (k x))
+
+let coer_list coer = List.map coer

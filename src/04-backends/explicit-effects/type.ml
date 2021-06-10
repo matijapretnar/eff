@@ -271,6 +271,13 @@ module FreeParams = struct
       skel_params = SkelParamSet.empty;
     }
 
+  let subset fp1 fp2 =
+    TyParamMap.for_all
+      (fun p1 _ -> TyParamMap.mem p1 fp2.ty_params)
+      fp1.ty_params
+    && DirtParamSet.subset fp1.dirt_params fp2.dirt_params
+    && SkelParamSet.subset fp1.skel_params fp2.skel_params
+
   let ty_singleton p skel =
     { empty with ty_params = TyParamMap.singleton p [ skel ] }
 

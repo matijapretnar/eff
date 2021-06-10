@@ -45,20 +45,24 @@
   ----------------------------------------------------------------------
   type a = Nil | Cons of (int * a)
   
-  let _f_42 (_x_43 : int) = match _x_43 with 1 -> 0 | _ -> 4
+  let _f_42 (_x_43 : int) = match _x_43 with 1 -> Value 0 | _ -> Value 4
   
   let f = _f_42
   
   let _g_44 (_a_45 : a) =
-    ( (match _a_45 with
-      | Nil -> 0
-      | Cons (_x_47, Nil) -> _x_47 + 4
-      | Cons (4, _x_49) -> 7
-      | _x_50 -> 13),
-      0,
-      3 + 4,
-      13,
-      7 )
+    (match _a_45 with
+    | Nil -> Value 0
+    | Cons (_x_47, Nil) ->
+        coer_return
+          (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+          (( + ) _x_47)
+        >>= fun _b_48 -> _b_48 4
+    | Cons (4, _x_49) -> Value 7
+    | _x_50 -> Value 13)
+    >>= fun _a0_46 ->
+    coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( + ) 3)
+    >>= fun _b_83 ->
+    _b_83 4 >>= fun _a2_84 -> Value (_a0_46, 0, _a2_84, 13, 7)
   
   let g = _g_44
   ======================================================================
@@ -116,6 +120,41 @@
   ;;
   2 + 1
   ======================================================================
+  codegen/map.eff
+  ----------------------------------------------------------------------
+  let rec _map_42 _tycoer_34 _tycoer_25 _tycoer_32 _tycoer_13 _tycoer_28
+      _tycoer_20 _tycoer_10 _tycoer_9 _tycoer_11 _tycoer_12 _tycoer_16 _tycoer_22
+      _tycoer_23 _tycoer_24 _tycoer_31 _tycoer_17 _tycoer_33 _x_50 =
+    let _f_43 = coer_arrow _tycoer_24 (coer_computation _tycoer_25) _x_50 in
+    coer_return
+      (coer_arrow (coer_list _tycoer_28)
+         (coer_computation (coer_list _tycoer_33)))
+      (fun (_x_44 : 'ty34 list) ->
+        match coer_list _tycoer_9 _x_44 with
+        | [] -> coer_return (coer_list _tycoer_10) []
+        | _x_45 :: _xs_46 ->
+            coer_computation _tycoer_13 (_f_43 (_tycoer_12 _x_45))
+            >>= fun _b_47 ->
+            coer_computation
+              (coer_arrow (coer_list _tycoer_31)
+                 (coer_computation (coer_list _tycoer_34)))
+              (_map_42 _tycoer_34 _tycoer_25 _tycoer_32 _tycoer_13 _tycoer_28
+                 _tycoer_20 _tycoer_10 _tycoer_9 _tycoer_11 _tycoer_12 _tycoer_16
+                 _tycoer_22 _tycoer_23 _tycoer_24 _tycoer_31 _tycoer_17 _tycoer_33
+                 (coer_arrow _tycoer_16 (coer_computation _tycoer_17) _f_43))
+            >>= fun _b_49 ->
+            coer_computation (coer_list _tycoer_32)
+              (_b_49 (coer_list _tycoer_20 _xs_46))
+            >>= fun _b_48 ->
+            coer_computation (coer_list _tycoer_11)
+              (Value
+                 ((fun (x, xs) -> x :: xs)
+                    (coer_tuple_2
+                       (_tycoer_22, coer_list _tycoer_23)
+                       (_b_47, _b_48)))))
+  
+  let map = _map_42
+  ======================================================================
   codegen/match_red.eff
   ----------------------------------------------------------------------
   ;;
@@ -160,7 +199,7 @@
   ======================================================================
   codegen/norec.eff
   ----------------------------------------------------------------------
-  let _f_42 (_x_43 : float) = ()
+  let _f_42 (_x_43 : 'ty5) = ()
   
   let f = _f_42
   ======================================================================
@@ -182,14 +221,32 @@
   codegen/optimize_pattern_match.eff
   ----------------------------------------------------------------------
   let _k_42 (_b_43 : int) =
-    let rec _a_44 (_x_45, _y_46) (_z_47 : int) = _x_45 + _y_46 + _z_47 + _b_43 in
+    let rec _a_44 (_x_45, _y_46) =
+      Value
+        (fun (_z_47 : int) ->
+          coer_return
+            (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+            (( + ) _x_45)
+          >>= fun _b_52 ->
+          _b_52 _y_46 >>= fun _b_51 ->
+          coer_return
+            (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+            (( + ) _b_51)
+          >>= fun _b_50 ->
+          _b_50 _z_47 >>= fun _b_49 ->
+          coer_return
+            (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+            (( + ) _b_49)
+          >>= fun _b_48 -> _b_48 _b_43)
+    in
     _a_44
   
   let k = _k_42
   ======================================================================
   codegen/optimize_short_circuit.eff
   ----------------------------------------------------------------------
-  let _a_42 (_b_43 : bool) (_c_44 : bool) = _b_43 && _c_44
+  let _a_42 (_b_43 : bool) (_c_44 : bool) =
+    if _b_43 then Value _c_44 else Value false
   
   let a = _a_42
   ======================================================================
@@ -309,17 +366,17 @@
   ----------------------------------------------------------------------
   type (_, _) eff_internal_effect += Ping : (unit, unit) eff_internal_effect
   
-  let _test_simple_42 (_x_43 : float) = ((), 1)
+  let _test_simple_42 (_x_43 : 'ty17) = Value ((), 1)
   
   let test_simple = _test_simple_42
   
-  let _test_simple2_60 (() : unit) = ()
+  let _test_simple2_60 (() : unit) = Value ()
   
   let test_simple2 = _test_simple2_60
   ======================================================================
   codegen/substitution.eff
   ----------------------------------------------------------------------
-  let _decide_func_42 (_bl_43 : bool) = if _bl_43 then 10 else 20
+  let _decide_func_42 (_bl_43 : bool) = if _bl_43 then Value 10 else Value 20
   
   let decide_func = _decide_func_42
   ======================================================================
@@ -453,9 +510,29 @@
   ======================================================================
   codegen/test20.eff
   ----------------------------------------------------------------------
-  let rec _even_43 _x_55 = _x_55 = 0 || _odd_42 (_x_55 - 1)
+  let rec _even_43 _x_55 =
+    coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( = ) _x_55)
+    >>= fun _b_57 ->
+    _b_57 0 >>= fun _b_58 ->
+    if _b_58 then Value true
+    else
+      coer_return
+        (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+        (( - ) _x_55)
+      >>= fun _b_59 ->
+      _b_59 1 >>= fun _b_60 -> _odd_42 _b_60
   
-  and _odd_42 _x_54 = if _x_54 = 0 then false else _even_43 (_x_54 - 1)
+  and _odd_42 _x_54 =
+    coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( = ) _x_54)
+    >>= fun _b_62 ->
+    _b_62 0 >>= fun _b_63 ->
+    if _b_63 then Value false
+    else
+      coer_return
+        (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+        (( - ) _x_54)
+      >>= fun _b_64 ->
+      _b_64 1 >>= fun _b_65 -> _even_43 _b_65
   
   let even, odd = (_even_43, _odd_42)
   ======================================================================
@@ -525,10 +602,17 @@
   
   type intlist = IntNil | IntCons of (int * intlist)
   
-  let rec _concat_42 _x_50 (_x_0 : intlist) =
+  let rec _concat_42 _x_50 =
     match _x_50 with
-    | IntNil -> _x_0
-    | IntCons (_z_54, _zs_53) -> IntCons (_z_54, _concat_42 _zs_53 _x_0)
+    | IntNil ->
+        coer_return
+          (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+          (fun (_ys_52 : intlist) -> _ys_52)
+    | IntCons (_z_54, _zs_53) ->
+        Value
+          (fun (_ys_55 : intlist) ->
+            _concat_42 _zs_53 >>= fun _b_56 ->
+            _b_56 _ys_55 >>= fun _b_57 -> Value (IntCons (_z_54, _b_57)))
   
   let concat = _concat_42
   
