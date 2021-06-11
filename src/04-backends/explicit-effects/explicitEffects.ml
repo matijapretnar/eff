@@ -180,7 +180,7 @@ module Evaluate : Language.BackendSignature.T = Make (struct
       defs;
     { evaluation_state = Eval.extend_let_rec state.evaluation_state defs }
 
-  let load_primitive _state _x _prim = failwith "Not implemented"
+  let load_primitive _state _x _prim = _state
 
   let process_tydef state _ = state
 
@@ -246,7 +246,6 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     defs'
 
   let process_computation state c =
-    Print.debug "%t" (Term.print_computation c);
     let c' =
       optimize_term state
       @@ TranslateExEff2NoEff.elab_computation translate_exeff_config c
@@ -270,7 +269,6 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     let defs' =
       Assoc.kmap
         (fun (x, (ws, e)) ->
-          Print.debug "%t" (Term.print_expression e);
           ( x,
             ( List.map fst ws.Type.ty_constraints,
               optimize_term state

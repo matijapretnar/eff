@@ -571,9 +571,7 @@ let pattern_match p e =
     | PVariant (lbl, Some p), Variant (lbl', Some e) when lbl = lbl' ->
         extend_subst p e sbst
     | PConst c, Const c' when Const.equal c c' -> Some sbst
-    | _, _ ->
-        (* Print.debug "%t = %t" (print_pattern p) (print_expression e); *)
-        None
+    | _, _ -> None
   in
   extend_subst p e Assoc.empty
 

@@ -164,9 +164,7 @@ and reduce_ty_coercion' state n_coer =
 and optimize_term state (n_term : NoEff.n_term) =
   (* Print.debug "%t" (Term.print_computation n_term); *)
   let n_term' = optimize_term' state n_term in
-  (* assert (Type.dirty_types_are_equal n_term.ty n_term'.ty); *)
   let n_term'' = reduce_term state n_term' in
-  (* assert (Type.dirty_types_are_equal n_term'.ty n_term''.ty); *)
   n_term''
 
 and optimize_term' state (n_term : NoEff.n_term) =
