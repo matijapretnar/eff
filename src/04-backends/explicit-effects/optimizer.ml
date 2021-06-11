@@ -374,21 +374,12 @@ and reduce_computation' state comp =
       | [] -> c'
       | defs' -> Term.letRec (Assoc.of_list defs', c'))
   | Term.Bind (cmp, abs) -> bind_computation state cmp abs
-  | Term.Handle ({ term = Term.Handler hnd; ty = hnd_ty }, cmp) -> (
-      Print.debug "Handling: %t :: %t;; :: %t ::: %t"
-        (Term.print_expression' (Term.Handler hnd))
-        (Type.print_ty hnd_ty)
-        (Term.print_computation cmp)
-        (Type.print_dirty cmp.ty);
+  | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) -> (
       let fingerprint = hnd.term.effect_clauses.fingerprint in
       let drty_in, _ = hnd.ty in
-      Print.debug "Drty_in: %t" (Type.print_dirty drty_in);
       let unspecialized_declared_functions =
         List.filter
           (fun (f, (_ws, { ty = _, drty_out; _ })) ->
-            Print.debug "Drty_out: %t :~: %t"
-              (Language.CoreTypes.Variable.print f)
-              (Type.print_dirty drty_out);
             Type.equal_dirty drty_in drty_out
             && Option.is_none
                  (Assoc.lookup (fingerprint, f) state.specialized_functions))
@@ -484,7 +475,6 @@ and reduce_computation' state comp =
              (fun (f, (_ws, _)) -> (f, FixedReturnClause hnd.term.value_clause))
              unspecialized_declared_functions)
       in
-      Print.debug "Len: %d" (List.length spec_rec_defs);
       let cmp' = handle_computation state' hnd cmp in
       match keep_used_bindings (Assoc.of_list spec_rec_defs) cmp' with
       | [] -> cmp'
