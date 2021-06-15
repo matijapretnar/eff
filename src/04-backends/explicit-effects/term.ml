@@ -127,6 +127,12 @@ let handler_with_new_value_clause hnd value_clause : handler =
     ty = ((ty_in, drt_in), drty_out);
   }
 
+let handler_with_smaller_input_dirt hnd dcoer : handler =
+  let (ty_in, drt_in), drty_out = hnd.ty in
+  let drt, drt_in' = dcoer.ty in
+  assert (Type.equal_dirt drt_in drt_in');
+  { term = hnd.term; ty = ((ty_in, drt), drty_out) }
+
 let handler h =
   let drty1, drty2 = h.ty in
   { term = Handler h; ty = Type.Handler (drty1, drty2) }

@@ -29,318 +29,340 @@ let _max_88 (_a_89 : int) (_b_90 : int) = if _a_89 > _b_90 then _a_89 else _b_90
 let max = _max_88
 
 let _effect_max_93 (_m_94 : int) =
-  let rec _find_max_133 (_x_115, _k_135) =
+  let rec _find_max_141 (_x_115, _k_143) =
     match _x_115 with
-    | Empty -> _k_135 0
-    | Node (Empty, _x_123, Empty) -> _k_135 _x_123
+    | Empty -> _k_143 0
+    | Node (Empty, _x_123, Empty) -> _k_143 _x_123
     | Node (_left_126, _x_125, _right_124) ->
         let _l_116 (_y_127 : bool) =
           if _y_127 then
-            _find_max_133
-              (_left_126, fun (_next_128 : int) -> _k_135 (_x_125 + _next_128))
+            _find_max_141
+              (_left_126, fun (_next_128 : int) -> _k_143 (_x_125 + _next_128))
           else
-            _find_max_133
-              (_right_124, fun (_next_128 : int) -> _k_135 (_x_125 + _next_128))
+            _find_max_141
+              (_right_124, fun (_next_128 : int) -> _k_143 (_x_125 + _next_128))
         in
         _max_88 (_l_116 true) (_l_116 false)
   in
-  _find_max_133 (_tester_42 _m_94, fun (_x_110 : int) -> _x_110)
+  _find_max_141 (_tester_42 _m_94, fun (_x_110 : int) -> _x_110)
 
 let effect_max = _effect_max_93
 
-let _test_max_138 (_m_139 : int) = _effect_max_93 _m_139
+let _test_max_160 (_m_161 : int) = _effect_max_93 _m_161
 
-let test_max = _test_max_138
+let test_max = _test_max_160
 
-let _op_140 (_x_141 : int) (_y_142 : int) = _x_141 - (3 * _y_142)
+let _op_162 (_x_163 : int) (_y_164 : int) = _x_163 - (3 * _y_164)
 
-let op = _op_140
+let op = _op_162
 
-let _max_146 (_a_147 : int) (_b_148 : int) =
-  if _a_147 > _b_148 then _a_147 else _b_148
+let _max_168 (_a_169 : int) (_b_170 : int) =
+  if _a_169 > _b_170 then _a_169 else _b_170
 
-let max = _max_146
+let max = _max_168
 
 type intlist = Nil | Cons of (int * intlist)
 
-let rec _op_151 (* @ *) _x_158 (_ys_160 : intlist) =
-  match _x_158 with
-  | Nil -> _ys_160
-  | Cons (_x_162, _xs_161) -> Cons (_x_162, _op_151 (* @ *) _xs_161 _ys_160)
+let rec _op_173 (* @ *) _x_180 (_ys_182 : intlist) =
+  match _x_180 with
+  | Nil -> _ys_182
+  | Cons (_x_184, _xs_183) -> Cons (_x_184, _op_173 (* @ *) _xs_183 _ys_182)
 
-let _op_151 (* @ *) = _op_151 (* @ *)
+let _op_173 (* @ *) = _op_173 (* @ *)
 
-let _test_general_165 (_m_166 : int) =
-  let rec _maxl_167 _x_197 (_x_232 : intlist) =
-    match _x_232 with
-    | Nil -> _x_197
-    | Cons (_x_234, _xs_233) -> _maxl_167 (_max_146 _x_234 _x_197) _xs_233
+let _test_general_187 (_m_188 : int) =
+  let rec _maxl_189 _x_219 (_x_279 : intlist) =
+    match _x_279 with
+    | Nil -> _x_219
+    | Cons (_x_281, _xs_280) -> _maxl_189 (_max_168 _x_281 _x_219) _xs_280
   in
-  _maxl_167 0
-    (let rec _explore_226 (_x_200, _k_228) =
-       match _x_200 with
-       | Empty -> _k_228 0
-       | Node (_left_216, _x_215, _right_214) ->
-           let _l_201 (_y_217 : bool) =
-             if _y_217 then
-               _explore_226
-                 ( _left_216,
-                   fun (_b_220 : int) -> _k_228 (_op_140 _x_215 _b_220) )
+  _maxl_189 0
+    (let rec _explore_255 (_x_222, _k_257) =
+       match _x_222 with
+       | Empty -> _k_257 0
+       | Node (_left_238, _x_237, _right_236) ->
+           let _l_223 (_y_239 : bool) =
+             if _y_239 then
+               _explore_255
+                 ( _left_238,
+                   fun (_b_272 : int) -> _k_257 (_op_162 _x_237 _b_272) )
              else
-               _explore_226
-                 ( _right_214,
-                   fun (_b_222 : int) -> _k_228 (_op_140 _x_215 _b_222) )
+               _explore_255
+                 ( _right_236,
+                   fun (_b_276 : int) -> _k_257 (_op_162 _x_237 _b_276) )
            in
-           _op_151 (* @ *) (_l_201 true) (_l_201 false)
+           _op_173 (* @ *) (_l_223 true) (_l_223 false)
      in
-     _explore_226 (_tester_42 _m_166, fun (_x_192 : int) -> Cons (_x_192, Nil)))
+     _explore_255 (_tester_42 _m_188, fun (_x_214 : int) -> Cons (_x_214, Nil)))
 
-let test_general = _test_general_165
+let test_general = _test_general_187
 
-let _test_general_loop_238 (_m_239 : int) =
-  let rec _maxl_240 _x_282 (_x_342 : intlist) =
-    match _x_342 with
-    | Nil -> _x_282
-    | Cons (_x_344, _xs_343) -> _maxl_240 (_max_146 _x_344 _x_282) _xs_343
+let _test_general_loop_285 (_m_286 : int) =
+  let rec _maxl_287 _x_329 (_x_414 : intlist) =
+    match _x_414 with
+    | Nil -> _x_329
+    | Cons (_x_416, _xs_415) -> _maxl_287 (_max_168 _x_416 _x_329) _xs_415
   in
-  let ____t_248 = _tester_42 _m_239 in
-  let rec _looper_302 _x_303 (_s_304 : int) =
-    if _x_303 = 0 then _s_304
+  let ____t_295 = _tester_42 _m_286 in
+  let rec _looper_349 _x_350 (_s_351 : int) =
+    if _x_350 = 0 then _s_351
     else
-      _looper_302 (_x_303 - 1)
-        (_s_304
-        + _maxl_240 0
-            (let rec _explore_336 (_x_285, _k_338) =
-               match _x_285 with
-               | Empty -> _k_338 0
-               | Node (_left_326, _x_325, _right_324) ->
-                   let _l_286 (_y_327 : bool) =
-                     if _y_327 then
-                       _explore_336
-                         ( _left_326,
-                           fun (_b_330 : int) -> _k_338 (_op_140 _x_325 _b_330)
+      _looper_349 (_x_350 - 1)
+        (_s_351
+        + _maxl_287 0
+            (let rec _explore_390 (_x_332, _k_392) =
+               match _x_332 with
+               | Empty -> _k_392 0
+               | Node (_left_373, _x_372, _right_371) ->
+                   let _l_333 (_y_374 : bool) =
+                     if _y_374 then
+                       _explore_390
+                         ( _left_373,
+                           fun (_b_407 : int) -> _k_392 (_op_162 _x_372 _b_407)
                          )
                      else
-                       _explore_336
-                         ( _right_324,
-                           fun (_b_332 : int) -> _k_338 (_op_140 _x_325 _b_332)
+                       _explore_390
+                         ( _right_371,
+                           fun (_b_411 : int) -> _k_392 (_op_162 _x_372 _b_411)
                          )
                    in
-                   _op_151 (* @ *) (_l_286 true) (_l_286 false)
+                   _op_173 (* @ *) (_l_333 true) (_l_333 false)
              in
-             _explore_336 (____t_248, fun (_x_265 : int) -> Cons (_x_265, Nil)))
+             _explore_390 (____t_295, fun (_x_312 : int) -> Cons (_x_312, Nil)))
         )
   in
-  _looper_302 100 0
+  _looper_349 100 0
 
-let test_general_loop = _test_general_loop_238
+let test_general_loop = _test_general_loop_285
 
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
-let _absurd_348 (_void_349 : float) = match _void_349 with _ -> assert false
+let _absurd_420 (_void_421 : float) = match _void_421 with _ -> assert false
 
-let absurd = _absurd_348
+let absurd = _absurd_420
 
-let _test_leaf_state_350 (_m_351 : int) =
-  let rec _maxl_352 _x_403 (_x_738 : intlist) =
-    match _x_738 with
-    | Nil -> _x_403
-    | Cons (_x_740, _xs_739) -> _maxl_352 (_max_146 _x_740 _x_403) _xs_739
+let _test_leaf_state_422 (_m_423 : int) =
+  let rec _maxl_424 _x_475 (_x_1533 : intlist) =
+    match _x_1533 with
+    | Nil -> _x_475
+    | Cons (_x_1535, _xs_1534) -> _maxl_424 (_max_168 _x_1535 _x_475) _xs_1534
   in
-  let rec _populate_leafs_360 _x_404 (_n_474 : int) =
-    if _x_404 = _n_474 then Nil
-    else Cons (_x_404 * 3, _populate_leafs_360 (_x_404 + 1) _n_474)
+  let rec _populate_leafs_432 _x_476 (_n_634 : int) =
+    if _x_476 = _n_634 then Nil
+    else Cons (_x_476 * 3, _populate_leafs_432 (_x_476 + 1) _n_634)
   in
-  _maxl_352 0
-    (let rec _explore_444 (_x_409, _k_446) =
-       match _x_409 with
-       | Empty -> Call (Get, (), fun (_y_434 : int) -> _k_446 _y_434)
-       | Node (_left_437, _x_436, _right_435) ->
-           let _l_410 (_y_438 : bool) =
-             _explore_444
-               ( (if _y_438 then _left_437 else _right_435),
-                 fun (_b_441 : int) -> _k_446 (_op_140 _x_436 _b_441) )
+  _maxl_424 0
+    (let rec _explore_523 (_x_481, _k_525) =
+       match _x_481 with
+       | Empty -> Call (Get, (), fun (_y_506 : int) -> _k_525 _y_506)
+       | Node (_left_509, _x_508, _right_507) ->
+           let _l_482 (_y_510 : bool) =
+             if _y_510 then
+               _explore_523
+                 ( _left_509,
+                   fun (_b_555 : int) -> _k_525 (_op_162 _x_508 _b_555) )
+             else
+               _explore_523
+                 ( _right_507,
+                   fun (_b_575 : int) -> _k_525 (_op_162 _x_508 _b_575) )
            in
-           _l_410 true >>= fun _b_386 ->
-           _l_410 false >>= fun _b_387 -> Value (_op_151 (* @ *) _b_386 _b_387)
+           _l_482 true >>= fun _b_458 ->
+           _l_482 false >>= fun _b_459 -> Value (_op_173 (* @ *) _b_458 _b_459)
      in
-     let rec _explore_448 (_x_409, _k_446) =
-       match _x_409 with
+     let rec _explore_577 (_x_481, _k_525) =
+       match _x_481 with
        | Empty -> (
-           fun (_s_450 : intlist) ->
-             match _s_450 with
-             | Cons (_x_452, _rest_451) ->
+           fun (_s_579 : intlist) ->
+             match _s_579 with
+             | Cons (_x_581, _rest_580) ->
                  force_unsafe
                    ((handler
                        {
                          value_clause =
-                           (fun (_x_455 : intlist) ->
-                             Value (fun (_ : intlist) -> _x_455));
+                           (fun (_x_584 : intlist) ->
+                             Value (fun (_ : intlist) -> _x_584));
                          effect_clauses =
                            (fun (type a b) (eff : (a, b) eff_internal_effect) :
                                 (a -> (b -> _) -> _) ->
                              match eff with
                              | Get ->
-                                 fun () _l_456 ->
+                                 fun () _l_585 ->
                                    Value
-                                     (fun (_s_457 : intlist) ->
-                                       match _s_457 with
-                                       | Cons (_x_459, _rest_458) ->
+                                     (fun (_s_586 : intlist) ->
+                                       match _s_586 with
+                                       | Cons (_x_588, _rest_587) ->
                                            coer_arrow coer_refl_ty force_unsafe
-                                             _l_456 _x_459 _rest_458
+                                             _l_585 _x_588 _rest_587
                                        | Nil -> Nil)
                              | eff' -> fun arg k -> Call (eff', arg, k));
                        })
-                      (_k_446 _x_452))
-                   _rest_451
+                      (_k_525 _x_581))
+                   _rest_580
              | Nil -> Nil)
-       | Node (_left_437, _x_436, _right_435) ->
-           let _l_410 (_y_438 : bool) =
-             _explore_444
-               ( (if _y_438 then _left_437 else _right_435),
-                 fun (_b_441 : int) -> _k_446 (_op_140 _x_436 _b_441) )
+       | Node (_left_509, _x_508, _right_507) ->
+           let _l_482 (_y_510 : bool) =
+             if _y_510 then
+               _explore_523
+                 ( _left_509,
+                   fun (_b_555 : int) -> _k_525 (_op_162 _x_508 _b_555) )
+             else
+               _explore_523
+                 ( _right_507,
+                   fun (_b_575 : int) -> _k_525 (_op_162 _x_508 _b_575) )
            in
            force_unsafe
              ((handler
                  {
                    value_clause =
-                     (fun (_b_386 : intlist) ->
+                     (fun (_b_458 : intlist) ->
                        Value
                          (force_unsafe
                             ((handler
                                 {
                                   value_clause =
-                                    (fun (_b_387 : intlist) ->
+                                    (fun (_b_594 : intlist) ->
                                       Value
                                         (fun (_ : intlist) ->
-                                          _op_151 (* @ *) _b_386 _b_387));
+                                          _op_173 (* @ *) _b_458 _b_594));
                                   effect_clauses =
                                     (fun (type a b)
                                          (eff : (a, b) eff_internal_effect) :
                                          (a -> (b -> _) -> _) ->
                                       match eff with
                                       | Get ->
-                                          fun () _l_423 ->
+                                          fun () _l_596 ->
                                             Value
-                                              (fun (_s_424 : intlist) ->
-                                                match _s_424 with
-                                                | Cons (_x_426, _rest_425) ->
+                                              (fun (_s_597 : intlist) ->
+                                                match _s_597 with
+                                                | Cons (_x_599, _rest_598) ->
                                                     coer_arrow coer_refl_ty
-                                                      force_unsafe _l_423 _x_426
-                                                      _rest_425
+                                                      force_unsafe _l_596 _x_599
+                                                      _rest_598
                                                 | Nil -> Nil)
                                       | eff' -> fun arg k -> Call (eff', arg, k));
                                 })
-                               (_l_410 false))));
+                               (_l_482 false))));
                    effect_clauses =
                      (fun (type a b) (eff : (a, b) eff_internal_effect) :
                           (a -> (b -> _) -> _) ->
                        match eff with
                        | Get ->
-                           fun () _l_423 ->
+                           fun () _l_495 ->
                              Value
-                               (fun (_s_424 : intlist) ->
-                                 match _s_424 with
-                                 | Cons (_x_426, _rest_425) ->
-                                     coer_arrow coer_refl_ty force_unsafe _l_423
-                                       _x_426 _rest_425
+                               (fun (_s_496 : intlist) ->
+                                 match _s_496 with
+                                 | Cons (_x_498, _rest_497) ->
+                                     coer_arrow coer_refl_ty force_unsafe _l_495
+                                       _x_498 _rest_497
                                  | Nil -> Nil)
                        | eff' -> fun arg k -> Call (eff', arg, k));
                  })
-                (_l_410 true))
+                (_l_482 true))
      in
-     _explore_448
-       (_tester_42 _m_351, fun (_x_388 : int) -> Value (Cons (_x_388, Nil)))
-       (_populate_leafs_360 0 154))
+     _explore_577
+       (_tester_42 _m_423, fun (_x_460 : int) -> Value (Cons (_x_460, Nil)))
+       (_populate_leafs_432 0 154))
 
-let test_leaf_state = _test_leaf_state_350
+let test_leaf_state = _test_leaf_state_422
 
-let _test_leaf_state_loop_1088 (_m_1089 : int) =
-  let rec _maxl_1090 _x_1153 (_x_1526 : intlist) =
-    match _x_1526 with
-    | Nil -> _x_1153
-    | Cons (_x_1528, _xs_1527) -> _maxl_1090 (_max_146 _x_1528 _x_1153) _xs_1527
+let _test_leaf_state_loop_2631 (_m_2632 : int) =
+  let rec _maxl_2633 _x_2696 (_x_3792 : intlist) =
+    match _x_3792 with
+    | Nil -> _x_2696
+    | Cons (_x_3794, _xs_3793) -> _maxl_2633 (_max_168 _x_3794 _x_2696) _xs_3793
   in
-  let rec _populate_leafs_1098 _x_1154 (_n_1262 : int) =
-    if _x_1154 = _n_1262 then Nil
-    else Cons (_x_1154 * 3, _populate_leafs_1098 (_x_1154 + 1) _n_1262)
+  let rec _populate_leafs_2641 _x_2697 (_n_2893 : int) =
+    if _x_2697 = _n_2893 then Nil
+    else Cons (_x_2697 * 3, _populate_leafs_2641 (_x_2697 + 1) _n_2893)
   in
-  let ____leafs_1109 = _populate_leafs_1098 0 154 in
-  let ____t_1111 = _tester_42 _m_1089 in
-  let rec _looper_1195 _x_1196 (_s_1197 : int) =
-    if _x_1196 = 0 then _s_1197
+  let ____leafs_2652 = _populate_leafs_2641 0 154 in
+  let ____t_2654 = _tester_42 _m_2632 in
+  let rec _looper_2738 _x_2739 (_s_2740 : int) =
+    if _x_2739 = 0 then _s_2740
     else
-      _looper_1195 (_x_1196 - 1)
-        (_s_1197
-        + _maxl_1090 0
-            (let rec _explore_1232 (_x_1159, _k_1234) =
-               match _x_1159 with
-               | Empty -> Call (Get, (), fun (_y_1222 : int) -> _k_1234 _y_1222)
-               | Node (_left_1225, _x_1224, _right_1223) ->
-                   let _l_1160 (_y_1226 : bool) =
-                     _explore_1232
-                       ( (if _y_1226 then _left_1225 else _right_1223),
-                         fun (_b_1229 : int) ->
-                           _k_1234 (_op_140 _x_1224 _b_1229) )
+      _looper_2738 (_x_2739 - 1)
+        (_s_2740
+        + _maxl_2633 0
+            (let rec _explore_2782 (_x_2702, _k_2784) =
+               match _x_2702 with
+               | Empty -> Call (Get, (), fun (_y_2765 : int) -> _k_2784 _y_2765)
+               | Node (_left_2768, _x_2767, _right_2766) ->
+                   let _l_2703 (_y_2769 : bool) =
+                     if _y_2769 then
+                       _explore_2782
+                         ( _left_2768,
+                           fun (_b_2814 : int) ->
+                             _k_2784 (_op_162 _x_2767 _b_2814) )
+                     else
+                       _explore_2782
+                         ( _right_2766,
+                           fun (_b_2834 : int) ->
+                             _k_2784 (_op_162 _x_2767 _b_2834) )
                    in
-                   _l_1160 true >>= fun _b_1124 ->
-                   _l_1160 false >>= fun _b_1125 ->
-                   Value (_op_151 (* @ *) _b_1124 _b_1125)
+                   _l_2703 true >>= fun _b_2667 ->
+                   _l_2703 false >>= fun _b_2668 ->
+                   Value (_op_173 (* @ *) _b_2667 _b_2668)
              in
-             let rec _explore_1236 (_x_1159, _k_1234) =
-               match _x_1159 with
+             let rec _explore_2836 (_x_2702, _k_2784) =
+               match _x_2702 with
                | Empty -> (
-                   fun (_s_1238 : intlist) ->
-                     match _s_1238 with
-                     | Cons (_x_1240, _rest_1239) ->
+                   fun (_s_2838 : intlist) ->
+                     match _s_2838 with
+                     | Cons (_x_2840, _rest_2839) ->
                          force_unsafe
                            ((handler
                                {
                                  value_clause =
-                                   (fun (_x_1243 : intlist) ->
-                                     Value (fun (_ : intlist) -> _x_1243));
+                                   (fun (_x_2843 : intlist) ->
+                                     Value (fun (_ : intlist) -> _x_2843));
                                  effect_clauses =
                                    (fun (type a b)
                                         (eff : (a, b) eff_internal_effect) :
                                         (a -> (b -> _) -> _) ->
                                      match eff with
                                      | Get ->
-                                         fun () _l_1244 ->
+                                         fun () _l_2844 ->
                                            Value
-                                             (fun (_s_1245 : intlist) ->
-                                               match _s_1245 with
-                                               | Cons (_x_1247, _rest_1246) ->
+                                             (fun (_s_2845 : intlist) ->
+                                               match _s_2845 with
+                                               | Cons (_x_2847, _rest_2846) ->
                                                    coer_arrow coer_refl_ty
-                                                     force_unsafe _l_1244
-                                                     _x_1247 _rest_1246
+                                                     force_unsafe _l_2844
+                                                     _x_2847 _rest_2846
                                                | Nil -> Nil)
                                      | eff' -> fun arg k -> Call (eff', arg, k));
                                })
-                              (_k_1234 _x_1240))
-                           _rest_1239
+                              (_k_2784 _x_2840))
+                           _rest_2839
                      | Nil -> Nil)
-               | Node (_left_1225, _x_1224, _right_1223) ->
-                   let _l_1160 (_y_1226 : bool) =
-                     _explore_1232
-                       ( (if _y_1226 then _left_1225 else _right_1223),
-                         fun (_b_1229 : int) ->
-                           _k_1234 (_op_140 _x_1224 _b_1229) )
+               | Node (_left_2768, _x_2767, _right_2766) ->
+                   let _l_2703 (_y_2769 : bool) =
+                     if _y_2769 then
+                       _explore_2782
+                         ( _left_2768,
+                           fun (_b_2814 : int) ->
+                             _k_2784 (_op_162 _x_2767 _b_2814) )
+                     else
+                       _explore_2782
+                         ( _right_2766,
+                           fun (_b_2834 : int) ->
+                             _k_2784 (_op_162 _x_2767 _b_2834) )
                    in
                    force_unsafe
                      ((handler
                          {
                            value_clause =
-                             (fun (_b_1124 : intlist) ->
+                             (fun (_b_2667 : intlist) ->
                                Value
                                  (force_unsafe
                                     ((handler
                                         {
                                           value_clause =
-                                            (fun (_b_1125 : intlist) ->
+                                            (fun (_b_2853 : intlist) ->
                                               Value
                                                 (fun (_ : intlist) ->
-                                                  _op_151 (* @ *) _b_1124
-                                                    _b_1125));
+                                                  _op_173 (* @ *) _b_2667
+                                                    _b_2853));
                                           effect_clauses =
                                             (fun (type a b)
                                                  (eff :
@@ -348,259 +370,282 @@ let _test_leaf_state_loop_1088 (_m_1089 : int) =
                                                  (a -> (b -> _) -> _) ->
                                               match eff with
                                               | Get ->
-                                                  fun () _l_1210 ->
+                                                  fun () _l_2855 ->
                                                     Value
-                                                      (fun (_s_1211 : intlist) ->
-                                                        match _s_1211 with
+                                                      (fun (_s_2856 : intlist) ->
+                                                        match _s_2856 with
                                                         | Cons
-                                                            (_x_1213, _rest_1212)
+                                                            (_x_2858, _rest_2857)
                                                           ->
                                                             coer_arrow
                                                               coer_refl_ty
                                                               force_unsafe
-                                                              _l_1210 _x_1213
-                                                              _rest_1212
+                                                              _l_2855 _x_2858
+                                                              _rest_2857
                                                         | Nil -> Nil)
                                               | eff' ->
                                                   fun arg k ->
                                                     Call (eff', arg, k));
                                         })
-                                       (_l_1160 false))));
+                                       (_l_2703 false))));
                            effect_clauses =
                              (fun (type a b) (eff : (a, b) eff_internal_effect)
                                   : (a -> (b -> _) -> _) ->
                                match eff with
                                | Get ->
-                                   fun () _l_1210 ->
+                                   fun () _l_2753 ->
                                      Value
-                                       (fun (_s_1211 : intlist) ->
-                                         match _s_1211 with
-                                         | Cons (_x_1213, _rest_1212) ->
+                                       (fun (_s_2754 : intlist) ->
+                                         match _s_2754 with
+                                         | Cons (_x_2756, _rest_2755) ->
                                              coer_arrow coer_refl_ty
-                                               force_unsafe _l_1210 _x_1213
-                                               _rest_1212
+                                               force_unsafe _l_2753 _x_2756
+                                               _rest_2755
                                          | Nil -> Nil)
                                | eff' -> fun arg k -> Call (eff', arg, k));
                          })
-                        (_l_1160 true))
+                        (_l_2703 true))
              in
-             _explore_1236
-               (____t_1111, fun (_x_1126 : int) -> Value (Cons (_x_1126, Nil)))
-               ____leafs_1109))
+             _explore_2836
+               (____t_2654, fun (_x_2669 : int) -> Value (Cons (_x_2669, Nil)))
+               ____leafs_2652))
   in
-  _looper_1195 100 0
+  _looper_2738 100 0
 
-let test_leaf_state_loop = _test_leaf_state_loop_1088
+let test_leaf_state_loop = _test_leaf_state_loop_2631
 
 type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
 
-let _test_leaf_state_update_1876 (_m_1877 : int) =
-  let rec _maxl_1878 _x_1920 (_x_2292 : intlist) =
-    match _x_2292 with
-    | Nil -> _x_1920
-    | Cons (_x_2294, _xs_2293) -> _maxl_1878 (_max_146 _x_2294 _x_1920) _xs_2293
+let _test_leaf_state_update_4890 (_m_4891 : int) =
+  let rec _maxl_4892 _x_4934 (_x_5594 : intlist) =
+    match _x_5594 with
+    | Nil -> _x_4934
+    | Cons (_x_5596, _xs_5595) -> _maxl_4892 (_max_168 _x_5596 _x_4934) _xs_5595
   in
-  _maxl_1878 0
-    (let rec _explore_1971 (_x_1927, _k_1973) =
-       match _x_1927 with
-       | Empty -> Call (Get, (), fun (_y_1958 : int) -> _k_1973 _y_1958)
-       | Node (_left_1961, _x_1960, _right_1959) ->
+  _maxl_4892 0
+    (let rec _explore_4992 (_x_4941, _k_4994) =
+       match _x_4941 with
+       | Empty -> Call (Get, (), fun (_y_4972 : int) -> _k_4994 _y_4972)
+       | Node (_left_4975, _x_4974, _right_4973) ->
            Call
              ( Set,
-               _x_1960 * _x_1960,
-               fun (_y_1964 : unit) ->
-                 let _l_1928 (_y_1965 : bool) =
-                   _explore_1971
-                     ( (if _y_1965 then _left_1961 else _right_1959),
-                       fun (_b_1968 : int) -> _k_1973 (_op_140 _x_1960 _b_1968)
-                     )
+               _x_4974 * _x_4974,
+               fun (_y_5092 : unit) ->
+                 let _l_5093 (_y_5097 : bool) =
+                   if _y_5097 then
+                     _explore_4992
+                       ( _left_4975,
+                         fun (_b_5099 : int) ->
+                           _k_4994 (_op_162 _x_4974 _b_5099) )
+                   else
+                     _explore_4992
+                       ( _right_4973,
+                         fun (_b_5102 : int) ->
+                           _k_4994 (_op_162 _x_4974 _b_5102) )
                  in
-                 _l_1928 true >>= fun _b_1901 ->
-                 _l_1928 false >>= fun _b_1902 ->
-                 Value (_op_151 (* @ *) _b_1901 _b_1902) )
+                 _l_5093 true >>= fun _b_5094 ->
+                 _l_5093 false >>= fun _b_5096 ->
+                 Value (_op_173 (* @ *) _b_5094 _b_5096) )
      in
-     let rec _explore_1975 (_x_1927, _k_1973) (_x_0 : int) =
-       match _x_1927 with
+     let rec _explore_5104 (_x_4941, _k_4994) (_x_0 : int) =
+       match _x_4941 with
        | Empty ->
            force_unsafe
              ((handler
                  {
                    value_clause =
-                     (fun (_x_1980 : intlist) ->
-                       Value (fun (_ : int) -> _x_1980));
+                     (fun (_x_5109 : intlist) ->
+                       Value (fun (_ : int) -> _x_5109));
                    effect_clauses =
                      (fun (type a b) (eff : (a, b) eff_internal_effect) :
                           (a -> (b -> _) -> _) ->
                        match eff with
                        | Get ->
-                           fun () _l_1981 ->
+                           fun () _l_5110 ->
                              Value
-                               (fun (_s_1982 : int) ->
-                                 coer_arrow coer_refl_ty force_unsafe _l_1981
-                                   _s_1982 _s_1982)
+                               (fun (_s_5111 : int) ->
+                                 coer_arrow coer_refl_ty force_unsafe _l_5110
+                                   _s_5111 _s_5111)
                        | Set ->
-                           fun _s_1984 _l_1985 ->
+                           fun _s_5113 _l_5114 ->
                              Value
                                (fun (_ : int) ->
-                                 coer_arrow coer_refl_ty force_unsafe _l_1985 ()
-                                   _s_1984)
+                                 coer_arrow coer_refl_ty force_unsafe _l_5114 ()
+                                   _s_5113)
                        | eff' -> fun arg k -> Call (eff', arg, k));
                  })
-                (_k_1973 _x_0))
+                (_k_4994 _x_0))
              _x_0
-       | Node (_left_1961, _x_1960, _right_1959) ->
-           (let _l_1991 (_y_2008 : bool) =
-              _explore_1971
-                ( (if _y_2008 then _left_1961 else _right_1959),
-                  fun (_b_2011 : int) -> _k_1973 (_op_140 _x_1960 _b_2011) )
+       | Node (_left_4975, _x_4974, _right_4973) ->
+           (let _l_5442 (_y_5459 : bool) =
+              if _y_5459 then
+                _explore_4992
+                  ( _left_4975,
+                    fun (_b_5461 : int) -> _k_4994 (_op_162 _x_4974 _b_5461) )
+              else
+                _explore_4992
+                  ( _right_4973,
+                    fun (_b_5464 : int) -> _k_4994 (_op_162 _x_4974 _b_5464) )
             in
             force_unsafe
               ((handler
                   {
                     value_clause =
-                      (fun (_b_1992 : intlist) ->
+                      (fun (_b_5443 : intlist) ->
                         Value
                           (force_unsafe
                              ((handler
                                  {
                                    value_clause =
-                                     (fun (_b_1994 : intlist) ->
+                                     (fun (_b_5445 : intlist) ->
                                        Value
                                          (fun (_ : int) ->
-                                           _op_151 (* @ *) _b_1992 _b_1994));
+                                           _op_173 (* @ *) _b_5443 _b_5445));
                                    effect_clauses =
                                      (fun (type a b)
                                           (eff : (a, b) eff_internal_effect) :
                                           (a -> (b -> _) -> _) ->
                                        match eff with
                                        | Get ->
-                                           fun () _l_1996 ->
+                                           fun () _l_5447 ->
                                              Value
-                                               (fun (_s_1997 : int) ->
+                                               (fun (_s_5448 : int) ->
                                                  coer_arrow coer_refl_ty
-                                                   force_unsafe _l_1996 _s_1997
-                                                   _s_1997)
+                                                   force_unsafe _l_5447 _s_5448
+                                                   _s_5448)
                                        | Set ->
-                                           fun _s_1999 _l_2000 ->
+                                           fun _s_5450 _l_5451 ->
                                              Value
                                                (fun (_ : int) ->
                                                  coer_arrow coer_refl_ty
-                                                   force_unsafe _l_2000 ()
-                                                   _s_1999)
+                                                   force_unsafe _l_5451 ()
+                                                   _s_5450)
                                        | eff' -> fun arg k -> Call (eff', arg, k));
                                  })
-                                (_l_1991 false))));
+                                (_l_5442 false))));
                     effect_clauses =
                       (fun (type a b) (eff : (a, b) eff_internal_effect) :
                            (a -> (b -> _) -> _) ->
                         match eff with
                         | Get ->
-                            fun () _l_2002 ->
+                            fun () _l_5453 ->
                               Value
-                                (fun (_s_2003 : int) ->
-                                  coer_arrow coer_refl_ty force_unsafe _l_2002
-                                    _s_2003 _s_2003)
+                                (fun (_s_5454 : int) ->
+                                  coer_arrow coer_refl_ty force_unsafe _l_5453
+                                    _s_5454 _s_5454)
                         | Set ->
-                            fun _s_2005 _l_2006 ->
+                            fun _s_5456 _l_5457 ->
                               Value
                                 (fun (_ : int) ->
-                                  coer_arrow coer_refl_ty force_unsafe _l_2006
-                                    () _s_2005)
+                                  coer_arrow coer_refl_ty force_unsafe _l_5457
+                                    () _s_5456)
                         | eff' -> fun arg k -> Call (eff', arg, k));
                   })
-                 (_l_1991 true)))
-             (_x_1960 * _x_1960)
+                 (_l_5442 true)))
+             (_x_4974 * _x_4974)
      in
-     _explore_1975
-       (_tester_42 _m_1877, fun (_x_1903 : int) -> Value (Cons (_x_1903, Nil)))
+     _explore_5104
+       (_tester_42 _m_4891, fun (_x_4917 : int) -> Value (Cons (_x_4917, Nil)))
        ~-1)
 
-let test_leaf_state_update = _test_leaf_state_update_1876
+let test_leaf_state_update = _test_leaf_state_update_4890
 
-let _test_leaf_state_update_loop_10985 (_m_10986 : int) =
-  let rec _maxl_10987 _x_11041 (_x_11452 : intlist) =
-    match _x_11452 with
-    | Nil -> _x_11041
-    | Cons (_x_11454, _xs_11453) ->
-        _maxl_10987 (_max_146 _x_11454 _x_11041) _xs_11453
+let _test_leaf_state_update_loop_21688 (_m_21689 : int) =
+  let rec _maxl_21690 _x_21744 (_x_22443 : intlist) =
+    match _x_22443 with
+    | Nil -> _x_21744
+    | Cons (_x_22445, _xs_22444) ->
+        _maxl_21690 (_max_168 _x_22445 _x_21744) _xs_22444
   in
-  let ____t_10995 = _tester_42 _m_10986 in
-  let rec _looper_11087 _x_11088 (_s_11089 : int) =
-    if _x_11088 = 0 then _s_11089
+  let ____t_21698 = _tester_42 _m_21689 in
+  let rec _looper_21790 _x_21791 (_s_21792 : int) =
+    if _x_21791 = 0 then _s_21792
     else
-      _looper_11087 (_x_11088 - 1)
-        (_s_11089
-        + _maxl_10987 0
-            (let rec _explore_11131 (_x_11048, _k_11133) =
-               match _x_11048 with
+      _looper_21790 (_x_21791 - 1)
+        (_s_21792
+        + _maxl_21690 0
+            (let rec _explore_21841 (_x_21751, _k_21843) =
+               match _x_21751 with
                | Empty ->
-                   Call (Get, (), fun (_y_11118 : int) -> _k_11133 _y_11118)
-               | Node (_left_11121, _x_11120, _right_11119) ->
+                   Call (Get, (), fun (_y_21821 : int) -> _k_21843 _y_21821)
+               | Node (_left_21824, _x_21823, _right_21822) ->
                    Call
                      ( Set,
-                       _x_11120 * _x_11120,
-                       fun (_y_11124 : unit) ->
-                         let _l_11049 (_y_11125 : bool) =
-                           _explore_11131
-                             ( (if _y_11125 then _left_11121 else _right_11119),
-                               fun (_b_11128 : int) ->
-                                 _k_11133 (_op_140 _x_11120 _b_11128) )
+                       _x_21823 * _x_21823,
+                       fun (_y_21941 : unit) ->
+                         let _l_21942 (_y_21946 : bool) =
+                           if _y_21946 then
+                             _explore_21841
+                               ( _left_21824,
+                                 fun (_b_21948 : int) ->
+                                   _k_21843 (_op_162 _x_21823 _b_21948) )
+                           else
+                             _explore_21841
+                               ( _right_21822,
+                                 fun (_b_21951 : int) ->
+                                   _k_21843 (_op_162 _x_21823 _b_21951) )
                          in
-                         _l_11049 true >>= fun _b_11010 ->
-                         _l_11049 false >>= fun _b_11011 ->
-                         Value (_op_151 (* @ *) _b_11010 _b_11011) )
+                         _l_21942 true >>= fun _b_21943 ->
+                         _l_21942 false >>= fun _b_21945 ->
+                         Value (_op_173 (* @ *) _b_21943 _b_21945) )
              in
-             let rec _explore_11135 (_x_11048, _k_11133) (_x_1 : int) =
-               match _x_11048 with
+             let rec _explore_21953 (_x_21751, _k_21843) (_x_1 : int) =
+               match _x_21751 with
                | Empty ->
                    force_unsafe
                      ((handler
                          {
                            value_clause =
-                             (fun (_x_11140 : intlist) ->
-                               Value (fun (_ : int) -> _x_11140));
+                             (fun (_x_21958 : intlist) ->
+                               Value (fun (_ : int) -> _x_21958));
                            effect_clauses =
                              (fun (type a b) (eff : (a, b) eff_internal_effect)
                                   : (a -> (b -> _) -> _) ->
                                match eff with
                                | Get ->
-                                   fun () _l_11141 ->
+                                   fun () _l_21959 ->
                                      Value
-                                       (fun (_s_11142 : int) ->
+                                       (fun (_s_21960 : int) ->
                                          coer_arrow coer_refl_ty force_unsafe
-                                           _l_11141 _s_11142 _s_11142)
+                                           _l_21959 _s_21960 _s_21960)
                                | Set ->
-                                   fun _s_11144 _l_11145 ->
+                                   fun _s_21962 _l_21963 ->
                                      Value
                                        (fun (_ : int) ->
                                          coer_arrow coer_refl_ty force_unsafe
-                                           _l_11145 () _s_11144)
+                                           _l_21963 () _s_21962)
                                | eff' -> fun arg k -> Call (eff', arg, k));
                          })
-                        (_k_11133 _x_1))
+                        (_k_21843 _x_1))
                      _x_1
-               | Node (_left_11121, _x_11120, _right_11119) ->
-                   (let _l_11151 (_y_11168 : bool) =
-                      _explore_11131
-                        ( (if _y_11168 then _left_11121 else _right_11119),
-                          fun (_b_11171 : int) ->
-                            _k_11133 (_op_140 _x_11120 _b_11171) )
+               | Node (_left_21824, _x_21823, _right_21822) ->
+                   (let _l_22291 (_y_22308 : bool) =
+                      if _y_22308 then
+                        _explore_21841
+                          ( _left_21824,
+                            fun (_b_22310 : int) ->
+                              _k_21843 (_op_162 _x_21823 _b_22310) )
+                      else
+                        _explore_21841
+                          ( _right_21822,
+                            fun (_b_22313 : int) ->
+                              _k_21843 (_op_162 _x_21823 _b_22313) )
                     in
                     force_unsafe
                       ((handler
                           {
                             value_clause =
-                              (fun (_b_11152 : intlist) ->
+                              (fun (_b_22292 : intlist) ->
                                 Value
                                   (force_unsafe
                                      ((handler
                                          {
                                            value_clause =
-                                             (fun (_b_11154 : intlist) ->
+                                             (fun (_b_22294 : intlist) ->
                                                Value
                                                  (fun (_ : int) ->
-                                                   _op_151 (* @ *) _b_11152
-                                                     _b_11154));
+                                                   _op_173 (* @ *) _b_22292
+                                                     _b_22294));
                                            effect_clauses =
                                              (fun (type a b)
                                                   (eff :
@@ -608,120 +653,132 @@ let _test_leaf_state_update_loop_10985 (_m_10986 : int) =
                                                   : (a -> (b -> _) -> _) ->
                                                match eff with
                                                | Get ->
-                                                   fun () _l_11156 ->
+                                                   fun () _l_22296 ->
                                                      Value
-                                                       (fun (_s_11157 : int) ->
+                                                       (fun (_s_22297 : int) ->
                                                          coer_arrow coer_refl_ty
-                                                           force_unsafe _l_11156
-                                                           _s_11157 _s_11157)
+                                                           force_unsafe _l_22296
+                                                           _s_22297 _s_22297)
                                                | Set ->
-                                                   fun _s_11159 _l_11160 ->
+                                                   fun _s_22299 _l_22300 ->
                                                      Value
                                                        (fun (_ : int) ->
                                                          coer_arrow coer_refl_ty
-                                                           force_unsafe _l_11160
-                                                           () _s_11159)
+                                                           force_unsafe _l_22300
+                                                           () _s_22299)
                                                | eff' ->
                                                    fun arg k ->
                                                      Call (eff', arg, k));
                                          })
-                                        (_l_11151 false))));
+                                        (_l_22291 false))));
                             effect_clauses =
                               (fun (type a b) (eff : (a, b) eff_internal_effect)
                                    : (a -> (b -> _) -> _) ->
                                 match eff with
                                 | Get ->
-                                    fun () _l_11162 ->
+                                    fun () _l_22302 ->
                                       Value
-                                        (fun (_s_11163 : int) ->
+                                        (fun (_s_22303 : int) ->
                                           coer_arrow coer_refl_ty force_unsafe
-                                            _l_11162 _s_11163 _s_11163)
+                                            _l_22302 _s_22303 _s_22303)
                                 | Set ->
-                                    fun _s_11165 _l_11166 ->
+                                    fun _s_22305 _l_22306 ->
                                       Value
                                         (fun (_ : int) ->
                                           coer_arrow coer_refl_ty force_unsafe
-                                            _l_11166 () _s_11165)
+                                            _l_22306 () _s_22305)
                                 | eff' -> fun arg k -> Call (eff', arg, k));
                           })
-                         (_l_11151 true)))
-                     (_x_11120 * _x_11120)
+                         (_l_22291 true)))
+                     (_x_21823 * _x_21823)
              in
-             _explore_11135
-               ( ____t_10995,
-                 fun (_x_11012 : int) -> Value (Cons (_x_11012, Nil)) )
+             _explore_21953
+               ( ____t_21698,
+                 fun (_x_21715 : int) -> Value (Cons (_x_21715, Nil)) )
                ~-1))
   in
-  _looper_11087 100 0
+  _looper_21790 100 0
 
-let test_leaf_state_update_loop = _test_leaf_state_update_loop_10985
+let test_leaf_state_update_loop = _test_leaf_state_update_loop_21688
 
-let _test_leaf_state_update_merged_handler_20145 (_m_20146 : int) =
-  let rec _maxl_20147 _x_20188 (_x_20256 : intlist) =
-    match _x_20256 with
-    | Nil -> _x_20188
-    | Cons (_x_20258, _xs_20257) ->
-        _maxl_20147 (_max_146 _x_20258 _x_20188) _xs_20257
+let _test_leaf_state_update_merged_handler_38537 (_m_38538 : int) =
+  let rec _maxl_38539 _x_38580 (_x_38777 : intlist) =
+    match _x_38777 with
+    | Nil -> _x_38580
+    | Cons (_x_38779, _xs_38778) ->
+        _maxl_38539 (_max_168 _x_38779 _x_38580) _xs_38778
   in
-  _maxl_20147 0
-    (let rec _explore_20231 (_x_20195, _k_20233) (_x_2 : int) =
-       match _x_20195 with
-       | Empty -> _k_20233 _x_2 _x_2
-       | Node (_left_20216, _x_20215, _right_20214) ->
-           (let _l_20243 (_y_20250 : bool) =
-              _explore_20231
-                ( (if _y_20250 then _left_20216 else _right_20214),
-                  fun (_b_20253 : int) -> _k_20233 (_op_140 _x_20215 _b_20253)
-                )
+  _maxl_38539 0
+    (let rec _explore_38630 (_x_38587, _k_38632) (_x_2 : int) =
+       match _x_38587 with
+       | Empty -> _k_38632 _x_2 _x_2
+       | Node (_left_38608, _x_38607, _right_38606) ->
+           (let _l_38762 (_y_38769 : bool) =
+              if _y_38769 then
+                _explore_38630
+                  ( _left_38608,
+                    fun (_b_38771 : int) -> _k_38632 (_op_162 _x_38607 _b_38771)
+                  )
+              else
+                _explore_38630
+                  ( _right_38606,
+                    fun (_b_38774 : int) -> _k_38632 (_op_162 _x_38607 _b_38774)
+                  )
             in
-            fun (_s_20244 : int) ->
-              _op_151 (* @ *) (_l_20243 true _s_20244) (_l_20243 false _s_20244))
-             (_x_20215 * _x_20215)
+            fun (_s_38763 : int) ->
+              _op_173 (* @ *) (_l_38762 true _s_38763) (_l_38762 false _s_38763))
+             (_x_38607 * _x_38607)
      in
-     _explore_20231
-       ( _tester_42 _m_20146,
-         fun (_x_20181 : int) (_ : int) -> Cons (_x_20181, Nil) )
+     _explore_38630
+       ( _tester_42 _m_38538,
+         fun (_x_38573 : int) (_ : int) -> Cons (_x_38573, Nil) )
        ~-1)
 
 let test_leaf_state_update_merged_handler =
-  _test_leaf_state_update_merged_handler_20145
+  _test_leaf_state_update_merged_handler_38537
 
-let _test_leaf_state_update_merged_handler_loop_20262 (_m_20263 : int) =
-  let rec _maxl_20264 _x_20317 (_x_20412 : intlist) =
-    match _x_20412 with
-    | Nil -> _x_20317
-    | Cons (_x_20414, _xs_20413) ->
-        _maxl_20264 (_max_146 _x_20414 _x_20317) _xs_20413
+let _test_leaf_state_update_merged_handler_loop_38783 (_m_38784 : int) =
+  let rec _maxl_38785 _x_38838 (_x_39062 : intlist) =
+    match _x_39062 with
+    | Nil -> _x_38838
+    | Cons (_x_39064, _xs_39063) ->
+        _maxl_38785 (_max_168 _x_39064 _x_38838) _xs_39063
   in
-  let ____t_20272 = _tester_42 _m_20263 in
-  let rec _looper_20345 _x_20346 (_s_20347 : int) =
-    if _x_20346 = 0 then _s_20347
+  let ____t_38793 = _tester_42 _m_38784 in
+  let rec _looper_38866 _x_38867 (_s_38868 : int) =
+    if _x_38867 = 0 then _s_38868
     else
-      _looper_20345 (_x_20346 - 1)
-        (_s_20347
-        + _maxl_20264 0
-            (let rec _explore_20387 (_x_20324, _k_20389) (_x_3 : int) =
-               match _x_20324 with
-               | Empty -> _k_20389 _x_3 _x_3
-               | Node (_left_20372, _x_20371, _right_20370) ->
-                   (let _l_20399 (_y_20406 : bool) =
-                      _explore_20387
-                        ( (if _y_20406 then _left_20372 else _right_20370),
-                          fun (_b_20409 : int) ->
-                            _k_20389 (_op_140 _x_20371 _b_20409) )
+      _looper_38866 (_x_38867 - 1)
+        (_s_38868
+        + _maxl_38785 0
+            (let rec _explore_38915 (_x_38845, _k_38917) (_x_3 : int) =
+               match _x_38845 with
+               | Empty -> _k_38917 _x_3 _x_3
+               | Node (_left_38893, _x_38892, _right_38891) ->
+                   (let _l_39047 (_y_39054 : bool) =
+                      if _y_39054 then
+                        _explore_38915
+                          ( _left_38893,
+                            fun (_b_39056 : int) ->
+                              _k_38917 (_op_162 _x_38892 _b_39056) )
+                      else
+                        _explore_38915
+                          ( _right_38891,
+                            fun (_b_39059 : int) ->
+                              _k_38917 (_op_162 _x_38892 _b_39059) )
                     in
-                    fun (_s_20400 : int) ->
-                      _op_151
-                        (* @ *) (_l_20399 true _s_20400)
-                        (_l_20399 false _s_20400))
-                     (_x_20371 * _x_20371)
+                    fun (_s_39048 : int) ->
+                      _op_173
+                        (* @ *) (_l_39047 true _s_39048)
+                        (_l_39047 false _s_39048))
+                     (_x_38892 * _x_38892)
              in
-             _explore_20387
-               ( ____t_20272,
-                 fun (_x_20298 : int) (_ : int) -> Cons (_x_20298, Nil) )
+             _explore_38915
+               ( ____t_38793,
+                 fun (_x_38819 : int) (_ : int) -> Cons (_x_38819, Nil) )
                ~-1))
   in
-  _looper_20345 100 0
+  _looper_38866 100 0
 
 let test_leaf_state_update_merged_handler_loop =
-  _test_leaf_state_update_merged_handler_loop_20262
+  _test_leaf_state_update_merged_handler_loop_38783

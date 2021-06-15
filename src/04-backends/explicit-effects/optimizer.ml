@@ -90,16 +90,9 @@ let rec extract_cast_value comp =
         (extract_cast_value comp)
   | _ -> None
 
-let rec recast_computation hnd comp =
-  match (comp.term, comp.ty) with
-  | Term.CastComp (comp, { term = tcoer, _; _ }), _ ->
-      Option.map
-        (fun comp ->
-          let _, drt = comp.ty in
-          Term.castComp
-            (comp, Constraint.bangCoercion (tcoer, Constraint.reflDirt drt)))
-        (recast_computation hnd comp)
-  | _, (ty, { Type.effect_set = effs; Type.row = EmptyRow }) ->
+let recast_computation hnd comp =
+  match comp.ty with
+  | ty, { Type.effect_set = effs; Type.row = EmptyRow } ->
       let handled_effs =
         Type.EffectSet.of_list
           (List.map
@@ -118,7 +111,7 @@ let rec recast_computation hnd comp =
         and drt_coer = Constraint.unionDirt (effs, Constraint.empty drt_diff) in
         Some (Term.castComp (comp, Constraint.bangCoercion (ty_coer, drt_coer)))
       else None
-  | _, _ -> None
+  | _ -> None
 
 let rec optimize_expression state exp =
   let exp' = optimize_expression' state exp in
@@ -302,6 +295,18 @@ and handle_computation state hnd comp =
           (handle_abstraction state hnd abs)
       in
       handle_computation state hnd' cmp
+  | CastComp (cmp, { term = tcoer, dcoer; _ }) ->
+      let ty, _ = cmp.ty in
+      let x_pat, x_var = Term.fresh_variable "x" ty in
+      let hnd' =
+        Term.handler_with_new_value_clause hnd
+          (Term.abstraction
+             ( x_pat,
+               Term.letVal (Term.castExp (x_var, tcoer), hnd.term.value_clause)
+             ))
+      in
+      let hnd'' = Term.handler_with_smaller_input_dirt hnd' dcoer in
+      handle_computation state hnd'' cmp
   | _ -> (
       match recast_computation hnd comp with
       | Some comp' -> bind_computation state comp' hnd.term.Term.value_clause

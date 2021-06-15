@@ -18,46 +18,46 @@ let rec _op_42 (* @ *) _x_49 (_ys_51 : triple_int_list) =
 let _op_42 (* @ *) = _op_42 (* @ *)
 
 let _testTriple_56 (_n_57 : int) (_s_58 : int) =
-  let rec _choice_244 _x_245 =
-    if _x_245 < 1 then TripleNil
+  let rec _choice_649 _x_650 =
+    if _x_650 < 1 then TripleNil
     else
-      let _l_248 (_y_252 : bool) =
-        if _y_252 then
-          let rec _choice_255 _x_256 =
-            if _x_256 < 1 then TripleNil
+      let _l_653 (_y_657 : bool) =
+        if _y_657 then
+          let rec _choice_660 _x_661 =
+            if _x_661 < 1 then TripleNil
             else
-              let _l_259 (_y_263 : bool) =
-                if _y_263 then
-                  let rec _choice_266 _x_267 =
-                    if _x_267 < 1 then TripleNil
+              let _l_664 (_y_668 : bool) =
+                if _y_668 then
+                  let rec _choice_671 _x_672 =
+                    if _x_672 < 1 then TripleNil
                     else
-                      let _l_270 (_y_274 : bool) =
-                        if _y_274 then
-                          if _x_245 + _x_256 + _x_267 = _s_58 then
-                            TripleCons ((_x_245, _x_256, _x_267), TripleNil)
+                      let _l_675 (_y_679 : bool) =
+                        if _y_679 then
+                          if _x_650 + _x_661 + _x_672 = _s_58 then
+                            TripleCons ((_x_650, _x_661, _x_672), TripleNil)
                           else TripleNil
-                        else _choice_266 (_x_267 - 1)
+                        else _choice_671 (_x_672 - 1)
                       in
-                      _op_42 (* @ *) (_l_270 true) (_l_270 false)
+                      _op_42 (* @ *) (_l_675 true) (_l_675 false)
                   in
-                  _choice_266 (_x_256 - 1)
-                else _choice_255 (_x_256 - 1)
+                  _choice_671 (_x_661 - 1)
+                else _choice_660 (_x_661 - 1)
               in
-              _op_42 (* @ *) (_l_259 true) (_l_259 false)
+              _op_42 (* @ *) (_l_664 true) (_l_664 false)
           in
-          _choice_255 (_x_245 - 1)
-        else _choice_244 (_x_245 - 1)
+          _choice_660 (_x_650 - 1)
+        else _choice_649 (_x_650 - 1)
       in
-      _op_42 (* @ *) (_l_248 true) (_l_248 false)
+      _op_42 (* @ *) (_l_653 true) (_l_653 false)
   in
-  _choice_244 _n_57
+  _choice_649 _n_57
 
 let testTriple = _testTriple_56
 
-let _handleTripleWrap_288 ((_x_289, _y_290) : int * int) =
-  _testTriple_56 _x_289 _y_290
+let _handleTripleWrap_693 ((_x_694, _y_695) : int * int) =
+  _testTriple_56 _x_694 _y_695
 
-let handleTripleWrap = _handleTripleWrap_288
+let handleTripleWrap = _handleTripleWrap_693
 
 type queen = int * int
 
@@ -71,90 +71,89 @@ type option = Some of queen_list | None
 
 type (_, _) eff_internal_effect += Select : (intlist, int) eff_internal_effect
 
-let rec _filter_292 _x_301 (_x_303 : intlist) =
-  match _x_303 with
+let rec _filter_697 _x_706 (_x_708 : intlist) =
+  match _x_708 with
   | End -> End
-  | Lst (_x_305, _xs_304) ->
-      if _x_301 _x_305 then Lst (_x_305, _filter_292 _x_301 _xs_304)
-      else _filter_292 _x_301 _xs_304
+  | Lst (_x_710, _xs_709) ->
+      if _x_706 _x_710 then Lst (_x_710, _filter_697 _x_706 _xs_709)
+      else _filter_697 _x_706 _xs_709
 
-let filter = _filter_292
+let filter = _filter_697
 
-let rec _forall_310 _x_317 (_x_319 : queen_list) =
-  match _x_319 with
+let rec _forall_715 _x_722 (_x_724 : queen_list) =
+  match _x_724 with
   | Nil -> true
-  | Cons (_x_321, _xs_320) -> _x_317 _x_321 && _forall_310 _x_317 _xs_320
+  | Cons (_x_726, _xs_725) -> _x_722 _x_726 && _forall_715 _x_722 _xs_725
 
-let forall = _forall_310
+let forall = _forall_715
 
-let _no_attack_324 ((_x_325, _y_326) : int * int)
-    ((_x'_327, _y'_328) : int * int) =
-  _x_325 <> _x'_327 && _y_326 <> _y'_328
-  && abs (_x_325 - _x'_327) <> abs (_y_326 - _y'_328)
+let _no_attack_729 ((_x_730, _y_731) : int * int)
+    ((_x'_732, _y'_733) : int * int) =
+  _x_730 <> _x'_732 && _y_731 <> _y'_733
+  && abs (_x_730 - _x'_732) <> abs (_y_731 - _y'_733)
 
-let no_attack = _no_attack_324
+let no_attack = _no_attack_729
 
-let _available_340 (_x_341 : int) (_qs_342 : queen_list) (_l_343 : intlist) =
-  _filter_292
-    (fun (_y_345 : int) ->
-      _forall_310 (_no_attack_324 (_x_341, _y_345)) _qs_342)
-    _l_343
+let _available_745 (_x_746 : int) (_qs_747 : queen_list) (_l_748 : intlist) =
+  _filter_697
+    (fun (_y_750 : int) ->
+      _forall_715 (_no_attack_729 (_x_746, _y_750)) _qs_747)
+    _l_748
 
-let available = _available_340
+let available = _available_745
 
-let _find_solution_348 (_n_349 : int) =
-  let rec _init_363 _x_388 (_acc_410 : intlist) =
-    if _x_388 = 0 then _acc_410
-    else _init_363 (_x_388 - 1) (Lst (_x_388, _acc_410))
+let _find_solution_753 (_n_754 : int) =
+  let rec _init_768 _x_793 (_acc_815 : intlist) =
+    if _x_793 = 0 then _acc_815
+    else _init_768 (_x_793 - 1) (Lst (_x_793, _acc_815))
   in
-  let ____l_371 = _init_363 _n_349 End in
-  let rec _place_423 (_x_374, _qs_375) =
-    if _x_374 = _n_349 + 1 then Some _qs_375
+  let rec _place_1033 (_x_1035, _qs_1034) =
+    if _x_1035 = _n_754 + 1 then Some _qs_1034
     else
-      let rec _loop_436 _x_437 (_x_438 : intlist) =
-        match _x_438 with
+      let rec _loop_1043 _x_1044 (_x_1045 : intlist) =
+        match _x_1045 with
         | End -> None
-        | Lst (_x_440, _xs_439) -> (
-            match _x_437 _x_440 with
-            | None -> _loop_436 _x_437 _xs_439
-            | Some _x_443 -> Some _x_443)
+        | Lst (_x_1047, _xs_1046) -> (
+            match _x_1044 _x_1047 with
+            | None -> _loop_1043 _x_1044 _xs_1046
+            | Some _x_1050 -> Some _x_1050)
       in
-      _loop_436
-        (fun (_y_445 : int) ->
-          _place_423 (_x_374 + 1, Cons ((_x_374, _y_445), _qs_375)))
-        (_available_340 _x_374 _qs_375 ____l_371)
+      _loop_1043
+        (fun (_y_1052 : int) ->
+          _place_1033 (_x_1035 + 1, Cons ((_x_1035, _y_1052), _qs_1034)))
+        (_available_745 _x_1035 _qs_1034 (_init_768 _n_754 End))
   in
-  _place_423 (1, Nil)
+  _place_1033 (1, Nil)
 
-let find_solution = _find_solution_348
+let find_solution = _find_solution_753
 
-let _queens_all_448 (_number_of_queens_449 : int) =
-  _find_solution_348 _number_of_queens_449
+let _queens_all_1055 (_number_of_queens_1056 : int) =
+  _find_solution_753 _number_of_queens_1056
 
-let queens_all = _queens_all_448
+let queens_all = _queens_all_1055
 
 type (_, _) eff_internal_effect += CountPut : (int, unit) eff_internal_effect
 
 type (_, _) eff_internal_effect += CountGet : (unit, int) eff_internal_effect
 
-let rec _count_450 _x_460 =
+let rec _count_1057 _x_1067 =
   Call
     ( CountGet,
       (),
-      fun (_y_464 : int) ->
-        if _y_464 = 0 then Value _y_464
-        else Call (CountPut, _y_464 - 1, fun (_y_462 : unit) -> _count_450 ())
+      fun (_y_1071 : int) ->
+        if _y_1071 = 0 then Value _y_1071
+        else Call (CountPut, _y_1071 - 1, fun (_y_1069 : unit) -> _count_1057 ())
     )
 
-let count = _count_450
+let count = _count_1057
 
-let _testCount_465 (_m_466 : int) =
-  let rec _count_483 _x_460 (_s_496 : int) =
-    if _s_496 = 0 then _s_496 else _count_483 () (_s_496 - 1)
+let _testCount_1072 (_m_1073 : int) =
+  let rec _count_1090 _x_1067 (_s_1134 : int) =
+    if _s_1134 = 0 then _s_1134 else _count_1090 () (_s_1134 - 1)
   in
-  _count_483 () _m_466
+  _count_1090 () _m_1073
 
-let testCount = _testCount_465
+let testCount = _testCount_1072
 
 type (_, _) eff_internal_effect +=
   | GeneratorPut : (int, unit) eff_internal_effect
@@ -165,11 +164,11 @@ type (_, _) eff_internal_effect +=
 type (_, _) eff_internal_effect +=
   | GeneratorYield : (int, unit) eff_internal_effect
 
-let _testGenerator_505 (_n_506 : int) =
-  let rec _generateFromTo_571 (_l_508, _u_509) (_x_1 : int) =
-    if _l_508 > _u_509 then _x_1
-    else _generateFromTo_571 (_l_508 + 1, _u_509) (_x_1 + _l_508)
+let _testGenerator_1143 (_n_1144 : int) =
+  let rec _generateFromTo_1234 (_l_1146, _u_1147) (_x_1 : int) =
+    if _l_1146 > _u_1147 then _x_1
+    else _generateFromTo_1234 (_l_1146 + 1, _u_1147) (_x_1 + _l_1146)
   in
-  _generateFromTo_571 (1, _n_506) 0
+  _generateFromTo_1234 (1, _n_1144) 0
 
-let testGenerator = _testGenerator_505
+let testGenerator = _testGenerator_1143

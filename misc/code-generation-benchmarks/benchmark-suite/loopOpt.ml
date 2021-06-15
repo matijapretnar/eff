@@ -41,49 +41,49 @@ let _test_incr_98 (_n_99 : int) =
 
 let test_incr = _test_incr_98
 
-let rec _loop_incr'_120 _x_128 =
-  if _x_128 = 0 then Value ()
+let rec _loop_incr'_148 _x_156 =
+  if _x_156 = 0 then Value ()
   else
-    _loop_incr'_120 (_x_128 - 1) >>= fun _ ->
-    Call (Incr, (), fun (_y_136 : unit) -> Value _y_136)
+    _loop_incr'_148 (_x_156 - 1) >>= fun _ ->
+    Call (Incr, (), fun (_y_164 : unit) -> Value _y_164)
 
-let loop_incr' = _loop_incr'_120
+let loop_incr' = _loop_incr'_148
 
-let _test_incr'_137 (_n_138 : int) =
-  let rec _loop_incr'_164 (_x_128, _k_167) =
-    if _x_128 = 0 then _k_167 ()
+let _test_incr'_165 (_n_166 : int) =
+  let rec _loop_incr'_200 (_x_156, _k_203) =
+    if _x_156 = 0 then _k_203 ()
     else
-      _loop_incr'_164
-        (_x_128 - 1, fun (_ : unit) (_x_171 : int) -> _k_167 () (_x_171 + 1))
-  and _loop_incr_165 _x_89 (_x_1 : int) =
-    if _x_89 = 0 then _x_1 else _loop_incr_165 (_x_89 - 1) (_x_1 + 1)
+      _loop_incr'_200
+        (_x_156 - 1, fun (_ : unit) (_x_260 : int) -> _k_203 () (_x_260 + 1))
+  and _loop_incr_201 _x_89 (_x_1 : int) =
+    if _x_89 = 0 then _x_1 else _loop_incr_201 (_x_89 - 1) (_x_1 + 1)
   in
-  _loop_incr'_164 (_n_138, fun (_x_145 : unit) (_x_147 : int) -> _x_147) 0
+  _loop_incr'_200 (_n_166, fun (_x_173 : unit) (_x_175 : int) -> _x_175) 0
 
-let test_incr' = _test_incr'_137
+let test_incr' = _test_incr'_165
 
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
 type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
 
-let rec _loop_state_181 _x_194 =
-  if _x_194 = 0 then Value ()
+let rec _loop_state_281 _x_294 =
+  if _x_294 = 0 then Value ()
   else
     Call
       ( Get,
         (),
-        fun (_y_203 : int) ->
+        fun (_y_303 : int) ->
           Call
             ( Put,
-              _y_203 + 1,
-              fun (_y_206 : unit) -> _loop_state_181 (_x_194 - 1) ) )
+              _y_303 + 1,
+              fun (_y_306 : unit) -> _loop_state_281 (_x_294 - 1) ) )
 
-let loop_state = _loop_state_181
+let loop_state = _loop_state_281
 
-let _test_state_209 (_n_210 : int) =
-  let rec _loop_state_227 _x_194 (_x_2 : int) =
-    if _x_194 = 0 then _x_2 else _loop_state_227 (_x_194 - 1) (_x_2 + 1)
+let _test_state_309 (_n_310 : int) =
+  let rec _loop_state_327 _x_294 (_x_2 : int) =
+    if _x_294 = 0 then _x_2 else _loop_state_327 (_x_294 - 1) (_x_2 + 1)
   in
-  _loop_state_227 _n_210 0
+  _loop_state_327 _n_310 0
 
-let test_state = _test_state_209
+let test_state = _test_state_309
