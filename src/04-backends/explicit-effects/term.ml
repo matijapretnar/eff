@@ -54,7 +54,7 @@ and expression' =
   | Record of (CoreTypes.Field.t, expression) Assoc.t
   | Variant of CoreTypes.Label.t * expression option
   | Lambda of abstraction
-  | Handler of handler
+  | Handler of handler_clauses
   | CastExp of expression * Constraint.ty_coercion
 
 and computation = (computation', Type.dirty) typed
@@ -71,15 +71,18 @@ and computation' =
   | Bind of computation * abstraction
   | CastComp of computation * Constraint.dirty_coercion
 
-and handler = (handler', Type.dirty * Type.dirty) typed
+and handler_clauses = (handler_clauses', Type.dirty * Type.dirty) typed
+(** Handler definitions *)
+
+and handler_clauses' = {
+  effect_clauses : effect_clauses;
+  value_clause : abstraction;
+}
 
 and effect_clauses = {
   effect_part : (effect, abstraction2) Assoc.t;
   fingerprint : effect_fingerprint;
 }
-
-and handler' = { effect_clauses : effect_clauses; value_clause : abstraction }
-(** Handler definitions *)
 
 and abstraction = (pattern * computation, Type.ty * Type.dirty) typed
 (** Abstractions that take one argument. *)
@@ -109,17 +112,21 @@ let variant (lbl, e) ty = { term = Variant (lbl, e); ty }
 
 let lambda abs = { term = Lambda abs; ty = Type.Arrow abs.ty }
 
-let fresh_handler value_clause effect_part ty =
+let handler_clauses (value_clause : abstraction) effect_part drt_in =
   (* TODO: Check that input dirt is either handled or covered in output dirt *)
-  (* TODO: Check that effect clauses have a correct type *)
   let fingerprint = EffectFingerprint.fresh () in
+  let ty_in, drty_out = value_clause.ty in
+  let ty = ((ty_in, drt_in), drty_out) in
+  let check_effect_clause ((_eff, (ty1, ty2)), abs) =
+    let pty1, pty2, drty = abs.ty in
+    assert (Type.equal_ty ty1 pty1);
+    assert (Type.equal_ty (Type.Arrow (ty2, drty_out)) pty2);
+    assert (Type.equal_dirty drty_out drty)
+  in
+  Assoc.iter check_effect_clause effect_part;
   { term = { value_clause; effect_clauses = { fingerprint; effect_part } }; ty }
 
-let handler_clauses value_clause effect_part drt_in : handler =
-  let ty_in, drty_out = value_clause.ty in
-  fresh_handler value_clause effect_part ((ty_in, drt_in), drty_out)
-
-let handler_with_new_value_clause hnd value_clause : handler =
+let handler_with_new_value_clause hnd value_clause =
   let ty_in, drty_out = value_clause.ty in
   let (_, drt_in), _ = hnd.ty in
   {
@@ -127,7 +134,7 @@ let handler_with_new_value_clause hnd value_clause : handler =
     ty = ((ty_in, drt_in), drty_out);
   }
 
-let handler_with_smaller_input_dirt hnd dcoer : handler =
+let handler_with_smaller_input_dirt hnd dcoer =
   let (ty_in, drt_in), drty_out = hnd.ty in
   let drt, drt_in' = dcoer.ty in
   assert (Type.equal_dirt drt_in drt_in');
