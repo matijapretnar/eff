@@ -207,16 +207,6 @@ plain_prefix_term:
       let op_loc = Location.make $startpos(op) $endpos(op) in
       Apply ({it= Var op; at= op_loc}, t)
     }
-  | PERFORM LPAREN eff = effect COLON LBRACE effs = separated_list(COMMA, effect) RBRACE t = term RPAREN
-    { Effect (eff, effs, t)}
-  | PERFORM LPAREN eff = effect t = term RPAREN
-    { Effect (eff, [], t)}
-  | PERFORM eff = effect
-    { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
-      Effect (eff, [], {it= Tuple []; at= unit_loc})}
-  | PERFORM eff = effect LBRACE effs = separated_list(COMMA, effect) RBRACE
-    { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
-      Effect (eff, effs, {it= Tuple []; at= unit_loc})}
   | t = plain_simple_term
     { t }
 
@@ -228,6 +218,11 @@ plain_simple_term:
     { Variant (lbl, None) }
   | cst = const_term
     { Const cst }
+  | PERFORM LPAREN eff = effect t = term RPAREN
+    { Effect (eff, t)}
+  | PERFORM eff = effect
+    { let unit_loc = Location.make $startpos(eff) $endpos(eff) in
+      Effect (eff, {it= Tuple []; at= unit_loc})}
   | LBRACK ts = separated_list(SEMI, comma_term) RBRACK
     {
       let nil = {it= Variant (CoreTypes.nil_annot, None); at= Location.make $endpos $endpos} in

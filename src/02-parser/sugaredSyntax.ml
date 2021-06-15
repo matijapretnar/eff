@@ -61,8 +61,7 @@ and plain_term =
   | Variant of label * term option  (** [Label] or [Label t] *)
   | Lambda of abstraction  (** [fun p1 p2 ... pn -> t] *)
   | Function of abstraction list  (** [function p1 -> t1 | ... | pn -> tn] *)
-  | Effect of effect * effect list * term
-      (** [eff], where [eff] is an effect symbol. *)
+  | Effect of effect * term  (** [eff], where [eff] is an effect symbol. *)
   | Handler of handler
       (** [handler clauses], where [clauses] are described below. *)
   | Let of (pattern * term) list * term

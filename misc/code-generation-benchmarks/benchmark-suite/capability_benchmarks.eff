@@ -26,7 +26,7 @@ let testTriple n s =
     let k = choice (j - 1) in
     if (i + j + k = s)
       then (i, j, k)
-      else (absurd1 (perform (TripleFail : {TripleFlip} ())))
+      else (absurd1 (perform (TripleFail ())))
   in
   handle 
   (let r = triple n s in TripleCons(r, TripleNil)
@@ -131,7 +131,7 @@ let testGenerator n =
   let rec generateFromTo (l,u) = 
     if l > u then ()
     else ( 
-      perform (GeneratorYield : {GeneratorPut, GeneratorGet} l); generateFromTo ((l+1) , u))
+      perform (GeneratorYield l); generateFromTo ((l+1) , u))
   in
   ( handle (handle (generateFromTo (1,n)) with 
     | effect (GeneratorYield e) k -> (

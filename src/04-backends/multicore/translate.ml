@@ -45,7 +45,7 @@ and of_expression { it; _ } =
               Function (List.map converter abs_lst)
           | _ -> Lambda (of_abstraction abs))
       | _ -> Lambda (of_abstraction abs))
-  | CoreSyntax.Effect (eff, _) -> Effect eff
+  | CoreSyntax.Effect eff -> Effect eff
   | CoreSyntax.Handler { effect_clauses; value_clause; finally_clause } ->
       (* Non-trivial case *)
       let effect_clauses' =
