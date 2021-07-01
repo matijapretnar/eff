@@ -8,7 +8,12 @@ module Backend : Language.BackendSignature.T = struct
 
   type state = { prog : Syntax.cmd list }
 
-  let initial_state = { prog = [] }
+  let initial_state =
+    {
+      prog =
+        [ (* Syntax.RawSource ("failwith", "failwith");
+             Syntax.RawSource ("_ocaml_tophandler", Primitives.top_handler); *) ];
+    }
 
   (* Auxiliary functions *)
   let update state cmd =
@@ -17,6 +22,10 @@ module Backend : Language.BackendSignature.T = struct
 
   (* ------------------------------------------------------------------------ *)
   (* Processing functions *)
+
+  let load_primitive state x prim =
+    update state (RawSource (x, Primitives.primitive_source prim))
+
   let process_computation state c _ty =
     let t = Translate.of_computation c in
     update state (Term t)
@@ -44,8 +53,6 @@ module Backend : Language.BackendSignature.T = struct
     in
     let defs' = Assoc.map converter defs |> Assoc.to_list in
     update state (TopLetRec defs')
-
-  let process_external state (x, ty, f) = update state (External (x, ty, f))
 
   let process_tydef state tydefs =
     let converter (ty_params, tydef) = (ty_params, Translate.of_tydef tydef) in

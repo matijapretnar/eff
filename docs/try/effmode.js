@@ -9,7 +9,6 @@ CodeMirror.defineMIME('text/x-eff', {
     'effect' : 'keyword',
     'else' : 'keyword',
     'end' : 'keyword',
-    'external' : 'keyword',
     'false' : 'builtin',
     'finally' : 'keyword',
     'fun' : 'keyword',
