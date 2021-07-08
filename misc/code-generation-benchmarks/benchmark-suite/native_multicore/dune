@@ -1,4 +1,6 @@
 (library
  (name nativeMulticore)
  (enabled_if
-  (= %{ocaml_version} "4.10.0+multicore")))
+  (or
+   (= %{ocaml_version} "4.10.0+multicore")
+   (= %{ocaml_version} "4.12.0+domains+effects"))))
