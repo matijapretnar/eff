@@ -1,3 +1,5 @@
+(* Code commented out for artifact branch *)
+(* 
 (* #directory "_delimcc";;
 #load "delimcc.cma";;
 #use "delimcc.ml";; *)
@@ -143,4 +145,4 @@ let queens_one_option n = handle_it c (fun () -> queens n) optionalize
 let queens_one_cps n =
   handle_it c (fun () -> queens n) backtrack (fun () -> absurd (fail ()))
 
-let queens_all n = handle_it c (fun () -> queens n) choose_all
+let queens_all n = handle_it c (fun () -> queens n) choose_all *)

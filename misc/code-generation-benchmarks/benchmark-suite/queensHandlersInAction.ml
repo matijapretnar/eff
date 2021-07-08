@@ -1,3 +1,5 @@
+(* Code commented out for artifact branch *)
+(* 
 (*
   Effect handlers for OCaml
 
@@ -268,4 +270,5 @@ let queens_one_option n = optionalize (fun () -> queens n)
 let queens_one_cps n =
   backtrack (fun () -> queens n) (fun () -> absurd (fail ()))
 
-let queens_all n = choose_all (fun () -> queens n)
+let queens_all n = choose_all (fun () -> queens n) 
+*)

@@ -9,7 +9,8 @@
   (:standard \ generate_benchmark_rules))
  (libraries
   bechamel
-  delimcc
+  ;;  ;; delimcc does not like mc ocaml and is uneeded since we don't use it in benchmarks
+  ;;  delimcc
   ocamlHeader
   (select
    config.ml
