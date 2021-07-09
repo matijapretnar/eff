@@ -15,7 +15,7 @@ module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
 
 type effect_fingerprint = EffectFingerprint.t
 
-type effect = CoreTypes.Effect.t * (Type.ty * Type.ty)
+type effekt = CoreTypes.Effect.t * (Type.ty * Type.ty)
 
 type pattern = (pattern', Type.ty) typed
 
@@ -67,7 +67,7 @@ and computation' =
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation
-  | Call of effect * expression * abstraction
+  | Call of effekt * expression * abstraction
   | Bind of computation * abstraction
   | CastComp of computation * Constraint.dirty_coercion
 
@@ -80,7 +80,7 @@ and handler_clauses' = {
 }
 
 and effect_clauses = {
-  effect_part : (effect, abstraction2) Assoc.t;
+  effect_part : (effekt, abstraction2) Assoc.t;
   fingerprint : effect_fingerprint;
 }
 

@@ -4,7 +4,7 @@
   open Language
 
   type handler_clause =
-    | EffectClause of effect * abstraction2
+    | EffectClause of effekt * abstraction2
     | ReturnClause of abstraction
     | FinallyClause of abstraction
 

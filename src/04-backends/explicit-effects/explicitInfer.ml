@@ -335,7 +335,7 @@ and tcLambda state abs =
   let abs', cnstrs = tcAbstraction state abs in
   ((Term.Lambda abs', Type.Arrow abs'.ty), cnstrs)
 
-and tcEffect state (eff : Untyped.effect) : tcExprOutput' =
+and tcEffect state (eff : Untyped.effekt) : tcExprOutput' =
   (* GEORGE: NOTE: This is verbatim copied from the previous implementation *)
   let in_ty, out_ty = Term.EffectMap.find eff state.effects
   and s = Type.EffectSet.singleton eff in
@@ -354,8 +354,8 @@ and tcEffect state (eff : Untyped.effect) : tcExprOutput' =
   ((outVal, outType), cnstrs)
 
 (* Handlers(Op Cases) *)
-and tcOpCases state (eclauses : (Untyped.effect, Untyped.abstraction2) Assoc.t)
-    (dirtyOut : Type.dirty) : (Term.effect, Term.abstraction2) Assoc.t tcOutput
+and tcOpCases state (eclauses : (Untyped.effekt, Untyped.abstraction2) Assoc.t)
+    (dirtyOut : Type.dirty) : (Term.effekt, Term.abstraction2) Assoc.t tcOutput
     =
   let rec go cs =
     match Assoc.to_list cs with
@@ -370,7 +370,7 @@ and tcOpCases state (eclauses : (Untyped.effect, Untyped.abstraction2) Assoc.t)
 
 (* Handlers(Op Case) *)
 and tcOpCase state
-    ((eff, abs2) : Untyped.effect * Untyped.abstraction2) (* Op clause *)
+    ((eff, abs2) : Untyped.effekt * Untyped.abstraction2) (* Op clause *)
     (dirtyOut : Type.dirty) (* Expected output type *) =
   (* 1: Lookup the type of Opi *)
   let tyAi, tyBi = Term.EffectMap.find eff state.effects in
@@ -405,7 +405,7 @@ and tcOpCase state
   let castExp, omegaCt5i = Term.cast_expression l_var rightty in
   let lsub = Term.subst_comp (Assoc.of_list [ (k, castExp) ]) in
   let outExpr =
-    ( ((eff, (tyAi, tyBi)) : Term.effect) (* Opi *),
+    ( ((eff, (tyAi, tyBi)) : Term.effekt) (* Opi *),
       Term.abstraction2 (xop, l_pat, Term.castComp (lsub trgCop, omega34i)) )
   in
 
@@ -419,7 +419,7 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
   let deltaIn = Type.fresh_dirt () in
   let ((_, deltaOut) as dirtyOut) = Constraint.fresh_dirty_with_fresh_skel () in
 
-  (* 2: Process the return and the operation clauses *)
+  (* 2: Process the  return and the operation clauses *)
   let trgRet, cs1 = tcAbstraction state h.value_clause in
   let trgCls, cs2 = tcOpCases state h.effect_clauses dirtyOut in
 

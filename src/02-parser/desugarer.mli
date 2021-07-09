@@ -13,7 +13,7 @@ val desugar_computation :
 
 val desugar_def_effect :
   state ->
-  SugaredSyntax.effect * (SugaredSyntax.ty * SugaredSyntax.ty) ->
+  SugaredSyntax.effekt * (SugaredSyntax.ty * SugaredSyntax.ty) ->
   state * (CoreTypes.Effect.t * (Type.ty * Type.ty))
 
 val desugar_top_let :

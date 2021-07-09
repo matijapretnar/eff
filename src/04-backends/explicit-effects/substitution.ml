@@ -209,8 +209,8 @@ and apply_sub_comp' sub computation =
       Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
   | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
   | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
-  | Call (effect, e1, abs) ->
-      Call (effect, apply_sub_exp sub e1, apply_sub_abs sub abs)
+  | Call (effekt, e1, abs) ->
+      Call (effekt, apply_sub_exp sub e1, apply_sub_abs sub abs)
   | Bind (c1, a1) -> Bind (apply_sub_comp sub c1, apply_sub_abs sub a1)
   | CastComp (c1, dc1) ->
       CastComp (apply_sub_comp sub c1, apply_sub_dirtycoer sub dc1)

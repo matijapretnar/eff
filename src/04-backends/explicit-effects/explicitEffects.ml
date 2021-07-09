@@ -11,7 +11,7 @@ module type ExplicitBackend = sig
 
   val process_type_of : state -> Term.computation -> state
 
-  val process_def_effect : state -> Term.effect -> state
+  val process_def_effect : state -> Term.effekt -> state
 
   val process_top_let :
     state -> (Term.variable, Term.expression) Assoc.t -> state

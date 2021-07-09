@@ -5,7 +5,7 @@ module Print = Utils.Print
 type variable = CoreTypes.Variable.t
 (** Syntax of the core language. *)
 
-type effect = CoreTypes.Effect.t
+type effekt = CoreTypes.Effect.t
 
 type label = CoreTypes.Label.t
 
@@ -45,7 +45,7 @@ type term =
   | Variant of label * term option
   | Lambda of abstraction
   | Function of match_case list
-  | Effect of effect
+  | Effect of effekt
   | Let of (pattern * term) list * term
   | LetRec of (variable * abstraction) list * term
   | Match of term * match_case list
@@ -54,7 +54,7 @@ type term =
 
 and match_case =
   | ValueClause of abstraction
-  | EffectClause of effect * abstraction2
+  | EffectClause of effekt * abstraction2
 
 and abstraction = pattern * term
 (** Abstractions that take one argument. *)
@@ -64,7 +64,7 @@ and abstraction2 = pattern * pattern * term
 
 type cmd =
   | Term of term
-  | DefEffect of effect * (ty * ty)
+  | DefEffect of effekt * (ty * ty)
   | TopLet of (pattern * term) list
   | TopLetRec of (variable * abstraction) list
   | RawSource of (variable * string)

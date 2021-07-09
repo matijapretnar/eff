@@ -3,7 +3,7 @@ open Utils
 
 type variable = CoreTypes.Variable.t
 
-type effect = CoreTypes.Effect.t
+type effekt = CoreTypes.Effect.t
 
 type label = CoreTypes.Label.t
 
@@ -32,7 +32,7 @@ and plain_expression =
   | Record of (field, expression) Assoc.t
   | Variant of label * expression option
   | Lambda of abstraction
-  | Effect of effect
+  | Effect of effekt
   | Handler of handler
 
 and computation = plain_computation located
@@ -48,7 +48,7 @@ and plain_computation =
   | Check of computation
 
 and handler = {
-  effect_clauses : (effect, abstraction2) Assoc.t;
+  effect_clauses : (effekt, abstraction2) Assoc.t;
   value_clause : abstraction;
   finally_clause : abstraction;
 }
