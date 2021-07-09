@@ -3,7 +3,7 @@ default: format
 .PHONY: default
 
 format:
-	dune build @fmt --auto-promote
+	# dune build @fmt --auto-promote
 .PHONY: format
 
 release: format
