@@ -3,9 +3,9 @@ open Toolkit
 
 let instance = Instance.monotonic_clock
 
-let limit = 5000
+let limit = 100
 
-let second_quota = 10.0
+let second_quota = 0.1
 
 module StringMap = Map.Make (String)
 module IntMap = Map.Make (Int)

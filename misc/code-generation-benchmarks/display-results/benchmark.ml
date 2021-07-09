@@ -9,7 +9,7 @@ let benchmark test =
   let instances =
     Instance.[ minor_allocated; major_allocated; monotonic_clock; promoted ]
   in
-  let cfg = Benchmark.cfg ~limit:5000 ~quota:(Time.second 5.0) () in
+  let cfg = Benchmark.cfg ~limit:100 ~quota:(Time.second 0.1) () in
   let raw_results = Benchmark.all cfg instances test in
   let results =
     List.map (fun instance -> Analyze.all ols instance raw_results) instances
