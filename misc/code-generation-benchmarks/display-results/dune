@@ -6,8 +6,8 @@
  (libraries benchmark_suite bechamel-notty notty notty.unix unix))
 
 (rule
- (deps
-  (source_tree .))
+(deps 
+(universe)) ;; always rebuild
  (targets benchmark.output)
  (action
   (with-stdout-to
@@ -16,7 +16,6 @@
 
 (rule
  (deps
-  (source_tree .)
   benchmark.output)
  (targets benchmark.output.version)
  (action
@@ -28,6 +27,7 @@
 
 (rule
  (alias benchmark)
+ (mode promote)
  (deps benchmark.output.version)
  (action
-  (diff benchmark.expected benchmark.output.version)))
+  (copy benchmark.output.version benchmark.expected)))
