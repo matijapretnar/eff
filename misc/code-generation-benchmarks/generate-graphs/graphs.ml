@@ -69,7 +69,7 @@ let measure_benchmark_set
   in
   let measure_at_param param =
     print_int param;
-    flush_all ();
+    (* flush_all (); *)
     let benchmark_at_param =
       Test.make_grouped ~name:"" ~fmt:"%s%s"
         (List.map
