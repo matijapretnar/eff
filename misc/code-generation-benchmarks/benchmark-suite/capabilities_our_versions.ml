@@ -208,7 +208,7 @@ let exploreGeneralTree_generated x0 =
        x1) (fun a2 -> [ a2 ]))
     x0
 
-let test_general n =
+let test_general_loop n =
   let t = tester n in
   let rec looper k s =
     if k = 0 then s
@@ -218,7 +218,7 @@ let test_general n =
   looper 100 0
 
 (*
-# test_general 100;;
+# test_general_loop 100;;
 - : int = 21174076100
 
 *)
@@ -297,7 +297,50 @@ let test_leaf_state_update m =
         (s + List.fold_left max 0 (exploreLeafStateUpdateTree_generated t))
   in
   looper 100 0
+
 (*
 # test_leaf_state_update 100;;
 - : int = 9976723161500
 *)
+
+(* queens *)
+
+let no_attack (x, y) (x', y') =
+  x <> x' && y <> y' && abs (x - x') <> abs (y - y')
+
+let rec not_attacked x' = function
+  | [] -> true
+  | x :: xs -> if no_attack x' x then not_attacked x' xs else false
+
+let available number_of_queens x qs =
+  let rec loop (possible, y) =
+    if y < 1 then possible
+    else if not_attacked (x, y) qs then loop (y :: possible, y - 1)
+    else loop (possible, y - 1)
+  in
+  loop ([], number_of_queens)
+
+let queensAll_generated x0 =
+  (fun x1 ->
+    ((fun x2 k3 ->
+       (((let rec f4 x5 y6 k7 =
+            if fst x5 > snd x5 then k7 y6
+            else
+              ((let rec f8 x9 k10 =
+                  match x9 with
+                  | [] -> []
+                  | hhd :: ttl ->
+                      let x11 = k10 hhd in
+                      let x12 = (f8 ttl) k10 in
+                      List.append x11 x12
+                in
+                f8)
+                 (available (snd x5) (fst x5) y6)) (fun a8 ->
+                  ((f4 (fst x5 + 1, snd x5)) ((fst x5, a8) :: y6)) k7)
+          in
+          f4)
+           (1, x2))
+          [])
+         k3)
+       x1) (fun a2 -> [ a2 ]))
+    x0
