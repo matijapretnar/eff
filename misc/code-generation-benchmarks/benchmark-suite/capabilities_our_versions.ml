@@ -175,3 +175,129 @@ let testStateLoop n =
 (* Tree *)
 
 type tree = EmptyNode | Node of tree * int * tree
+
+let tester k =
+  let leaf a = Node (EmptyNode, a * k, EmptyNode) in
+  let bot t t2 =
+    Node
+      ( Node (Node (t, 0, t2), 2, leaf 13),
+        5,
+        Node (leaf 9, 7, Node (t2, 3, Node (leaf 3, 5, t2))) )
+  in
+  let n1 = Node (bot (leaf 3) (leaf 4), 10, bot (leaf 1) (leaf 3)) in
+  let n2 =
+    bot (Node (bot (leaf 3) (leaf 4), 10, bot (leaf 1) (leaf 3))) (leaf 10)
+  in
+  bot n1 n2
+
+let op x y = x - (3 * y)
+
+(* general  *)
+
+let exploreGeneralTree_generated x0 =
+  (fun x1 ->
+    ((let rec f2 x3 k4 =
+        match x3 with
+        | EmptyNode -> k4 0
+        | Node (l, mid, r) ->
+            let x5 = (f2 l) (fun a6 -> k4 (op mid a6)) in
+            let x6 = (f2 r) (fun a7 -> k4 (op mid a7)) in
+            List.append x5 x6
+      in
+      f2)
+       x1) (fun a2 -> [ a2 ]))
+    x0
+
+let test_general n =
+  let t = tester n in
+  let rec looper k s =
+    if k = 0 then s
+    else
+      looper (k - 1) (s + List.fold_left max 0 (exploreGeneralTree_generated t))
+  in
+  looper 100 0
+
+(*
+# test_general 100;;
+- : int = 21174076100
+
+*)
+
+(* leaf state *)
+
+let exploreLeafStateTree_generated leafs x0 =
+  (fun x1 ->
+    let x2 =
+      (((let rec f3 x4 k5 k6 =
+           match x4 with
+           | EmptyNode ->
+               fun x7 ->
+                 let x8 = (k5 (List.hd x7)) k6 in
+                 x8 (List.tl x7)
+           | Node (l, mid, r) ->
+               ((f3 l) (fun a7 k8 -> (k5 (op mid a7)) k8)) (fun a7 ->
+                   ((f3 r) (fun a8 k9 -> (k5 (op mid a8)) k9)) (fun a8 ->
+                       k6 (List.append a7 a8)))
+         in
+         f3)
+          x1) (fun a3 k4 -> k4 [ a3 ])) (fun a3 x4 -> a3)
+    in
+    x2 leafs)
+    x0
+
+let test_leaf_state m =
+  let t = tester m in
+  let leafs = List.init 154 (fun i -> i * 3) in
+  let rec looper k s =
+    if k = 0 then s
+    else
+      looper (k - 1)
+        (s + List.fold_left max 0 (exploreLeafStateTree_generated leafs t))
+  in
+  looper 100 0
+
+(* 
+
+# test_leaf_state 100;;
+- : int = 18792433100
+*)
+
+(* leaf update *)
+
+let exploreLeafStateUpdateTree_generated x0 =
+  (fun x1 ->
+    let x2 =
+      (((let rec f3 x4 k5 k6 =
+           match x4 with
+           | EmptyNode ->
+               fun x7 ->
+                 let x8 = (k5 x7) k6 in
+                 x8 x7
+           | Node (l, mid, r) ->
+               fun x7 ->
+                 let x8 =
+                   ((f3 l) (fun a9 k10 -> (k5 (op mid a9)) k10)) (fun a9 ->
+                       ((f3 r) (fun a10 k11 -> (k5 (op mid a10)) k11))
+                         (fun a10 -> k6 (List.append a9 a10)))
+                 in
+                 x8 (mid * mid)
+         in
+         f3)
+          x1) (fun a3 k4 -> k4 [ a3 ])) (fun a3 x4 -> a3)
+    in
+    x2 (-1))
+    x0
+
+let test_leaf_state_update m =
+  let t = tester m in
+  let rec looper k s =
+    if k = 0 then s
+    else
+      looper (k - 1)
+        (s + List.fold_left max 0 (exploreLeafStateUpdateTree_generated t))
+  in
+  looper 100 0
+(*
+# test_leaf_state_update 100;;
+- : int = 9976723161500
+*)
