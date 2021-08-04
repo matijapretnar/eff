@@ -41,3 +41,15 @@ val profiling : bool ref
 (** Should profiling be enabled? *)
 
 val optimization_fuel : int ref
+
+type 'a optimizator_base_config = {
+  specialize_functions : 'a;
+  eliminate_coercions : 'a;
+  push_coercions : 'a;
+  handler_reductions : 'a;
+  purity_aware_translation : 'a;
+}
+
+type optimizator_config = bool optimizator_base_config
+
+val optimizator_config : optimizator_config ref

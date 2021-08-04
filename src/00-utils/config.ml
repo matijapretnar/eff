@@ -27,3 +27,23 @@ let enable_optimization = ref true
 let profiling = ref false
 
 let optimization_fuel = ref 5
+
+type 'a optimizator_base_config = {
+  specialize_functions : 'a;
+  eliminate_coercions : 'a;
+  push_coercions : 'a;
+  handler_reductions : 'a;
+  purity_aware_translation : 'a;
+}
+
+type optimizator_config = bool optimizator_base_config
+
+let optimizator_config =
+  ref
+    {
+      specialize_functions = true;
+      eliminate_coercions = true;
+      push_coercions = true;
+      handler_reductions = true;
+      purity_aware_translation = true;
+    }

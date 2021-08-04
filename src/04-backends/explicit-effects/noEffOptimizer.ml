@@ -1,9 +1,15 @@
 open Utils
 module NoEff = SyntaxNoEff
 
-type state = { fuel : int }
+type optimization_config = {
+  eliminate_coercions : bool;
+  purity_aware_translation : bool;
+}
 
-let initial_state = { fuel = !Config.optimization_fuel }
+type state = { fuel : int; optimization_config : optimization_config }
+
+let initial_state optimization_config =
+  { fuel = !Config.optimization_fuel; optimization_config }
 
 (* Optimization functions *)
 
@@ -96,7 +102,7 @@ let rec sub_leafs subs (n_term : NoEff.n_term) =
 
 let naive_lambda_lift e =
   match get_fun_leafs e with
-  | Some leafs -> (
+  | Some leafs when false -> (
       match leafs with
       | [] -> e
       | (_, (_, ty, _)) :: _ ->
@@ -109,7 +115,7 @@ let naive_lambda_lift e =
             |> Assoc.of_list
           in
           NoEff.NFun (p, ty, sub_leafs subs e))
-  | None -> e
+  | _ -> e
 
 let rec optimize_ty_coercion state (n_coer : NoEff.n_coercion) =
   reduce_ty_coercion state (optimize_ty_coercion' state n_coer)
@@ -136,13 +142,19 @@ and optimize_ty_coercion' state (n_coer : NoEff.n_coercion) =
 
 and reduce_ty_coercion state ty_coer = reduce_ty_coercion' state ty_coer
 
-and reduce_ty_coercion' _state n_coer =
+and reduce_ty_coercion' state n_coer =
   match n_coer with
-  | NoEff.NCoerArrow (NCoerRefl, NCoerRefl) -> NCoerRefl
-  | NoEff.NCoerHandler (NCoerRefl, NCoerRefl) -> NCoerRefl
-  | NCoerComp NCoerRefl -> NCoerRefl
+  | NoEff.NCoerArrow (NCoerRefl, NCoerRefl)
+    when state.optimization_config.eliminate_coercions ->
+      NCoerRefl
+  | NoEff.NCoerHandler (NCoerRefl, NCoerRefl)
+    when state.optimization_config.eliminate_coercions ->
+      NCoerRefl
+  | NCoerComp NCoerRefl when state.optimization_config.eliminate_coercions ->
+      NCoerRefl
   | NoEff.NCoerTuple coers
-    when List.for_all (fun coer -> coer = NoEff.NCoerRefl) coers ->
+    when List.for_all (fun coer -> coer = NoEff.NCoerRefl) coers
+         && state.optimization_config.eliminate_coercions ->
       NCoerRefl
   | _ -> n_coer
 
@@ -231,9 +243,13 @@ and is_letrec_unused _state defs t =
 and reduce_term' state (n_term : NoEff.n_term) =
   (* Print.debug "Reducing noeff term: %t" (NoEff.print_term n_term); *)
   match n_term with
-  | NCast (t, (NCoerReturn NCoerRefl as _c)) -> NoEff.NReturn t
+  | NCast (t, (NCoerReturn NCoerRefl as _c))
+    when state.optimization_config.eliminate_coercions ->
+      NoEff.NReturn t
   | NCast (t, NCoerRefl) -> t
-  | NBind (NReturn t, c) -> beta_reduce state c t
+  | NBind (NReturn t, c) when state.optimization_config.purity_aware_translation
+    ->
+      beta_reduce state c t
   | NLet (e, a) -> beta_reduce state a e
   (* | NFun (p, ty, c) when not (is_fun c) ->
       NoEff.NFun (p, ty, naive_lambda_lift c) *)

@@ -9,6 +9,15 @@ let file_queue = ref []
 
 let enqueue_file filename = file_queue := filename :: !file_queue
 
+let optimizator_bitmask_config : int Config.optimizator_base_config =
+  {
+    specialize_functions = 0;
+    eliminate_coercions = 1;
+    push_coercions = 2;
+    handler_reductions = 3;
+    purity_aware_translation = 4;
+  }
+
 (* Command-line options *)
 let options =
   Arg.align
@@ -40,6 +49,39 @@ let options =
       ( "--no-opts",
         Arg.Clear Config.enable_optimization,
         " Disable optimizations" );
+      ( "--optimizations",
+        Arg.Int
+          (fun bitmask ->
+            let {
+              Config.specialize_functions;
+              eliminate_coercions;
+              push_coercions;
+              handler_reductions;
+              purity_aware_translation;
+            } =
+              optimizator_bitmask_config
+            in
+            let specialize_functions =
+              Int.logor bitmask specialize_functions = 1
+            in
+            let eliminate_coercions =
+              Int.logor bitmask eliminate_coercions = 1
+            in
+            let push_coercions = Int.logor bitmask push_coercions = 1 in
+            let handler_reductions = Int.logor bitmask handler_reductions = 1 in
+            let purity_aware_translation =
+              Int.logor bitmask purity_aware_translation = 1
+            in
+            Config.optimizator_config :=
+              {
+                specialize_functions;
+                eliminate_coercions;
+                push_coercions;
+                handler_reductions;
+                purity_aware_translation;
+              };
+            ()),
+        "enable/disable specific optimizations" );
       ("--ascii", Arg.Set Config.ascii, " Use ASCII output");
       ( "-v",
         Arg.Unit

@@ -42,7 +42,17 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
     {
       type_system_state = ExplicitInfer.initial_state;
       backend_state = ExBackend.initial_state;
-      optimizer_state = Optimizer.initial_state;
+      optimizer_state =
+        Optimizer.initial_state
+          {
+            specialize_functions =
+              !Config.optimizator_config.specialize_functions;
+            eliminate_coercions = !Config.optimizator_config.eliminate_coercions;
+            push_coercions = !Config.optimizator_config.push_coercions;
+            handler_reductions = !Config.optimizator_config.handler_reductions;
+            purity_aware_translation =
+              !Config.optimizator_config.purity_aware_translation;
+          };
     }
 
   let process_computation state c _ =
@@ -183,6 +193,20 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
+  let translate_exeff_config =
+    TranslateExEff2NoEff.initial_state
+      {
+        purity_aware_translation =
+          !Config.optimizator_config.purity_aware_translation;
+      }
+
+  let translate_noeff_config =
+    TranslateNoEff2Ocaml.initial_state
+      {
+        purity_aware_translation =
+          !Config.optimizator_config.purity_aware_translation;
+      }
+
   type state = {
     prog : SyntaxNoEff.cmd list;
     no_eff_optimizer_state : NoEffOptimizer.state;
@@ -193,7 +217,13 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   let initial_state =
     {
       prog = [];
-      no_eff_optimizer_state = NoEffOptimizer.initial_state;
+      no_eff_optimizer_state =
+        NoEffOptimizer.initial_state
+          {
+            eliminate_coercions = !Config.optimizator_config.eliminate_coercions;
+            purity_aware_translation =
+              !Config.optimizator_config.purity_aware_translation;
+          };
       primitives = Assoc.empty;
     }
 
@@ -219,7 +249,10 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
 
   let process_computation state c =
     Print.debug "%t" (Term.print_computation c);
-    let c' = optimize_term state @@ TranslateExEff2NoEff.elab_computation c in
+    let c' =
+      optimize_term state
+      @@ TranslateExEff2NoEff.elab_computation translate_exeff_config c
+    in
     { state with prog = SyntaxNoEff.Term c' :: state.prog }
 
   let process_type_of state _ =
@@ -230,7 +263,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     {
       state with
       prog =
-        SyntaxNoEff.DefEffect (TranslateExEff2NoEff.elab_effect eff)
+        SyntaxNoEff.DefEffect
+          (TranslateExEff2NoEff.elab_effect translate_exeff_config eff)
         :: state.prog;
     }
 
@@ -239,7 +273,9 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
       Assoc.kmap
         (fun (x, e) ->
           Print.debug "%t" (Term.print_expression e);
-          (x.term, optimize_term state @@ TranslateExEff2NoEff.elab_expression e))
+          ( x.term,
+            optimize_term state
+            @@ TranslateExEff2NoEff.elab_expression translate_exeff_config e ))
         defs
     in
     { state with prog = SyntaxNoEff.TopLet defs' :: state.prog }
@@ -247,7 +283,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   let process_top_let_rec state defs =
     let defs' =
       optimize_rec_definitions state
-      @@ TranslateExEff2NoEff.elab_rec_definitions defs
+      @@ TranslateExEff2NoEff.elab_rec_definitions translate_exeff_config defs
     in
     { state with prog = SyntaxNoEff.TopLetRec defs' :: state.prog }
 
@@ -268,8 +304,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
       (fun cmd ->
         Format.fprintf !Config.output_formatter "%t\n"
           (TranslateNoEff2Ocaml.pp_cmd
-             (TranslateNoEff2Ocaml.add_primitives
-                TranslateNoEff2Ocaml.initial_state state.primitives)
+             (TranslateNoEff2Ocaml.add_primitives translate_noeff_config
+                state.primitives)
              cmd))
       (List.rev state.prog)
 end)

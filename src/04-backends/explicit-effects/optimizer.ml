@@ -6,6 +6,14 @@ type return_clause_kind =
 
 exception ReturnClauseNotFixed of Language.CoreTypes.Variable.t
 
+type optimization_config = {
+  specialize_functions : bool;
+  eliminate_coercions : bool;
+  push_coercions : bool;
+  handler_reductions : bool;
+  purity_aware_translation : bool;
+}
+
 type state = {
   declared_functions :
     (Language.CoreTypes.Variable.t, Term.abstraction) Assoc.t;
@@ -15,13 +23,15 @@ type state = {
     ( Term.EffectFingerprint.t * Language.CoreTypes.Variable.t,
       Term.variable * return_clause_kind )
     Assoc.t;
+  config : optimization_config;
 }
 
-let initial_state =
+let initial_state config =
   {
     declared_functions = Assoc.empty;
     fuel = !Config.optimization_fuel;
     specialized_functions = Assoc.empty;
+    config;
   }
 
 let reduce_if_fuel reduce_term state term =
@@ -212,21 +222,30 @@ and optimize_abstraction2' state (pat1, pat2, cmp) =
 and optimize_rec_definitions state defs =
   Assoc.map (optimize_abstraction state) defs
 
-and cast_expression _state exp coer =
+and cast_expression state exp coer =
   match (exp.term, coer.term) with
-  | _, _ when Constraint.is_trivial_ty_coercion coer -> exp
+  | _, _
+    when Constraint.is_trivial_ty_coercion coer
+         && state.config.eliminate_coercions ->
+      exp
   | _, _ -> Term.castExp (exp, coer)
 
 and cast_computation state comp coer =
   match (comp.term, coer.term) with
-  | _, _ when Constraint.is_trivial_dirty_coercion coer -> comp
-  | Term.Bind (cmp, abs), (_, dcoer) ->
+  | _, _
+    when Constraint.is_trivial_dirty_coercion coer
+         && state.config.eliminate_coercions ->
+      (* Elim-Co-Comp *)
+      comp
+  | Term.Bind (cmp, abs), (_, dcoer) when state.config.push_coercions ->
+      (* Push-Co-Do *)
       let ty1, _ = cmp.ty in
       let coer1 = Constraint.bangCoercion (Constraint.reflTy ty1, dcoer) in
       bind_computation state
         (cast_computation state cmp coer1)
         (cast_abstraction state abs coer)
-  | Term.Call (eff, exp, abs), _ ->
+  | Term.Call (eff, exp, abs), _ when state.config.push_coercions ->
+      (* Push-Co-Op *)
       Term.call (eff, exp, cast_abstraction state abs coer)
   | _, _ -> Term.castComp (comp, coer)
 
@@ -249,6 +268,8 @@ and bind_abstraction state { term = pat, cmp; _ } bind =
 
 and handle_computation state hnd comp =
   match comp.term with
+  | _ when not state.config.handler_reductions ->
+      Term.handle (Term.handler hnd, comp)
   | Term.Match (exp, cases) ->
       let _, drty_out = hnd.ty in
       Term.match_ (exp, List.map (handle_abstraction state hnd) cases) drty_out
@@ -362,7 +383,9 @@ and reduce_computation' state comp =
               (exp, { term = Constraint.ArrowCoercion (ty_coer, drty_coer); _ });
           _;
         },
-        e ) ->
+        e )
+    when state.config.push_coercions ->
+      (* Push-Co-App *)
       cast_computation state
         (optimize_computation state
            (Term.apply (exp, cast_expression state e ty_coer)))
@@ -377,7 +400,8 @@ and reduce_computation' state comp =
       match keep_used_bindings defs c' with
       | [] -> c'
       | defs' -> Term.letRec (Assoc.of_list defs', c'))
-  | Term.Bind (cmp, abs) -> bind_computation state cmp abs
+  | Term.Bind (cmp, abs) when state.config.push_coercions ->
+      bind_computation state cmp abs
   | Term.Handle ({ term = Term.Handler hnd; ty = hnd_ty }, cmp) -> (
       Print.debug "Handling: %t :: %t;; :: %t ::: %t"
         (Term.print_expression' (Term.Handler hnd))
@@ -481,6 +505,7 @@ and reduce_computation' state comp =
       let cmp' = handle_computation state' hnd cmp in
       match keep_used_bindings (Assoc.of_list spec_rec_defs) cmp' with
       | [] -> cmp'
+      | _ when not state.config.specialize_functions -> cmp'
       | defs' ->
           Term.letRec (Assoc.of_list defs', cmp') |> optimize_computation state'
       )
@@ -495,7 +520,9 @@ and reduce_computation' state comp =
                 } );
           _;
         },
-        cmp ) ->
+        cmp )
+    when state.config.push_coercions ->
+      (* Push-Co-Handle *)
       cast_computation state
         (optimize_computation state
            (Term.handle (exp, cast_computation state cmp drty_coer1)))
