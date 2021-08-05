@@ -268,6 +268,26 @@ and bind_abstraction state { term = pat, cmp; _ } bind =
 
 and handle_computation state hnd comp =
   match comp.term with
+  | Term.Apply ({ term = Var f; _ }, exp)
+    when Option.is_some
+           (Assoc.lookup
+              (hnd.term.Term.effect_clauses.fingerprint, f.term)
+              state.specialized_functions)
+         && state.config.specialize_functions -> (
+      let value_clause = hnd.term.Term.value_clause in
+      match
+        Assoc.lookup
+          (hnd.term.Term.effect_clauses.fingerprint, f.term)
+          state.specialized_functions
+      with
+      | Some (f', FixedReturnClause value_clause') ->
+          if value_clause = value_clause' then Term.apply (Term.var f', exp)
+          else raise (ReturnClauseNotFixed f.term)
+      | Some (f', VaryingReturnClause) ->
+          Term.apply
+            ( Term.var f',
+              Term.tuple [ exp; Term.lambda hnd.term.Term.value_clause ] )
+      | None -> assert false)
   | _ when not state.config.handler_reductions ->
       Term.handle (Term.handler hnd, comp)
   | Term.Match (exp, cases) ->
@@ -291,25 +311,6 @@ and handle_computation state hnd comp =
           in
           beta_reduce state (Term.abstraction (p1, comp')) exp
       | None -> Term.call (eff, exp, handled_abs))
-  | Apply ({ term = Var f; _ }, exp)
-    when Option.is_some
-           (Assoc.lookup
-              (hnd.term.Term.effect_clauses.fingerprint, f.term)
-              state.specialized_functions) -> (
-      let value_clause = hnd.term.Term.value_clause in
-      match
-        Assoc.lookup
-          (hnd.term.Term.effect_clauses.fingerprint, f.term)
-          state.specialized_functions
-      with
-      | Some (f', FixedReturnClause value_clause') ->
-          if value_clause = value_clause' then Term.apply (Term.var f', exp)
-          else raise (ReturnClauseNotFixed f.term)
-      | Some (f', VaryingReturnClause) ->
-          Term.apply
-            ( Term.var f',
-              Term.tuple [ exp; Term.lambda hnd.term.Term.value_clause ] )
-      | None -> assert false)
   | Bind (cmp, abs) ->
       let hnd' =
         Term.handler_with_new_value_clause hnd
@@ -505,7 +506,6 @@ and reduce_computation' state comp =
       let cmp' = handle_computation state' hnd cmp in
       match keep_used_bindings (Assoc.of_list spec_rec_defs) cmp' with
       | [] -> cmp'
-      | _ when not state.config.specialize_functions -> cmp'
       | defs' ->
           Term.letRec (Assoc.of_list defs', cmp') |> optimize_computation state'
       )
