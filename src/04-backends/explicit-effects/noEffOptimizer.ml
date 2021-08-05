@@ -100,9 +100,10 @@ let rec sub_leafs subs (n_term : NoEff.n_term) =
   | NoEff.NMatch (trm, lst) ->
       NoEff.NMatch (trm, List.map (fun (p, t) -> (p, sub_leafs subs t)) lst)
 
-let naive_lambda_lift e =
+(* Name is wrong *)
+let naive_lambda_lift state e =
   match get_fun_leafs e with
-  | Some leafs when false -> (
+  | Some leafs when state.optimization_config.eliminate_coercions -> (
       match leafs with
       | [] -> e
       | (_, (_, ty, _)) :: _ ->
@@ -247,9 +248,7 @@ and reduce_term' state (n_term : NoEff.n_term) =
     when state.optimization_config.eliminate_coercions ->
       NoEff.NReturn t
   | NCast (t, NCoerRefl) -> t
-  | NBind (NReturn t, c) when state.optimization_config.purity_aware_translation
-    ->
-      beta_reduce state c t
+  | NBind (NReturn t, c) -> beta_reduce state c t
   | NLet (e, a) -> beta_reduce state a e
   (* | NFun (p, ty, c) when not (is_fun c) ->
       NoEff.NFun (p, ty, naive_lambda_lift c) *)
@@ -257,13 +256,13 @@ and reduce_term' state (n_term : NoEff.n_term) =
       let defs =
         Assoc.kmap
           (fun (v, (p, c)) ->
-            if is_fun c then (v, (p, c)) else (v, (p, naive_lambda_lift c)))
+            if is_fun c then (v, (p, c)) else (v, (p, naive_lambda_lift state c)))
           defs
       in
       if is_letrec_unused state defs t then t else NoEff.NLetRec (defs, t)
   | NApplyTerm (NFun (p, _, c), t) -> beta_reduce state (p, c) t
   | NApplyTerm (NLetRec (e, t), t2) -> NLetRec (e, NApplyTerm (t, t2))
-  | NMatch _ -> naive_lambda_lift n_term
+  | NMatch _ -> naive_lambda_lift state n_term
   | _ -> n_term
 
 and reduce_term state n_term =

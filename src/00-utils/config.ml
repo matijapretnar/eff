@@ -41,9 +41,14 @@ type optimizator_config = bool optimizator_base_config
 let optimizator_config =
   ref
     {
+      (* ok *)
       specialize_functions = true;
+      (* plays badly with lambda_lift *)
       eliminate_coercions = true;
+      (* ok *)
       push_coercions = true;
+      (* ok *)
       handler_reductions = true;
+      (* not ok *)
       purity_aware_translation = true;
     }

@@ -207,13 +207,11 @@ and elab_abstraction_with_param_ty state { term = p, c; ty = param_ty, _ } =
 and elab_computation state { term; ty = _ty, drt } =
   elab_computation' state term (is_empty_dirt drt)
 
-and elab_computation' state c is_empty =
+and elab_computation' state c _is_empty =
   match c with
   | ExEff.Value value ->
       let elab = elab_expression state value in
-      if is_empty && not state.config.purity_aware_translation then
-        NoEff.NReturn elab
-      else elab
+      elab
   | ExEff.LetVal (value, abs) ->
       let elabv = elab_expression state value in
       let elababs = elab_abstraction state abs in
@@ -262,18 +260,7 @@ and elab_computation' state c is_empty =
       if
         ExEffTypes.is_empty_dirt dirt1 && ExEffTypes.is_empty_dirt dirt2
         (* Bind - Case 1 *)
-      then
-        if not (is_empty && not state.config.purity_aware_translation) then
-          NoEff.NLet (elab1, elababs) (* Bind - Case 2 *)
-        else (
-          Print.debug "Comp: %t" (ExEff.print_computation' c);
-          match elab1 with
-          | NoEff.NReturn _ ->
-              Print.debug "Some let return";
-              NoEff.NBind (elab1, elababs)
-          | _ ->
-              Print.debug "Some let";
-              NoEff.NBind (NoEff.NReturn elab1, elababs))
+      then NoEff.NLet (elab1, elababs) (* Bind - Case 2 *)
       else NoEff.NBind (elab1, elababs)
   | ExEff.CastComp (comp, coer) ->
       let elabc = elab_dirty_coercion state coer in
