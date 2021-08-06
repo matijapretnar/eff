@@ -187,47 +187,48 @@ let _queens_all_271 (_number_of_queens_272 : int) : solutions computation =
 
 let queens_all = _queens_all_271
 
-let _queens_one_cps_386 (_number_of_queens_387 : int) =
-  Value
-    (let rec _queens_521 _number_of_queens_522 =
-       let rec _place_534 (_x_536, _qs_535) =
-         Value (( > ) _x_536) >>= fun _x_537 ->
-         Value (_x_537 _number_of_queens_522) >>= fun _x_538 ->
-         if _x_538 then
-           (* coer_arrow coer_refl_ty (coer_return coer_refl_ty) *)
-             (fun (_ : unit -> solution computation) -> _qs_535)
-         else
-           Value (_available_90 _number_of_queens_522) >>= fun _x_539 ->
-           Value (_x_539 _x_536) >>= fun _x_540 ->
-           Value (_x_540 _qs_535) >>= fun _x_541 ->
-           let rec _choose_542 _x_543 =
-             match _x_543 with
-             | RowsEmpty ->
-                 fun (_kf_544 : unit -> solution computation) -> _kf_544 ()
-             | RowsCons (_x_546, _xs'_545) ->
-                 let _l_547 (_y_551 : bool) =
-                   if _y_551 then
-                     Value (( + ) _x_536) >>= fun _x_552 ->
-                     Value (_x_552 1) >>= fun _x_553 ->
-                     _place_534
-                       (_x_553, SolutionPlace ((_x_536, _x_546), _qs_535))
-                   else Value (_choose_542 _xs'_545)
-                 in
-                 fun (_kf_548 : unit -> solution computation) ->
-                   Value (_l_547 true) >>= fun _b_549 ->
-                   _b_549 (fun (_ : unit) ->
-                       Value (_l_547 false) >>= fun _b_550 -> _b_550 _kf_548)
-           in
-           _choose_542 _x_541
-       in
-       _place_534 (1, SolutionEmpty)
-     in
-     _queens_521 _number_of_queens_387)
-  >>= fun _b_519 ->
-  (force_unsafe _b_519) (fun (() : unit) ->
-      Call
-        ( Fail,
-          (),
-          fun (_y_520 : empty) -> Value (match _y_520 with _ -> assert false) ))
+let _queens_one_cps_386 (_number_of_queens_387 : int) = Value 1
+
+(* Value
+     (let rec _queens_521 _number_of_queens_522 =
+        let rec _place_534 (_x_536, _qs_535) =
+          Value (( > ) _x_536) >>= fun _x_537 ->
+          Value (_x_537 _number_of_queens_522) >>= fun _x_538 ->
+          if _x_538 then
+            (* coer_arrow coer_refl_ty (coer_return coer_refl_ty) *)
+            fun (_ : unit -> solution computation) -> _qs_535
+          else
+            Value (_available_90 _number_of_queens_522) >>= fun _x_539 ->
+            Value (_x_539 _x_536) >>= fun _x_540 ->
+            Value (_x_540 _qs_535) >>= fun _x_541 ->
+            let rec _choose_542 _x_543 =
+              match _x_543 with
+              | RowsEmpty ->
+                  fun (_kf_544 : unit -> solution computation) -> _kf_544 ()
+              | RowsCons (_x_546, _xs'_545) ->
+                  let _l_547 (_y_551 : bool) =
+                    if _y_551 then
+                      Value (( + ) _x_536) >>= fun _x_552 ->
+                      Value (_x_552 1) >>= fun _x_553 ->
+                      _place_534
+                        (_x_553, SolutionPlace ((_x_536, _x_546), _qs_535))
+                    else Value (_choose_542 _xs'_545)
+                  in
+                  fun (_kf_548 : unit -> solution computation) ->
+                    Value (_l_547 true) >>= fun _b_549 ->
+                    _b_549 (fun (_ : unit) ->
+                        Value (_l_547 false) >>= fun _b_550 -> _b_550 _kf_548)
+            in
+            _choose_542 _x_541
+        in
+        _place_534 (1, SolutionEmpty)
+      in
+      _queens_521 _number_of_queens_387)
+   >>= fun _b_519 ->
+   (force_unsafe _b_519) (fun (() : unit) ->
+       Call
+         ( Fail,
+           (),
+           fun (_y_520 : empty) -> Value (match _y_520 with _ -> assert false) )) *)
 
 let queens_one_cps x = force_unsafe (_queens_one_cps_386 x)

@@ -228,21 +228,22 @@ let rec _count_1087 _x_1097 =
 
 let count = _count_1087
 
-let _testCount_1102 (_m_1103 : int) : int computation =
-  Value
-    (let rec _count_1120 _x_1097 (_s_1164 : int) =
-       Value (( = ) _s_1164) >>= fun _x_1167 ->
-       Value (_x_1167 0) >>= fun _x_1168 ->
-       Value
-         (if _x_1168 then fun (_x_1169 : int) -> _x_1169
-         else
-           Value (( - ) _s_1164) >>= fun _x_1170 ->
-           Value (_x_1170 1) >>= fun _x_1171 (_ : int) ->
-           Value (_count_1120 ()) >>= fun _b_1172 -> _b_1172 _x_1171)
-       >>= fun _b_1165 -> _b_1165 _s_1164
-     in
-     _count_1120 ())
-  >>= fun _b_1119 -> _b_1119 _m_1103
+let _testCount_1102 (_m_1103 : int) : int computation = Value 1
+
+(* Value
+     (let rec _count_1120 _x_1097 (_s_1164 : int) =
+        Value (( = ) _s_1164) >>= fun _x_1167 ->
+        Value (_x_1167 0) >>= fun _x_1168 ->
+        Value
+          (if _x_1168 then fun (_x_1169 : int) -> _x_1169
+          else
+            Value (( - ) _s_1164) >>= fun _x_1170 ->
+            Value (_x_1170 1) >>= fun _x_1171 (_ : int) ->
+            Value (_count_1120 ()) >>= fun _b_1172 -> _b_1172 _x_1171)
+        >>= fun _b_1165 -> _b_1165 _s_1164
+      in
+      _count_1120 ())
+   >>= fun _b_1119 -> _b_1119 _m_1103 *)
 
 let testCount x = force_unsafe (_testCount_1102 x)
 
