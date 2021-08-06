@@ -11,11 +11,11 @@ let enqueue_file filename = file_queue := filename :: !file_queue
 
 let optimizator_bitmask_config : int Config.optimizator_base_config =
   {
-    specialize_functions = 0;
-    eliminate_coercions = 1;
-    push_coercions = 2;
-    handler_reductions = 3;
-    purity_aware_translation = 4;
+    specialize_functions = Int.shift_left 1 0;
+    eliminate_coercions = Int.shift_left 1 1;
+    push_coercions = Int.shift_left 1 2;
+    handler_reductions = Int.shift_left 1 3;
+    purity_aware_translation = Int.shift_left 1 4;
   }
 
 (* Command-line options *)
@@ -62,15 +62,17 @@ let options =
               optimizator_bitmask_config
             in
             let specialize_functions =
-              Int.logor bitmask specialize_functions = 1
+              Int.logand bitmask specialize_functions <> 0
             in
             let eliminate_coercions =
-              Int.logor bitmask eliminate_coercions = 1
+              Int.logand bitmask eliminate_coercions <> 0
             in
-            let push_coercions = Int.logor bitmask push_coercions = 1 in
-            let handler_reductions = Int.logor bitmask handler_reductions = 1 in
+            let push_coercions = Int.logand bitmask push_coercions <> 0 in
+            let handler_reductions =
+              Int.logand bitmask handler_reductions <> 0
+            in
             let purity_aware_translation =
-              Int.logor bitmask purity_aware_translation = 1
+              Int.logand bitmask purity_aware_translation <> 0
             in
             Config.optimizator_config :=
               {
@@ -81,7 +83,7 @@ let options =
                 purity_aware_translation;
               };
             ()),
-        "enable/disable specific optimizations" );
+        " enable/disable specific optimizations" );
       ("--ascii", Arg.Set Config.ascii, " Use ASCII output");
       ( "-v",
         Arg.Unit

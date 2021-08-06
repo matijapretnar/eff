@@ -103,7 +103,9 @@ let rec sub_leafs subs (n_term : NoEff.n_term) =
 (* Name is wrong *)
 let naive_lambda_lift state e =
   match get_fun_leafs e with
-  | Some leafs when state.optimization_config.eliminate_coercions -> (
+  | Some leafs
+    when state.optimization_config.eliminate_coercions
+         && state.optimization_config.purity_aware_translation -> (
       match leafs with
       | [] -> e
       | (_, (_, ty, _)) :: _ ->
@@ -248,7 +250,9 @@ and reduce_term' state (n_term : NoEff.n_term) =
     when state.optimization_config.eliminate_coercions ->
       NoEff.NReturn t
   | NCast (t, NCoerRefl) -> t
-  | NBind (NReturn t, c) -> beta_reduce state c t
+  | NBind (NReturn t, c) when state.optimization_config.purity_aware_translation
+    ->
+      beta_reduce state c t
   | NLet (e, a) -> beta_reduce state a e
   (* | NFun (p, ty, c) when not (is_fun c) ->
       NoEff.NFun (p, ty, naive_lambda_lift c) *)

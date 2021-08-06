@@ -35,7 +35,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
   type state = {
     type_system_state : ExplicitInfer.state;
     backend_state : ExBackend.state;
-    optimizer_state : Optimizer.state;
+    optimizer_state : unit -> Optimizer.state;
   }
 
   let initial_state =
@@ -43,21 +43,23 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
       type_system_state = ExplicitInfer.initial_state;
       backend_state = ExBackend.initial_state;
       optimizer_state =
-        Optimizer.initial_state
-          {
-            specialize_functions =
-              !Config.optimizator_config.specialize_functions;
-            eliminate_coercions = !Config.optimizator_config.eliminate_coercions;
-            push_coercions = !Config.optimizator_config.push_coercions;
-            handler_reductions = !Config.optimizator_config.handler_reductions;
-            purity_aware_translation =
-              !Config.optimizator_config.purity_aware_translation;
-          };
+        (fun () ->
+          Optimizer.initial_state
+            {
+              specialize_functions =
+                !Config.optimizator_config.specialize_functions;
+              eliminate_coercions =
+                !Config.optimizator_config.eliminate_coercions;
+              push_coercions = !Config.optimizator_config.push_coercions;
+              handler_reductions = !Config.optimizator_config.handler_reductions;
+              purity_aware_translation =
+                !Config.optimizator_config.purity_aware_translation;
+            });
     }
 
   let process_computation state c _ =
     let c' = ExplicitInfer.process_computation state.type_system_state c in
-    let c'' = Optimizer.process_computation state.optimizer_state c' in
+    let c'' = Optimizer.process_computation (state.optimizer_state ()) c' in
     let backend_state' =
       ExBackend.process_computation state.backend_state c''
     in
@@ -65,7 +67,7 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
 
   let process_type_of state c _ =
     let c' = ExplicitInfer.process_computation state.type_system_state c in
-    let c'' = Optimizer.process_computation state.optimizer_state c' in
+    let c'' = Optimizer.process_computation (state.optimizer_state ()) c' in
     let backend_state' = ExBackend.process_type_of state.backend_state c'' in
     { state with backend_state = backend_state' }
 
@@ -87,12 +89,12 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
       ExplicitInfer.process_top_let state.type_system_state defs
     in
     let optimizer_state', defs'' =
-      Optimizer.process_top_let state.optimizer_state defs'
+      Optimizer.process_top_let (state.optimizer_state ()) defs'
     in
     let backend_state' = ExBackend.process_top_let state.backend_state defs'' in
     {
       type_system_state = type_system_state';
-      optimizer_state = optimizer_state';
+      optimizer_state = (fun () -> optimizer_state');
       backend_state = backend_state';
     }
 
@@ -101,14 +103,14 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
       ExplicitInfer.process_top_let_rec state.type_system_state defs
     in
     let optimizer_state', defs'' =
-      Optimizer.process_top_let_rec state.optimizer_state defs'
+      Optimizer.process_top_let_rec (state.optimizer_state ()) defs'
     in
     let backend_state' =
       ExBackend.process_top_let_rec state.backend_state defs''
     in
     {
       type_system_state = type_system_state';
-      optimizer_state = optimizer_state';
+      optimizer_state = (fun () -> optimizer_state');
       backend_state = backend_state';
     }
 
@@ -193,14 +195,14 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
-  let translate_exeff_config =
+  let translate_exeff_config () =
     TranslateExEff2NoEff.initial_state
       {
         purity_aware_translation =
           !Config.optimizator_config.purity_aware_translation;
       }
 
-  let translate_noeff_config =
+  let translate_noeff_config () =
     TranslateNoEff2Ocaml.initial_state
       {
         purity_aware_translation =
@@ -209,7 +211,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
 
   type state = {
     prog : SyntaxNoEff.cmd list;
-    no_eff_optimizer_state : NoEffOptimizer.state;
+    no_eff_optimizer_state : unit -> NoEffOptimizer.state;
     primitives :
       (Language.CoreTypes.Variable.t, Language.Primitives.primitive) Assoc.t;
   }
@@ -218,12 +220,14 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     {
       prog = [];
       no_eff_optimizer_state =
-        NoEffOptimizer.initial_state
-          {
-            eliminate_coercions = !Config.optimizator_config.eliminate_coercions;
-            purity_aware_translation =
-              !Config.optimizator_config.purity_aware_translation;
-          };
+        (fun () ->
+          NoEffOptimizer.initial_state
+            {
+              eliminate_coercions =
+                !Config.optimizator_config.eliminate_coercions;
+              purity_aware_translation =
+                !Config.optimizator_config.purity_aware_translation;
+            });
       primitives = Assoc.empty;
     }
 
@@ -233,7 +237,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   let optimize_term state term =
     let t' =
       if !Config.enable_optimization then
-        NoEffOptimizer.optimize_term state.no_eff_optimizer_state term
+        NoEffOptimizer.optimize_term (state.no_eff_optimizer_state ()) term
       else term
     in
     t'
@@ -241,7 +245,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   let optimize_rec_definitions state defs =
     let defs' =
       if !Config.enable_optimization then
-        NoEffOptimizer.optimize_rec_definitions state.no_eff_optimizer_state
+        NoEffOptimizer.optimize_rec_definitions
+          (state.no_eff_optimizer_state ())
           defs
       else defs
     in
@@ -251,7 +256,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     Print.debug "%t" (Term.print_computation c);
     let c' =
       optimize_term state
-      @@ TranslateExEff2NoEff.elab_computation translate_exeff_config c
+      @@ TranslateExEff2NoEff.elab_computation (translate_exeff_config ()) c
     in
     { state with prog = SyntaxNoEff.Term c' :: state.prog }
 
@@ -275,7 +280,9 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
           Print.debug "%t" (Term.print_expression e);
           ( x.term,
             optimize_term state
-            @@ TranslateExEff2NoEff.elab_expression translate_exeff_config e ))
+            @@ TranslateExEff2NoEff.elab_expression
+                 (translate_exeff_config ())
+                 e ))
         defs
     in
     { state with prog = SyntaxNoEff.TopLet defs' :: state.prog }
@@ -283,7 +290,9 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   let process_top_let_rec state defs =
     let defs' =
       optimize_rec_definitions state
-      @@ TranslateExEff2NoEff.elab_rec_definitions translate_exeff_config defs
+      @@ TranslateExEff2NoEff.elab_rec_definitions
+           (translate_exeff_config ())
+           defs
     in
     { state with prog = SyntaxNoEff.TopLetRec defs' :: state.prog }
 
@@ -304,7 +313,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
       (fun cmd ->
         Format.fprintf !Config.output_formatter "%t\n"
           (TranslateNoEff2Ocaml.pp_cmd
-             (TranslateNoEff2Ocaml.add_primitives translate_noeff_config
+             (TranslateNoEff2Ocaml.add_primitives
+                (translate_noeff_config ())
                 state.primitives)
              cmd))
       (List.rev state.prog)
