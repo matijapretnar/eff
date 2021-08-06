@@ -290,8 +290,7 @@ let tree_benchmark =
         ("native", TreeNative.test_general);
         (* ("generated", TreeOpt.test_general); *)
         ("generated-loop", TreeOpt.test_general_loop);
-        ( "capabilities-loop",
-          Capabilities_our_versions.test_general_loop );
+        ("capabilities-loop", Capabilities_our_versions.test_general_loop);
       ];
     parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";
@@ -307,8 +306,7 @@ let state_tree_benchmark =
         ("native-ref", TreeNative.test_leaf_state);
         (* ("generated", TreeOpt.test_leaf_state); *)
         ("generated-loop", TreeOpt.test_leaf_state_loop);
-        ( "capabilities-loop",
-          Capabilities_our_versions.test_leaf_state );
+        ("capabilities-loop", Capabilities_our_versions.test_leaf_state);
       ];
     parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";
@@ -326,8 +324,7 @@ let state_with_update_tree_benchmark =
         (* ("generated-merged", TreeOpt.test_leaf_state_update_merged_handler); *)
         ( "generated-merged-loop",
           TreeOpt.test_leaf_state_update_merged_handler_loop );
-        ( "capabilities-loop",
-          Capabilities_our_versions.test_leaf_state_update );
+        ("capabilities-loop", Capabilities_our_versions.test_leaf_state_update);
       ];
     parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";

@@ -41,10 +41,10 @@ let measure_benchmark benchmark baseline =
     | _ -> assert false
   in
   let baseline_result = StringMap.find baseline instance_results in
-  let normalized_results =
+  let slowdowns =
     StringMap.map (fun result -> result /. baseline_result) instance_results
   in
-  normalized_results
+  slowdowns
 
 let transpose_nested_map map_by_a_by_b =
   IntMap.fold
@@ -97,9 +97,7 @@ let display_benchmark_set_results
       in
       Printf.fprintf chan "# %s: %s\n" set.name test_label;
       IntMap.iter
-        (fun param param_result ->
-          Printf.fprintf chan "%d %d\n" param
-            (int_of_float (100. *. param_result)))
+        (fun param slowdown -> Printf.fprintf chan "%d %.2f\n" param slowdown)
         test_results;
       close_out chan)
     benchmark_results;
