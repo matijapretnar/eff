@@ -234,8 +234,8 @@ and cast_computation state comp coer =
   match (comp.term, coer.term) with
   | _, _
     when Constraint.is_trivial_dirty_coercion coer
-         && state.config.eliminate_coercions ->
-      (* Elim-Co-Comp *)
+         && (state.config.eliminate_coercions || true) ->
+      (* Elim-Co-Comp, this plays badly with return type detection so we just turn it off *)
       comp
   | Term.Bind (cmp, abs), (_, dcoer) when state.config.push_coercions ->
       (* Push-Co-Do *)

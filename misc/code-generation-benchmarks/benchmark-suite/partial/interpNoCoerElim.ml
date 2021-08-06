@@ -23,10 +23,7 @@ let rec _createZeroCase_43 _x_52 =
       Sub
         (coer_tuple_2
            (coer_refl_ty, coer_refl_ty)
-           ( _createZeroCase_43
-               (coer_arrow coer_refl_ty coer_refl_ty (( - ) _n_54) 1),
-             _createZeroCase_43
-               (coer_arrow coer_refl_ty coer_refl_ty (( - ) _n_54) 1) ))
+           (_createZeroCase_43 (_n_54 - 1), _createZeroCase_43 (_n_54 - 1)))
 
 let createZeroCase = _createZeroCase_43
 
@@ -41,313 +38,212 @@ let rec _createCase_61 _x_67 =
       Add
         (coer_tuple_2
            (coer_refl_ty, coer_refl_ty)
-           ( _addCase_42,
-             _createCase_61
-               (coer_arrow coer_refl_ty coer_refl_ty (( - ) _x_67) 1) ))
+           (_addCase_42, _createCase_61 (_x_67 - 1)))
 
 let createCase = _createCase_61
 
 let _bigTest_68 (_num_69 : int) =
-  let rec _interp_160 (_x_100, _k_162) =
+  let rec _interp_135 (_x_100, _k_137) =
     match _x_100 with
-    | Num _b_111 -> _k_162 _b_111
-    | Add (_l_113, _r_112) ->
-        _interp_160
+    | Num _b_106 -> _k_137 _b_106
+    | Add (_l_108, _r_107) ->
+        _interp_135
+          ( _l_108,
+            fun (_x_109 : int) ->
+              _interp_135
+                (_r_107, fun (_y_110 : int) -> _k_137 (_x_109 + _y_110)) )
+    | Mul (_l_113, _r_112) ->
+        _interp_135
           ( _l_113,
-            fun (_x_186 : int) ->
-              _interp_160
-                ( _r_112,
-                  fun (_x_305 : int) ->
-                    _k_162
-                      (coer_arrow coer_refl_ty coer_refl_ty (( + ) _x_186)
-                         _x_305) ) )
-    | Mul (_l_118, _r_117) ->
-        _interp_160
+            fun (_x_114 : int) ->
+              _interp_135
+                (_r_112, fun (_y_115 : int) -> _k_137 (_x_114 * _y_115)) )
+    | Sub (_l_118, _r_117) ->
+        _interp_135
           ( _l_118,
-            fun (_x_203 : int) ->
-              _interp_160
-                ( _r_117,
-                  fun (_x_345 : int) ->
-                    _k_162
-                      (coer_arrow coer_refl_ty coer_refl_ty (( * ) _x_203)
-                         _x_345) ) )
-    | Sub (_l_123, _r_122) ->
-        _interp_160
-          ( _l_123,
-            fun (_x_220 : int) ->
-              _interp_160
-                ( _r_122,
-                  fun (_x_385 : int) ->
-                    _k_162
-                      (coer_arrow coer_refl_ty coer_refl_ty (( - ) _x_220)
-                         _x_385) ) )
-    | Div (_l_128, _r_127) ->
-        _interp_160
-          ( _r_127,
-            fun (_x_267 : int) ->
-              _interp_160
-                ( _l_128,
-                  fun (_x_407 : int) ->
-                    match _x_267 with
-                    | 0 -> ~-1
-                    | _ ->
-                        _k_162
-                          (coer_arrow coer_refl_ty coer_refl_ty (( / ) _x_407)
-                             _x_267) ) )
+            fun (_x_119 : int) ->
+              _interp_135
+                (_r_117, fun (_y_120 : int) -> _k_137 (_x_119 - _y_120)) )
+    | Div (_l_123, _r_122) ->
+        _interp_135
+          ( _r_122,
+            fun (_y_124 : int) ->
+              _interp_135
+                ( _l_123,
+                  fun (_x_125 : int) ->
+                    match _y_124 with 0 -> ~-1 | _ -> _k_137 (_x_125 / _y_124)
+                ) )
   in
-  _interp_160 (_createCase_61 _num_69, fun (_x_107 : int) -> _x_107)
+  _interp_135 (_createCase_61 _num_69, fun (_id_96 : int) -> _id_96)
 
 let bigTest = _bigTest_68
 
-let _bigTestLoop_410 (_num_411 : int) =
-  let ____finalCase_435 = _createCase_61 _num_411 in
-  let rec _looper_458 _x_459 =
-    coer_arrow coer_refl_ty coer_refl_ty (fun (_s_461 : int) ->
-        if coer_arrow coer_refl_ty coer_refl_ty (( = ) _x_459) 0 then _s_461
-        else
-          coer_arrow coer_refl_ty coer_refl_ty
-            (_looper_458
-               (coer_arrow coer_refl_ty coer_refl_ty (( - ) _x_459) 1))
-            (coer_arrow coer_refl_ty coer_refl_ty (( + ) _s_461)
-               (let rec _interp_528 (_x_454, _k_530) =
-                  match _x_454 with
-                  | Num _b_479 -> _k_530 _b_479
-                  | Add (_l_481, _r_480) ->
-                      _interp_528
-                        ( _l_481,
-                          fun (_x_554 : int) ->
-                            _interp_528
-                              ( _r_480,
-                                fun (_x_673 : int) ->
-                                  _k_530
-                                    (coer_arrow coer_refl_ty coer_refl_ty
-                                       (( + ) _x_554) _x_673) ) )
-                  | Mul (_l_486, _r_485) ->
-                      _interp_528
-                        ( _l_486,
-                          fun (_x_571 : int) ->
-                            _interp_528
-                              ( _r_485,
-                                fun (_x_713 : int) ->
-                                  _k_530
-                                    (coer_arrow coer_refl_ty coer_refl_ty
-                                       (( * ) _x_571) _x_713) ) )
-                  | Sub (_l_491, _r_490) ->
-                      _interp_528
-                        ( _l_491,
-                          fun (_x_588 : int) ->
-                            _interp_528
-                              ( _r_490,
-                                fun (_x_753 : int) ->
-                                  _k_530
-                                    (coer_arrow coer_refl_ty coer_refl_ty
-                                       (( - ) _x_588) _x_753) ) )
-                  | Div (_l_496, _r_495) ->
-                      _interp_528
-                        ( _r_495,
-                          fun (_x_635 : int) ->
-                            _interp_528
-                              ( _l_496,
-                                fun (_x_775 : int) ->
-                                  match _x_635 with
-                                  | 0 -> ~-1
-                                  | _ ->
-                                      _k_530
-                                        (coer_arrow coer_refl_ty coer_refl_ty
-                                           (( / ) _x_775) _x_635) ) )
-                in
-                _interp_528 (____finalCase_435, fun (_x_475 : int) -> _x_475))))
+let _bigTestLoop_166 (_num_167 : int) =
+  let ____finalCase_191 = _createCase_61 _num_167 in
+  let rec _looper_214 _x_215 (_s_217 : int) =
+    if _x_215 = 0 then _s_217
+    else
+      _looper_214 (_x_215 - 1)
+        (_s_217
+        +
+        let rec _interp_259 (_x_210, _k_261) =
+          match _x_210 with
+          | Num _b_230 -> _k_261 _b_230
+          | Add (_l_232, _r_231) ->
+              _interp_259
+                ( _l_232,
+                  fun (_x_233 : int) ->
+                    _interp_259
+                      (_r_231, fun (_y_234 : int) -> _k_261 (_x_233 + _y_234))
+                )
+          | Mul (_l_237, _r_236) ->
+              _interp_259
+                ( _l_237,
+                  fun (_x_238 : int) ->
+                    _interp_259
+                      (_r_236, fun (_y_239 : int) -> _k_261 (_x_238 * _y_239))
+                )
+          | Sub (_l_242, _r_241) ->
+              _interp_259
+                ( _l_242,
+                  fun (_x_243 : int) ->
+                    _interp_259
+                      (_r_241, fun (_y_244 : int) -> _k_261 (_x_243 - _y_244))
+                )
+          | Div (_l_247, _r_246) ->
+              _interp_259
+                ( _r_246,
+                  fun (_y_248 : int) ->
+                    _interp_259
+                      ( _l_247,
+                        fun (_x_249 : int) ->
+                          match _y_248 with
+                          | 0 -> ~-1
+                          | _ -> _k_261 (_x_249 / _y_248) ) )
+        in
+        _interp_259 (____finalCase_191, fun (_id_194 : int) -> _id_194))
   in
-  coer_arrow coer_refl_ty coer_refl_ty (_looper_458 100) 0
+  _looper_214 100 0
 
-let bigTestLoop = _bigTestLoop_410
+let bigTestLoop = _bigTestLoop_166
 
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
 type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
 
-let _testState_778 (_n_779 : int) =
-  coer_arrow coer_refl_ty coer_refl_ty
-    (coer_arrow coer_refl_ty coer_refl_ty
-       (let rec _interp_907 (_x_821, _k_909) =
-          match _x_821 with
-          | Num _b_838 ->
-              coer_arrow coer_refl_ty coer_refl_ty (fun (_ : int) ->
-                  coer_arrow coer_refl_ty coer_refl_ty
-                    (coer_arrow coer_refl_ty coer_refl_ty (_k_909 _b_838))
-                    (coer_arrow coer_refl_ty coer_refl_ty (( * ) _b_838) _b_838))
-          | Add (_l_843, _r_842) ->
-              _interp_907
-                ( _l_843,
-                  fun (_x_950 : int) ->
-                    _interp_907
-                      ( _r_842,
-                        fun (_x_1098 : int) ->
-                          _k_909
-                            (coer_arrow coer_refl_ty coer_refl_ty (( + ) _x_950)
-                               _x_1098) ) )
-          | Mul (_l_848, _r_847) ->
-              _interp_907
-                ( _l_848,
-                  fun (_x_967 : int) ->
-                    _interp_907
-                      ( _r_847,
-                        fun (_x_1138 : int) ->
-                          _k_909
-                            (coer_arrow coer_refl_ty coer_refl_ty (( * ) _x_967)
-                               _x_1138) ) )
-          | Sub (_l_853, _r_852) ->
-              _interp_907
-                ( _l_853,
-                  fun (_x_984 : int) ->
-                    _interp_907
-                      ( _r_852,
-                        fun (_x_1178 : int) ->
-                          _k_909
-                            (coer_arrow coer_refl_ty coer_refl_ty (( - ) _x_984)
-                               _x_1178) ) )
-          | Div (_l_858, _r_857) ->
-              _interp_907
-                ( _r_857,
-                  fun (_x_1035 : int) ->
-                    _interp_907
-                      ( _l_858,
-                        fun (_x_1210 : int) ->
-                          match _x_1035 with
-                          | 0 ->
-                              coer_arrow coer_refl_ty coer_refl_ty
-                                (fun (_s_1211 : int) ->
-                                  coer_arrow coer_refl_ty coer_refl_ty
-                                    (coer_arrow coer_refl_ty coer_refl_ty
-                                       (_k_909 _s_1211))
-                                    _s_1211)
-                          | _ ->
-                              _k_909
-                                (coer_arrow coer_refl_ty coer_refl_ty
-                                   (( / ) _x_1210) _x_1035) ) )
-        in
-        _interp_907
-          ( _createCase_61 _n_779,
-            fun (_x_832 : int) ->
-              coer_arrow coer_refl_ty coer_refl_ty (fun (_ : int) -> _x_832) )))
-    _n_779
+let _testState_290 (_n_291 : int) =
+  let rec _interp_387 (_x_333, _k_389) =
+    match _x_333 with
+    | Num _b_345 -> fun (_ : int) -> _k_389 _b_345 (_b_345 * _b_345)
+    | Add (_l_350, _r_349) ->
+        _interp_387
+          ( _l_350,
+            fun (_x_351 : int) ->
+              _interp_387
+                (_r_349, fun (_y_352 : int) -> _k_389 (_x_351 + _y_352)) )
+    | Mul (_l_355, _r_354) ->
+        _interp_387
+          ( _l_355,
+            fun (_x_356 : int) ->
+              _interp_387
+                (_r_354, fun (_y_357 : int) -> _k_389 (_x_356 * _y_357)) )
+    | Sub (_l_360, _r_359) ->
+        _interp_387
+          ( _l_360,
+            fun (_x_361 : int) ->
+              _interp_387
+                (_r_359, fun (_y_362 : int) -> _k_389 (_x_361 - _y_362)) )
+    | Div (_l_365, _r_364) ->
+        _interp_387
+          ( _r_364,
+            fun (_y_366 : int) ->
+              _interp_387
+                ( _l_365,
+                  fun (_x_367 : int) ->
+                    match _y_366 with
+                    | 0 -> fun (_s_419 : int) -> _k_389 _s_419 _s_419
+                    | _ -> _k_389 (_x_367 / _y_366) ) )
+  in
+  _interp_387
+    (_createCase_61 _n_291, fun (_x_324 : int) (_ : int) -> _x_324)
+    _n_291
 
-let testState = _testState_778
+let testState = _testState_290
 
-let _testStateLoop_1215 (_n_1216 : int) =
-  let _addCase_1217 =
+let _testStateLoop_447 (_n_448 : int) =
+  let _addCase_449 =
     Add
       ( Add (Add (Num 20, Num 2), Mul (Num 1, Num 2)),
         Sub (Add (Num 2, Num 2), Div (Num 1, Num 10)) )
   in
-  let rec _createZeroCase_1218 _x_1282 =
-    match _x_1282 with
-    | 0 -> Sub (_addCase_1217, _addCase_1217)
-    | _n_1697 ->
+  let rec _createZeroCase_450 _x_514 =
+    match _x_514 with
+    | 0 -> Sub (_addCase_449, _addCase_449)
+    | _n_649 ->
         Sub
           (coer_tuple_2
              (coer_refl_ty, coer_refl_ty)
-             ( _createZeroCase_1218
-                 (coer_arrow coer_refl_ty coer_refl_ty (( - ) _n_1697) 1),
-               _createZeroCase_1218
-                 (coer_arrow coer_refl_ty coer_refl_ty (( - ) _n_1697) 1) ))
+             (_createZeroCase_450 (_n_649 - 1), _createZeroCase_450 (_n_649 - 1)))
   in
-  let rec _createCase_1227 _x_1283 =
-    match _x_1283 with
+  let rec _createCase_459 _x_515 =
+    match _x_515 with
     | 1 ->
         Div
           (coer_tuple_2
              (coer_refl_ty, coer_refl_ty)
-             (Num 100, _createZeroCase_1218 3))
+             (Num 100, _createZeroCase_450 3))
     | _ ->
         Add
           (coer_tuple_2
              (coer_refl_ty, coer_refl_ty)
-             ( _addCase_1217,
-               _createCase_1227
-                 (coer_arrow coer_refl_ty coer_refl_ty (( - ) _x_1283) 1) ))
+             (_addCase_449, _createCase_459 (_x_515 - 1)))
   in
-  let ____finalCase_1294 = _createCase_1227 _n_1216 in
-  let rec _looper_1295 _x_1296 =
-    coer_arrow coer_refl_ty coer_refl_ty (fun (_s_1298 : int) ->
-        if coer_arrow coer_refl_ty coer_refl_ty (( = ) _x_1296) 0 then _s_1298
-        else
-          coer_arrow coer_refl_ty coer_refl_ty
-            (_looper_1295
-               (coer_arrow coer_refl_ty coer_refl_ty (( - ) _x_1296) 1))
-            (coer_arrow coer_refl_ty coer_refl_ty (( + ) _s_1298)
-               (coer_arrow coer_refl_ty coer_refl_ty
-                  (coer_arrow coer_refl_ty coer_refl_ty
-                     (let rec _interp_1388 (_x_1288, _k_1390) =
-                        match _x_1288 with
-                        | Num _b_1319 ->
-                            coer_arrow coer_refl_ty coer_refl_ty
-                              (fun (_ : int) ->
-                                coer_arrow coer_refl_ty coer_refl_ty
-                                  (coer_arrow coer_refl_ty coer_refl_ty
-                                     (_k_1390 _b_1319))
-                                  (coer_arrow coer_refl_ty coer_refl_ty
-                                     (( * ) _b_1319) _b_1319))
-                        | Add (_l_1324, _r_1323) ->
-                            _interp_1388
-                              ( _l_1324,
-                                fun (_x_1431 : int) ->
-                                  _interp_1388
-                                    ( _r_1323,
-                                      fun (_x_1579 : int) ->
-                                        _k_1390
-                                          (coer_arrow coer_refl_ty coer_refl_ty
-                                             (( + ) _x_1431) _x_1579) ) )
-                        | Mul (_l_1329, _r_1328) ->
-                            _interp_1388
-                              ( _l_1329,
-                                fun (_x_1448 : int) ->
-                                  _interp_1388
-                                    ( _r_1328,
-                                      fun (_x_1619 : int) ->
-                                        _k_1390
-                                          (coer_arrow coer_refl_ty coer_refl_ty
-                                             (( * ) _x_1448) _x_1619) ) )
-                        | Sub (_l_1334, _r_1333) ->
-                            _interp_1388
-                              ( _l_1334,
-                                fun (_x_1465 : int) ->
-                                  _interp_1388
-                                    ( _r_1333,
-                                      fun (_x_1659 : int) ->
-                                        _k_1390
-                                          (coer_arrow coer_refl_ty coer_refl_ty
-                                             (( - ) _x_1465) _x_1659) ) )
-                        | Div (_l_1339, _r_1338) ->
-                            _interp_1388
-                              ( _r_1338,
-                                fun (_x_1516 : int) ->
-                                  _interp_1388
-                                    ( _l_1339,
-                                      fun (_x_1691 : int) ->
-                                        match _x_1516 with
-                                        | 0 ->
-                                            coer_arrow coer_refl_ty coer_refl_ty
-                                              (fun (_s_1692 : int) ->
-                                                coer_arrow coer_refl_ty
-                                                  coer_refl_ty
-                                                  (coer_arrow coer_refl_ty
-                                                     coer_refl_ty
-                                                     (_k_1390 _s_1692))
-                                                  _s_1692)
-                                        | _ ->
-                                            _k_1390
-                                              (coer_arrow coer_refl_ty
-                                                 coer_refl_ty (( / ) _x_1691)
-                                                 _x_1516) ) )
-                      in
-                      _interp_1388
-                        ( ____finalCase_1294,
-                          fun (_x_1313 : int) ->
-                            coer_arrow coer_refl_ty coer_refl_ty
-                              (fun (_ : int) -> _x_1313) )))
-                  _n_1216)))
+  let ____finalCase_526 = _createCase_459 _n_448 in
+  let rec _looper_527 _x_528 (_s_530 : int) =
+    if _x_528 = 0 then _s_530
+    else
+      _looper_527 (_x_528 - 1)
+        (_s_530
+        +
+        let rec _interp_588 (_x_520, _k_590) =
+          match _x_520 with
+          | Num _b_546 -> fun (_ : int) -> _k_590 _b_546 (_b_546 * _b_546)
+          | Add (_l_551, _r_550) ->
+              _interp_588
+                ( _l_551,
+                  fun (_x_552 : int) ->
+                    _interp_588
+                      (_r_550, fun (_y_553 : int) -> _k_590 (_x_552 + _y_553))
+                )
+          | Mul (_l_556, _r_555) ->
+              _interp_588
+                ( _l_556,
+                  fun (_x_557 : int) ->
+                    _interp_588
+                      (_r_555, fun (_y_558 : int) -> _k_590 (_x_557 * _y_558))
+                )
+          | Sub (_l_561, _r_560) ->
+              _interp_588
+                ( _l_561,
+                  fun (_x_562 : int) ->
+                    _interp_588
+                      (_r_560, fun (_y_563 : int) -> _k_590 (_x_562 - _y_563))
+                )
+          | Div (_l_566, _r_565) ->
+              _interp_588
+                ( _r_565,
+                  fun (_y_567 : int) ->
+                    _interp_588
+                      ( _l_566,
+                        fun (_x_568 : int) ->
+                          match _y_567 with
+                          | 0 -> fun (_s_620 : int) -> _k_590 _s_620 _s_620
+                          | _ -> _k_590 (_x_568 / _y_567) ) )
+        in
+        _interp_588
+          (____finalCase_526, fun (_x_497 : int) (_ : int) -> _x_497)
+          _n_448)
   in
-  coer_arrow coer_refl_ty coer_refl_ty (_looper_1295 100) 0
+  _looper_527 100 0
 
-let testStateLoop = _testStateLoop_1215
+let testStateLoop = _testStateLoop_447

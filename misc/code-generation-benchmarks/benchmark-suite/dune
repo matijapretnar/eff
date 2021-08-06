@@ -11,6 +11,7 @@
   bechamel
   delimcc
   ocamlHeader
+  partial_benchmark_suite
   (select
    config.ml
    from
