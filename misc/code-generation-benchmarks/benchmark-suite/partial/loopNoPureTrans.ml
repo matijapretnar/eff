@@ -3,7 +3,7 @@ open OcamlHeader
 let rec _loop_pure_42 _x_48 =
   Value (( = ) _x_48) >>= fun _b_50 ->
   Value (_b_50 0) >>= fun _b_51 ->
-  if _b_51 then ()
+  if _b_51 then Value ()
   else
     Value (( - ) _x_48) >>= fun _b_52 ->
     Value (_b_52 1) >>= fun _b_53 -> _loop_pure_42 _b_53
@@ -59,16 +59,18 @@ let _test_incr_98 (_n_99 : int) =
     (let rec _loop_incr_114 _x_89 =
        Value (( = ) _x_89) >>= fun _x_130 ->
        Value (_x_130 0) >>= fun _x_140 ->
-       if _x_140 then fun (_x_141 : int) -> _x_141
-       else fun (_x_142 : int) ->
-         Value (( - ) _x_89) >>= fun _x_143 ->
-         Value (_x_143 1) >>= fun _x_144 ->
-         Value (_loop_incr_114 _x_144) >>= fun _b_145 ->
-         Value (( + ) _x_142) >>= fun _b_146 ->
-         Value (_b_146 1) >>= fun _b_147 -> _b_145 _b_147
+       if _x_140 then Value (fun (_x_141 : int) -> Value _x_141)
+       else
+         Value
+           (fun (_x_142 : int) ->
+             Value (( - ) _x_89) >>= fun _x_143 ->
+             Value (_x_143 1) >>= fun _x_144 ->
+             Value (_loop_incr_114 _x_144) >>= fun _b_145 ->
+             Value (( + ) _x_142) >>= fun _b_146 ->
+             Value (_b_146 1) >>= fun _b_147 -> (force_unsafe _b_145) _b_147)
      in
      _loop_incr_114 _n_99)
-  >>= fun _b_113 -> _b_113 0
+  >>= fun _b_113 -> (force_unsafe _b_113) 0
 
 let test_incr = _test_incr_98
 
@@ -89,7 +91,7 @@ let _test_incr'_165 (_n_166 : int) =
     (let rec _loop_incr'_200 (_x_156, _k_203) =
        Value (( = ) _x_156) >>= fun _x_232 ->
        Value (_x_232 0) >>= fun _x_257 ->
-       if _x_257 then _k_203 ()
+       if _x_257 then Value (_k_203 ())
        else
          Value (( - ) _x_156) >>= fun _x_258 ->
          Value (_x_258 1) >>= fun _x_259 ->
@@ -99,21 +101,11 @@ let _test_incr'_165 (_n_166 : int) =
                Value (_k_203 ()) >>= fun _b_261 ->
                Value (( + ) _x_260) >>= fun _b_262 ->
                Value (_b_262 1) >>= fun _b_263 -> _b_261 _b_263 )
-     and _loop_incr_201 _x_89 =
-       Value (( = ) _x_89) >>= fun _x_248 ->
-       Value (_x_248 0) >>= fun _x_273 ->
-       if _x_273 then fun (_x_274 : int) -> _x_274
-       else fun (_x_275 : int) ->
-         Value (( - ) _x_89) >>= fun _x_276 ->
-         Value (_x_276 1) >>= fun _x_277 ->
-         Value (_loop_incr_201 _x_277) >>= fun _b_278 ->
-         Value (( + ) _x_275) >>= fun _b_279 ->
-         Value (_b_279 1) >>= fun _b_280 -> _b_278 _b_280
      in
-     _loop_incr'_200 (_n_166, fun (_x_173 : unit) (_x_175 : int) -> _x_175))
-  >>= fun _b_180 -> _b_180 0
+     _loop_incr'_200 (_n_166, fun (_x_173 : unit) (_x_175 : int) -> Value _x_175))
+  >>= fun _b_180 -> (force_unsafe _b_180) 0
 
-let test_incr' = _test_incr'_165
+let test_incr' x = force_unsafe (_test_incr'_165 x)
 
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
@@ -144,15 +136,18 @@ let _test_state_309 (_n_310 : int) =
     (let rec _loop_state_327 _x_294 =
        Value (( = ) _x_294) >>= fun _x_376 ->
        Value (_x_376 0) >>= fun _x_386 ->
-       if _x_386 then fun (_x_387 : int) -> _x_387
-       else fun (_s_388 : int) ->
-         Value (( + ) _s_388) >>= fun _x_389 ->
-         Value (_x_389 1) >>= fun _x_390 ->
-         Value (( - ) _x_294) >>= fun _x_391 ->
-         Value (_x_391 1) >>= fun _x_392 ->
-         Value (_loop_state_327 _x_392) >>= fun _b_393 -> _b_393 _x_390
+       if _x_386 then Value (fun (_x_387 : int) -> Value _x_387)
+       else
+         Value
+           (fun (_s_388 : int) ->
+             Value (( + ) _s_388) >>= fun _x_389 ->
+             Value (_x_389 1) >>= fun _x_390 ->
+             Value (( - ) _x_294) >>= fun _x_391 ->
+             Value (_x_391 1) >>= fun _x_392 ->
+             Value (_loop_state_327 _x_392) >>= fun _b_393 ->
+             (force_unsafe _b_393) _x_390)
      in
      _loop_state_327 _n_310)
-  >>= fun _b_326 -> _b_326 0
+  >>= fun _b_326 -> (force_unsafe _b_326) 0
 
-let test_state = _test_state_309
+let test_state x = force_unsafe (_test_state_309 x)

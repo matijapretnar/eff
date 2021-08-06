@@ -1,5 +1,6 @@
 open OcamlHeader
 
+(* Manual value extractions *)
 type tree = Empty | Node of (tree * int * tree)
 
 type (_, _) eff_internal_effect += Choose : (unit, bool) eff_internal_effect
@@ -7,43 +8,50 @@ type (_, _) eff_internal_effect += Choose : (unit, bool) eff_internal_effect
 let _tester_42 (_k_43 : int) =
   let _leaf_44 (_a_45 : int) =
     Value (( * ) _a_45) >>= fun _b_47 ->
-    Value (_b_47 _k_43) >>= fun _b_46 -> Node (Empty, _b_46, Empty)
+    Value (_b_47 _k_43) >>= fun _b_46 -> Value (Node (Empty, _b_46, Empty))
   in
   let _bot_48 (_t_49 : tree) (_t2_50 : tree) =
     Value (_leaf_44 13) >>= fun _b_51 ->
     Value (_leaf_44 9) >>= fun _b_52 ->
     Value (_leaf_44 3) >>= fun _b_53 ->
-    Node
-      ( Node (Node (_t_49, 0, _t2_50), 2, _b_51),
-        5,
-        Node (_b_52, 7, Node (_t2_50, 3, Node (_b_53, 5, _t2_50))) )
+    Value
+      (Node
+         ( Node (Node (_t_49, 0, _t2_50), 2, force_unsafe _b_51),
+           5,
+           Node
+             ( force_unsafe _b_52,
+               7,
+               Node (_t2_50, 3, Node (force_unsafe _b_53, 5, _t2_50)) ) ))
   in
   Value (_leaf_44 3) >>= fun _b_57 ->
-  Value (_bot_48 _b_57) >>= fun _b_56 ->
+  Value (_bot_48 (force_unsafe _b_57)) >>= fun _b_56 ->
   Value (_leaf_44 4) >>= fun _b_58 ->
-  Value (_b_56 _b_58) >>= fun _b_55 ->
+  Value (_b_56 (force_unsafe _b_58)) >>= fun _b_55 ->
   Value (_leaf_44 1) >>= fun _b_61 ->
-  Value (_bot_48 _b_61) >>= fun _b_60 ->
+  Value (_bot_48 (force_unsafe _b_61)) >>= fun _b_60 ->
   Value (_leaf_44 3) >>= fun _b_62 ->
-  Value (_b_60 _b_62) >>= fun _b_59 ->
+  Value (_b_60 (force_unsafe _b_62)) >>= fun _b_59 ->
   Value (_leaf_44 3) >>= fun _b_76 ->
-  Value (_bot_48 _b_76) >>= fun _b_77 ->
+  Value (_bot_48 (force_unsafe _b_76)) >>= fun _b_77 ->
   Value (_leaf_44 4) >>= fun _b_78 ->
-  Value (_b_77 _b_78) >>= fun _b_79 ->
+  Value (_b_77 (force_unsafe _b_78)) >>= fun _b_79 ->
   Value (_leaf_44 1) >>= fun _b_80 ->
-  Value (_bot_48 _b_80) >>= fun _b_81 ->
+  Value (_bot_48 (force_unsafe _b_80)) >>= fun _b_81 ->
   Value (_leaf_44 3) >>= fun _b_82 ->
-  Value (_b_81 _b_82) >>= fun _b_83 ->
-  Value (_bot_48 (Node (_b_79, 10, _b_83))) >>= fun _b_84 ->
+  Value (_b_81 (force_unsafe _b_82)) >>= fun _b_83 ->
+  Value (_bot_48 (Node (force_unsafe _b_79, 10, force_unsafe _b_83)))
+  >>= fun _b_84 ->
   Value (_leaf_44 10) >>= fun _b_85 ->
-  Value (_b_84 _b_85) >>= fun _n2_86 ->
-  Value (_bot_48 (Node (_b_55, 10, _b_59))) >>= fun _b_87 -> _b_87 _n2_86
+  Value (_b_84 (force_unsafe _b_85)) >>= fun _n2_86 ->
+  Value (_bot_48 (Node (force_unsafe _b_55, 10, force_unsafe _b_59)))
+  >>= fun _b_87 -> _b_87 (force_unsafe _n2_86)
 
 let tester = _tester_42
 
 let _max_88 (_a_89 : int) (_b_90 : int) =
   Value (( > ) _a_89) >>= fun _b_92 ->
-  Value (_b_92 _b_90) >>= fun _b_91 -> if _b_91 then _a_89 else _b_90
+  Value (_b_92 _b_90) >>= fun _b_91 ->
+  if _b_91 then Value _a_89 else Value _b_90
 
 let max = _max_88
 
@@ -69,10 +77,10 @@ let _effect_max_93 (_m_94 : int) =
                   Value (_x_153 _next_128) >>= fun _x_159 -> _k_143 _x_159 )
         in
         Value (_l_116 true) >>= fun _b_108 ->
-        Value (_max_88 _b_108) >>= fun _b_107 ->
-        Value (_l_116 false) >>= fun _b_109 -> _b_107 _b_109
+        Value (_max_88 (force_unsafe _b_108)) >>= fun _b_107 ->
+        Value (_l_116 false) >>= fun _b_109 -> _b_107 (force_unsafe _b_109)
   in
-  _find_max_141 (_t_104, fun (_x_110 : int) -> _x_110)
+  _find_max_141 (force_unsafe _t_104, fun (_x_110 : int) -> Value _x_110)
 
 let effect_max = _effect_max_93
 
@@ -83,35 +91,37 @@ let test_max = _test_max_160
 let _op_162 (_x_163 : int) (_y_164 : int) =
   Value (( - ) _x_163) >>= fun _b_165 ->
   Value (( * ) 3) >>= fun _b_167 ->
-  Value (_b_167 _y_164) >>= fun _b_166 -> _b_165 _b_166
+  Value (_b_167 _y_164) >>= fun _b_166 -> Value (_b_165 _b_166)
 
 let op = _op_162
 
 let _max_168 (_a_169 : int) (_b_170 : int) =
   Value (( > ) _a_169) >>= fun _b_172 ->
-  Value (_b_172 _b_170) >>= fun _b_171 -> if _b_171 then _a_169 else _b_170
+  Value (_b_172 _b_170) >>= fun _b_171 ->
+  if _b_171 then Value _a_169 else Value _b_170
 
 let max = _max_168
 
 type intlist = Nil | Cons of (int * intlist)
 
-let rec _op_173 (* @ *) _x_180 (_ys_182 : intlist) =
+let rec _op_173 (* @ *) _x_180 (_ys_182 : intlist) : intlist computation =
   match _x_180 with
-  | Nil -> _ys_182
+  | Nil -> Value _ys_182
   | Cons (_x_184, _xs_183) ->
       Value (_op_173 (* @ *) _xs_183) >>= fun _b_185 ->
-      Value (_b_185 _ys_182) >>= fun _b_186 -> Cons (_x_184, _b_186)
+      Value (_b_185 _ys_182) >>= fun _b_186 ->
+      Value (Cons (_x_184, force_unsafe _b_186))
 
 let _op_173 (* @ *) = _op_173 (* @ *)
 
 let _test_general_187 (_m_188 : int) =
-  let rec _maxl_189 _x_219 (_x_279 : intlist) =
+  let rec _maxl_189 _x_219 (_x_279 : intlist) : int computation =
     match _x_279 with
-    | Nil -> _x_219
+    | Nil -> Value _x_219
     | Cons (_x_281, _xs_280) ->
         Value (_max_168 _x_281) >>= fun _b_282 ->
         Value (_b_282 _x_219) >>= fun _b_283 ->
-        Value (_maxl_189 _b_283) >>= fun _b_284 -> _b_284 _xs_280
+        Value (_maxl_189 (force_unsafe _b_283)) >>= fun _b_284 -> _b_284 _xs_280
   in
   Value (_tester_42 _m_188) >>= fun _t_197 ->
   Value (_maxl_189 0) >>= fun _b_226 ->
@@ -126,37 +136,40 @@ let _test_general_187 (_m_188 : int) =
                _explore_255
                  ( _left_238,
                    fun (_b_272 : int) ->
-                     Value (_x_267 _b_272) >>= fun _x_273 -> _k_257 _x_273 )
+                     Value (_x_267 _b_272) >>= fun _x_273 ->
+                     _k_257 (force_unsafe _x_273) )
              else
                Value (_op_162 _x_237) >>= fun _x_269 ->
                _explore_255
                  ( _right_236,
                    fun (_b_276 : int) ->
-                     Value (_x_269 _b_276) >>= fun _x_277 -> _k_257 _x_277 )
+                     Value (_x_269 _b_276) >>= fun _x_277 ->
+                     _k_257 (force_unsafe _x_277) )
            in
            Value (_l_223 true) >>= fun _b_212 ->
-           Value (_op_173 (* @ *) _b_212) >>= fun _b_211 ->
-           Value (_l_223 false) >>= fun _b_213 -> _b_211 _b_213
+           Value (_op_173 (* @ *) (force_unsafe _b_212)) >>= fun _b_211 ->
+           Value (_l_223 false) >>= fun _b_213 -> _b_211 (force_unsafe _b_213)
      in
-     _explore_255 (_t_197, fun (_x_214 : int) -> Cons (_x_214, Nil)))
-  >>= fun _b_227 -> _b_226 _b_227
+     _explore_255
+       (force_unsafe _t_197, fun (_x_214 : int) -> Value (Cons (_x_214, Nil))))
+  >>= fun _b_227 -> _b_226 (force_unsafe _b_227)
 
 let test_general = _test_general_187
 
 let _test_general_loop_285 (_m_286 : int) =
-  let rec _maxl_287 _x_329 (_x_414 : intlist) =
+  let rec _maxl_287 _x_329 (_x_414 : intlist) : int computation =
     match _x_414 with
-    | Nil -> _x_329
+    | Nil -> Value _x_329
     | Cons (_x_416, _xs_415) ->
         Value (_max_168 _x_416) >>= fun _b_417 ->
         Value (_b_417 _x_329) >>= fun _b_418 ->
-        Value (_maxl_287 _b_418) >>= fun _b_419 -> _b_419 _xs_415
+        Value (_maxl_287 (force_unsafe _b_418)) >>= fun _b_419 -> _b_419 _xs_415
   in
   Value (_tester_42 _m_286) >>= fun ____t_295 ->
   let rec _looper_349 _x_350 (_s_351 : int) =
     Value (( = ) _x_350) >>= fun _b_352 ->
     Value (_b_352 0) >>= fun _b_353 ->
-    if _b_353 then _s_351
+    if _b_353 then Value _s_351
     else
       Value (( - ) _x_350) >>= fun _b_354 ->
       Value (_b_354 1) >>= fun _b_355 ->
@@ -174,24 +187,27 @@ let _test_general_loop_285 (_m_286 : int) =
                    _explore_390
                      ( _left_373,
                        fun (_b_407 : int) ->
-                         Value (_x_402 _b_407) >>= fun _x_408 -> _k_392 _x_408
-                     )
+                         Value (_x_402 _b_407) >>= fun _x_408 ->
+                         _k_392 (force_unsafe _x_408) )
                  else
                    Value (_op_162 _x_372) >>= fun _x_404 ->
                    _explore_390
                      ( _right_371,
                        fun (_b_411 : int) ->
-                         Value (_x_404 _b_411) >>= fun _x_412 -> _k_392 _x_412
-                     )
+                         Value (_x_404 _b_411) >>= fun _x_412 ->
+                         _k_392 (force_unsafe _x_412) )
                in
                Value (_l_333 true) >>= fun _b_310 ->
-               Value (_op_173 (* @ *) _b_310) >>= fun _b_309 ->
-               Value (_l_333 false) >>= fun _b_311 -> _b_309 _b_311
+               Value (_op_173 (* @ *) (force_unsafe _b_310)) >>= fun _b_309 ->
+               Value (_l_333 false) >>= fun _b_311 ->
+               _b_309 (force_unsafe _b_311)
          in
-         _explore_390 (____t_295, fun (_x_312 : int) -> Cons (_x_312, Nil)))
+         _explore_390
+           ( force_unsafe ____t_295,
+             fun (_x_312 : int) -> Value (Cons (_x_312, Nil)) ))
       >>= fun _b_359 ->
-      Value (_b_358 _b_359) >>= fun _b_360 ->
-      Value (_b_357 _b_360) >>= fun _b_361 -> _b_356 _b_361
+      Value (_b_358 (force_unsafe _b_359)) >>= fun _b_360 ->
+      Value (_b_357 (force_unsafe _b_360)) >>= fun _b_361 -> _b_356 _b_361
   in
   Value (_looper_349 100) >>= fun _b_362 -> _b_362 0
 
@@ -203,26 +219,28 @@ let _absurd_420 (_void_421 : float) = match _void_421 with _ -> assert false
 
 let absurd = _absurd_420
 
-let _test_leaf_state_422 (_m_423 : int) =
-  let rec _maxl_424 _x_475 (_x_1533 : intlist) =
+let _test_leaf_state_422 (_m_423 : int) : int computation =
+  let rec _maxl_424 _x_475 (_x_1533 : intlist) : int computation =
     match _x_1533 with
-    | Nil -> _x_475
+    | Nil -> Value _x_475
     | Cons (_x_1535, _xs_1534) ->
         Value (_max_168 _x_1535) >>= fun _b_1536 ->
         Value (_b_1536 _x_475) >>= fun _b_1537 ->
-        Value (_maxl_424 _b_1537) >>= fun _b_1538 -> _b_1538 _xs_1534
+        Value (_maxl_424 (force_unsafe _b_1537)) >>= fun _b_1538 ->
+        _b_1538 _xs_1534
   in
   let rec _populate_leafs_432 _x_476 (_n_634 : int) =
     Value (( = ) _x_476) >>= fun _b_635 ->
     Value (_b_635 _n_634) >>= fun _b_636 ->
-    if _b_636 then Nil
+    if _b_636 then Value Nil
     else
       Value (( * ) _x_476) >>= fun _b_637 ->
       Value (_b_637 3) >>= fun _b_638 ->
       Value (( + ) _x_476) >>= fun _b_639 ->
       Value (_b_639 1) >>= fun _b_640 ->
       Value (_populate_leafs_432 _b_640) >>= fun _b_641 ->
-      Value (_b_641 _n_634) >>= fun _b_642 -> Cons (_b_638, _b_642)
+      Value (_b_641 _n_634) >>= fun _b_642 ->
+      Value (Cons (_b_638, force_unsafe _b_642))
   in
   Value (_populate_leafs_432 0) >>= fun _b_444 ->
   Value (_b_444 154) >>= fun _leafs_443 ->
@@ -239,17 +257,19 @@ let _test_leaf_state_422 (_m_423 : int) =
                _explore_523
                  ( _left_509,
                    fun (_b_555 : int) ->
-                     Value (_x_554 _b_555) >>= fun _x_556 -> _k_525 _x_556 )
+                     Value (_x_554 _b_555) >>= fun _x_556 ->
+                     _k_525 (force_unsafe _x_556) )
              else
                Value (_op_162 _x_508) >>= fun _x_574 ->
                _explore_523
                  ( _right_507,
                    fun (_b_575 : int) ->
-                     Value (_x_574 _b_575) >>= fun _x_576 -> _k_525 _x_576 )
+                     Value (_x_574 _b_575) >>= fun _x_576 ->
+                     _k_525 (force_unsafe _x_576) )
            in
            _l_482 true >>= fun _b_458 ->
            Value (_op_173 (* @ *) _b_458) >>= fun _b_457 ->
-           _l_482 false >>= fun _b_459 -> Value (_b_457 _b_459)
+           _l_482 false >>= fun _b_459 -> _b_457 _b_459
      in
      let rec _explore_577 (_x_481, _k_525) =
        match _x_481 with
@@ -269,7 +289,7 @@ let _test_leaf_state_422 (_m_423 : int) =
                                    : (a -> (b -> _) -> _) ->
                                 match eff with
                                 | Get ->
-                                    fun () _l_585 ->
+                                    fun (() : unit) _l_585 ->
                                       Value
                                         (fun (_s_586 : intlist) ->
                                           match _s_586 with
@@ -282,8 +302,8 @@ let _test_leaf_state_422 (_m_423 : int) =
                                 | eff' -> fun arg k -> Call (eff', arg, k));
                           })
                          (_k_525 _x_581)))
-                 >>= fun _b_582 -> _b_582 _rest_580
-             | Nil -> Nil)
+                 >>= fun _b_582 -> Value (_b_582 _rest_580)
+             | Nil -> Value Nil)
        | Node (_left_509, _x_508, _right_507) ->
            let _l_482 (_y_510 : bool) =
              if _y_510 then
@@ -291,13 +311,15 @@ let _test_leaf_state_422 (_m_423 : int) =
                _explore_523
                  ( _left_509,
                    fun (_b_555 : int) ->
-                     Value (_x_554 _b_555) >>= fun _x_556 -> _k_525 _x_556 )
+                     Value (_x_554 _b_555) >>= fun _x_556 ->
+                     _k_525 (force_unsafe _x_556) )
              else
                Value (_op_162 _x_508) >>= fun _x_574 ->
                _explore_523
                  ( _right_507,
                    fun (_b_575 : int) ->
-                     Value (_x_574 _b_575) >>= fun _x_576 -> _k_525 _x_576 )
+                     Value (_x_574 _b_575) >>= fun _x_576 ->
+                     _k_525 (force_unsafe _x_576) )
            in
            force_unsafe
              ((handler
@@ -355,32 +377,36 @@ let _test_leaf_state_422 (_m_423 : int) =
                  })
                 (_l_482 true))
      in
-     _explore_577 (_t_445, fun (_x_460 : int) -> Value (Cons (_x_460, Nil))))
+     _explore_577
+       (force_unsafe _t_445, fun (_x_460 : int) -> Value (Cons (_x_460, Nil))))
   >>= fun _b_492 ->
-  Value (_b_492 _leafs_443) >>= fun _b_493 -> _b_491 _b_493
+  Value (_b_492 (force_unsafe _leafs_443)) >>= fun _b_493 ->
+  _b_491 (force_unsafe _b_493)
 
 let test_leaf_state = _test_leaf_state_422
 
 let _test_leaf_state_loop_2631 (_m_2632 : int) =
-  let rec _maxl_2633 _x_2696 (_x_3792 : intlist) =
+  let rec _maxl_2633 _x_2696 (_x_3792 : intlist) : int computation =
     match _x_3792 with
-    | Nil -> _x_2696
+    | Nil -> Value _x_2696
     | Cons (_x_3794, _xs_3793) ->
         Value (_max_168 _x_3794) >>= fun _b_3795 ->
         Value (_b_3795 _x_2696) >>= fun _b_3796 ->
-        Value (_maxl_2633 _b_3796) >>= fun _b_3797 -> _b_3797 _xs_3793
+        Value (_maxl_2633 (force_unsafe _b_3796)) >>= fun _b_3797 ->
+        _b_3797 _xs_3793
   in
   let rec _populate_leafs_2641 _x_2697 (_n_2893 : int) =
     Value (( = ) _x_2697) >>= fun _b_2894 ->
     Value (_b_2894 _n_2893) >>= fun _b_2895 ->
-    if _b_2895 then Nil
+    if _b_2895 then Value Nil
     else
       Value (( * ) _x_2697) >>= fun _b_2896 ->
       Value (_b_2896 3) >>= fun _b_2897 ->
       Value (( + ) _x_2697) >>= fun _b_2898 ->
       Value (_b_2898 1) >>= fun _b_2899 ->
       Value (_populate_leafs_2641 _b_2899) >>= fun _b_2900 ->
-      Value (_b_2900 _n_2893) >>= fun _b_2901 -> Cons (_b_2897, _b_2901)
+      Value (_b_2900 _n_2893) >>= fun _b_2901 ->
+      Value (Cons (_b_2897, force_unsafe _b_2901))
   in
   Value (_populate_leafs_2641 0) >>= fun _b_2653 ->
   Value (_b_2653 154) >>= fun ____leafs_2652 ->
@@ -388,7 +414,7 @@ let _test_leaf_state_loop_2631 (_m_2632 : int) =
   let rec _looper_2738 _x_2739 (_s_2740 : int) =
     Value (( = ) _x_2739) >>= fun _b_2741 ->
     Value (_b_2741 0) >>= fun _b_2742 ->
-    if _b_2742 then _s_2740
+    if _b_2742 then Value _s_2740
     else
       Value (( - ) _x_2739) >>= fun _b_2743 ->
       Value (_b_2743 1) >>= fun _b_2744 ->
@@ -407,18 +433,18 @@ let _test_leaf_state_loop_2631 (_m_2632 : int) =
                      ( _left_2768,
                        fun (_b_2814 : int) ->
                          Value (_x_2813 _b_2814) >>= fun _x_2815 ->
-                         _k_2784 _x_2815 )
+                         _k_2784 (force_unsafe _x_2815) )
                  else
                    Value (_op_162 _x_2767) >>= fun _x_2833 ->
                    _explore_2782
                      ( _right_2766,
                        fun (_b_2834 : int) ->
                          Value (_x_2833 _b_2834) >>= fun _x_2835 ->
-                         _k_2784 _x_2835 )
+                         _k_2784 (force_unsafe _x_2835) )
                in
                _l_2703 true >>= fun _b_2667 ->
                Value (_op_173 (* @ *) _b_2667) >>= fun _b_2666 ->
-               _l_2703 false >>= fun _b_2668 -> Value (_b_2666 _b_2668)
+               _l_2703 false >>= fun _b_2668 -> _b_2666 _b_2668
          in
          let rec _explore_2836 (_x_2702, _k_2784) =
            match _x_2702 with
@@ -454,8 +480,8 @@ let _test_leaf_state_loop_2631 (_m_2632 : int) =
                                     | eff' -> fun arg k -> Call (eff', arg, k));
                               })
                              (_k_2784 _x_2840)))
-                     >>= fun _b_2841 -> _b_2841 _rest_2839
-                 | Nil -> Nil)
+                     >>= fun _b_2841 -> Value (_b_2841 _rest_2839)
+                 | Nil -> Value Nil)
            | Node (_left_2768, _x_2767, _right_2766) ->
                let _l_2703 (_y_2769 : bool) =
                  if _y_2769 then
@@ -464,14 +490,14 @@ let _test_leaf_state_loop_2631 (_m_2632 : int) =
                      ( _left_2768,
                        fun (_b_2814 : int) ->
                          Value (_x_2813 _b_2814) >>= fun _x_2815 ->
-                         _k_2784 _x_2815 )
+                         _k_2784 (force_unsafe _x_2815) )
                  else
                    Value (_op_162 _x_2767) >>= fun _x_2833 ->
                    _explore_2782
                      ( _right_2766,
                        fun (_b_2834 : int) ->
                          Value (_x_2833 _b_2834) >>= fun _x_2835 ->
-                         _k_2784 _x_2835 )
+                         _k_2784 (force_unsafe _x_2835) )
                in
                force_unsafe
                  ((handler
@@ -533,11 +559,12 @@ let _test_leaf_state_loop_2631 (_m_2632 : int) =
                     (_l_2703 true))
          in
          _explore_2836
-           (____t_2654, fun (_x_2669 : int) -> Value (Cons (_x_2669, Nil))))
+           ( force_unsafe ____t_2654,
+             fun (_x_2669 : int) -> Value (Cons (_x_2669, Nil)) ))
       >>= fun _b_2748 ->
-      Value (_b_2748 ____leafs_2652) >>= fun _b_2749 ->
-      Value (_b_2747 _b_2749) >>= fun _b_2750 ->
-      Value (_b_2746 _b_2750) >>= fun _b_2751 -> _b_2745 _b_2751
+      Value (_b_2748 (force_unsafe ____leafs_2652)) >>= fun _b_2749 ->
+      Value (_b_2747 (force_unsafe _b_2749)) >>= fun _b_2750 ->
+      Value (_b_2746 (force_unsafe _b_2750)) >>= fun _b_2751 -> _b_2745 _b_2751
   in
   Value (_looper_2738 100) >>= fun _b_2758 -> _b_2758 0
 
@@ -546,13 +573,14 @@ let test_leaf_state_loop = _test_leaf_state_loop_2631
 type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
 
 let _test_leaf_state_update_4890 (_m_4891 : int) =
-  let rec _maxl_4892 _x_4934 (_x_5594 : intlist) =
+  let rec _maxl_4892 (_x_4934 : int) (_x_5594 : intlist) : int computation =
     match _x_5594 with
-    | Nil -> _x_4934
+    | Nil -> Value _x_4934
     | Cons (_x_5596, _xs_5595) ->
         Value (_max_168 _x_5596) >>= fun _b_5597 ->
         Value (_b_5597 _x_4934) >>= fun _b_5598 ->
-        Value (_maxl_4892 _b_5598) >>= fun _b_5599 -> _b_5599 _xs_5595
+        Value (_maxl_4892 (force_unsafe _b_5598)) >>= fun _b_5599 ->
+        _b_5599 _xs_5595
   in
   Value (_tester_42 _m_4891) >>= fun _t_4900 ->
   Value (_maxl_4892 0) >>= fun _b_4953 ->
@@ -621,7 +649,7 @@ let _test_leaf_state_update_4890 (_m_4891 : int) =
                             | eff' -> fun arg k -> Call (eff', arg, k));
                       })
                      (_k_4994 _s_5106)))
-             >>= fun _b_5107 -> _b_5107 _s_5106
+             >>= fun _b_5107 -> Value (_b_5107 _s_5106)
        | Node (_left_4975, _x_4974, _right_4973) ->
            Value (( * ) _x_4974) >>= fun _x_5285 ->
            Value (_x_5285 _x_4974) >>= fun _x_5440 (_ : int) ->
@@ -711,27 +739,30 @@ let _test_leaf_state_update_4890 (_m_4891 : int) =
                    (_l_5442 true)))
            >>= fun _b_5441 -> _b_5441 _x_5440
      in
-     _explore_5104 (_t_4900, fun (_x_4917 : int) -> Value (Cons (_x_4917, Nil))))
+     _explore_5104
+       (force_unsafe _t_4900, fun (_x_4917 : int) -> Value (Cons (_x_4917, Nil))))
   >>= fun _b_4954 ->
   Value ~-1 >>= fun _b_4955 ->
-  Value (_b_4954 _b_4955) >>= fun _b_4956 -> _b_4953 _b_4956
+  Value (_b_4954 _b_4955) >>= fun _b_4956 ->
+  Value (_b_4953 (force_unsafe _b_4956))
 
 let test_leaf_state_update = _test_leaf_state_update_4890
 
 let _test_leaf_state_update_loop_21688 (_m_21689 : int) =
-  let rec _maxl_21690 _x_21744 (_x_22443 : intlist) =
+  let rec _maxl_21690 _x_21744 (_x_22443 : intlist) : int computation =
     match _x_22443 with
-    | Nil -> _x_21744
+    | Nil -> Value _x_21744
     | Cons (_x_22445, _xs_22444) ->
         Value (_max_168 _x_22445) >>= fun _b_22446 ->
         Value (_b_22446 _x_21744) >>= fun _b_22447 ->
-        Value (_maxl_21690 _b_22447) >>= fun _b_22448 -> _b_22448 _xs_22444
+        Value (_maxl_21690 (force_unsafe _b_22447)) >>= fun _b_22448 ->
+        _b_22448 _xs_22444
   in
   Value (_tester_42 _m_21689) >>= fun ____t_21698 ->
   let rec _looper_21790 _x_21791 (_s_21792 : int) =
     Value (( = ) _x_21791) >>= fun _b_21793 ->
     Value (_b_21793 0) >>= fun _b_21794 ->
-    if _b_21794 then _s_21792
+    if _b_21794 then Value _s_21792
     else
       Value (( - ) _x_21791) >>= fun _b_21795 ->
       Value (_b_21795 1) >>= fun _b_21796 ->
@@ -756,14 +787,14 @@ let _test_leaf_state_update_loop_21688 (_m_21689 : int) =
                            ( _left_21824,
                              fun (_b_21948 : int) ->
                                Value (_x_21947 _b_21948) >>= fun _x_21949 ->
-                               _k_21843 _x_21949 )
+                               _k_21843 (force_unsafe _x_21949) )
                        else
                          Value (_op_162 _x_21823) >>= fun _x_21950 ->
                          _explore_21841
                            ( _right_21822,
                              fun (_b_21951 : int) ->
                                Value (_x_21950 _b_21951) >>= fun _x_21952 ->
-                               _k_21843 _x_21952 )
+                               _k_21843 (force_unsafe _x_21952) )
                      in
                      _l_21942 true >>= fun _b_21943 ->
                      Value (_op_173 (* @ *) _b_21943) >>= fun _b_21944 ->
@@ -901,12 +932,14 @@ let _test_leaf_state_update_loop_21688 (_m_21689 : int) =
                >>= fun _b_22290 -> _b_22290 _x_22289
          in
          _explore_21953
-           (____t_21698, fun (_x_21715 : int) -> Value (Cons (_x_21715, Nil))))
+           ( force_unsafe ____t_21698,
+             fun (_x_21715 : int) -> Value (Cons (_x_21715, Nil)) ))
       >>= fun _b_21800 ->
       Value ~-1 >>= fun _b_21801 ->
       Value (_b_21800 _b_21801) >>= fun _b_21802 ->
-      Value (_b_21799 _b_21802) >>= fun _b_21803 ->
-      Value (_b_21798 _b_21803) >>= fun _b_21804 -> _b_21797 _b_21804
+      Value (_b_21799 (force_unsafe _b_21802)) >>= fun _b_21803 ->
+      Value (_b_21798 (force_unsafe _b_21803)) >>= fun _b_21804 ->
+      _b_21797 _b_21804
   in
   Value (_looper_21790 100) >>= fun _b_21812 -> _b_21812 0
 
@@ -915,11 +948,12 @@ let test_leaf_state_update_loop = _test_leaf_state_update_loop_21688
 let _test_leaf_state_update_merged_handler_38537 (_m_38538 : int) =
   let rec _maxl_38539 _x_38580 (_x_38777 : intlist) =
     match _x_38777 with
-    | Nil -> _x_38580
+    | Nil -> Value _x_38580
     | Cons (_x_38779, _xs_38778) ->
         Value (_max_168 _x_38779) >>= fun _b_38780 ->
         Value (_b_38780 _x_38580) >>= fun _b_38781 ->
-        Value (_maxl_38539 _b_38781) >>= fun _b_38782 -> _b_38782 _xs_38778
+        Value (_maxl_38539 (force_unsafe _b_38781)) >>= fun _b_38782 ->
+        _b_38782 _xs_38778
   in
   Value (_tester_42 _m_38538) >>= fun _t_38547 ->
   Value (_maxl_38539 0) >>= fun _b_38593 ->
@@ -958,10 +992,12 @@ let _test_leaf_state_update_merged_handler_38537 (_m_38538 : int) =
            >>= fun _b_38761 -> _b_38761 _x_38760
      in
      _explore_38630
-       (_t_38547, fun (_x_38573 : int) (_ : int) -> Cons (_x_38573, Nil)))
+       ( force_unsafe _t_38547,
+         fun (_x_38573 : int) (_ : int) -> Value (Cons (_x_38573, Nil)) ))
   >>= fun _b_38594 ->
   Value ~-1 >>= fun _b_38595 ->
-  Value (_b_38594 _b_38595) >>= fun _b_38596 -> _b_38593 _b_38596
+  Value (_b_38594 _b_38595) >>= fun _b_38596 ->
+  Value (_b_38593 (force_unsafe _b_38596))
 
 let test_leaf_state_update_merged_handler =
   _test_leaf_state_update_merged_handler_38537
@@ -969,17 +1005,18 @@ let test_leaf_state_update_merged_handler =
 let _test_leaf_state_update_merged_handler_loop_38783 (_m_38784 : int) =
   let rec _maxl_38785 _x_38838 (_x_39062 : intlist) =
     match _x_39062 with
-    | Nil -> _x_38838
+    | Nil -> Value _x_38838
     | Cons (_x_39064, _xs_39063) ->
         Value (_max_168 _x_39064) >>= fun _b_39065 ->
         Value (_b_39065 _x_38838) >>= fun _b_39066 ->
-        Value (_maxl_38785 _b_39066) >>= fun _b_39067 -> _b_39067 _xs_39063
+        Value (_maxl_38785 (force_unsafe _b_39066)) >>= fun _b_39067 ->
+        _b_39067 _xs_39063
   in
   Value (_tester_42 _m_38784) >>= fun ____t_38793 ->
   let rec _looper_38866 _x_38867 (_s_38868 : int) =
     Value (( = ) _x_38867) >>= fun _b_38869 ->
     Value (_b_38869 0) >>= fun _b_38870 ->
-    if _b_38870 then _s_38868
+    if _b_38870 then Value _s_38868
     else
       Value (( - ) _x_38867) >>= fun _b_38871 ->
       Value (_b_38871 1) >>= fun _b_38872 ->
@@ -1022,12 +1059,14 @@ let _test_leaf_state_update_merged_handler_loop_38783 (_m_38784 : int) =
                >>= fun _b_39046 -> _b_39046 _x_39045
          in
          _explore_38915
-           (____t_38793, fun (_x_38819 : int) (_ : int) -> Cons (_x_38819, Nil)))
+           ( force_unsafe ____t_38793,
+             fun (_x_38819 : int) (_ : int) -> Value (Cons (_x_38819, Nil)) ))
       >>= fun _b_38876 ->
       Value ~-1 >>= fun _b_38877 ->
       Value (_b_38876 _b_38877) >>= fun _b_38878 ->
-      Value (_b_38875 _b_38878) >>= fun _b_38879 ->
-      Value (_b_38874 _b_38879) >>= fun _b_38880 -> _b_38873 _b_38880
+      Value (_b_38875 (force_unsafe _b_38878)) >>= fun _b_38879 ->
+      Value (_b_38874 (force_unsafe _b_38879)) >>= fun _b_38880 ->
+      _b_38873 _b_38880
   in
   Value (_looper_38866 100) >>= fun _b_38881 -> _b_38881 0
 

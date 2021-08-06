@@ -286,11 +286,12 @@ let _testGenerator_25367 (_n_25368 : int) =
                  (a -> (b -> _) -> _) ->
               match eff with
               | GeneratorPut ->
-                  fun _s'_25377 _l_25398 ->
-                    Value
-                      (fun (_s_25379 : int) ->
-                        coer_arrow coer_refl_ty force_unsafe _l_25398 ()
-                          _s'_25377)
+                  (* Manual: explicit type param *)
+                  fun (_s'_25377 : int) _l_25398 ->
+                   Value
+                     (fun (_s_25379 : int) ->
+                       coer_arrow coer_refl_ty force_unsafe _l_25398 ()
+                         _s'_25377)
               | GeneratorGet ->
                   fun _ _l_25399 ->
                     Value

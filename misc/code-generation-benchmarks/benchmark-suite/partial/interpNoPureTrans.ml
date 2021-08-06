@@ -18,24 +18,28 @@ let addCase = _addCase_42
 
 let rec _createZeroCase_43 _x_52 =
   match _x_52 with
-  | 0 -> Sub (_addCase_42, _addCase_42)
+  | 0 -> Value (Sub (_addCase_42, _addCase_42))
   | _n_54 ->
       Value (( - ) _n_54) >>= fun _b_55 ->
       Value (_b_55 1) >>= fun _b_56 ->
       Value (_createZeroCase_43 _b_56) >>= fun _b_57 ->
       Value (( - ) _n_54) >>= fun _b_58 ->
       Value (_b_58 1) >>= fun _b_59 ->
-      Value (_createZeroCase_43 _b_59) >>= fun _b_60 -> Sub (_b_57, _b_60)
+      Value (_createZeroCase_43 _b_59) >>= fun _b_60 ->
+      Value (Sub (force_unsafe _b_57, force_unsafe _b_60))
 
 let createZeroCase = _createZeroCase_43
 
 let rec _createCase_61 _x_67 =
   match _x_67 with
-  | 1 -> Value (_createZeroCase_43 3) >>= fun _b_69 -> Div (Num 100, _b_69)
+  | 1 ->
+      Value (_createZeroCase_43 3) >>= fun _b_69 ->
+      Value (Div (Num 100, force_unsafe _b_69))
   | _ ->
       Value (( - ) _x_67) >>= fun _b_70 ->
       Value (_b_70 1) >>= fun _b_71 ->
-      Value (_createCase_61 _b_71) >>= fun _b_72 -> Add (_addCase_42, _b_72)
+      Value (_createCase_61 _b_71) >>= fun _b_72 ->
+      Value (Add (_addCase_42, force_unsafe _b_72))
 
 let createCase = _createCase_61
 
@@ -79,13 +83,13 @@ let _bigTest_73 (_num_74 : int) =
                 ( _l_128,
                   fun (_x_130 : int) ->
                     match _y_129 with
-                    | 0 -> ~-1
+                    | 0 -> Value ~-1
                     | _ ->
                         Value (( / ) _x_130) >>= fun _x_158 ->
                         Value (_x_158 _y_129) >>= fun _x_161 -> _k_142 _x_161 )
           )
   in
-  _interp_140 (_finalCase_98, fun (_id_101 : int) -> _id_101)
+  _interp_140 (force_unsafe _finalCase_98, fun (_id_101 : int) -> Value _id_101)
 
 let bigTest = _bigTest_73
 
@@ -94,7 +98,7 @@ let _bigTestLoop_171 (_num_172 : int) =
   let rec _looper_229 _x_230 (_s_231 : int) =
     Value (( = ) _x_230) >>= fun _b_232 ->
     Value (_b_232 0) >>= fun _b_233 ->
-    if _b_233 then _s_231
+    if _b_233 then Value _s_231
     else
       Value (( - ) _x_230) >>= fun _b_234 ->
       Value (_b_234 1) >>= fun _b_235 ->
@@ -142,15 +146,16 @@ let _bigTestLoop_171 (_num_172 : int) =
                        ( _l_261,
                          fun (_x_263 : int) ->
                            match _y_262 with
-                           | 0 -> ~-1
+                           | 0 -> Value ~-1
                            | _ ->
                                Value (( / ) _x_263) >>= fun _x_291 ->
                                Value (_x_291 _y_262) >>= fun _x_294 ->
                                _k_275 _x_294 ) )
          in
-         _interp_273 (____finalCase_196, fun (_id_199 : int) -> _id_199))
+         _interp_273
+           (force_unsafe ____finalCase_196, fun (_id_199 : int) -> Value _id_199))
       >>= fun _b_238 ->
-      Value (_b_237 _b_238) >>= fun _b_239 -> _b_236 _b_239
+      Value (_b_237 (force_unsafe _b_238)) >>= fun _b_239 -> _b_236 _b_239
   in
   Value (_looper_229 100) >>= fun _b_240 -> _b_240 0
 
@@ -160,7 +165,7 @@ type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
 type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
 
-let _testState_304 (_n_305 : int) =
+let _testState_304 (_n_305 : int) : int computation =
   Value (_createCase_61 _n_305) >>= fun _finalCase_352 ->
   Value
     (let rec _interp_401 (_x_347, _k_403) =
@@ -208,16 +213,17 @@ let _testState_304 (_n_305 : int) =
                      fun (_x_381 : int) ->
                        match _y_380 with
                        | 0 ->
-                           fun (_s_433 : int) ->
+                          (fun (_s_433 : int) ->
                              Value (_k_403 _s_433) >>= fun _b_434 ->
-                             _b_434 _s_433
+                             Value (_b_434 _s_433))
                        | _ ->
                            Value (( / ) _x_381) >>= fun _x_437 ->
                            Value (_x_437 _y_380) >>= fun _x_441 -> _k_403 _x_441
                    ) )
      in
-     _interp_401 (_finalCase_352, fun (_x_338 : int) (_ : int) -> _x_338))
-  >>= fun _b_353 -> _b_353 _n_305
+     _interp_401
+       (force_unsafe _finalCase_352, fun (_x_338 : int) (_ : int) -> _x_338))
+  >>= fun _b_353 -> (force_unsafe _b_353) _n_305
 
 let testState = _testState_304
 
@@ -240,18 +246,20 @@ let _testStateLoop_461 (_n_462 : int) =
   in
   let rec _createCase_473 _x_529 =
     match _x_529 with
-    | 1 -> Value (_createZeroCase_464 3) >>= fun _b_673 -> Div (Num 100, _b_673)
+    | 1 ->
+        Value (_createZeroCase_464 3) >>= fun _b_673 ->
+        Value (Div (Num 100, _b_673))
     | _ ->
         Value (( - ) _x_529) >>= fun _b_674 ->
         Value (_b_674 1) >>= fun _b_675 ->
         Value (_createCase_473 _b_675) >>= fun _b_676 ->
-        Add (_addCase_463, _b_676)
+        Value (Add (_addCase_463, force_unsafe _b_676))
   in
   Value (_createCase_473 _n_462) >>= fun ____finalCase_551 ->
   let rec _looper_552 _x_553 (_s_554 : int) =
     Value (( = ) _x_553) >>= fun _b_555 ->
     Value (_b_555 0) >>= fun _b_556 ->
-    if _b_556 then _s_554
+    if _b_556 then Value _s_554
     else
       Value
         (let rec _interp_612 (_x_534, _k_614) =
@@ -307,9 +315,11 @@ let _testStateLoop_461 (_n_462 : int) =
                                Value (_x_648 _y_591) >>= fun _x_652 ->
                                _k_614 _x_652 ) )
          in
-         _interp_612 (____finalCase_551, fun (_x_511 : int) (_ : int) -> _x_511))
+         _interp_612
+           ( force_unsafe ____finalCase_551,
+             fun (_x_511 : int) (_ : int) -> _x_511 ))
       >>= fun _b_557 ->
-      Value (_b_557 _n_462) >>= fun _x_558 ->
+      Value ((force_unsafe _b_557) _n_462) >>= fun _x_558 ->
       Value (( - ) _x_553) >>= fun _b_559 ->
       Value (_b_559 1) >>= fun _b_560 ->
       Value (_looper_552 _b_560) >>= fun _b_561 ->
