@@ -362,15 +362,15 @@ let tree_benchmark =
         ("generated-loop", TreeOpt.test_general_loop);
         ("capabilities-loop", Capabilities_our_versions.test_general_loop);
         ( "partial-generated-no-fun-spec",
-          Partial_benchmark_suite.TreeNoFunSpec.test_general );
+          Partial_benchmark_suite.TreeNoFunSpec.test_general_loop );
         ( "partial-generated-no-coer-elim",
-          Partial_benchmark_suite.TreeNoCoerElim.test_general );
+          Partial_benchmark_suite.TreeNoCoerElim.test_general_loop );
         ( "partial-generated-no-coer-push",
-          Partial_benchmark_suite.TreeNoCoerPush.test_general );
+          Partial_benchmark_suite.TreeNoCoerPush.test_general_loop );
         ( "partial-generated-no-hand-reduc",
-          Partial_benchmark_suite.TreeNoHandReduc.test_general );
+          Partial_benchmark_suite.TreeNoHandReduc.test_general_loop );
         ( "partial-generated-no-pure-trans",
-          Partial_benchmark_suite.TreeNoPureTrans.test_general );
+          Partial_benchmark_suite.TreeNoPureTrans.test_general_loop );
       ];
     parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";
@@ -388,15 +388,15 @@ let state_tree_benchmark =
         ("generated-loop", TreeOpt.test_leaf_state_loop);
         ("capabilities-loop", Capabilities_our_versions.test_leaf_state);
         ( "partial-generated-no-fun-spec",
-          Partial_benchmark_suite.TreeNoFunSpec.test_leaf_state );
+          Partial_benchmark_suite.TreeNoFunSpec.test_leaf_state_loop );
         ( "partial-generated-no-coer-elim",
-          Partial_benchmark_suite.TreeNoCoerElim.test_leaf_state );
+          Partial_benchmark_suite.TreeNoCoerElim.test_leaf_state_loop );
         ( "partial-generated-no-coer-push",
-          Partial_benchmark_suite.TreeNoCoerPush.test_leaf_state );
+          Partial_benchmark_suite.TreeNoCoerPush.test_leaf_state_loop );
         ( "partial-generated-no-hand-reduc",
-          Partial_benchmark_suite.TreeNoHandReduc.test_leaf_state );
+          Partial_benchmark_suite.TreeNoHandReduc.test_leaf_state_loop );
         ( "partial-generated-no-pure-trans",
-          Partial_benchmark_suite.TreeNoPureTrans.test_leaf_state );
+          Partial_benchmark_suite.TreeNoPureTrans.test_leaf_state_loop );
       ];
     parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";
@@ -416,15 +416,15 @@ let state_with_update_tree_benchmark =
           TreeOpt.test_leaf_state_update_merged_handler_loop );
         ("capabilities-loop", Capabilities_our_versions.test_leaf_state_update);
         ( "partial-generated-no-fun-spec",
-          Partial_benchmark_suite.TreeNoFunSpec.test_leaf_state_update );
+          Partial_benchmark_suite.TreeNoFunSpec.test_leaf_state_update_loop );
         ( "partial-generated-no-coer-elim",
-          Partial_benchmark_suite.TreeNoCoerElim.test_leaf_state_update );
+          Partial_benchmark_suite.TreeNoCoerElim.test_leaf_state_update_loop );
         ( "partial-generated-no-coer-push",
-          Partial_benchmark_suite.TreeNoCoerPush.test_leaf_state_update );
+          Partial_benchmark_suite.TreeNoCoerPush.test_leaf_state_update_loop );
         ( "partial-generated-no-hand-reduc",
-          Partial_benchmark_suite.TreeNoHandReduc.test_leaf_state_update );
+          Partial_benchmark_suite.TreeNoHandReduc.test_leaf_state_update_loop );
         ( "partial-generated-no-pure-trans",
-          Partial_benchmark_suite.TreeNoPureTrans.test_leaf_state_update );
+          Partial_benchmark_suite.TreeNoPureTrans.test_leaf_state_update_loop );
       ];
     parameters = [ 100; 2 * 100; 4 * 100; 8 * 100; 16 * 100; 32 * 100 ];
     parameter_unit = "leaf_val";
@@ -468,21 +468,24 @@ let generator_benchmark =
             Capability_benchmarks_cps_paper.handledGenerator_generated );
         ( "partial-generated-no-fun-spec",
           ignore_value
-            Partial_benchmark_suite.Capability_benchmarksNoFunSpec.testGenerator );
+            Partial_benchmark_suite.Capability_benchmarksNoFunSpec.testGenerator
+        );
         ( "partial-generated-no-coer-elim",
           ignore_value
-            Partial_benchmark_suite.Capability_benchmarksNoCoerElim.testGenerator );
+            Partial_benchmark_suite.Capability_benchmarksNoCoerElim
+            .testGenerator );
         ( "partial-generated-no-coer-push",
           ignore_value
-            Partial_benchmark_suite.Capability_benchmarksNoCoerPush.testGenerator );
+            Partial_benchmark_suite.Capability_benchmarksNoCoerPush
+            .testGenerator );
         ( "partial-generated-no-hand-reduc",
           ignore_value
-            Partial_benchmark_suite.Capability_benchmarksNoHandReduc.testGenerator
-        );
+            Partial_benchmark_suite.Capability_benchmarksNoHandReduc
+            .testGenerator );
         ( "partial-generated-no-pure-trans",
           ignore_value
-            Partial_benchmark_suite.Capability_benchmarksNoPureTrans.testGenerator
-        );
+            Partial_benchmark_suite.Capability_benchmarksNoPureTrans
+            .testGenerator );
       ];
     parameters =
       [ 1_000_000; 2 * 1_000_000; 4 * 1_000_000; 8 * 1_000_000; 16 * 1_000_000 ];

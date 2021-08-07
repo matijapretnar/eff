@@ -211,7 +211,7 @@ let _test_general_loop_285 (_m_286 : int) =
   in
   Value (_looper_349 100) >>= fun _b_362 -> _b_362 0
 
-let test_general_loop = _test_general_loop_285
+let test_general_loop x = force_unsafe( _test_general_loop_285 x)
 
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
