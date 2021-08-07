@@ -3,14 +3,15 @@ open Toolkit
 
 let instance = Instance.monotonic_clock
 
-let limit = 5000
+let limit = 50
 
-let second_quota = 10.0
+let second_quota = 1.0
 
 module StringMap = Map.Make (String)
 module IntMap = Map.Make (Int)
 
 let measure_benchmark benchmark baseline =
+  print_string baseline;
   let ols =
     Analyze.ols ~bootstrap:0 ~r_square:true ~predictors:Measure.[| run |]
   in
@@ -140,3 +141,11 @@ let _ = run_benchmark_set suite.loop_incr_optimizer
 let _ = run_benchmark_set suite.loop_latent_optimizer
 
 let _ = run_benchmark_set suite.loop_state_optimizer
+
+let _ = run_benchmark_set suite.count_benchmark
+
+let _ = run_benchmark_set suite.generator_benchmark
+
+let _ = run_benchmark_set suite.state_tree_benchmark
+
+let _ = run_benchmark_set suite.state_with_update_tree_benchmark
