@@ -54,9 +54,11 @@ let string_length _ = assert false
 
 let to_string _ = assert false
 
-let lift_unary f x = Value (f x)
+let lift_unary f = fun x -> Value (f x)
 
-let lift_binary f x = Value (fun y -> Value (f x y))
+let lift_binary f = fun x -> Value (fun y -> Value (f x y))
+
+let lift_ternary f = fun x -> Value (fun y -> Value (fun z -> f x y z))
 
 let coer_refl_ty term = term
 

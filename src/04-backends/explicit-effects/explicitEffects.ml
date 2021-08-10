@@ -269,7 +269,7 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
       state with
       prog =
         SyntaxNoEff.DefEffect
-          (TranslateExEff2NoEff.elab_effect translate_exeff_config eff)
+          (TranslateExEff2NoEff.elab_effect (translate_exeff_config ()) eff)
         :: state.prog;
     }
 

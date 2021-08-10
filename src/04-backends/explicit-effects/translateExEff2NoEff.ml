@@ -1,6 +1,5 @@
 open Utils
 open SyntaxNoEff
-open Type
 open Term
 module NoEff = SyntaxNoEff
 module ExEffTypes = Type
@@ -18,6 +17,9 @@ let typefail str =
   let message = "ExEff-to-NoEff: " ^ str in
   failwith message
 
+let is_empty_dirt state drt =
+  state.config.purity_aware_translation && Type.is_empty_dirt drt
+
 let rec elab_ty state (ty : ExEffTypes.ty) =
   match ty with
   | ExEffTypes.TyParam (x, _skel) -> NoEff.NTyParam x
@@ -29,9 +31,7 @@ let rec elab_ty state (ty : ExEffTypes.ty) =
       NoEff.NTyArrow (elab1, elab2)
   | ExEffTypes.Handler ((type1, dirt1), (type2, dirt2)) ->
       let elab1 = elab_ty state type1 in
-      if
-        ExEffTypes.is_empty_dirt dirt1
-        (* Handler type - Case 1: empty input dirt *)
+      if is_empty_dirt state dirt1 (* Handler type - Case 1: empty input dirt *)
       then
         let elab2 = elab_dirty state (type2, dirt2) in
         NoEff.NTyArrow (elab1, elab2)
@@ -46,9 +46,10 @@ let rec elab_ty state (ty : ExEffTypes.ty) =
 
 and elab_dirty state (ty, dirt) =
   let elab = elab_ty state ty in
-  if ExEffTypes.is_empty_dirt dirt then elab else NoEff.NTyComp elab
+  if is_empty_dirt state dirt then elab else NoEff.NTyComp elab
 
-let has_empty_dirt ((_ty, dirt) : ExEffTypes.dirty) = is_empty_dirt dirt
+let has_empty_dirt state ((_ty, dirt) : ExEffTypes.dirty) =
+  is_empty_dirt state dirt
 
 let rec get_effectset_temp set effects =
   match effects with
@@ -70,7 +71,7 @@ let rec elab_ty_coercion state coer =
       and coerB1, _coerB2 = coerB.ty
       and elabB = elab_dirty_coercion state coerB in
       if
-        has_empty_dirt coerA1 && has_empty_dirt coerA2
+        has_empty_dirt state coerA1 && has_empty_dirt state coerA2
         (* Handler coercion - Case 1 *)
       then NoEff.NCoerArrow (elabA, elabB)
       else
@@ -78,7 +79,8 @@ let rec elab_ty_coercion state coer =
         | tycoer, _dirtcoer -> (
             let elab2 = elab_ty_coercion state tycoer in
             if
-              (not (has_empty_dirt coerA2)) && not (has_empty_dirt coerA2)
+              (not (has_empty_dirt state coerA2))
+              && not (has_empty_dirt state coerA2)
               (* Handler coercion - Case 2 *)
             then NoEff.NCoerHandler (elabA, NoEff.NCoerComp elab2)
             else
@@ -86,15 +88,15 @@ let rec elab_ty_coercion state coer =
               | tycoerA, _dirtcoerA ->
                   let elab1 = elab_ty_coercion state tycoerA in
                   if
-                    has_empty_dirt coerB1
-                    && (not (has_empty_dirt coerA1))
-                    && has_empty_dirt coerA2
+                    has_empty_dirt state coerB1
+                    && (not (has_empty_dirt state coerA1))
+                    && has_empty_dirt state coerA2
                     (* Handler coercion - Case 3 *)
                   then NoEff.NCoerHandToFun (elab1, NoEff.NCoerUnsafe elab2)
                   else if
-                    has_empty_dirt coerA2
-                    && (not (has_empty_dirt coerA1))
-                    && not (has_empty_dirt coerB1)
+                    has_empty_dirt state coerA2
+                    && (not (has_empty_dirt state coerA1))
+                    && not (has_empty_dirt state coerB1)
                     (* Handler coercion - Case 4 *)
                   then NoEff.NCoerHandToFun (elab1, elab2)
                   else failwith "Ill-typed handler coercion"))
@@ -108,9 +110,9 @@ let rec elab_ty_coercion state coer =
 and elab_dirty_coercion state { term = tcoer, dcoer; _ } =
   let tyelab = elab_ty_coercion state tcoer in
   let d1, d2 = dcoer.ty in
-  if is_empty_dirt d1 && is_empty_dirt d2 then tyelab
-  else if is_empty_dirt d1 then NoEff.NCoerReturn tyelab
-  else if not (is_empty_dirt d2) then NoEff.NCoerComp tyelab
+  if is_empty_dirt state d1 && is_empty_dirt state d2 then tyelab
+  else if is_empty_dirt state d1 then NoEff.NCoerReturn tyelab
+  else if not (is_empty_dirt state d2) then NoEff.NCoerComp tyelab
   else failwith "Ill-typed bang coercion"
 
 let rec elab_pattern state p =
@@ -140,7 +142,7 @@ and elab_expression' state exp =
       then NoEff.NFun elabvc
       else
         let _, (_ty, dirt) = h.term.value_clause.ty in
-        if ExEffTypes.is_empty_dirt dirt (* Handler - Case 2 *) then
+        if is_empty_dirt state dirt (* Handler - Case 2 *) then
           let subst_cont_effect ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
               =
             let elab1 = elab_ty state ty1 in
@@ -189,7 +191,8 @@ and elab_expression' state exp =
   | ExEff.CastExp (value, coer) ->
       let elab1 = elab_expression state value in
       let elab2 = elab_ty_coercion state coer in
-      NoEff.NCast (elab1, elab2)
+      if state.config.purity_aware_translation then NoEff.NCast (elab1, elab2)
+      else elab1
   | ExEff.Variant (lbl, None) -> NoEff.NVariant (lbl, None)
   | ExEff.Variant (lbl, Some exp) ->
       let elab_e = elab_expression state exp in
@@ -204,14 +207,13 @@ and elab_abstraction_with_param_ty state { term = p, c; ty = param_ty, _ } =
   let elab2 = elab_computation state c in
   (elab_pattern state p, elab_ty state param_ty, elab2)
 
-and elab_computation state { term; ty = _ty, drt } =
-  elab_computation' state term (is_empty_dirt drt)
+and elab_computation state { term; _ } = elab_computation' state term
 
-and elab_computation' state c _is_empty =
+and elab_computation' state c =
   match c with
   | ExEff.Value value ->
       let elab = elab_expression state value in
-      if false && not _is_empty then NoEff.NReturn elab else elab
+      if state.config.purity_aware_translation then elab else NoEff.NReturn elab
   | ExEff.LetVal (value, abs) ->
       let elabv = elab_expression state value in
       let elababs = elab_abstraction state abs in
@@ -258,15 +260,12 @@ and elab_computation' state c _is_empty =
       and _ty1', (_ty2, dirt2) = abs.ty
       and elababs = elab_abstraction state abs in
       if
-        ExEffTypes.is_empty_dirt dirt1
-        && ExEffTypes.is_empty_dirt dirt2
-        && state.config.purity_aware_translation
+        is_empty_dirt state dirt1 && is_empty_dirt state dirt2
         (* Bind - Case 1 *)
       then NoEff.NLet (elab1, elababs) (* Bind - Case 2 *)
       else if
         (* if first is pure in unpure translation *)
-        (not state.config.purity_aware_translation)
-        && ExEffTypes.is_empty_dirt dirt1
+        is_empty_dirt state dirt1
       then (
         Print.debug "2.1";
         NoEff.NBind (NoEff.NReturn elab1, elababs))
@@ -276,7 +275,8 @@ and elab_computation' state c _is_empty =
   | ExEff.CastComp (comp, coer) ->
       let elabc = elab_dirty_coercion state coer in
       let coelab = elab_computation state comp in
-      NoEff.NCast (coelab, elabc)
+      if state.config.purity_aware_translation then NoEff.NCast (coelab, elabc)
+      else coelab
 
 and elab_rec_definitions state defs =
   Assoc.kmap (fun (x, abs) -> (x.term, elab_abstraction state abs)) defs
