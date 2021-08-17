@@ -1,7 +1,7 @@
 (executable
  (name eff)
  (public_name eff)
- (libraries utils language runtime multicore loader unix)
+ (libraries utils language runtime multicore js loader unix)
  (promote
   (until-clean)
   (into ../../)))

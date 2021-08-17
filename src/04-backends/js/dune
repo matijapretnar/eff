@@ -1,0 +1,19 @@
+(library
+ (name js)
+ (libraries language))
+
+(rule
+ (with-stdout-to
+  stdlib_eff.ml
+  (progn
+   (echo "let source = {|")
+   (cat stdlib.eff)
+   (echo "|}"))))
+
+(rule
+ (with-stdout-to
+  stdlib_js.ml
+  (progn
+   (echo "let source = {|")
+   (cat stdlib.js)
+   (echo "|}"))))

@@ -4,7 +4,7 @@ let version = "5.1"
 
 let use_stdlib = ref true
 
-type backend = Runtime | Multicore
+type backend = Runtime | Multicore | Js
 
 let backend = ref Runtime
 
