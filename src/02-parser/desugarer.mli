@@ -5,8 +5,11 @@ type state
 
 val initial_state : state
 
-val load_primitive :
-  state -> UntypedSyntax.variable -> Primitives.primitive -> state
+val load_primitive_value :
+  state -> UntypedSyntax.variable -> Primitives.primitive_value -> state
+
+val load_primitive_effect :
+  state -> UntypedSyntax.variable -> Primitives.primitive_effect -> state
 
 val desugar_computation :
   state -> SugaredSyntax.term -> state * UntypedSyntax.computation

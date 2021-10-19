@@ -13,8 +13,11 @@ module Backend : Language.BackendSignature.T = struct
 
   let initial_state = Eval.initial_state
 
-  let load_primitive state x prim =
+  let load_primitive_value state x prim =
     Eval.update x (Primitives.primitive_value prim) state
+
+  let load_primitive_effect state eff prim =
+    Eval.add_runner eff (Primitives.runner prim) state
 
   (* Processing functions *)
   let process_computation state c ty =

@@ -5,13 +5,21 @@ module V = Value
 module Untyped = UntypedSyntax
 module RuntimeEnv = Map.Make (CoreTypes.Variable)
 
-type state = V.value RuntimeEnv.t
+type state = {
+  environment : V.value RuntimeEnv.t;
+  runners : (Untyped.effect, V.value -> V.value) Assoc.t;
+}
 
-let initial_state = RuntimeEnv.empty
+let initial_state = { environment = RuntimeEnv.empty; runners = Assoc.empty }
 
-let update x = RuntimeEnv.add x
+let update x v state =
+  { state with environment = RuntimeEnv.add x v state.environment }
 
-let lookup x state = try Some (RuntimeEnv.find x state) with Not_found -> None
+let lookup x state =
+  try Some (RuntimeEnv.find x state.environment) with Not_found -> None
+
+let add_runner eff runner state =
+  { state with runners = Assoc.update eff runner state.runners }
 
 exception PatternMatch of Location.t
 
@@ -146,45 +154,16 @@ and eval_closure state a v =
   let p, c = a in
   ceval (extend p v state) c
 
-let rec top_handle op =
+let rec top_handle state op =
   match op with
   | V.Value v -> v
   | V.Call (eff, v, k) -> (
-      match CoreTypes.Effect.fold (fun annot _n -> annot) eff with
-      | "Print" ->
-          let str = V.to_str v in
-          Format.pp_print_string !Config.output_formatter str;
-          Format.pp_print_flush !Config.output_formatter ();
-          top_handle (k V.unit_value)
-      | "Raise" -> Error.runtime "%t" (V.print_value v)
-      | "RandomInt" ->
-          let rnd_int = Random.int (V.to_int v) in
-          let rnd_int_v = V.Const (Const.of_integer rnd_int) in
-          top_handle (k rnd_int_v)
-      | "RandomFloat" ->
-          let rnd_float = Random.float (V.to_float v) in
-          let rnd_float_v = V.Const (Const.of_float rnd_float) in
-          top_handle (k rnd_float_v)
-      | "Read" ->
-          let str = read_line () in
-          let str_v = V.Const (Const.of_string str) in
-          top_handle (k str_v)
-      | "Write" -> (
-          match v with
-          | V.Tuple
-              [ V.Const (Const.String file_name); V.Const (Const.String str) ]
-            ->
-              let file_handle =
-                open_out_gen
-                  [ Open_wronly; Open_append; Open_creat; Open_text ]
-                  0o666 file_name
-              in
-              Printf.fprintf file_handle "%s" str;
-              close_out file_handle;
-              top_handle (k V.unit_value)
-          | _ -> Error.runtime "A pair of a file name and string expected")
-      | _eff_annot ->
+      match Assoc.lookup eff state.runners with
+      | Some f ->
+          let w = f v in
+          top_handle state (k w)
+      | None ->
           Error.runtime "uncaught effect %t %t." (V.print_effect eff)
             (V.print_value v))
 
-let run state c = top_handle (ceval state c)
+let run state c = top_handle state (ceval state c)
