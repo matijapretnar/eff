@@ -384,22 +384,25 @@ and tcOpCase state
   in
 
   let (xop, kop, trgCop), (_, _, (tyBOpi, dirtDOpi)) = (abs2.term, abs2.ty) in
+  let leftty = Type.Arrow (tyBi, dirtyOut) in
+  let rightty = Type.Arrow (tyBi, dirtyi) in
 
   (* 4: Make sure that the pattern for k is a variable one.
    *    We do not support anything else at the moment *)
   let k =
     match kop.term with
     | Term.PVar k -> k
-    | _ -> failwith "tcOpCase: only varpats allowed"
+    | Term.PNonbinding -> { term = CoreTypes.Variable.fresh "k"; ty = rightty }
+    | _ ->
+        failwith
+          "tcOpCase: only variables and underscores allowed in continuation \
+           patterns"
   in
 
   (* 5: Generate all the needed constraints *)
   let omega34i, omegaCt34i =
     Constraint.fresh_dirty_coer ((tyBOpi, dirtDOpi), dirtyOut)
   in
-  let leftty = Type.Arrow (tyBi, dirtyOut) in
-  let rightty = Type.Arrow (tyBi, dirtyi) in
-
   (* 6: Create the elaborated clause *)
   let l_pat, l_var = Term.fresh_variable "l" leftty in
   let castExp, omegaCt5i = Term.cast_expression l_var rightty in
