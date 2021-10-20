@@ -271,6 +271,20 @@ and print_case case ppf =
           (Symbol.print_effect eff) (print_pattern p1) (print_pattern p2)
           (print_pattern p2) (print_pattern p2) (print_term t)
 
+let print_top_handler cases ppf =
+  let print_top_handler_case (eff, _, (x, k, t)) ppf =
+    print ppf "  | effect (%t %s) %s -> %s" (Symbol.print_effect eff) x k t
+  in
+  print ppf "let _ocaml_tophandler c =\n  match c () with\n%t\n  | x -> x\n"
+    (Print.sequence "" print_top_handler_case cases)
+
+let print_header effects ppf =
+  print ppf "type empty = |\n";
+  List.iter
+    (fun (eff, eff_sig, _) -> print_def_effect (eff, eff_sig) ppf)
+    effects;
+  print_top_handler effects ppf
+
 let print_cmd cmd ppf =
   match cmd with
   | Term t ->

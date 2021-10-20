@@ -135,7 +135,7 @@ let not_equal v1 v2 = not (equal v1 v2)
 
 let less_than v1 v2 =
   match compare v1 v2 with
-  | Less -> true
+  | Const.Less -> true
   | Greater | Equal -> false
   | Invalid -> Error.runtime "invalid comparison with <"
 
@@ -214,3 +214,37 @@ let primitive_value = function
         value_str s
       in
       from_fun to_string
+
+let runner prim v =
+  match prim with
+  | Primitives.Print ->
+      let str = V.to_str v in
+      Format.pp_print_string !Config.output_formatter str;
+      Format.pp_print_flush !Config.output_formatter ();
+      V.unit_value
+  | Primitives.Raise -> Error.runtime "%t" (V.print_value v)
+  | Primitives.RandomInt ->
+      let rnd_int = Random.int (V.to_int v) in
+      let rnd_int_v = V.Const (Const.of_integer rnd_int) in
+      rnd_int_v
+  | Primitives.RandomFloat ->
+      let rnd_float = Random.float (V.to_float v) in
+      let rnd_float_v = V.Const (Const.of_float rnd_float) in
+      rnd_float_v
+  | Primitives.Read ->
+      let str = read_line () in
+      let str_v = V.Const (Const.of_string str) in
+      str_v
+  | Primitives.Write -> (
+      match v with
+      | V.Tuple [ V.Const (Const.String file_name); V.Const (Const.String str) ]
+        ->
+          let file_handle =
+            open_out_gen
+              [ Open_wronly; Open_append; Open_creat; Open_text ]
+              0o666 file_name
+          in
+          Printf.fprintf file_handle "%s" str;
+          close_out file_handle;
+          V.unit_value
+      | _ -> Error.runtime "A pair of a file name and string expected")

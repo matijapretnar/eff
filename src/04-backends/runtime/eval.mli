@@ -15,3 +15,6 @@ val run : state -> UntypedSyntax.computation -> Value.value
 val update : UntypedSyntax.variable -> Value.value -> state -> state
 
 val lookup : UntypedSyntax.variable -> state -> Value.value option
+
+val add_runner :
+  UntypedSyntax.effect -> (Value.value -> Value.value) -> state -> state

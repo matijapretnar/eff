@@ -18,8 +18,11 @@ module type ExplicitBackend = sig
 
   val process_top_let_rec : state -> Term.rec_definitions -> state
 
-  val load_primitive :
-    state -> Term.variable -> Language.Primitives.primitive -> state
+  val load_primitive_value :
+    state -> Term.variable -> Language.Primitives.primitive_value -> state
+
+  val load_primitive_effect :
+    state -> Term.effect -> Language.Primitives.primitive_effect -> state
 
   val process_tydef :
     state ->
@@ -112,13 +115,30 @@ module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
       backend_state = backend_state';
     }
 
-  let load_primitive state x prim =
-    let ty = Primitives.primitive_type_scheme prim in
+  let load_primitive_value state x prim =
+    let ty = Primitives.primitive_value_type_scheme prim in
     let type_system_state' =
       ExplicitInfer.extend_var state.type_system_state x ty
     in
     let backend_state' =
-      ExBackend.load_primitive state.backend_state (Term.variable x ty) prim
+      ExBackend.load_primitive_value state.backend_state (Term.variable x ty)
+        prim
+    in
+    {
+      state with
+      type_system_state = type_system_state';
+      backend_state = backend_state';
+    }
+
+  let load_primitive_effect state eff prim =
+    let ty1, ty2 = Typechecker.Primitives.primitive_effect_signature prim in
+    let type_system_state', (ty1', ty2') =
+      ExplicitInfer.process_def_effect eff (ty1, ty2) state.type_system_state
+    in
+    let backend_state' =
+      ExBackend.load_primitive_effect state.backend_state
+        (eff, (ty1', ty2'))
+        prim
     in
     {
       state with
@@ -182,7 +202,9 @@ module Evaluate : Language.BackendSignature.T = Make (struct
       defs;
     { evaluation_state = Eval.extend_let_rec state.evaluation_state defs }
 
-  let load_primitive _state _x _prim = failwith "Not implemented"
+  let load_primitive_value _state _x _prim = failwith "Not implemented"
+
+  let load_primitive_effect _state _x _prim = failwith "Not implemented"
 
   let process_tydef state _ = state
 
@@ -210,8 +232,11 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
   type state = {
     prog : SyntaxNoEff.cmd list;
     no_eff_optimizer_state : NoEffOptimizer.state;
-    primitives :
-      (Language.CoreTypes.Variable.t, Language.Primitives.primitive) Assoc.t;
+    primitive_values :
+      ( Language.CoreTypes.Variable.t,
+        Language.Primitives.primitive_value )
+      Assoc.t;
+    primitive_effects : Term.effect list;
   }
 
   let initial_state =
@@ -224,7 +249,8 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
             purity_aware_translation =
               !Config.optimizator_config.purity_aware_translation;
           };
-      primitives = Assoc.empty;
+      primitive_values = Assoc.empty;
+      primitive_effects = [];
     }
 
   (* ------------------------------------------------------------------------ *)
@@ -287,8 +313,14 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     in
     { state with prog = SyntaxNoEff.TopLetRec defs' :: state.prog }
 
-  let load_primitive state x prim =
-    { state with primitives = Assoc.update x.term prim state.primitives }
+  let load_primitive_value state x prim =
+    {
+      state with
+      primitive_values = Assoc.update x.term prim state.primitive_values;
+    }
+
+  let load_primitive_effect state eff _prim =
+    { state with primitive_effects = eff :: state.primitive_effects }
 
   let process_tydef state tydefs =
     let converter (ty_params, tydef) =
@@ -298,14 +330,21 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
     { state with prog = SyntaxNoEff.TyDef tydefs' :: state.prog }
 
   let finalize state =
+    let pp_state =
+      TranslateNoEff2Ocaml.add_primitive_values translate_noeff_config
+        state.primitive_values
+    in
     if !Config.include_header_open then
       Format.fprintf !Config.output_formatter "open OcamlHeader;;";
     List.iter
+      (fun eff ->
+        let eff' = TranslateExEff2NoEff.elab_effect state eff in
+        Format.fprintf !Config.output_formatter "%t (* primitive effect *)\n"
+          (TranslateNoEff2Ocaml.pp_def_effect eff'))
+      (List.rev state.primitive_effects);
+    List.iter
       (fun cmd ->
         Format.fprintf !Config.output_formatter "%t\n"
-          (TranslateNoEff2Ocaml.pp_cmd
-             (TranslateNoEff2Ocaml.add_primitives translate_noeff_config
-                state.primitives)
-             cmd))
+          (TranslateNoEff2Ocaml.pp_cmd pp_state cmd))
       (List.rev state.prog)
 end)

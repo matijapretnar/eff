@@ -3,19 +3,6 @@
 
 let continue x = x
 
-(* Top level effects. *)
-effect Print : string -> unit
-
-effect Read : string
-
-effect Raise : string -> empty
-
-effect RandomInt : int -> int
-
-effect RandomFloat: float -> float
-
-effect Write : (string*string) -> unit
-
 let absurd void = match void with;;
 
 effect DivisionByZero : empty
