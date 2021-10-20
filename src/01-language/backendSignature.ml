@@ -6,6 +6,12 @@ module type T = sig
 
   val initial_state : state
 
+  val load_primitive_value :
+    state -> CoreTypes.Variable.t -> Primitives.primitive_value -> state
+
+  val load_primitive_effect :
+    state -> CoreTypes.Variable.t -> Primitives.primitive_effect -> state
+
   val process_computation :
     state ->
     CoreSyntax.computation ->
@@ -32,9 +38,6 @@ module type T = sig
     (CoreSyntax.variable, CoreSyntax.abstraction) Assoc.t ->
     (CoreSyntax.variable * Type.ty_scheme) list ->
     state
-
-  val process_external :
-    state -> CoreTypes.Variable.t * Type.ty * string -> state
 
   val process_tydef :
     state ->

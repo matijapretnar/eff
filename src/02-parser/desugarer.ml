@@ -641,11 +641,21 @@ let desugar_top_let_rec state defs =
   let defs' = List.fold_right desugar_defs (List.combine ns defs) [] in
   (state', defs')
 
-let desugar_external state (x, t, f) =
-  let n = fresh_var (Some x) in
-  let ts = syntax_to_core_params (free_type_params t) in
-  let _state', t' = desugar_type ts state t in
-  ({ state with context = Assoc.update x n state.context }, (n, t', f))
+let load_primitive_value state x prim =
+  {
+    state with
+    context =
+      Assoc.update (Primitives.primitive_value_name prim) x state.context;
+  }
+
+let load_primitive_effect state eff prim =
+  {
+    state with
+    effect_symbols =
+      Assoc.update
+        (Primitives.primitive_effect_name prim)
+        eff state.effect_symbols;
+  }
 
 let desugar_def_effect state (eff, (ty1, ty2)) =
   let state', eff' = effect_to_symbol state eff in

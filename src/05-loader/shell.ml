@@ -26,13 +26,46 @@ module Make (Backend : Language.BackendSignature.T) = struct
     backend_state : Backend.state;
   }
 
+  let add_primitive_effect state prim =
+    let x =
+      Language.CoreTypes.Variable.fresh (Primitives.primitive_effect_name prim)
+    in
+    {
+      desugarer_state =
+        Desugarer.load_primitive_effect state.desugarer_state x prim;
+      type_system_state =
+        TypeSystem.load_primitive_effect state.type_system_state x prim;
+      backend_state = Backend.load_primitive_effect state.backend_state x prim;
+    }
+
+  let add_primitive_value state prim =
+    let x =
+      Language.CoreTypes.Variable.fresh (Primitives.primitive_value_name prim)
+    in
+    {
+      desugarer_state =
+        Desugarer.load_primitive_value state.desugarer_state x prim;
+      type_system_state =
+        TypeSystem.load_primitive_value state.type_system_state x prim;
+      backend_state = Backend.load_primitive_value state.backend_state x prim;
+    }
+
   let initialize () =
     Random.self_init ();
-    {
-      desugarer_state = Desugarer.initial_state;
-      type_system_state = TypeSystem.initial_state;
-      backend_state = Backend.initial_state;
-    }
+    let state =
+      {
+        desugarer_state = Desugarer.initial_state;
+        type_system_state = TypeSystem.initial_state;
+        backend_state = Backend.initial_state;
+      }
+    in
+    let state' =
+      List.fold_left add_primitive_value state Primitives.primitive_values
+    in
+    let state'' =
+      List.fold_left add_primitive_effect state' Primitives.primitive_effects
+    in
+    state''
 
   (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
      It prints the result to [ppf] and returns the new state. *)
@@ -117,21 +150,6 @@ module Make (Backend : Language.BackendSignature.T) = struct
         let defs'' = Assoc.of_list defs' in
         let backend_state' =
           Backend.process_top_let_rec state.backend_state defs'' vars
-        in
-        {
-          desugarer_state = desugarer_state';
-          type_system_state = type_system_state';
-          backend_state = backend_state';
-        }
-    | Commands.External ext_def ->
-        let desugarer_state', (x, ty, f) =
-          Desugarer.desugar_external state.desugarer_state ext_def
-        in
-        let type_system_state' =
-          TypeSystem.extend state.type_system_state x (Type.free_params ty, ty)
-        in
-        let backend_state' =
-          Backend.process_external state.backend_state (x, ty, f)
         in
         {
           desugarer_state = desugarer_state';

@@ -3,7 +3,7 @@ open Language
 
 let protected =
   [ "and"; "as"; "assert"; "asr"; "begin"; "class"; "constraint"; "do"; "done" ]
-  @ [ "downto"; "else"; "end"; "exception"; "external"; "false"; "for"; "fun" ]
+  @ [ "downto"; "else"; "end"; "exception"; "false"; "for"; "fun" ]
   @ [ "function"; "functor"; "if"; "in"; "include"; "inherit"; "initializer" ]
   @ [ "land"; "lazy"; "let"; "lor"; "lsl"; "lsr"; "lxor"; "match"; "method" ]
   @ [
@@ -40,12 +40,7 @@ let print_label lbl ppf = CoreTypes.Label.print lbl ppf
 let print_field fld ppf = CoreTypes.Field.print fld ppf
 
 let print_tyname tyname ppf =
-  let printer desc _n =
-    if desc = "empty" then
-      Print.warning
-        "Warning: [empty] type encountered. Must be fixed by hand!@.";
-    Format.fprintf ppf "%s" desc
-  in
+  let printer desc _n = Format.fprintf ppf "%s" desc in
   CoreTypes.TyName.fold printer tyname
 
 let print_typaram typaram ppf =

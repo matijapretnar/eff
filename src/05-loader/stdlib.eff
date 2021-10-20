@@ -3,30 +3,6 @@
 
 let continue x = x
 
-(* Top level effects. *)
-effect Print : string -> unit
-
-effect Read : string
-
-effect Raise : string -> empty
-
-effect RandomInt : int -> int
-
-effect RandomFloat: float -> float
-
-effect Write : (string*string) -> unit
-               
-(* Integers and Floats *)
-external ( = ) : 'a -> 'a -> bool = "="
-
-external ( < ) : 'a -> 'a -> bool = "<"
-
-external infinity : float = "infinity"
-
-external neg_infinity : float = "neg_infinity"
-
-external nan : float = "nan"
-
 let absurd void = match void with;;
 
 effect DivisionByZero : empty
@@ -41,74 +17,13 @@ effect AssertionFault : empty
 
 let assert b = if b then () else absurd (perform AssertionFault) ;;
 
-external ( ~- ) : int -> int = "~-"
-
-external ( + ) : int -> int -> int = "+"
-
-external ( * ) : int -> int -> int = "*"
-
-external ( - ) : int -> int -> int = "-"
-
-external ( mod ) : int -> int -> int = "mod"
 let (mod) m n = match n with
   | 0 -> absurd (perform DivisionByZero)
   | n -> m mod n
 
-external ( ~-. ) : float -> float = "~-."
-
-external ( +. ) : float -> float -> float = "+."
-
-external ( *. ) : float -> float -> float = "*."
-
-external ( -. ) : float -> float -> float = "-."
-
-external ( /. ) : float -> float -> float = "/."
-
-external ( ** ) : int -> int -> int = "**"
-
-external ( / ) : int -> int -> int = "/"
 let ( / ) m n = match n with
   | 0 -> absurd (perform DivisionByZero)
   | n -> (/) m n
-
-external exp : float -> float = "exp"
-
-external expm1 : float -> float = "expm1"
-
-external log : float -> float = "log"
-
-external log1p : float -> float = "log1p"
-
-external cos : float -> float = "cos"
-
-external sin : float -> float = "sin"
-
-external tan : float -> float = "tan"
-
-external acos : float -> float = "acos"
-
-external asin : float -> float = "asin"
-
-external atan : float -> float = "atan"
-
-external sqrt : float -> float = "sqrt"
-                               
-(* Strings *)
-external float_of_int : int -> float = "float_of_int"
-
-external int_of_float : float -> int = "int_of_float"
-
-external ( ^ ) : string -> string -> string = "^"
-
-external string_length : string -> int = "string_length"
-
-external sub : string -> int -> int -> string = "sub"
-
-external string_of_float : float -> string  = "string_of_float"
-
-external string_of_int : int -> string  = "string_of_int"
-
-external to_string : 'a -> string  = "to_string"  (*Unsafe for compilation*)
 
 (* Booleans *)
 let not x = if x then false else true
