@@ -40,12 +40,13 @@ let primitive_source = function
   | Primitives.StringLength -> "String.length"
   | Primitives.StringOfFloat -> "string_of_float"
   | Primitives.StringOfInt -> "string_of_int"
-  | Primitives.StringSub -> "sub"
-  | Primitives.ToString -> "to_string"
+  | Primitives.StringSub -> "String.sub"
+  | Primitives.ToString -> "fun _ -> \"<abstr>\""
 
-let top_handler =
-  "(fun c ->" ^ "  match c () with\n"
-  ^ "  | effect (Print s) k -> (print_string s; continue k ())\n"
-  ^ "  | effect (RandomInt i) k -> continue k (Random.int i)\n"
-  ^ "  | effect (RandomFloat f) k -> continue k (Random.float f)\n"
-  ^ "  | effect (Read ()) k -> continue k (read_line ())\n" ^ "  | x -> x )\n"
+let top_level_handler_source = function
+  | Primitives.Print -> ("s", "k", "print_string s; continue k ()")
+  | Primitives.RandomInt -> ("i", "k", "continue k (Random.int i)")
+  | Primitives.RandomFloat -> ("f", "k", "continue k (Random.float f)")
+  | Primitives.Read -> ("()", "k", "continue k (read_line ())")
+  | Primitives.Raise -> ("_", "_", "failwith \"Not supported\"")
+  | Primitives.Write -> ("_", "_", "failwith \"Not supported\"")

@@ -20,7 +20,7 @@ let binary_float_op_ty =
 
 let comparison_ty = poly_type (fun a -> binary_op_ty a a Type.bool_ty)
 
-let primitive_type_scheme = function
+let primitive_value_type_scheme = function
   | Primitives.CompareEq -> comparison_ty
   | Primitives.CompareGe -> comparison_ty
   | Primitives.CompareGt -> comparison_ty
@@ -72,3 +72,12 @@ let primitive_type_scheme = function
            ))
   | Primitives.ToString ->
       poly_type (fun a -> Type.Arrow (a, Type.Basic Const.StringTy))
+
+let primitive_effect_signature = function
+  | Primitives.Print -> (Type.string_ty, Type.unit_ty)
+  | Primitives.Read -> (Type.unit_ty, Type.string_ty)
+  | Primitives.Raise -> (Type.string_ty, Type.empty_ty)
+  | Primitives.RandomInt -> (Type.int_ty, Type.int_ty)
+  | Primitives.RandomFloat -> (Type.float_ty, Type.float_ty)
+  | Primitives.Write ->
+      (Type.Tuple [ Type.string_ty; Type.string_ty ], Type.unit_ty)

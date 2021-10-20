@@ -73,7 +73,7 @@ type n_term =
   | NMatch of n_term * n_abstraction list
   | NRecord of (CoreTypes.Field.t, n_term) Assoc.t
   | NVariant of CoreTypes.Label.t * n_term option
-  | NDirectPrimitive of Language.Primitives.primitive
+  | NDirectPrimitive of Language.Primitives.primitive_value
 
 and n_handler = {
   effect_clauses : (n_effect, n_abstraction_2_args) Assoc.t;
@@ -387,7 +387,7 @@ let rec print_term ?max_level t ppf =
       print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)
   | NVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
   | NDirectPrimitive p ->
-      print "DirectPrimitive (%s)" (Language.Primitives.primitive_name p)
+      print "DirectPrimitive (%s)" (Language.Primitives.primitive_value_name p)
 
 and print_let_rec_abstraction (f, (ws, abs)) ppf =
   (* We're printing only local let-recs *)

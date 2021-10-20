@@ -25,7 +25,7 @@ let binary_string_op_ty = binary_op_ty string_ty string_ty string_ty
 (* TODO: I want to be polymorphic *)
 let comparison_ty = binary_op_ty int_ty int_ty bool_ty
 
-let primitive_type_scheme = function
+let primitive_value_type_scheme = function
   | Language.Primitives.CompareEq -> comparison_ty
   | CompareGe -> comparison_ty
   | CompareGt -> comparison_ty

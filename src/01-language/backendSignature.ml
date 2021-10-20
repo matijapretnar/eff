@@ -6,8 +6,11 @@ module type T = sig
 
   val initial_state : state
 
-  val load_primitive :
-    state -> CoreTypes.Variable.t -> Primitives.primitive -> state
+  val load_primitive_value :
+    state -> CoreTypes.Variable.t -> Primitives.primitive_value -> state
+
+  val load_primitive_effect :
+    state -> CoreTypes.Variable.t -> Primitives.primitive_effect -> state
 
   val process_computation :
     state ->

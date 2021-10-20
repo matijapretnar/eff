@@ -26,26 +26,46 @@ module Make (Backend : Language.BackendSignature.T) = struct
     backend_state : Backend.state;
   }
 
-  let add_primitive state prim =
+  let add_primitive_effect state prim =
     let x =
-      Language.CoreTypes.Variable.fresh (Primitives.primitive_name prim)
+      Language.CoreTypes.Variable.fresh (Primitives.primitive_effect_name prim)
     in
     {
-      desugarer_state = Desugarer.load_primitive state.desugarer_state x prim;
+      desugarer_state =
+        Desugarer.load_primitive_effect state.desugarer_state x prim;
       type_system_state =
-        TypeSystem.load_primitive state.type_system_state x prim;
-      backend_state = Backend.load_primitive state.backend_state x prim;
+        TypeSystem.load_primitive_effect state.type_system_state x prim;
+      backend_state = Backend.load_primitive_effect state.backend_state x prim;
+    }
+
+  let add_primitive_value state prim =
+    let x =
+      Language.CoreTypes.Variable.fresh (Primitives.primitive_value_name prim)
+    in
+    {
+      desugarer_state =
+        Desugarer.load_primitive_value state.desugarer_state x prim;
+      type_system_state =
+        TypeSystem.load_primitive_value state.type_system_state x prim;
+      backend_state = Backend.load_primitive_value state.backend_state x prim;
     }
 
   let initialize () =
     Random.self_init ();
-    List.fold_left add_primitive
+    let state =
       {
         desugarer_state = Desugarer.initial_state;
         type_system_state = TypeSystem.initial_state;
         backend_state = Backend.initial_state;
       }
-      Primitives.primitives
+    in
+    let state' =
+      List.fold_left add_primitive_value state Primitives.primitive_values
+    in
+    let state'' =
+      List.fold_left add_primitive_effect state' Primitives.primitive_effects
+    in
+    state''
 
   (* [exec_cmd ppf st cmd] executes toplevel command [cmd] in a state [st].
      It prints the result to [ppf] and returns the new state. *)

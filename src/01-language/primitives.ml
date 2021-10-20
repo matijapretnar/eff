@@ -1,4 +1,4 @@
-type primitive =
+type primitive_value =
   | CompareEq
   | CompareGe
   | CompareGt
@@ -41,8 +41,10 @@ type primitive =
   | StringSub
   | ToString
 
-(* Keep this list up to date with the type above, otherwise the missing primitives will not be loaded *)
-let primitives =
+type primitive_effect = Print | Read | Raise | RandomInt | RandomFloat | Write
+
+(* Keep these lists up to date with the type sabove, otherwise the missing primitives will not be loaded *)
+let primitive_values =
   [
     CompareEq;
     CompareGe;
@@ -88,7 +90,9 @@ let primitives =
     ToString;
   ]
 
-let primitive_name = function
+let primitive_effects = [ Print; Read; Raise; RandomInt; RandomFloat; Write ]
+
+let primitive_value_name = function
   | CompareEq -> "="
   | CompareGe -> ">="
   | CompareGt -> ">"
@@ -130,3 +134,11 @@ let primitive_name = function
   | StringOfInt -> "string_of_int"
   | StringSub -> "sub"
   | ToString -> "to_string"
+
+let primitive_effect_name = function
+  | Print -> "Print"
+  | Read -> "Read"
+  | Raise -> "Raise"
+  | RandomInt -> "RandomInt"
+  | RandomFloat -> "RandomFloat"
+  | Write -> "Write"

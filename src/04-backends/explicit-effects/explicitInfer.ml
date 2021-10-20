@@ -372,7 +372,11 @@ and tcOpCase state
   let k =
     match kop.term with
     | Term.PVar k -> k
-    | _ -> failwith "tcOpCase: only varpats allowed"
+    | Term.PNonbinding -> CoreTypes.Variable.fresh "k"
+    | _ ->
+        failwith
+          "tcOpCase: only variables and underscores allowed in continuation \
+           patterns"
   in
 
   (* 5: Generate all the needed constraints *)

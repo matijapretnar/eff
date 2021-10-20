@@ -68,4 +68,9 @@ type cmd =
   | RawSource of (variable * string)
   | TyDef of (label * (CoreTypes.TyParam.t list * tydef)) list
 
+val print_header :
+  (effect * (ty * ty) * (string * string * string)) list ->
+  Format.formatter ->
+  unit
+
 val print_cmd : cmd -> Format.formatter -> unit

@@ -5,17 +5,18 @@ type optimization_config = { purity_aware_translation : bool }
 
 type state = {
   inlinable_primitives :
-    (Language.CoreTypes.Variable.t, Language.Primitives.primitive) Assoc.t;
+    (Language.CoreTypes.Variable.t, Language.Primitives.primitive_value) Assoc.t;
   optimization_config : optimization_config;
 }
 
 let initial_state optimization_config =
   { inlinable_primitives = Assoc.empty; optimization_config }
 
-let add_primitives state primitives =
+let add_primitive_values state primitive_values =
   {
     state with
-    inlinable_primitives = Assoc.concat primitives state.inlinable_primitives;
+    inlinable_primitives =
+      Assoc.concat primitive_values state.inlinable_primitives;
   }
 
 let print = Format.fprintf
