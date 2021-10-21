@@ -125,15 +125,16 @@ let recast_computation hnd comp =
 
 let rec optimize_expression state exp =
   let exp' = optimize_expression' state exp in
-  (* Print.debug "EXP: %t : %t" (Term.print_expression exp) (Type.print_ty exp.ty); *)
-  (* Print.debug "EXP': %t : %t"
-     (Term.print_expression exp')
-     (Type.print_ty exp'.ty); *)
+  if exp <> exp' then
+    Print.debug "%t ~> %t"
+      (Term.print_expression exp)
+      (Term.print_expression exp');
   assert (Type.equal_ty exp.ty exp'.ty);
   let exp'' = reduce_expression state exp' in
-  (* Print.debug "EXP'': %t : %t"
-     (Term.print_expression exp'')
-     (Type.print_ty exp''.ty); *)
+  if exp' <> exp'' then
+    Print.debug "%t ~> %t"
+      (Term.print_expression exp')
+      (Term.print_expression exp'');
   assert (Type.equal_ty exp'.ty exp''.ty);
   exp''
 
@@ -150,12 +151,17 @@ and optimize_expression' state exp =
       Term.castExp (optimize_expression state exp, coer)
 
 and optimize_computation state cmp =
-  (* Print.debug "CMP: %t" (Term.print_computation cmp); *)
   let cmp' = optimize_computation' state cmp in
-  (* Print.debug "CMP': %t" (Term.print_computation cmp'); *)
+  if cmp <> cmp' then
+    Print.debug "%t ~> %t"
+      (Term.print_computation cmp)
+      (Term.print_computation cmp');
   assert (Type.equal_dirty cmp.ty cmp'.ty);
   let cmp'' = reduce_computation state cmp' in
-  (* Print.debug "CMP'': %t" (Term.print_computation cmp''); *)
+  if cmp' <> cmp'' then
+    Print.debug "%t ~> %t"
+      (Term.print_computation cmp')
+      (Term.print_computation cmp'');
   assert (Type.equal_dirty cmp'.ty cmp''.ty);
   cmp''
 
