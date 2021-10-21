@@ -318,6 +318,10 @@ and handle_computation state hnd comp =
           (handle_abstraction state hnd abs)
       in
       handle_computation state hnd' cmp
+  | CastComp (cmp, { term = tcoer, dcoer; _ })
+    when Constraint.is_trivial_ty_coercion tcoer ->
+      let hnd' = Term.handler_with_smaller_input_dirt hnd dcoer in
+      handle_computation state hnd' cmp
   | CastComp (cmp, { term = tcoer, dcoer; _ }) ->
       let ty, _ = cmp.ty in
       let x_pat, x_var = Term.fresh_variable "x" ty in
@@ -325,8 +329,8 @@ and handle_computation state hnd comp =
         Term.handler_with_new_value_clause hnd
           (Term.abstraction
              ( x_pat,
-               Term.letVal (Term.castExp (x_var, tcoer), hnd.term.value_clause)
-             ))
+               Term.letVal
+                 (cast_expression state x_var tcoer, hnd.term.value_clause) ))
       in
       let hnd'' = Term.handler_with_smaller_input_dirt hnd' dcoer in
       handle_computation state hnd'' cmp
