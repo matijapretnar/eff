@@ -6,7 +6,7 @@ module CoreTypes = Language.CoreTypes
 module Untyped = Language.UntypedSyntax
 module Type = Language.Type
 
-module Backend : Language.BackendSignature.ExplicitT = struct
+module Backend : Language.BackendSignature.T = struct
   type state = Eval.state
 
   let initial_state = Eval.initial_state

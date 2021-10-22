@@ -3,7 +3,7 @@ open Utils
 module Term = Language.Term
 module Type = Language.Type
 
-module Backend : Language.BackendSignature.ExplicitT = struct
+module Backend : Language.BackendSignature.T = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
@@ -80,8 +80,7 @@ module Backend : Language.BackendSignature.ExplicitT = struct
     {
       state with
       prog =
-        SyntaxNoEff.DefEffect
-          (TranslateExEff2NoEff.elab_effect translate_exeff_config eff)
+        SyntaxNoEff.DefEffect (TranslateExEff2NoEff.elab_effect eff)
         :: state.prog;
     }
 
@@ -127,7 +126,7 @@ module Backend : Language.BackendSignature.ExplicitT = struct
       Format.fprintf !Config.output_formatter "open OcamlHeader;;";
     List.iter
       (fun eff ->
-        let eff' = TranslateExEff2NoEff.elab_effect state eff in
+        let eff' = TranslateExEff2NoEff.elab_effect eff in
         Format.fprintf !Config.output_formatter "%t (* primitive effect *)\n"
           (TranslateNoEff2Ocaml.pp_def_effect eff'))
       (List.rev state.primitive_effects);

@@ -1,1 +1,1 @@
-module Backend : Language.BackendSignature.ExplicitT
+module Backend : Language.BackendSignature.T

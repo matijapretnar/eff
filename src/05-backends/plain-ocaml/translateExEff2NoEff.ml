@@ -19,34 +19,33 @@ let typefail str =
   let message = "ExEff-to-NoEff: " ^ str in
   failwith message
 
-let rec elab_ty state (ty : ExEffTypes.ty) =
+let rec elab_ty (ty : ExEffTypes.ty) =
   match ty.term with
   | ExEffTypes.TyParam x -> NoEff.NTyParam x
-  | ExEffTypes.Apply (name, lst) ->
-      NoEff.NTyApply (name, List.map (elab_ty state) lst)
+  | ExEffTypes.Apply (name, lst) -> NoEff.NTyApply (name, List.map elab_ty lst)
   | ExEffTypes.Arrow (t, dirty) ->
-      let elab1 = elab_ty state t in
-      let elab2 = elab_dirty state dirty in
+      let elab1 = elab_ty t in
+      let elab2 = elab_dirty dirty in
       NoEff.NTyArrow (elab1, elab2)
   | ExEffTypes.Handler ((type1, dirt1), (type2, dirt2)) ->
-      let elab1 = elab_ty state type1 in
+      let elab1 = elab_ty type1 in
       if
         ExEffTypes.is_empty_dirt dirt1
         (* Handler type - Case 1: empty input dirt *)
       then
-        let elab2 = elab_dirty state (type2, dirt2) in
+        let elab2 = elab_dirty (type2, dirt2) in
         NoEff.NTyArrow (elab1, elab2)
         (* Handler type - Case 2: non-empty input dirt *)
       else
-        let elab2 = elab_ty state type2 in
+        let elab2 = elab_ty type2 in
         NoEff.NTyHandler (elab1, elab2)
   | ExEffTypes.Tuple tys ->
-      let ty_elab_list = List.map (elab_ty state) tys in
+      let ty_elab_list = List.map elab_ty tys in
       NoEff.NTyTuple ty_elab_list
   | ExEffTypes.TyBasic ty -> NoEff.NTyBasic ty
 
-and elab_dirty state (ty, dirt) =
-  let elab = elab_ty state ty in
+and elab_dirty (ty, dirt) =
+  let elab = elab_ty ty in
   if ExEffTypes.is_empty_dirt dirt then elab else NoEff.NTyComp elab
 
 let has_empty_dirt ((_ty, dirt) : ExEffTypes.dirty) = is_empty_dirt dirt
@@ -293,8 +292,8 @@ and elab_expression' state exp =
         if ExEffTypes.is_empty_dirt dirt (* Handler - Case 2 *) then
           let subst_cont_effect ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
               =
-            let elab1 = elab_ty state ty1 in
-            let elab2 = elab_ty state ty2 in
+            let elab1 = elab_ty ty1 in
+            let elab2 = elab_ty ty2 in
             let elabcomp = elab_computation state comp in
             match p2.term with
             | PVar x ->
@@ -322,8 +321,8 @@ and elab_expression' state exp =
         else
           let elab_effect_clause ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
               =
-            let elab1 = elab_ty state ty1 in
-            let elab2 = elab_ty state ty2 in
+            let elab1 = elab_ty ty1 in
+            let elab2 = elab_ty ty2 in
             let elabcomp = elab_computation state comp in
             ( (eff, (elab1, elab2)),
               (elab_pattern state p1, elab_pattern state p2, elabcomp) )
@@ -352,7 +351,7 @@ and elab_abstraction state { term = p, c; _ } =
 
 and elab_abstraction_with_param_ty state { term = p, c; ty = param_ty, _ } =
   let elab2 = elab_computation state c in
-  (elab_pattern state p, elab_ty state param_ty, elab2)
+  (elab_pattern state p, elab_ty param_ty, elab2)
 
 and elab_computation state { term; ty = _ty, drt } =
   elab_computation' state term (is_empty_dirt drt)
@@ -397,8 +396,8 @@ and elab_computation' state c _is_empty =
           else NoEff.NHandle (elabc, velab)
       | _ -> failwith "Ill-typed handler")
   | ExEff.Call ((eff, (ty1, ty2)), value, abs) ->
-      let t1 = elab_ty state ty1 in
-      let t2 = elab_ty state ty2 in
+      let t1 = elab_ty ty1 in
+      let t2 = elab_ty ty2 in
       let velab = elab_expression state value in
       let aelab = elab_abstraction_with_param_ty state abs in
       NoEff.NCall ((eff, (t1, t2)), velab, aelab)
@@ -423,26 +422,11 @@ and elab_rec_definitions state defs =
       (x, (List.map fst ws.ty_constraints, elab_abstraction state abs)))
     defs
 
-let rec elab_source_ty = function
-  | Language.SimpleType.Apply (name, ts) ->
-      NoEff.NTyApply (name, List.map elab_source_ty ts)
-  | TyParam p -> NoEff.NTyParam p
-  | Basic s -> NoEff.NTyBasic s
-  | Tuple tys -> NoEff.NTyTuple (List.map elab_source_ty tys)
-  | Arrow (t1, t2) -> NoEff.NTyArrow (elab_source_ty t1, elab_source_ty t2)
-  | Handler h ->
-      NoEff.NTyHandler (elab_source_ty h.value, elab_source_ty h.finally)
-
 let elab_tydef = function
-  | Language.SimpleType.Record assoc ->
-      NoEff.TyDefRecord (Assoc.map elab_source_ty assoc)
+  | Type.Record assoc -> NoEff.TyDefRecord (Assoc.map elab_ty assoc)
   | Sum assoc ->
-      let converter = function
-        | None -> None
-        | Some ty -> Some (elab_source_ty ty)
-      in
+      let converter = function None -> None | Some ty -> Some (elab_ty ty) in
       NoEff.TyDefSum (Assoc.map converter assoc)
-  | Inline ty -> NoEff.TyDefInline (elab_source_ty ty)
+  | Inline ty -> NoEff.TyDefInline (elab_ty ty)
 
-let elab_effect state (eff, (ty1, ty2)) : n_effect =
-  (eff, (elab_ty state ty1, elab_ty state ty2))
+let elab_effect (eff, (ty1, ty2)) : n_effect = (eff, (elab_ty ty1, elab_ty ty2))

@@ -182,10 +182,10 @@ let main =
   (* Files were listed in the wrong order, so we reverse them *)
   file_queue := List.rev !file_queue;
   try
-    let (module Backend : Language.BackendSignature.ExplicitT) =
+    let (module Backend : Language.BackendSignature.T) =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
-      | Config.Multicore -> failwith "Not implemented"
+      | Config.Multicore -> (module MulticoreOCaml.Backend)
       | Config.Ocaml -> (module PlainOCaml.Backend)
     in
     let (module Shell) =

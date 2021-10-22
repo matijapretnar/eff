@@ -26,7 +26,7 @@ module Backend : Language.BackendSignature.T = struct
   let load_primitive_value state x prim =
     update state (RawSource (x, Primitives.primitive_source prim))
 
-  let load_primitive_effect state eff prim =
+  let load_primitive_effect state (eff, _) prim =
     let x, k, c = Primitives.top_level_handler_source prim in
     let ty1, ty2 = Typechecker.Primitives.primitive_effect_signature prim in
     let ty1', ty2' = (Translate.of_type ty1, Translate.of_type ty2) in
@@ -36,11 +36,11 @@ module Backend : Language.BackendSignature.T = struct
         (eff, (ty1', ty2'), (x, k, c)) :: state.primitive_effects;
     }
 
-  let process_computation state c _ty =
+  let process_computation state c =
     let t = Translate.of_computation c in
     update state (Term t)
 
-  let process_type_of state _c _ty =
+  let process_type_of state _ =
     Print.warning
       "[#typeof] commands are ignored when compiling to Multicore OCaml.";
     state
@@ -50,17 +50,13 @@ module Backend : Language.BackendSignature.T = struct
     let ty2' = Translate.of_type ty2 in
     update state (DefEffect (eff, (ty1', ty2')))
 
-  let process_top_let state defs _vars =
-    let converter (p, c) =
-      (Translate.of_pattern p, Translate.of_computation c)
-    in
-    let defs' = List.map converter defs in
+  let process_top_let state defs =
+    let converter (x, (_, e)) = (Syntax.PVar x, Translate.of_expression e) in
+    let defs' = List.map converter (Assoc.to_list defs) in
     update state (TopLet defs')
 
-  let process_top_let_rec state defs _vars =
-    let converter { term = p, c; _ } =
-      (Translate.of_pattern p, Translate.of_computation c)
-    in
+  let process_top_let_rec state defs =
+    let converter (_, a) = Translate.of_abstraction a in
     let defs' = Assoc.map converter defs |> Assoc.to_list in
     update state (TopLetRec defs')
 

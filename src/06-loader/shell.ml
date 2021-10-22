@@ -19,7 +19,7 @@ module type Shell = sig
   val finalize : state -> unit
 end
 
-module Make (Backend : Language.BackendSignature.ExplicitT) = struct
+module Make (Backend : Language.BackendSignature.T) = struct
   type state = {
     desugarer_state : Desugarer.state;
     type_system_state : TypeSystem.state;
@@ -180,8 +180,16 @@ module Make (Backend : Language.BackendSignature.ExplicitT) = struct
         let type_system_state' =
           TypeSystem.add_type_definitions state.type_system_state tydefs'
         in
+        let tydefs'' =
+          Assoc.map
+            (fun (ps, tydef) ->
+              ( ps,
+                TypeSystem.source_to_target_tydef state.type_system_state.tydefs
+                  tydef ))
+            tydefs'
+        in
         let backend_state' =
-          Backend.process_tydef state.backend_state tydefs'
+          Backend.process_tydef state.backend_state tydefs''
         in
         {
           state with
