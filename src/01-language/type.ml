@@ -72,6 +72,13 @@ and ct_dirt = dirt * dirt
 
 and ct_dirty = dirty * dirty
 
+type tydef =
+  | Record of (CoreTypes.Field.t, ty) Assoc.t
+  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
+  | Inline of ty
+
+type type_data = { params : CoreTypes.TyParam.t list; type_def : tydef }
+
 let skeleton_of_ty ty = ty.ty
 
 let skeleton_of_dirty (ty, _) = skeleton_of_ty ty

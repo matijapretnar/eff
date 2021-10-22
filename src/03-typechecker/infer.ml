@@ -84,6 +84,13 @@ let rec source_to_target tctx_st ty =
 
 and source_to_dirty tctx_st ty = (source_to_target tctx_st ty, Type.empty_dirt)
 
+let source_to_target_tydef tctx_st = function
+  | Language.SimpleType.Record assoc ->
+      Type.Record (Assoc.map (source_to_target tctx_st) assoc)
+  | Language.SimpleType.Sum assoc ->
+      Type.Sum (Assoc.map (Option.map (source_to_target tctx_st)) assoc)
+  | Language.SimpleType.Inline ty -> Type.Inline ((source_to_target tctx_st) ty)
+
 let process_def_effect eff (ty1, ty2) state =
   let ty1 = source_to_target state.tydefs ty1 in
   let ty2 = source_to_target state.tydefs ty2 in

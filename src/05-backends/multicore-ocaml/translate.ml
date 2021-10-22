@@ -1,39 +1,30 @@
 open Utils
 open Language
 open Syntax
-module CoreSyntax = UntypedSyntax
-module Type = SimpleType
 
 (* ------------------------------------------------------------------------ *)
 (* Translations *)
 
-let abstraction_is_id (p, _c) =
-  (* Used to remove trivial finally clauses from handlers. *)
-  match p with
-  | PVar v -> CoreTypes.Variable.fold (fun desc _ -> desc = "$id_par") v
-  | _ -> false
+let rec of_abstraction { term = p, c; _ } = (of_pattern p, of_computation c)
 
-let rec of_abstraction (p, c) = (of_pattern p, of_computation c)
-
-and of_abstraction2 (p1, p2, c) =
+and of_abstraction2 { term = p1, p2, c; _ } =
   (of_pattern p1, of_pattern p2, of_computation c)
 
 (** Conversion functions. *)
-and of_expression { it; _ } =
-  match it with
-  | CoreSyntax.Var v -> Var v
-  | CoreSyntax.Const const -> Const const
-  | CoreSyntax.Annotated (e, ty) -> Annotated (of_expression e, of_type ty)
-  | CoreSyntax.Tuple es -> Tuple (List.map of_expression es)
-  | CoreSyntax.Record assoc -> Record (Assoc.map of_expression assoc)
-  | CoreSyntax.Variant (lbl, e_opt) -> (
+and of_expression exp =
+  match exp.term with
+  | Term.Var v -> Var v.variable
+  | Term.Const const -> Const const
+  | Term.Tuple es -> Tuple (List.map of_expression es)
+  | Term.Record assoc -> Record (Assoc.map of_expression assoc)
+  | Term.Variant (lbl, e_opt) -> (
       match e_opt with
       | None -> Variant (lbl, None)
       | Some e -> Variant (lbl, Some (of_expression e)))
-  | CoreSyntax.Lambda abs -> (
+  | Term.Lambda abs -> (
       (* Transform back to [function] keyword if possible *)
-      match abs with
-      | p, { it = CoreSyntax.Match (e, abs_lst); _ } -> (
+      match abs.term with
+      | p, { term = Term.Match (e, abs_lst); _ } -> (
           let p' = of_pattern p in
           let e' = of_expression e in
           match (p', e') with
@@ -46,70 +37,74 @@ and of_expression { it; _ } =
               Function (List.map converter abs_lst)
           | _ -> Lambda (of_abstraction abs))
       | _ -> Lambda (of_abstraction abs))
-  | CoreSyntax.Effect eff -> Effect eff
-  | CoreSyntax.Handler { effect_clauses; value_clause; finally_clause } ->
+  | Term.Handler
+      { term = { value_clause; effect_clauses = { effect_part; _ } }; _ } ->
       (* Non-trivial case *)
       let effect_clauses' =
         List.map
-          (fun (eff, abs) -> EffectClause (eff, of_abstraction2 abs))
-          (Assoc.to_list effect_clauses)
+          (fun ((eff, _), abs) -> EffectClause (eff, of_abstraction2 abs))
+          (Assoc.to_list effect_part)
       in
       let value_clause' = ValueClause (of_abstraction value_clause) in
-      let finally_clause_abs = of_abstraction finally_clause in
       let ghost_bind = CoreTypes.Variable.fresh "$c_thunk" in
       let match_handler =
         Match
           (Apply (Var ghost_bind, Tuple []), value_clause' :: effect_clauses')
       in
-      if abstraction_is_id finally_clause_abs then
-        Lambda (PVar ghost_bind, match_handler)
-      else
-        Lambda
-          (PVar ghost_bind, Apply (Lambda finally_clause_abs, match_handler))
+      Lambda (PVar ghost_bind, match_handler)
+  | Term.CastExp (exp, _) -> of_expression exp
 
-and of_computation { it; _ } =
-  match it with
-  | CoreSyntax.Value e -> of_expression e
-  | CoreSyntax.Let (p_c_lst, c) ->
-      let converter (p, c) = (of_pattern p, of_computation c) in
-      Let (List.map converter p_c_lst, of_computation c)
-  | CoreSyntax.LetRec (var_abs_lst, c) ->
-      let converter (var, abs) = (var, of_abstraction abs) in
-      LetRec (List.map converter var_abs_lst, of_computation c)
-  | CoreSyntax.Match (e, abs_lst) ->
+and of_computation cmp =
+  match cmp.term with
+  | Term.Value e -> of_expression e
+  | Term.LetVal (e, a) ->
+      let p, c = of_abstraction a in
+      Let ([ (p, of_expression e) ], c)
+  | Term.Bind (c1, a) ->
+      let p, c2 = of_abstraction a in
+      Let ([ (p, of_computation c1) ], c2)
+  | Term.LetRec (var_abs_lst, c) ->
+      let converter (var, (_, abs)) = (var, of_abstraction abs) in
+      LetRec (List.map converter (Assoc.to_list var_abs_lst), of_computation c)
+  | Term.Match (e, abs_lst) ->
       let converter abs = ValueClause (of_abstraction abs) in
       Match (of_expression e, List.map converter abs_lst)
-  | CoreSyntax.Apply (e1, e2) -> Apply (of_expression e1, of_expression e2)
-  | CoreSyntax.Check c -> Check (of_computation c)
-  | CoreSyntax.Handle (e, c) ->
+  | Term.Apply (e1, e2) -> Apply (of_expression e1, of_expression e2)
+  | Term.Handle (e, c) ->
       (* Non-trivial case *)
       let modified_handler = of_expression e in
       let thunked_c = Lambda (PNonbinding, of_computation c) in
       Apply (modified_handler, thunked_c)
+  | Term.Call ((eff, _), e, a) ->
+      let p, c = of_abstraction a in
+      Let ([ (p, Apply (Effect eff, of_expression e)) ], c)
+  | Term.CastComp (c, _) -> of_computation c
 
-and of_pattern { it; _ } =
-  match it with
-  | CoreSyntax.PVar var -> PVar var
-  | CoreSyntax.PAnnotated (p, ty) -> PAnnotated (of_pattern p, of_type ty)
-  | CoreSyntax.PAs (p, var) -> PAs (of_pattern p, var)
-  | CoreSyntax.PTuple ps -> PTuple (List.map of_pattern ps)
-  | CoreSyntax.PRecord assoc -> PRecord (Assoc.map of_pattern assoc)
-  | CoreSyntax.PVariant (lbl, p_opt) -> (
+and of_pattern pat =
+  match pat.term with
+  | Term.PVar var -> PVar var
+  | Term.PAs (p, var) -> PAs (of_pattern p, var)
+  | Term.PTuple ps -> PTuple (List.map of_pattern ps)
+  | Term.PRecord assoc -> PRecord (Assoc.map of_pattern assoc)
+  | Term.PVariant (lbl, p_opt) -> (
       match p_opt with
       | None -> PVariant (lbl, None)
       | Some p -> PVariant (lbl, Some (of_pattern p)))
-  | CoreSyntax.PConst const -> PConst const
-  | CoreSyntax.PNonbinding -> PNonbinding
+  | Term.PConst const -> PConst const
+  | Term.PNonbinding -> PNonbinding
 
-and of_type = function
+and of_type ty =
+  match ty.term with
   | Type.Apply (name, tys) -> TyApply (name, List.map of_type tys)
   | Type.TyParam ty_param -> TyParam ty_param
-  | Type.Basic s -> TyBasic s
+  | Type.TyBasic s -> TyBasic s
   | Type.Tuple tys -> TyTuple (List.map of_type tys)
-  | Type.Arrow (ty1, ty2) -> TyArrow (of_type ty1, of_type ty2)
-  | Type.Handler { value; finally } ->
+  | Type.Arrow (ty1, ty2) -> TyArrow (of_type ty1, of_dirty ty2)
+  | Type.Handler (drty1, drty2) ->
       (* Non-trivial case *)
-      TyArrow (TyArrow (of_type Type.unit_ty, of_type value), of_type finally)
+      TyArrow (TyArrow (of_type Type.unit_ty, of_dirty drty1), of_dirty drty2)
+
+and of_dirty (ty, _) = of_type ty
 
 and of_tydef = function
   | Type.Record assoc -> TyDefRecord (Assoc.map of_type assoc)

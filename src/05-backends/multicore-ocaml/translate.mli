@@ -1,10 +1,8 @@
 open Language
-module CoreSyntax = UntypedSyntax
-module Type = SimpleType
 
-val of_computation : CoreSyntax.computation -> Syntax.term
+val of_computation : Term.computation -> Syntax.term
 
-val of_pattern : CoreSyntax.pattern -> Syntax.pattern
+val of_pattern : Term.pattern -> Syntax.pattern
 
 val of_type : Type.ty -> Syntax.ty
 

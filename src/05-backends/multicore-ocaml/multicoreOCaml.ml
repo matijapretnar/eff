@@ -28,9 +28,7 @@ module Backend : Language.BackendSignature.T = struct
 
   let load_primitive_effect state eff prim =
     let x, k, c = Primitives.top_level_handler_source prim in
-    let ty1, ty2 =
-      Typechecker.SimplePrimitives.primitive_effect_signature prim
-    in
+    let ty1, ty2 = Typechecker.Primitives.primitive_effect_signature prim in
     let ty1', ty2' = (Translate.of_type ty1, Translate.of_type ty2) in
     {
       state with
@@ -60,7 +58,7 @@ module Backend : Language.BackendSignature.T = struct
     update state (TopLet defs')
 
   let process_top_let_rec state defs _vars =
-    let converter (p, c) =
+    let converter { term = p, c; _ } =
       (Translate.of_pattern p, Translate.of_computation c)
     in
     let defs' = Assoc.map converter defs |> Assoc.to_list in
