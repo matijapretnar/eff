@@ -1,5 +1,5 @@
 (library
- (name multicore)
+ (name multicoreOCaml)
  (libraries language typechecker))
 
 (rule

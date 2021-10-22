@@ -186,7 +186,7 @@ let main =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
       | Config.Multicore -> failwith "Not implemented"
-      | Config.Ocaml -> (module ExplicitEffects.CompileToPlainOCaml)
+      | Config.Ocaml -> (module PlainOCaml.Backend)
     in
     let (module Shell) =
       (module Loader.Shell.Make (Backend) : Loader.Shell.Shell)
@@ -203,7 +203,7 @@ let main =
         let stdlib =
           match !Config.backend with
           | Config.Runtime | Config.Ocaml -> Loader.Stdlib_eff.source
-          | Config.Multicore -> Multicore.stdlib
+          | Config.Multicore -> MulticoreOCaml.stdlib
         in
         Shell.load_source stdlib state
       else state

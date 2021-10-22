@@ -3,7 +3,7 @@ open Utils
 module Term = Language.Term
 module Type = Language.Type
 
-module CompileToPlainOCaml : Language.BackendSignature.ExplicitT = struct
+module Backend : Language.BackendSignature.ExplicitT = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 

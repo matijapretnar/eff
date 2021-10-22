@@ -53,7 +53,7 @@ let protected =
 
 let pp_variable ?(safe = true) state var ppf =
   match Assoc.lookup var state.inlinable_primitives with
-  | Some s -> Format.fprintf ppf "%s" (OcamlPrimitives.primitive_source s)
+  | Some s -> Format.fprintf ppf "%s" (Primitives.primitive_source s)
   | None ->
       let printer desc n =
         (* [mod] has privileges because otherwise it's stupid *)
@@ -263,7 +263,7 @@ let rec pp_term ?max_level state noEff_term ppf =
         (pp_term state ~max_level:1 t2)
         (pp_term state ~max_level:0 t1)
   | NDirectPrimitive p ->
-      print ~at_level:1 "(%s)" (OcamlPrimitives.primitive_source p)
+      print ~at_level:1 "(%s)" (Primitives.primitive_source p)
 
 and pp_abs state (p, t) ppf =
   print ppf "@[<h> %t ->@ %t@]" (pp_pattern state p) (pp_term state t)
