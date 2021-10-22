@@ -1,6 +1,6 @@
 (library
  (name loader)
- (libraries language typechecker parser))
+ (libraries language typechecker optimizer parser))
 
 (rule
  (with-stdout-to

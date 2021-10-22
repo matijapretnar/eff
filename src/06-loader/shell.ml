@@ -23,6 +23,7 @@ module Make (Backend : Language.BackendSignature.ExplicitT) = struct
   type state = {
     desugarer_state : Desugarer.state;
     type_system_state : TypeSystem.state;
+    optimizer_state : Optimizer.state;
     backend_state : Backend.state;
   }
 
@@ -34,6 +35,7 @@ module Make (Backend : Language.BackendSignature.ExplicitT) = struct
       TypeSystem.load_primitive_effect state.type_system_state x prim
     in
     {
+      state with
       desugarer_state =
         Desugarer.load_primitive_effect state.desugarer_state x prim;
       type_system_state = type_system_state';
@@ -46,6 +48,7 @@ module Make (Backend : Language.BackendSignature.ExplicitT) = struct
       Language.CoreTypes.Variable.fresh (Primitives.primitive_value_name prim)
     in
     {
+      state with
       desugarer_state =
         Desugarer.load_primitive_value state.desugarer_state x prim;
       type_system_state =
@@ -55,10 +58,22 @@ module Make (Backend : Language.BackendSignature.ExplicitT) = struct
 
   let initialize () =
     Random.self_init ();
+    let optimizer_state =
+      Optimizer.initial_state
+        {
+          specialize_functions = !Config.optimizator_config.specialize_functions;
+          eliminate_coercions = !Config.optimizator_config.eliminate_coercions;
+          push_coercions = !Config.optimizator_config.push_coercions;
+          handler_reductions = !Config.optimizator_config.handler_reductions;
+          purity_aware_translation =
+            !Config.optimizator_config.purity_aware_translation;
+        }
+    in
     let state =
       {
         desugarer_state = Desugarer.initial_state;
         type_system_state = TypeSystem.initial_state;
+        optimizer_state;
         backend_state = Backend.initial_state;
       }
     in
@@ -78,14 +93,16 @@ module Make (Backend : Language.BackendSignature.ExplicitT) = struct
     | Commands.Term t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let c' = TypeSystem.process_computation state.type_system_state c in
+        let c'' = Optimizer.process_computation state.optimizer_state c' in
         let backend_state' =
-          Backend.process_computation state.backend_state c'
+          Backend.process_computation state.backend_state c''
         in
         { state with backend_state = backend_state' }
     | Commands.TypeOf t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let c' = TypeSystem.process_computation state.type_system_state c in
-        let backend_state' = Backend.process_type_of state.backend_state c' in
+        let c'' = Optimizer.process_computation state.optimizer_state c' in
+        let backend_state' = Backend.process_type_of state.backend_state c'' in
         { state with backend_state = backend_state' }
     | Commands.Help ->
         let help_text =
@@ -108,6 +125,7 @@ module Make (Backend : Language.BackendSignature.ExplicitT) = struct
           Backend.process_def_effect state.backend_state (eff, (ty1', ty2'))
         in
         {
+          state with
           type_system_state = type_system_state';
           desugarer_state = desugarer_state';
           backend_state = backend_state';
@@ -123,12 +141,16 @@ module Make (Backend : Language.BackendSignature.ExplicitT) = struct
         let type_system_state', defs'' =
           TypeSystem.process_top_let state.type_system_state defs'
         in
+        let optimizer_state', defs''' =
+          Optimizer.process_top_let state.optimizer_state defs''
+        in
         let backend_state' =
-          Backend.process_top_let state.backend_state defs''
+          Backend.process_top_let state.backend_state defs'''
         in
         {
           desugarer_state = desugarer_state';
           type_system_state = type_system_state';
+          optimizer_state = optimizer_state';
           backend_state = backend_state';
         }
     | Commands.TopLetRec defs ->
@@ -139,12 +161,16 @@ module Make (Backend : Language.BackendSignature.ExplicitT) = struct
         let type_system_state', defs''' =
           TypeSystem.process_top_let_rec state.type_system_state defs''
         in
+        let optimizer_state', defs'''' =
+          Optimizer.process_top_let_rec state.optimizer_state defs'''
+        in
         let backend_state' =
-          Backend.process_top_let_rec state.backend_state defs'''
+          Backend.process_top_let_rec state.backend_state defs''''
         in
         {
           desugarer_state = desugarer_state';
           type_system_state = type_system_state';
+          optimizer_state = optimizer_state';
           backend_state = backend_state';
         }
     | Commands.Tydef tydefs ->
@@ -158,6 +184,7 @@ module Make (Backend : Language.BackendSignature.ExplicitT) = struct
           Backend.process_tydef state.backend_state tydefs'
         in
         {
+          state with
           desugarer_state = desugarer_state';
           type_system_state = type_system_state';
           backend_state = backend_state';
