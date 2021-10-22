@@ -7,7 +7,7 @@ module NoEff = SyntaxNoEff
 module ExEffTypes = Type
 module ExEff = Term
 module EffectSet = Set.Make (CoreTypes.Effect)
-module Sub = Substitution
+module Sub = Typechecker.Substitution
 
 type optimization_config = { purity_aware_translation : bool }
 
@@ -144,8 +144,9 @@ let rec value_coercion_from_impure_dirt empty_dirt_params ty =
               in
               if
                 is_empty_dirt
-                  (Substitution.apply_substitutions_to_dirt
-                     (Substitution.empty_dirt_substitution empty_dirt_params)
+                  (Typechecker.Substitution.apply_substitutions_to_dirt
+                     (Typechecker.Substitution.empty_dirt_substitution
+                        empty_dirt_params)
                      drt2)
               then NoEff.NCoerHandToFun (coer1, NoEff.NCoerUnsafe coer2)
               else NoEff.NCoerHandToFun (coer1, NoEff.NCoerComp coer2)
@@ -174,8 +175,9 @@ and computation_coercion_from_impure_dirt empty_dirt_params (ty1, drt) =
       assert (
         not
           (is_empty_dirt
-             (Substitution.apply_substitutions_to_dirt
-                (Substitution.empty_dirt_substitution empty_dirt_params)
+             (Typechecker.Substitution.apply_substitutions_to_dirt
+                (Typechecker.Substitution.empty_dirt_substitution
+                   empty_dirt_params)
                 drt)));
       NoEff.NCoerComp noeff_coer
 
@@ -208,8 +210,9 @@ and value_coercion_to_impure_dirt empty_dirt_params ty =
               let coer2 = value_coercion_to_impure_dirt empty_dirt_params ty2 in
               if
                 is_empty_dirt
-                  (Substitution.apply_substitutions_to_dirt
-                     (Substitution.empty_dirt_substitution empty_dirt_params)
+                  (Typechecker.Substitution.apply_substitutions_to_dirt
+                     (Typechecker.Substitution.empty_dirt_substitution
+                        empty_dirt_params)
                      drt2)
               then NoEff.NCoerFunToHand (coer1, NoEff.NCoerReturn coer2)
               else NoEff.NCoerFunToHand (coer1, NoEff.NCoerComp coer2)
@@ -239,8 +242,9 @@ and computation_coercion_to_impure_dirt empty_dirt_params (ty1, drt) =
       assert (
         not
           (is_empty_dirt
-             (Substitution.apply_substitutions_to_dirt
-                (Substitution.empty_dirt_substitution empty_dirt_params)
+             (Typechecker.Substitution.apply_substitutions_to_dirt
+                (Typechecker.Substitution.empty_dirt_substitution
+                   empty_dirt_params)
                 drt)));
       NoEff.NCoerComp noeff_coer
 

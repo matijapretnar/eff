@@ -459,7 +459,7 @@ let infer_top_let_rec st defs =
   (vars, st)
 
 let load_primitive_value st x prim =
-  extend st x (Primitives.primitive_value_type_scheme prim)
+  extend st x (SimplePrimitives.primitive_value_type_scheme prim)
 
 let load_primitive_effect st eff prim =
-  add_effect st eff (Primitives.primitive_effect_signature prim)
+  add_effect st eff (SimplePrimitives.primitive_effect_signature prim)

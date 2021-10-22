@@ -28,7 +28,9 @@ module Backend : Language.BackendSignature.T = struct
 
   let load_primitive_effect state eff prim =
     let x, k, c = Primitives.top_level_handler_source prim in
-    let ty1, ty2 = Typechecker.Primitives.primitive_effect_signature prim in
+    let ty1, ty2 =
+      Typechecker.SimplePrimitives.primitive_effect_signature prim
+    in
     let ty1', ty2' = (Translate.of_type ty1, Translate.of_type ty2) in
     {
       state with

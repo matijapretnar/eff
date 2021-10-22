@@ -2,7 +2,7 @@ open Utils
 module Const = Language.Const
 module Untyped = Language.UntypedSyntax
 module CoreTypes = Language.CoreTypes
-module TypeDefinitionContext = Typechecker.TypeDefinitionContext
+module TypeDefinitionContext = TypeDefinitionContext
 open Language
 
 (* GEORGE: TODO:
@@ -59,10 +59,8 @@ let rec source_to_target tctx_st ty =
   let loc = Location.unknown in
   match ty with
   | Language.SimpleType.Apply (ty_name, _args)
-    when Typechecker.TypeDefinitionContext.transparent ~loc ty_name tctx_st -> (
-      match
-        Typechecker.TypeDefinitionContext.ty_apply ~loc ty_name [] tctx_st
-      with
+    when TypeDefinitionContext.transparent ~loc ty_name tctx_st -> (
+      match TypeDefinitionContext.ty_apply ~loc ty_name [] tctx_st with
       (* We currently support only inlined types with no arguments *)
       | Language.SimpleType.Inline ty -> source_to_target tctx_st ty
       (* Other cases should not be transparent *)

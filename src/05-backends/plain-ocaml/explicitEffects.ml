@@ -7,14 +7,14 @@ module Type = Language.Type
 module Make (ExBackend : Language.BackendSignature.ExplicitT) :
   Language.BackendSignature.T = struct
   type state = {
-    type_system_state : ExplicitInfer.state;
+    type_system_state : Typechecker.ExplicitInfer.state;
     backend_state : ExBackend.state;
     optimizer_state : Optimizer.state;
   }
 
   let initial_state =
     {
-      type_system_state = ExplicitInfer.initial_state;
+      type_system_state = Typechecker.ExplicitInfer.initial_state;
       backend_state = ExBackend.initial_state;
       optimizer_state =
         Optimizer.initial_state
@@ -30,7 +30,9 @@ module Make (ExBackend : Language.BackendSignature.ExplicitT) :
     }
 
   let process_computation state c _ =
-    let c' = ExplicitInfer.process_computation state.type_system_state c in
+    let c' =
+      Typechecker.ExplicitInfer.process_computation state.type_system_state c
+    in
     let c'' = Optimizer.process_computation state.optimizer_state c' in
     let backend_state' =
       ExBackend.process_computation state.backend_state c''
@@ -38,14 +40,17 @@ module Make (ExBackend : Language.BackendSignature.ExplicitT) :
     { state with backend_state = backend_state' }
 
   let process_type_of state c _ =
-    let c' = ExplicitInfer.process_computation state.type_system_state c in
+    let c' =
+      Typechecker.ExplicitInfer.process_computation state.type_system_state c
+    in
     let c'' = Optimizer.process_computation state.optimizer_state c' in
     let backend_state' = ExBackend.process_type_of state.backend_state c'' in
     { state with backend_state = backend_state' }
 
   let process_def_effect state (eff, (ty1, ty2)) =
     let type_system_state', (ty1, ty2) =
-      ExplicitInfer.process_def_effect eff (ty1, ty2) state.type_system_state
+      Typechecker.ExplicitInfer.process_def_effect eff (ty1, ty2)
+        state.type_system_state
     in
     let backend_state' =
       ExBackend.process_def_effect state.backend_state (eff, (ty1, ty2))
@@ -58,7 +63,7 @@ module Make (ExBackend : Language.BackendSignature.ExplicitT) :
 
   let process_top_let state defs _vars =
     let type_system_state', defs' =
-      ExplicitInfer.process_top_let state.type_system_state defs
+      Typechecker.ExplicitInfer.process_top_let state.type_system_state defs
     in
     let optimizer_state', defs'' =
       Optimizer.process_top_let state.optimizer_state defs'
@@ -72,7 +77,7 @@ module Make (ExBackend : Language.BackendSignature.ExplicitT) :
 
   let process_top_let_rec state defs _vars =
     let type_system_state', defs' =
-      ExplicitInfer.process_top_let_rec state.type_system_state defs
+      Typechecker.ExplicitInfer.process_top_let_rec state.type_system_state defs
     in
     let optimizer_state', defs'' =
       Optimizer.process_top_let_rec state.optimizer_state defs'
@@ -87,9 +92,9 @@ module Make (ExBackend : Language.BackendSignature.ExplicitT) :
     }
 
   let load_primitive_value state x prim =
-    let ty = Primitives.primitive_value_type_scheme prim in
+    let ty = Typechecker.Primitives.primitive_value_type_scheme prim in
     let type_system_state' =
-      ExplicitInfer.extend_var state.type_system_state x ty
+      Typechecker.ExplicitInfer.extend_var state.type_system_state x ty
     in
     let backend_state' =
       ExBackend.load_primitive_value state.backend_state x prim
@@ -101,9 +106,12 @@ module Make (ExBackend : Language.BackendSignature.ExplicitT) :
     }
 
   let load_primitive_effect state eff prim =
-    let ty1, ty2 = Typechecker.Primitives.primitive_effect_signature prim in
+    let ty1, ty2 =
+      Typechecker.SimplePrimitives.primitive_effect_signature prim
+    in
     let type_system_state', (ty1', ty2') =
-      ExplicitInfer.process_def_effect eff (ty1, ty2) state.type_system_state
+      Typechecker.ExplicitInfer.process_def_effect eff (ty1, ty2)
+        state.type_system_state
     in
     let backend_state' =
       ExBackend.load_primitive_effect state.backend_state
@@ -118,7 +126,8 @@ module Make (ExBackend : Language.BackendSignature.ExplicitT) :
 
   let process_tydef state tydefs =
     let type_system_state' =
-      ExplicitInfer.add_type_definitions state.type_system_state tydefs
+      Typechecker.ExplicitInfer.add_type_definitions state.type_system_state
+        tydefs
     in
     let backend_state' = ExBackend.process_tydef state.backend_state tydefs in
     {
