@@ -1,6 +1,5 @@
 (* Compilation to multicore ocaml *)
 open Utils
-module V = Value
 module Term = Language.Term
 module Type = Language.Type
 
@@ -137,57 +136,6 @@ module Make (ExBackend : Language.BackendSignature.ExplicitT) :
     }
 
   let finalize state = ExBackend.finalize state.backend_state
-end
-
-module Evaluate : Language.BackendSignature.ExplicitT = struct
-  (* ------------------------------------------------------------------------ *)
-  (* Setup *)
-
-  type state = { evaluation_state : Eval.state }
-
-  let initial_state = { evaluation_state = Eval.initial_state }
-
-  (* ------------------------------------------------------------------------ *)
-  (* Processing functions *)
-  let process_computation state c =
-    let v = Eval.run state.evaluation_state c in
-    Format.fprintf !Config.output_formatter "@[- : %t = %t@]@."
-      (Type.print_dirty c.ty) (V.print_value v);
-    state
-
-  let process_type_of state c =
-    Format.fprintf !Config.output_formatter "- : %t\n" (Type.print_dirty c.ty);
-    state
-
-  let process_def_effect state _ = state
-
-  let process_top_let state defs =
-    match Assoc.to_list defs with
-    | [] -> state
-    | [ (x, (_ws, exp)) ] ->
-        let v = Eval.eval_expression state.evaluation_state exp in
-        Format.fprintf !Config.output_formatter "@[%t : %t = %t@]@."
-          (Language.CoreTypes.Variable.print x)
-          (Type.print_ty exp.ty) (V.print_value v);
-        { evaluation_state = Eval.update x v state.evaluation_state }
-    | _ -> failwith __LOC__
-
-  let process_top_let_rec state defs =
-    Assoc.iter
-      (fun (f, (_ws, abs)) ->
-        Format.fprintf !Config.output_formatter "@[%t : %t = <fun>@]@."
-          (Language.CoreTypes.Variable.print f)
-          (Type.print_ty (Type.arrow abs.ty)))
-      defs;
-    { evaluation_state = Eval.extend_let_rec state.evaluation_state defs }
-
-  let load_primitive_value _state _x _prim = failwith "Not implemented"
-
-  let load_primitive_effect _state _x _prim = failwith "Not implemented"
-
-  let process_tydef state _ = state
-
-  let finalize _state = ()
 end
 
 module CompileToPlainOCaml : Language.BackendSignature.ExplicitT = struct

@@ -42,9 +42,6 @@ let options =
       ( "--compile-plain-ocaml",
         Arg.Unit (fun () -> Config.backend := Ocaml),
         " Compile the Eff code into plain OCaml (sent to standard output)" );
-      ( "--explicit-effects",
-        Arg.Unit (fun () -> Config.backend := ExplicitEffects),
-        " Compile the Eff code into plain OCaml (sent to standard output)" );
       ("--profile", Arg.Set Config.profiling, " Print out profiling information");
       ( "--no-opts",
         Arg.Clear Config.enable_optimization,
@@ -81,7 +78,7 @@ let options =
                 purity_aware_translation;
               };
             ()),
-        "enable/disable specific optimizations" );
+        " Enable/disable specific optimizations" );
       ("--ascii", Arg.Set Config.ascii, " Use ASCII output");
       ( "-v",
         Arg.Unit
@@ -187,10 +184,9 @@ let main =
   try
     let (module Backend : Language.BackendSignature.ExplicitT) =
       match !Config.backend with
-      | Config.Runtime -> failwith "Not implemented"
+      | Config.Runtime -> (module Runtime.Backend)
       | Config.Multicore -> failwith "Not implemented"
       | Config.Ocaml -> (module ExplicitEffects.CompileToPlainOCaml)
-      | Config.ExplicitEffects -> (module ExplicitEffects.Evaluate)
     in
     let (module Shell) =
       (module Loader.Shell.Make (Backend) : Loader.Shell.Shell)
@@ -206,8 +202,7 @@ let main =
       if !Config.use_stdlib then
         let stdlib =
           match !Config.backend with
-          | Config.Runtime | Config.Ocaml | Config.ExplicitEffects ->
-              Loader.Stdlib_eff.source
+          | Config.Runtime | Config.Ocaml -> Loader.Stdlib_eff.source
           | Config.Multicore -> Multicore.stdlib
         in
         Shell.load_source stdlib state

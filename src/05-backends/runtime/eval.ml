@@ -1,13 +1,12 @@
-(* Evaluation of the intermediate language, big step. *)
+(* Evaluation of the ExEff language, big step. *)
 open Utils
 open Language
 module V = Value
-module Untyped = UntypedSyntax
 module RuntimeEnv = Map.Make (CoreTypes.Variable)
 
 type state = {
   environment : V.value RuntimeEnv.t;
-  runners : (Untyped.effect, V.value -> V.value) Assoc.t;
+  runners : (CoreTypes.Effect.t, V.value -> V.value) Assoc.t;
 }
 
 let initial_state = { environment = RuntimeEnv.empty; runners = Assoc.empty }
@@ -18,34 +17,33 @@ let update x v state =
 let lookup x state =
   try Some (RuntimeEnv.find x state.environment) with Not_found -> None
 
-let add_runner eff runner state =
+let add_runner (eff, _) runner state =
   { state with runners = Assoc.update eff runner state.runners }
 
 exception PatternMatch of Location.t
 
 let rec extend_value p v state =
-  match (p.it, v) with
-  | Untyped.PVar x, v -> update x v state
-  | Untyped.PAnnotated (p, _t), v -> extend_value p v state
-  | Untyped.PAs (p, x), v ->
+  match (p.term, v) with
+  | Term.PVar x, v -> update x v state
+  (* | Term.PAnnotated (p, _t), v -> extend_value p v state *)
+  | Term.PAs (p, x), v ->
       let state = extend_value p v state in
       update x v state
-  | Untyped.PNonbinding, _ -> state
-  | Untyped.PTuple ps, V.Tuple vs -> List.fold_right2 extend_value ps vs state
-  | Untyped.PRecord ps, V.Record vs -> (
+  | Term.PNonbinding, _ -> state
+  | Term.PTuple ps, V.Tuple vs -> List.fold_right2 extend_value ps vs state
+  | Term.PRecord ps, V.Record vs -> (
       let extender state (f, p) =
         match Assoc.lookup f vs with
         | None -> raise Not_found
         | Some v -> extend_value p v state
       in
       try Assoc.fold_left extender state ps
-      with Not_found -> raise (PatternMatch p.at))
-  | Untyped.PVariant (lbl, None), V.Variant (lbl', None) when lbl = lbl' ->
-      state
-  | Untyped.PVariant (lbl, Some p), V.Variant (lbl', Some v) when lbl = lbl' ->
+      with Not_found -> raise (PatternMatch Location.unknown))
+  | Term.PVariant (lbl, None), V.Variant (lbl', None) when lbl = lbl' -> state
+  | Term.PVariant (lbl, Some p), V.Variant (lbl', Some v) when lbl = lbl' ->
       extend_value p v state
-  | Untyped.PConst c, V.Const c' when Const.equal c c' -> state
-  | _, _ -> raise (PatternMatch p.at)
+  | Term.PConst c, V.Const c' when Const.equal c c' -> state
+  | _, _ -> raise (PatternMatch Location.unknown)
 
 let extend p v state =
   try extend_value p v state
@@ -58,37 +56,38 @@ let rec sequence k = function
       V.Call (op, v, k'')
 
 let rec ceval state c =
-  let loc = c.at in
-  match c.it with
-  | Untyped.Apply (e1, e2) -> (
+  match c.term with
+  | Term.Apply (e1, e2) -> (
       let v1 = veval state e1 and v2 = veval state e2 in
       match v1 with
       | V.Closure f -> f v2
       | _ -> Error.runtime "Only functions can be applied.")
-  | Untyped.Value e -> V.Value (veval state e)
-  | Untyped.Match (e, cases) ->
+  | Term.Value e -> V.Value (veval state e)
+  | Term.Match (e, cases) ->
       let v = veval state e in
       let rec eval_case = function
         | [] -> Error.runtime "No branches succeeded in a pattern match."
         | a :: lst -> (
-            let p, c = a in
+            let p, c = a.term in
             try ceval (extend_value p v state) c
             with PatternMatch _ -> eval_case lst)
       in
       eval_case cases
-  | Untyped.Handle (e, c) ->
+  | Term.Handle (e, c) ->
       let v = veval state e in
       let r = ceval state c in
       let h = V.to_handler v in
       h r
-  | Untyped.Let (lst, c) -> eval_let state lst c
-  | Untyped.LetRec (defs, c) ->
-      let state = extend_let_rec state (Assoc.of_list defs) in
+  | Term.LetVal (e, { term = p, c; _ }) ->
+      eval_let state [ (p, Term.value e) ] c
+  | Term.LetRec (defs, c) ->
+      let state = extend_let_rec state defs in
       ceval state c
-  | Untyped.Check c ->
-      let r = ceval state c in
-      Print.check ~loc "%t" (V.print_result r);
-      V.unit_result
+  | Term.Call ((eff, _), e, a) ->
+      let e' = veval state e in
+      V.Call (eff, e', eval_closure state a.term)
+  | Term.Bind (c1, { term = p, c2; _ }) -> eval_let state [ (p, c1) ] c2
+  | Term.CastComp (c, _) -> ceval state c
 
 and eval_let state lst c =
   match lst with
@@ -101,8 +100,8 @@ and extend_let_rec state defs =
   let state' = ref state in
   let state =
     Assoc.fold_right
-      (fun (f, a) state ->
-        let p, c = a in
+      (fun (f, (_ws, a)) state ->
+        let p, c = a.term in
         let g = V.Closure (fun v -> ceval (extend p v !state') c) in
         update f g state)
       defs state
@@ -111,44 +110,47 @@ and extend_let_rec state defs =
   state
 
 and veval state e =
-  match e.it with
-  | Untyped.Var x -> (
-      match lookup x state with
+  match e.term with
+  | Term.Var x -> (
+      match lookup x.variable state with
       | Some v -> v
       | None ->
-          Error.runtime "Name %t is not defined." (CoreTypes.Variable.print x))
-  | Untyped.Const c -> V.Const c
-  | Untyped.Annotated (t, _ty) -> veval state t
-  | Untyped.Tuple es -> V.Tuple (List.map (veval state) es)
-  | Untyped.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)
-  | Untyped.Variant (lbl, None) -> V.Variant (lbl, None)
-  | Untyped.Variant (lbl, Some e) -> V.Variant (lbl, Some (veval state e))
-  | Untyped.Lambda a -> V.Closure (eval_closure state a)
-  | Untyped.Effect eff ->
-      V.Closure (fun v -> V.Call (eff, v, fun r -> V.Value r))
-  | Untyped.Handler h -> V.Handler (eval_handler state h)
+          Error.runtime "Name %t is not defined."
+            (CoreTypes.Variable.print x.variable))
+  | Term.Const c -> V.Const c
+  (* | Term.Annotated (t, _ty) -> veval state t *)
+  | Term.Tuple es -> V.Tuple (List.map (veval state) es)
+  | Term.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)
+  | Term.Variant (lbl, e) -> V.Variant (lbl, Option.map (veval state) e)
+  | Term.Lambda a -> V.Closure (eval_closure state a.term)
+  | Term.Handler h -> V.Handler (eval_handler state h)
+  | Term.CastExp (e, _coercion) -> veval state e
 
 and eval_handler state
     {
-      Untyped.effect_clauses = ops;
-      Untyped.value_clause = value;
-      Untyped.finally_clause = fin;
+      term =
+        {
+          Term.effect_clauses = { Term.effect_part = ops; _ };
+          Term.value_clause = value;
+        };
+      _;
     } =
-  let eval_op a2 =
-    let p, kvar, c = a2 in
+  let eval_op ((eff, _), a2) =
+    let p, kvar, c = a2.term in
     let f u k = eval_closure (extend kvar (V.Closure k) state) (p, c) u in
-    f
+    (eff, f)
   in
-  let ops = Assoc.map eval_op ops in
+  let ops = Assoc.kmap eval_op ops in
   let rec h = function
-    | V.Value v -> eval_closure state value v
+    | V.Value v -> eval_closure state value.term v
     | V.Call (eff, v, k) -> (
         let k' u = h (k u) in
         match Assoc.lookup eff ops with
         | Some f -> f v k'
         | None -> V.Call (eff, v, k'))
   in
-  fun r -> sequence (eval_closure state fin) (h r)
+  (* fun r -> sequence (eval_closure state fin) (h r) *)
+  h
 
 and eval_closure state a v =
   let p, c = a in
@@ -165,5 +167,7 @@ let rec top_handle state op =
       | None ->
           Error.runtime "uncaught effect %t %t." (V.print_effect eff)
             (V.print_value v))
+
+let eval_expression state exp = veval state exp
 
 let run state c = top_handle state (ceval state c)
