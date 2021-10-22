@@ -4,39 +4,8 @@ module V = Value
 module Term = Language.Term
 module Type = Language.Type
 
-module type ExplicitBackend = sig
-  type state
-
-  val initial_state : state
-
-  val process_computation : state -> Term.computation -> state
-
-  val process_type_of : state -> Term.computation -> state
-
-  val process_def_effect : state -> Term.effect -> state
-
-  val process_top_let :
-    state -> (Term.variable, Type.parameters * Term.expression) Assoc.t -> state
-
-  val process_top_let_rec : state -> Term.rec_definitions -> state
-
-  val load_primitive_value :
-    state -> Term.variable -> Language.Primitives.primitive_value -> state
-
-  val load_primitive_effect :
-    state -> Term.effect -> Language.Primitives.primitive_effect -> state
-
-  val process_tydef :
-    state ->
-    ( Language.CoreTypes.TyName.t,
-      Language.CoreTypes.TyParam.t list * Language.SimpleType.tydef )
-    Assoc.t ->
-    state
-
-  val finalize : state -> unit
-end
-
-module Make (ExBackend : ExplicitBackend) : Language.BackendSignature.T = struct
+module Make (ExBackend : Language.BackendSignature.ExplicitT) :
+  Language.BackendSignature.T = struct
   type state = {
     type_system_state : ExplicitInfer.state;
     backend_state : ExBackend.state;
