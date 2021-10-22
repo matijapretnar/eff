@@ -139,7 +139,7 @@ module Make (ExBackend : Language.BackendSignature.ExplicitT) :
   let finalize state = ExBackend.finalize state.backend_state
 end
 
-module Evaluate : Language.BackendSignature.T = Make (struct
+module Evaluate : Language.BackendSignature.ExplicitT = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
@@ -188,9 +188,9 @@ module Evaluate : Language.BackendSignature.T = Make (struct
   let process_tydef state _ = state
 
   let finalize _state = ()
-end)
+end
 
-module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
+module CompileToPlainOCaml : Language.BackendSignature.ExplicitT = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
@@ -323,4 +323,4 @@ module CompileToPlainOCaml : Language.BackendSignature.T = Make (struct
         Format.fprintf !Config.output_formatter "%t\n"
           (TranslateNoEff2Ocaml.pp_cmd pp_state cmd))
       (List.rev state.prog)
-end)
+end

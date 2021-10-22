@@ -2,8 +2,10 @@ open Utils
 module Const = Language.Const
 module Untyped = Language.UntypedSyntax
 module CoreTypes = Language.CoreTypes
+module Constraint = Language.Constraint
+module Term = Language.Term
+module Type = Language.Type
 module TypeDefinitionContext = TypeDefinitionContext
-open Language
 
 (* GEORGE: TODO:
      1. Add debugging output to the new code snippets
@@ -934,3 +936,11 @@ let add_type_definitions state tydefs =
       TypeDefinitionContext.extend_type_definitions ~loc:Location.unknown tydefs
         state.tydefs;
   }
+
+let load_primitive_effect state eff prim =
+  let ty1, ty2 = SimplePrimitives.primitive_effect_signature prim in
+  process_def_effect eff (ty1, ty2) state
+
+let load_primitive_value state x prim =
+  let ty = Primitives.primitive_value_type_scheme prim in
+  extend_var state x ty

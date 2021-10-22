@@ -1,7 +1,7 @@
 open Utils
 open Language
 open Parser
-module TypeSystem = Typechecker.SimpleInfer
+module TypeSystem = Typechecker.ExplicitInfer
 
 module type Shell = sig
   type state
@@ -19,7 +19,7 @@ module type Shell = sig
   val finalize : state -> unit
 end
 
-module Make (Backend : Language.BackendSignature.T) = struct
+module Make (Backend : Language.BackendSignature.ExplicitT) = struct
   type state = {
     desugarer_state : Desugarer.state;
     type_system_state : TypeSystem.state;
@@ -30,12 +30,15 @@ module Make (Backend : Language.BackendSignature.T) = struct
     let x =
       Language.CoreTypes.Variable.fresh (Primitives.primitive_effect_name prim)
     in
+    let type_system_state', (ty1, ty2) =
+      TypeSystem.load_primitive_effect state.type_system_state x prim
+    in
     {
       desugarer_state =
         Desugarer.load_primitive_effect state.desugarer_state x prim;
-      type_system_state =
-        TypeSystem.load_primitive_effect state.type_system_state x prim;
-      backend_state = Backend.load_primitive_effect state.backend_state x prim;
+      type_system_state = type_system_state';
+      backend_state =
+        Backend.load_primitive_effect state.backend_state (x, (ty1, ty2)) prim;
     }
 
   let add_primitive_value state prim =
@@ -74,28 +77,16 @@ module Make (Backend : Language.BackendSignature.T) = struct
     match cmd with
     | Commands.Term t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
-        let type_system_state', ty =
-          TypeSystem.infer_top_comp state.type_system_state c
-        in
+        let c' = TypeSystem.process_computation state.type_system_state c in
         let backend_state' =
-          Backend.process_computation state.backend_state c ty
+          Backend.process_computation state.backend_state c'
         in
-        {
-          state with
-          type_system_state = type_system_state';
-          backend_state = backend_state';
-        }
+        { state with backend_state = backend_state' }
     | Commands.TypeOf t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
-        let type_system_state', ty =
-          TypeSystem.infer_top_comp state.type_system_state c
-        in
-        let backend_state' = Backend.process_type_of state.backend_state c ty in
-        {
-          state with
-          type_system_state = type_system_state';
-          backend_state = backend_state';
-        }
+        let c' = TypeSystem.process_computation state.type_system_state c in
+        let backend_state' = Backend.process_type_of state.backend_state c' in
+        { state with backend_state = backend_state' }
     | Commands.Help ->
         let help_text =
           "Toplevel commands:\n"
@@ -110,11 +101,11 @@ module Make (Backend : Language.BackendSignature.T) = struct
         let desugarer_state', (eff, (ty1, ty2)) =
           Desugarer.desugar_def_effect state.desugarer_state effect_def
         in
-        let type_system_state' =
-          TypeSystem.add_effect state.type_system_state eff (ty1, ty2)
+        let type_system_state', (ty1', ty2') =
+          TypeSystem.process_def_effect eff (ty1, ty2) state.type_system_state
         in
         let backend_state' =
-          Backend.process_def_effect state.backend_state (eff, (ty1, ty2))
+          Backend.process_def_effect state.backend_state (eff, (ty1', ty2'))
         in
         {
           type_system_state = type_system_state';
@@ -129,11 +120,11 @@ module Make (Backend : Language.BackendSignature.T) = struct
         let desugarer_state', defs' =
           Desugarer.desugar_top_let state.desugarer_state defs
         in
-        let vars, type_system_state' =
-          TypeSystem.infer_top_let state.type_system_state defs'
+        let type_system_state', defs'' =
+          TypeSystem.process_top_let state.type_system_state defs'
         in
         let backend_state' =
-          Backend.process_top_let state.backend_state defs' vars
+          Backend.process_top_let state.backend_state defs''
         in
         {
           desugarer_state = desugarer_state';
@@ -144,12 +135,12 @@ module Make (Backend : Language.BackendSignature.T) = struct
         let desugarer_state', defs' =
           Desugarer.desugar_top_let_rec state.desugarer_state defs
         in
-        let vars, type_system_state' =
-          TypeSystem.infer_top_let_rec state.type_system_state defs'
-        in
         let defs'' = Assoc.of_list defs' in
+        let type_system_state', defs''' =
+          TypeSystem.process_top_let_rec state.type_system_state defs''
+        in
         let backend_state' =
-          Backend.process_top_let_rec state.backend_state defs'' vars
+          Backend.process_top_let_rec state.backend_state defs'''
         in
         {
           desugarer_state = desugarer_state';
@@ -161,7 +152,7 @@ module Make (Backend : Language.BackendSignature.T) = struct
           Desugarer.desugar_tydefs state.desugarer_state tydefs
         in
         let type_system_state' =
-          TypeSystem.add_type_definitions ~loc tydefs' state.type_system_state
+          TypeSystem.add_type_definitions state.type_system_state tydefs'
         in
         let backend_state' =
           Backend.process_tydef state.backend_state tydefs'
