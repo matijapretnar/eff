@@ -1,7 +1,7 @@
 open Utils
 open Language
 open Parser
-module TypeSystem = Typechecker.ExplicitInfer
+module TypeSystem = Typechecker.Infer
 
 module type Shell = sig
   type state

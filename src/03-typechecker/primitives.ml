@@ -6,14 +6,6 @@ let pure_arrow t1 t2 = Type.arrow (t1, pure_ty t2)
 
 let binary_op_ty t1 t2 ty = Type.arrow (t1, pure_ty (pure_arrow t2 ty))
 
-let int_ty = Type.tyBasic Const.IntegerTy
-
-let float_ty = Type.tyBasic Const.FloatTy
-
-let bool_ty = Type.tyBasic Const.BooleanTy
-
-let string_ty = Type.tyBasic Const.StringTy
-
 let unary_integer_op_ty = pure_arrow int_ty int_ty
 
 let binary_integer_op_ty = binary_op_ty int_ty int_ty int_ty
@@ -70,3 +62,11 @@ let primitive_value_type_scheme = function
   | StringSub ->
       pure_arrow string_ty (pure_arrow int_ty (pure_arrow int_ty string_ty))
   | ToString -> pure_arrow int_ty string_ty
+
+let primitive_effect_signature = function
+  | Primitives.Print -> (string_ty, Type.unit_ty)
+  | Primitives.Read -> (Type.unit_ty, string_ty)
+  | Primitives.Raise -> (string_ty, Type.empty_ty)
+  | Primitives.RandomInt -> (int_ty, int_ty)
+  | Primitives.RandomFloat -> (float_ty, float_ty)
+  | Primitives.Write -> (Type.tuple [ string_ty; string_ty ], Type.unit_ty)

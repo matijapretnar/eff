@@ -104,6 +104,18 @@ let handler (drty1, drty2) =
 
 let tyBasic pt = { term = TyBasic pt; ty = SkelBasic pt }
 
+let unit_ty = tuple []
+
+let empty_ty = apply (CoreTypes.empty_tyname, [])
+
+let int_ty = tyBasic Const.IntegerTy
+
+let float_ty = tyBasic Const.FloatTy
+
+let bool_ty = tyBasic Const.BooleanTy
+
+let string_ty = tyBasic Const.StringTy
+
 and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
 
 type parameters = {

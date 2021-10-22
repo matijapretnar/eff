@@ -938,8 +938,9 @@ let add_type_definitions state tydefs =
   }
 
 let load_primitive_effect state eff prim =
-  let ty1, ty2 = SimplePrimitives.primitive_effect_signature prim in
-  process_def_effect eff (ty1, ty2) state
+  let ty1, ty2 = Primitives.primitive_effect_signature prim in
+  ( { state with effects = Term.EffectMap.add eff (ty1, ty2) state.effects },
+    (ty1, ty2) )
 
 let load_primitive_value state x prim =
   let ty = Primitives.primitive_value_type_scheme prim in
