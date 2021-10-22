@@ -1,4 +1,6 @@
 open Utils
+module Type = SimpleType
+
 (** Syntax of the core language. *)
 
 type variable = CoreTypes.Variable.t

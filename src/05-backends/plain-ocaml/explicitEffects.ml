@@ -1,6 +1,8 @@
 (* Compilation to multicore ocaml *)
 open Utils
 module V = Value
+module Term = Language.Term
+module Type = Language.Type
 
 module type ExplicitBackend = sig
   type state
@@ -27,7 +29,7 @@ module type ExplicitBackend = sig
   val process_tydef :
     state ->
     ( Language.CoreTypes.TyName.t,
-      Language.CoreTypes.TyParam.t list * Language.Type.tydef )
+      Language.CoreTypes.TyParam.t list * Language.SimpleType.tydef )
     Assoc.t ->
     state
 

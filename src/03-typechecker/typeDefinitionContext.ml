@@ -1,6 +1,7 @@
 open Utils
 open Language
-open Type
+open SimpleType
+module Type = SimpleType
 
 type state = (CoreTypes.TyName.t, type_data) Assoc.t
 
@@ -13,7 +14,7 @@ let initial_state =
       (CoreTypes.string_tyname, { params = []; type_def = Inline string_ty });
       (CoreTypes.float_tyname, { params = []; type_def = Inline float_ty });
       ( CoreTypes.list_tyname,
-        let a = Type.fresh_ty_param () in
+        let a = fresh_ty_param () in
         let list_nil = (CoreTypes.nil, None) in
         let list_cons =
           ( CoreTypes.cons,

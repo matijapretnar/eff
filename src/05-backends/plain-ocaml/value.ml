@@ -1,6 +1,5 @@
 open Utils
-module Const = Language.Const
-module CoreTypes = Language.CoreTypes
+open Language
 
 type value =
   | Const of Const.t

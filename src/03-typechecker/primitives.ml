@@ -1,4 +1,5 @@
 open Language
+module Type = SimpleType
 
 let mono_type ty = ([], ty)
 

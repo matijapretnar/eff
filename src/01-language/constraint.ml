@@ -1,5 +1,4 @@
 open Utils
-module CoreTypes = Language.CoreTypes
 
 let add_to_constraints con constraints = con :: constraints
 

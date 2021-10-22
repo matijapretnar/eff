@@ -1,5 +1,6 @@
 open Utils
 open Language
+module Type = SimpleType
 
 (** [unify sbst loc t1 t2] solves the equation [t1 = t2] and stores the
     solution in the substitution [sbst]. *)

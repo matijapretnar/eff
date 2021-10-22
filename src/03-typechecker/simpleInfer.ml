@@ -1,7 +1,7 @@
 open Utils
 module CoreTypes = Language.CoreTypes
-module Type = Language.Type
-module T = Type
+module Type = Language.SimpleType
+module T = Language.SimpleType
 module Untyped = Language.UntypedSyntax
 module Unify = SimpleUnify
 module Const = Language.Const

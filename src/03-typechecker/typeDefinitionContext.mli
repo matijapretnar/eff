@@ -1,6 +1,7 @@
 open Utils
 open Language
-open Type
+open SimpleType
+module Type = SimpleType
 
 type state = (CoreTypes.TyName.t, type_data) Assoc.t
 

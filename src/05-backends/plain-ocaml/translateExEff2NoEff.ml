@@ -1,7 +1,8 @@
 open Utils
 open SyntaxNoEff
 open Type
-open Term
+open Language.Term
+open Language
 module NoEff = SyntaxNoEff
 module ExEffTypes = Type
 module ExEff = Term
@@ -419,7 +420,7 @@ and elab_rec_definitions state defs =
     defs
 
 let rec elab_source_ty = function
-  | Language.Type.Apply (name, ts) ->
+  | Language.SimpleType.Apply (name, ts) ->
       NoEff.NTyApply (name, List.map elab_source_ty ts)
   | TyParam p -> NoEff.NTyParam p
   | Basic s -> NoEff.NTyBasic s
@@ -429,7 +430,7 @@ let rec elab_source_ty = function
       NoEff.NTyHandler (elab_source_ty h.value, elab_source_ty h.finally)
 
 let elab_tydef = function
-  | Language.Type.Record assoc ->
+  | Language.SimpleType.Record assoc ->
       NoEff.TyDefRecord (Assoc.map elab_source_ty assoc)
   | Sum assoc ->
       let converter = function

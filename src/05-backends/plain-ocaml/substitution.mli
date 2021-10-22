@@ -4,7 +4,7 @@ Substitutions
 Holds substitutions
 *)
 
-module CoreTypes = Language.CoreTypes
+open Language
 
 type t
 

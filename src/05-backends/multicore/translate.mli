@@ -1,5 +1,6 @@
 open Language
 module CoreSyntax = UntypedSyntax
+module Type = SimpleType
 
 val of_computation : CoreSyntax.computation -> Syntax.term
 

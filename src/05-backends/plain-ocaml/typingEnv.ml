@@ -1,6 +1,7 @@
 open Utils
+open Language
 
-type t = (Language.CoreTypes.Variable.t, Type.ty_scheme) Assoc.t
+type t = (CoreTypes.Variable.t, Type.ty_scheme) Assoc.t
 
 let empty = Assoc.empty
 

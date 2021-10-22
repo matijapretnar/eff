@@ -1,3 +1,5 @@
+open Language
+module Type = Language.Type
 open Type
 
 let pure_arrow t1 t2 = Type.arrow (t1, pure_ty t2)

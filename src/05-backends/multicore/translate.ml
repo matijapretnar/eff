@@ -2,6 +2,7 @@ open Utils
 open Language
 open Syntax
 module CoreSyntax = UntypedSyntax
+module Type = SimpleType
 
 (* ------------------------------------------------------------------------ *)
 (* Translations *)

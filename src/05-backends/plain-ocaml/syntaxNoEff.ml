@@ -3,6 +3,7 @@ open Utils
 
 module CoreTypes = Language.CoreTypes
 module Const = Language.Const
+module Type = Language.Type
 module Variable = Symbol.Make (Symbol.String)
 module VariableMap = Map.Make (Variable)
 

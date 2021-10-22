@@ -2,7 +2,8 @@
 
 open Utils
 open Language
-module T = Type
+module T = SimpleType
+module Type = SimpleType
 module Sugared = SugaredSyntax
 module Untyped = UntypedSyntax
 

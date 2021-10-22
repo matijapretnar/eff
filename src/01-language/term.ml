@@ -1,7 +1,4 @@
 open Utils
-module CoreTypes = Language.CoreTypes
-
-module Const = Language.Const
 (** Syntax of the core language. *)
 
 module EffectMap = Map.Make (CoreTypes.Effect)
@@ -25,7 +22,7 @@ and pattern' =
   | PTuple of pattern list
   | PRecord of (CoreTypes.Field.t, pattern) Assoc.t
   | PVariant of CoreTypes.Label.t * pattern option
-  | PConst of Language.Const.t
+  | PConst of Const.t
   | PNonbinding
 
 let pVar p ty = { term = PVar p; ty }
@@ -56,7 +53,7 @@ and expression' =
       ty_coercions : Constraint.ty_coercion list;
       dirt_coercions : Constraint.dirt_coercion list;
     }
-  | Const of Language.Const.t
+  | Const of Const.t
   | Tuple of expression list
   | Record of (CoreTypes.Field.t, expression) Assoc.t
   | Variant of CoreTypes.Label.t * expression option
@@ -144,7 +141,7 @@ let fresh_variable x ty =
   let x' = CoreTypes.Variable.fresh x in
   (pVar x' ty, mono_var x' ty)
 
-let const (c : Language.Const.t) : expression =
+let const (c : Const.t) : expression =
   { term = Const c; ty = Type.tyBasic (Const.infer_ty c) }
 
 let tuple es =

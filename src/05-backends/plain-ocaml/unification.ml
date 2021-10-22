@@ -1,4 +1,5 @@
 open Utils
+open Language
 open Type
 
 let fresh_ty_with_skel skel =

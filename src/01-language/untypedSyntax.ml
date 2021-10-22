@@ -1,4 +1,5 @@
 open Utils
+module Type = SimpleType
 
 (** Syntax of the core language. *)
 

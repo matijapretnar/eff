@@ -1,4 +1,5 @@
 open Utils
+open Language
 
 type return_clause_kind =
   | FixedReturnClause of Term.abstraction
@@ -59,7 +60,7 @@ type inlinability =
 let abstraction_inlinability { term = pat, cmp; _ } =
   match pat.term with
   | Term.PVar v
-    when Term.CoreTypes.Variable.fold
+    when CoreTypes.Variable.fold
            (fun v _ -> String.length v >= 3 && String.sub v 0 3 = "___")
            v ->
       NotInlinable

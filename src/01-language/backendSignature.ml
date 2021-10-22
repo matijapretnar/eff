@@ -1,5 +1,6 @@
 open Utils
 module CoreSyntax = UntypedSyntax
+module Type = SimpleType
 
 module type T = sig
   type state

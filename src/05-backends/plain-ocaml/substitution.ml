@@ -1,7 +1,7 @@
 (** Substitution implementation *)
 
 open Utils
-module CoreTypes = Language.CoreTypes
+open Language
 
 type t = {
   type_param_to_type_coercions :

@@ -3,6 +3,7 @@ module Const = Language.Const
 module Untyped = Language.UntypedSyntax
 module CoreTypes = Language.CoreTypes
 module TypeDefinitionContext = Typechecker.TypeDefinitionContext
+open Language
 
 (* GEORGE: TODO:
      1. Add debugging output to the new code snippets
@@ -52,9 +53,40 @@ let initial_state : state =
     tydefs = TypeDefinitionContext.initial_state;
   }
 
+(* ************************************************************************* *)
+
+let rec source_to_target tctx_st ty =
+  let loc = Location.unknown in
+  match ty with
+  | Language.SimpleType.Apply (ty_name, _args)
+    when Typechecker.TypeDefinitionContext.transparent ~loc ty_name tctx_st -> (
+      match
+        Typechecker.TypeDefinitionContext.ty_apply ~loc ty_name [] tctx_st
+      with
+      (* We currently support only inlined types with no arguments *)
+      | Language.SimpleType.Inline ty -> source_to_target tctx_st ty
+      (* Other cases should not be transparent *)
+      | Language.SimpleType.Record _ | Language.SimpleType.Sum _ -> assert false
+      )
+  | Language.SimpleType.Apply (ty_name, args) ->
+      Type.apply (ty_name, List.map (source_to_target tctx_st) args)
+  | Language.SimpleType.TyParam p ->
+      Type.tyParam p (Type.SkelParam (Type.SkelParam.fresh ()))
+  | Language.SimpleType.Basic s -> Type.tyBasic s
+  | Language.SimpleType.Tuple l ->
+      Type.tuple (List.map (source_to_target tctx_st) l)
+  | Language.SimpleType.Arrow (ty, dirty) ->
+      Type.arrow ((source_to_target tctx_st) ty, source_to_dirty tctx_st dirty)
+  | Language.SimpleType.Handler
+      { Language.SimpleType.value = dirty1; finally = dirty2 } ->
+      Type.handler
+        (source_to_dirty tctx_st dirty1, source_to_dirty tctx_st dirty2)
+
+and source_to_dirty tctx_st ty = (source_to_target tctx_st ty, Type.empty_dirt)
+
 let process_def_effect eff (ty1, ty2) state =
-  let ty1 = Type.source_to_target state.tydefs ty1 in
-  let ty2 = Type.source_to_target state.tydefs ty2 in
+  let ty1 = source_to_target state.tydefs ty1 in
+  let ty2 = source_to_target state.tydefs ty2 in
   ( { state with effects = Term.EffectMap.add eff (ty1, ty2) state.effects },
     (ty1, ty2) )
 
@@ -128,8 +160,8 @@ let infer_constructor_signature tctx_st lbl =
   match TypeDefinitionContext.infer_variant lbl tctx_st with
   | None -> assert false
   | Some (ty_out, ty_in) ->
-      ( Option.map (Type.source_to_target tctx_st) ty_in,
-        Type.source_to_target tctx_st ty_out )
+      ( Option.map (source_to_target tctx_st) ty_in,
+        source_to_target tctx_st ty_out )
 
 let check_constructor_signature tctx_st lbl ty_out =
   let ty_in, ty_out' = infer_constructor_signature tctx_st lbl in
@@ -189,8 +221,7 @@ let rec check_pattern state ty (pat : Untyped.pattern) : Term.pattern * state =
 and check_pattern' state ty pat =
   match pat.it with
   | Untyped.PVar x -> (Term.PVar x, extend_var state x ty)
-  | Untyped.PAnnotated (p, ty') when Type.source_to_target state.tydefs ty' = ty
-    ->
+  | Untyped.PAnnotated (p, ty') when source_to_target state.tydefs ty' = ty ->
       let p', state = check_pattern state ty p in
       (p'.term, state)
   | Untyped.PNonbinding -> (Term.PNonbinding, state)
@@ -231,7 +262,7 @@ and infer_pattern' state pat =
       let alpha = Constraint.fresh_ty_with_fresh_skel () in
       (Term.PVar x, alpha, extend_var state x alpha, [])
   | Untyped.PAnnotated (p, ty) ->
-      let ty' = Type.source_to_target state.tydefs ty in
+      let ty' = source_to_target state.tydefs ty in
       let p', state' = check_pattern state ty' p in
       (p'.term, ty', state', [])
   | Untyped.PNonbinding ->
@@ -451,7 +482,8 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
 and tcExpr' state : Untyped.plain_expression -> tcExprOutput' = function
   | Untyped.Var x -> tcVar state x
   | Untyped.Const c -> tcConst state c
-  | Untyped.Annotated (e, ty) -> tcAnnotated state (e, ty)
+  | Untyped.Annotated (e, ty) ->
+      tcAnnotated state (e, source_to_target state.tydefs ty)
   | Untyped.Tuple es -> tcTuple state es
   | Untyped.Record lst -> tcRecord state lst
   | Untyped.Variant (lbl, mbe) -> tcVariant state (lbl, mbe)
