@@ -46,7 +46,9 @@ type 'a option = None | Some of 'a
 
 let rec assoc x = function
   | [] -> None
-  | (key, v) :: lst -> if x = key then Some v else assoc x lst
+  | keyv :: lst ->
+      let (key, v) = keyv in
+      if x = key then Some v else assoc x lst
 
 let rec range m n =
   if m > n then
@@ -123,8 +125,10 @@ let rec zip xs ys =
 
 let rec unzip = function
   | [] -> ([], [])
-  | (x, y) :: xys ->
-    let xs, ys = unzip xys in
+  | xy :: xys ->
+    let (x, y) = xy in 
+    let xsys = unzip xys in
+    let (xs, ys) = xsys in
     (x :: xs, y :: ys)
 
 let rec (@) xs ys =

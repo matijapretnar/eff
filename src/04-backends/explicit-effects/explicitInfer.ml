@@ -206,8 +206,9 @@ and check_pattern' state ty pat =
           let p = Term.pTuple ps' in
           (p.term, state')
       | _ ->
-          failwith
-            "check_pattern: Please no pattern matching in lambda abstractions!")
+          Error.typing ~loc:pat.at "Cannot check pattern %t against %t"
+            (Untyped.print_pattern pat)
+            (Type.print_ty ty))
   | Untyped.PVariant (lbl, p) -> (
       match (p, check_constructor_signature state.tydefs lbl ty) with
       | None, None -> (Term.PVariant (lbl, None), state)
