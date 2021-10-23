@@ -27,6 +27,9 @@ let options =
         Arg.Unit (fun () -> Config.backend := Multicore),
         " Compile the Eff code into a Multicore OCaml (sent to standard output)"
       );
+      ( "--compile-js",
+        Arg.Unit (fun () -> Config.backend := Js),
+        " Compile the Eff code into JavaScript (sent to standard output)" );
       ("--ascii", Arg.Set Config.ascii, " Use ASCII output");
       ( "-v",
         Arg.Unit
@@ -133,6 +136,7 @@ let main =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
       | Config.Multicore -> (module Multicore.Backend)
+      | Config.Js -> (module Js.Backend)
     in
     let (module Shell) =
       (module Loader.Shell.Make (Backend) : Loader.Shell.Shell)
@@ -150,6 +154,7 @@ let main =
           match !Config.backend with
           | Config.Runtime -> Loader.Stdlib_eff.source
           | Config.Multicore -> Multicore.stdlib
+          | Config.Js -> Js.stdlib
         in
         Shell.load_source stdlib state
       else state
