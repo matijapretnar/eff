@@ -251,7 +251,7 @@ let rec pp_term ?max_level state noEff_term ppf =
         (pp_term state t)
         (pp_sequence "@, | " (pp_abs state) cases)
   | NCall (e, t, abs_ty) ->
-      print ~at_level:2 "@[<hov 2> Call (%t, %t, (fun %t))@]" (pp_effect e)
+      print ~at_level:2 "@[<hov 2> Call (%t, (%t), (fun %t))@]" (pp_effect e)
         (pp_term state t)
         (pp_abs_with_ty state abs_ty)
   | NBind (t, abs) ->
