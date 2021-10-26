@@ -184,7 +184,7 @@ module Make (Backend : Language.BackendSignature.T) = struct
           Assoc.map
             (fun (ps, tydef) ->
               ( ps,
-                TypeSystem.source_to_target_tydef state.type_system_state.tydefs
+                TypeSystem.source_to_target_tydef type_system_state'.tydefs
                   tydef ))
             tydefs'
         in
