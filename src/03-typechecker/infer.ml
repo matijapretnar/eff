@@ -948,4 +948,4 @@ let load_primitive_effect state eff prim =
 
 let load_primitive_value state x prim =
   let ty = Primitives.primitive_value_type_scheme prim in
-  extend_var state x ty
+  extend_poly_var state x ty
