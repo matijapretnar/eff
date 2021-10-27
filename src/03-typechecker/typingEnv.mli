@@ -16,7 +16,7 @@ val empty : t
 val lookup :
   t ->
   Language.CoreTypes.Variable.t ->
-  Language.Term.expression * Language.Coercion.omega_ct list
+  Language.Term.expression * Constraint.omega_ct list
 (** [lookup ctx x] returns a fresh instance of the type scheme assigned
     to the variable [x] in the context [ctx]. *)
 

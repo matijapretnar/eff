@@ -53,7 +53,7 @@ val merge : t -> t -> t
 (* Substitution application *)
 
 val apply_substitutions_to_constraints :
-  t -> Coercion.omega_ct list -> Coercion.omega_ct list
+  t -> Constraint.omega_ct list -> Constraint.omega_ct list
 (** [apply_substitutions_to_constraints subs constraints] Applies all substitutions from [subs] to [constraints] *)
 
 val apply_substitutions_to_computation :

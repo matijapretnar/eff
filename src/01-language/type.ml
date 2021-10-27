@@ -276,6 +276,47 @@ let pure_ty ty = (ty, empty_dirt)
 let add_effects effect_set drt =
   { drt with effect_set = EffectSet.union drt.effect_set effect_set }
 
+let fresh_skel () =
+  let skel_var = SkelParam.fresh () in
+  SkelParam skel_var
+
+let fresh_ty_param_with_skel skel =
+  let ty_var = CoreTypes.TyParam.fresh () in
+  tyParam ty_var skel
+
+let fresh_dirty_param_with_skel skel =
+  let ty = fresh_ty_param_with_skel skel in
+  make_dirty ty
+
+let fresh_ty_with_fresh_skel () = fresh_ty_param_with_skel (fresh_skel ())
+
+let fresh_dirty_with_fresh_skel () = fresh_dirty_param_with_skel (fresh_skel ())
+
+let fresh_ty_with_skel skel =
+  match skel with
+  (* α : ς *)
+  | SkelParam _ -> assert false
+  (* α : int *)
+  | SkelBasic ps -> tyBasic ps
+  (* α : τ₁ -> τ₂ *)
+  | SkelArrow (sk1, sk2) ->
+      let tvar1 = fresh_ty_param_with_skel sk1
+      and dtvar2 = fresh_dirty_param_with_skel sk2 in
+      arrow (tvar1, dtvar2)
+  (* α : τ₁ x τ₂ ... *)
+  | SkelTuple sks ->
+      let tvars = List.map fresh_ty_param_with_skel sks in
+      tuple tvars
+  (* α : ty_name (τ₁, τ₂, ...) *)
+  | SkelApply (ty_name, sks) ->
+      let tvars = List.map fresh_ty_param_with_skel sks in
+      apply (ty_name, tvars)
+  (* α : τ₁ => τ₂ *)
+  | SkelHandler (sk1, sk2) ->
+      let dtvar1 = fresh_dirty_param_with_skel sk1
+      and dtvar2 = fresh_dirty_param_with_skel sk2 in
+      handler (dtvar1, dtvar2)
+
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)

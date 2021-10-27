@@ -637,25 +637,6 @@ and free_vars_abs2 { term = p1, p2, c; _ } =
 let does_not_occur v vars =
   match VariableMap.find_opt v vars with Some x -> x = 0 | None -> true
 
-let cast_expression e ty =
-  let omega, cons = Coercion.fresh_ty_coer (e.ty, ty) in
-  (castExp (e, omega), cons)
-
-let cast_computation c dirty =
-  let omega, cnstrs = Coercion.fresh_dirty_coer (c.ty, dirty) in
-  (castComp (c, omega), cnstrs)
-
-let cast_abstraction { term = pat, cmp; _ } dirty =
-  let cmp', cnstrs = cast_computation cmp dirty in
-  (abstraction (pat, cmp'), cnstrs)
-
-let full_cast_abstraction { term = pat, cmp; _ } ty_in dirty_out =
-  let x_pat, x_var = fresh_variable "x" ty_in in
-  let exp', cnstrs1 = cast_expression x_var pat.ty in
-  let cmp', cnstrs2 = cast_computation cmp dirty_out in
-  ( abstraction (x_pat, letVal (exp', abstraction (pat, cmp'))),
-    cnstrs1 :: cnstrs2 )
-
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)

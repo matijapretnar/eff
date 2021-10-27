@@ -1,10 +1,5 @@
 open Utils
 
-let add_to_constraints con constraints = con :: constraints
-
-let add_list_to_constraints new_constraints old_constraints =
-  new_constraints @ old_constraints
-
 type ty_coercion = (ty_coercion', Type.ct_ty) typed
 
 and ty_coercion' =
@@ -24,11 +19,6 @@ and dirt_coercion' =
   | UnionDirt of (Type.effect_set * dirt_coercion)
 
 and dirty_coercion = (ty_coercion * dirt_coercion, Type.ct_dirty) typed
-
-type omega_ct =
-  | TyOmega of (Type.TyCoercionParam.t * Type.ct_ty)
-  | DirtOmega of (Type.DirtCoercionParam.t * Type.ct_dirt)
-  | SkelEq of Type.skeleton * Type.skeleton
 
 let is_trivial_ty_coercion omega =
   let ty1, ty2 = omega.ty in
@@ -86,41 +76,6 @@ let unionDirt (effs, dcoer) =
     ty = (Type.add_effects effs drt, Type.add_effects effs drt');
   }
 
-type resolved = {
-  ty_constraints :
-    (Type.TyCoercionParam.t
-    * CoreTypes.TyParam.t
-    * CoreTypes.TyParam.t
-    * Type.SkelParam.t)
-    list;
-  dirt_constraints : (Type.DirtCoercionParam.t * Type.ct_dirt) list;
-}
-
-let unresolve resolved =
-  List.map
-    (fun (omega, a, b, skel) ->
-      TyOmega
-        ( omega,
-          ( Type.tyParam a (Type.SkelParam skel),
-            Type.tyParam b (Type.SkelParam skel) ) ))
-    resolved.ty_constraints
-  @ List.map
-      (fun (omega, ct) -> DirtOmega (omega, ct))
-      resolved.dirt_constraints
-
-let return_resolved resolved queue = unresolve resolved @ queue
-
-let empty_resolved = { ty_constraints = []; dirt_constraints = [] }
-
-let resolve_ty_constraint resolved omega ty1 ty2 skel =
-  {
-    resolved with
-    ty_constraints = (omega, ty1, ty2, skel) :: resolved.ty_constraints;
-  }
-
-let resolve_dirt_constraint resolved omega ct =
-  { resolved with dirt_constraints = (omega, ct) :: resolved.dirt_constraints }
-
 (* ************************************************************************* *)
 (*                         COERCION VARIABLES OF                             *)
 (* ************************************************************************* *)
@@ -173,89 +128,6 @@ and print_dirt_coercion ?max_level c ppf =
       print ~at_level:2 "{%t}∪%t"
         (Type.print_effect_set eset)
         (print_dirt_coercion ~max_level:2 dc)
-
-and print_omega_ct ?max_level c ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c with
-  | TyOmega (p, (ty1, ty2)) ->
-      print "%t: (%t ≤ %t)"
-        (Type.TyCoercionParam.print p)
-        (Type.print_ty ty1) (Type.print_ty ty2)
-  | DirtOmega (p, (ty1, ty2)) ->
-      print "%t: (%t ≤ %t)"
-        (Type.DirtCoercionParam.print p)
-        (Type.print_dirt ty1) (Type.print_dirt ty2)
-  | SkelEq (sk1, sk2) ->
-      print "%t ~ %t" (Type.print_skeleton sk1) (Type.print_skeleton sk2)
-
-let print_constraints cs = Print.sequence ";" print_omega_ct cs
-
-let fresh_skel () =
-  let skel_var = Type.SkelParam.fresh () in
-  Type.SkelParam skel_var
-
-let fresh_ty_with_skel skel =
-  let ty_var = CoreTypes.TyParam.fresh () in
-  Type.tyParam ty_var skel
-
-let fresh_dirty_with_skel skel =
-  let ty = fresh_ty_with_skel skel in
-  Type.make_dirty ty
-
-let fresh_ty_with_fresh_skel () = fresh_ty_with_skel (fresh_skel ())
-
-let fresh_dirty_with_fresh_skel () = fresh_dirty_with_skel (fresh_skel ())
-
-let fresh_ty_coer cons =
-  let param = Type.TyCoercionParam.fresh () in
-  ({ term = TyCoercionVar param; ty = cons }, TyOmega (param, cons))
-
-let fresh_dirt_coer cons =
-  let param = Type.DirtCoercionParam.fresh () in
-  ({ term = DirtCoercionVar param; ty = cons }, DirtOmega (param, cons))
-
-let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
-  let ty_coer, ty_cons = fresh_ty_coer (ty1, ty2)
-  and drt_coer, drt_cons = fresh_dirt_coer (drt1, drt2) in
-  (bangCoercion (ty_coer, drt_coer), [ ty_cons; drt_cons ])
-
-(* ************************************************************************* *)
-(*                        FREE PARAMETER COMPUTATION                         *)
-(* ************************************************************************* *)
-
-let free_params_constraint = function
-  | TyOmega (_, ct) -> Type.free_params_ct_ty ct
-  | DirtOmega (_, ct) -> Type.free_params_ct_dirt ct
-  | SkelEq (sk1, sk2) ->
-      Type.FreeParams.union
-        (Type.free_params_skeleton sk1)
-        (Type.free_params_skeleton sk2)
-
-let free_params_constraints = Type.FreeParams.union_map free_params_constraint
-
-let free_params_resolved (res : resolved) =
-  let free_params_ty =
-    Type.FreeParams.union_map
-      (fun (_, ty1, ty2, skel) ->
-        Type.FreeParams.union
-          {
-            Type.FreeParams.empty with
-            ty_params =
-              Type.TyParamMap.of_seq
-                (List.to_seq
-                   [
-                     (ty1, [ Type.SkelParam skel ]);
-                     (ty2, [ Type.SkelParam skel ]);
-                   ]);
-          }
-          (Type.FreeParams.skel_singleton skel))
-      res.ty_constraints
-  and free_params_dirt =
-    Type.FreeParams.union_map
-      (fun (_, dt) -> Type.free_params_ct_dirt dt)
-      res.dirt_constraints
-  in
-  Type.FreeParams.union free_params_ty free_params_dirt
 
 (* ************************************************************************* *)
 

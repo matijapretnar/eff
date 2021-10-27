@@ -299,10 +299,10 @@ let apply_substitutions_to_skeleton = apply_sub_skel
 
 let apply_sub1 subs cons =
   match cons with
-  | Coercion.TyOmega (coer_p, (ty1, ty2)) ->
-      Coercion.TyOmega (coer_p, (apply_sub_ty subs ty1, apply_sub_ty subs ty2))
-  | Coercion.DirtOmega (coer_p, (drt1, drt2)) ->
-      Coercion.DirtOmega
+  | Constraint.TyOmega (coer_p, (ty1, ty2)) ->
+      Constraint.TyOmega (coer_p, (apply_sub_ty subs ty1, apply_sub_ty subs ty2))
+  | Constraint.DirtOmega (coer_p, (drt1, drt2)) ->
+      Constraint.DirtOmega
         (coer_p, (apply_sub_dirt subs drt1, apply_sub_dirt subs drt2))
   | _ -> cons
 
