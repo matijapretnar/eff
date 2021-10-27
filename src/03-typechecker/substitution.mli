@@ -13,11 +13,10 @@ val empty : t
 
 (* Adding and merging *)
 
-val add_type_coercion :
-  Type.TyCoercionParam.t -> Constraint.ty_coercion -> t -> t
+val add_type_coercion : Type.TyCoercionParam.t -> Coercion.ty_coercion -> t -> t
 (** [add_type_coercion parameter t_coercion sub] Add type [parameter] [t_coercion] to [sub]. *)
 
-val add_type_coercion_e : Type.TyCoercionParam.t -> Constraint.ty_coercion -> t
+val add_type_coercion_e : Type.TyCoercionParam.t -> Coercion.ty_coercion -> t
 (** [add_type_coercion_e parameter t_coercion] Add type [parameter] [t_coercion] to empty substitution. *)
 
 val add_type_substitution : CoreTypes.TyParam.t -> Type.ty -> t -> t
@@ -27,11 +26,11 @@ val add_type_substitution_e : CoreTypes.TyParam.t -> Type.ty -> t
 (** [add_type_substitution_e parameter ty] Add type [parameter] to [ty] substitution to empty substitution *)
 
 val add_dirt_var_coercion :
-  Type.DirtCoercionParam.t -> Constraint.dirt_coercion -> t -> t
+  Type.DirtCoercionParam.t -> Coercion.dirt_coercion -> t -> t
 (** [add_dirt_var_coercion dirt_var dc sub] Add [dirt_var] to target dirt coercion ([dc]) to [sub] *)
 
 val add_dirt_var_coercion_e :
-  Type.DirtCoercionParam.t -> Constraint.dirt_coercion -> t
+  Type.DirtCoercionParam.t -> Coercion.dirt_coercion -> t
 (** [add_dirt_var_coercion dirt_var dc] Add [dirt_var] to target dirt coercion ([dc]) to empty substitution *)
 
 val add_dirt_substitution : Type.DirtParam.t -> Type.dirt -> t -> t
@@ -54,7 +53,7 @@ val merge : t -> t -> t
 (* Substitution application *)
 
 val apply_substitutions_to_constraints :
-  t -> Constraint.omega_ct list -> Constraint.omega_ct list
+  t -> Coercion.omega_ct list -> Coercion.omega_ct list
 (** [apply_substitutions_to_constraints subs constraints] Applies all substitutions from [subs] to [constraints] *)
 
 val apply_substitutions_to_computation :
@@ -77,15 +76,14 @@ val apply_substitutions_to_dirt : t -> Type.dirt -> Type.dirt
 val apply_substitutions_to_skeleton : t -> Type.skeleton -> Type.skeleton
 (** [apply_substitutions_to_skeleton subs skeleton] Applies all substitutions from [subs] to [skeleton] *)
 
-val apply_sub_tycoer : t -> Constraint.ty_coercion -> Constraint.ty_coercion
+val apply_sub_tycoer : t -> Coercion.ty_coercion -> Coercion.ty_coercion
 (** [apply_sub_tycoer subs co] Applies all substitutions from [subs] to [co] *)
 
-val apply_sub_dirtcoer :
-  t -> Constraint.dirt_coercion -> Constraint.dirt_coercion
+val apply_sub_dirtcoer : t -> Coercion.dirt_coercion -> Coercion.dirt_coercion
 (** [apply_sub_dirtcoer subs co] Applies all substitutions from [subs] to [co] *)
 
 val apply_sub_dirtycoer :
-  t -> Constraint.dirty_coercion -> Constraint.dirty_coercion
+  t -> Coercion.dirty_coercion -> Coercion.dirty_coercion
 (** [apply_sub_dirtycoer subs co] Applies all substitutions from [subs] to [co] *)
 
 (* Other type information *)

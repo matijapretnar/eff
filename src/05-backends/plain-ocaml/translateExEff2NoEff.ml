@@ -59,12 +59,12 @@ let get_effectset effects = get_effectset_temp EffectSet.empty effects
 
 let rec elab_ty_coercion state coer =
   match coer.term with
-  | Constraint.ReflTy -> NoEff.NCoerRefl
-  | Constraint.ArrowCoercion (tycoer, dirtycoer) ->
+  | Coercion.ReflTy -> NoEff.NCoerRefl
+  | Coercion.ArrowCoercion (tycoer, dirtycoer) ->
       let tyelab = elab_ty_coercion state tycoer in
       let dirtyelab = elab_dirty_coercion state dirtycoer in
       NoEff.NCoerArrow (tyelab, dirtyelab)
-  | Constraint.HandlerCoercion (coerA, coerB) -> (
+  | Coercion.HandlerCoercion (coerA, coerB) -> (
       let coerA2, coerA1 = coerA.ty
       and elabA = elab_dirty_coercion state coerA
       and coerB1, _coerB2 = coerB.ty
@@ -98,10 +98,10 @@ let rec elab_ty_coercion state coer =
                     (* Handler coercion - Case 4 *)
                   then NoEff.NCoerHandToFun (elab1, elab2)
                   else failwith "Ill-typed handler coercion"))
-  | Constraint.TyCoercionVar par -> NoEff.NCoerVar par
-  | Constraint.ApplyCoercion (name, coer_list) ->
+  | Coercion.TyCoercionVar par -> NoEff.NCoerVar par
+  | Coercion.ApplyCoercion (name, coer_list) ->
       NoEff.NCoerApply (name, List.map (elab_ty_coercion state) coer_list)
-  | Constraint.TupleCoercion lst ->
+  | Coercion.TupleCoercion lst ->
       let elabs = List.map (elab_ty_coercion state) lst in
       NoEff.NCoerTuple elabs
 

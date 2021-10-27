@@ -50,8 +50,8 @@ and expression' =
       skeletons : Type.skeleton list;
       tys : Type.ty list;
       dirts : (Type.DirtParam.t * Type.dirt) list;
-      ty_coercions : Constraint.ty_coercion list;
-      dirt_coercions : Constraint.dirt_coercion list;
+      ty_coercions : Coercion.ty_coercion list;
+      dirt_coercions : Coercion.dirt_coercion list;
     }
   | Const of Const.t
   | Tuple of expression list
@@ -59,7 +59,7 @@ and expression' =
   | Variant of CoreTypes.Label.t * expression option
   | Lambda of abstraction
   | Handler of handler_clauses
-  | CastExp of expression * Constraint.ty_coercion
+  | CastExp of expression * Coercion.ty_coercion
 
 and computation = (computation', Type.dirty) typed
 (** Impure computations *)
@@ -73,7 +73,7 @@ and computation' =
   | Handle of expression * computation
   | Call of effect * expression * abstraction
   | Bind of computation * abstraction
-  | CastComp of computation * Constraint.dirty_coercion
+  | CastComp of computation * Coercion.dirty_coercion
 
 and handler_clauses = (handler_clauses', Type.dirty * Type.dirty) typed
 (** Handler definitions *)
@@ -128,11 +128,11 @@ let poly_var_with_parameters x parameters ty =
     List.map (fun p -> (p, Type.no_effect_dirt p)) parameters.Type.dirt_params
   and ty_coercions =
     List.map
-      (fun (p, ct) -> Constraint.tyCoercionVar p ct)
+      (fun (p, ct) -> Coercion.tyCoercionVar p ct)
       parameters.Type.ty_constraints
   and dirt_coercions =
     List.map
-      (fun (p, dt) -> Constraint.dirtCoercionVar p dt)
+      (fun (p, dt) -> Coercion.dirtCoercionVar p dt)
       parameters.Type.dirt_constraints
   in
   poly_var x skeletons tys dirts ty_coercions dirt_coercions ty
@@ -197,10 +197,10 @@ let lambdaTyCoerVar (_ : Type.TyCoercionParam.t * expression) : expression =
 let lambdaDirtCoerVar (_ : Type.DirtCoercionParam.t * expression) : expression =
   failwith __LOC__
 
-let applyTyCoercion (_ : expression * Constraint.ty_coercion) : expression =
+let applyTyCoercion (_ : expression * Coercion.ty_coercion) : expression =
   failwith __LOC__
 
-let applyDirtCoercion (_ : expression * Constraint.dirt_coercion) : expression =
+let applyDirtCoercion (_ : expression * Coercion.dirt_coercion) : expression =
   failwith __LOC__
 
 let value exp = { term = Value exp; ty = Type.pure_ty exp.ty }
@@ -300,7 +300,7 @@ and print_expression' ?max_level e ppf =
   | CastExp (e1, tc) ->
       print ~at_level:2 "%t ▷ %t"
         (print_expression ~max_level:0 e1)
-        (Constraint.print_ty_coercion ~max_level:0 tc)
+        (Coercion.print_ty_coercion ~max_level:0 tc)
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -338,7 +338,7 @@ and print_computation' ?max_level c ppf =
   | CastComp (c1, dc) ->
       print ~at_level:2 "%t ▷ %t"
         (print_computation ~max_level:2 c1)
-        (Constraint.print_dirty_coercion ~max_level:0 dc)
+        (Coercion.print_dirty_coercion ~max_level:0 dc)
   | LetVal (e1, { term = p, c1; _ }) ->
       print ~at_level:3 "let %t = %t in %t" (print_pattern p)
         (print_expression e1) (print_computation c1)
@@ -638,11 +638,11 @@ let does_not_occur v vars =
   match VariableMap.find_opt v vars with Some x -> x = 0 | None -> true
 
 let cast_expression e ty =
-  let omega, cons = Constraint.fresh_ty_coer (e.ty, ty) in
+  let omega, cons = Coercion.fresh_ty_coer (e.ty, ty) in
   (castExp (e, omega), cons)
 
 let cast_computation c dirty =
-  let omega, cnstrs = Constraint.fresh_dirty_coer (c.ty, dirty) in
+  let omega, cnstrs = Coercion.fresh_dirty_coer (c.ty, dirty) in
   (castComp (c, omega), cnstrs)
 
 let cast_abstraction { term = pat, cmp; _ } dirty =
@@ -679,7 +679,7 @@ and free_params_expression' e =
   | Handler h -> free_params_abstraction h.term.value_clause
   | CastExp (e, tc) ->
       Type.FreeParams.union (free_params_expression e)
-        (Constraint.free_params_ty_coercion tc)
+        (Coercion.free_params_ty_coercion tc)
 
 and free_params_computation c =
   Type.FreeParams.union
@@ -717,7 +717,7 @@ and free_params_computation' c =
   | CastComp (c, dc) ->
       Type.FreeParams.union
         (free_params_computation c)
-        (Constraint.free_params_dirty_coercion dc)
+        (Coercion.free_params_dirty_coercion dc)
 
 and free_params_abstraction abs =
   Type.FreeParams.union

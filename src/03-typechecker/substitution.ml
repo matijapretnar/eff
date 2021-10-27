@@ -5,10 +5,10 @@ open Language
 
 type t = {
   type_param_to_type_coercions :
-    (Type.TyCoercionParam.t, Constraint.ty_coercion) Assoc.t;
+    (Type.TyCoercionParam.t, Coercion.ty_coercion) Assoc.t;
   type_param_to_type_subs : (CoreTypes.TyParam.t, Type.ty) Assoc.t;
   dirt_var_to_dirt_coercions :
-    (Type.DirtCoercionParam.t, Constraint.dirt_coercion) Assoc.t;
+    (Type.DirtCoercionParam.t, Coercion.dirt_coercion) Assoc.t;
   dirt_var_to_dirt_subs : (Type.DirtParam.t, Type.dirt) Assoc.t;
   skel_param_to_skel_subs : (Type.SkelParam.t, Type.skeleton) Assoc.t;
 }
@@ -159,7 +159,7 @@ and apply_sub_ct_dirt sub (drt1, drt2) =
 let rec apply_sub_tycoer sub ty_coer =
   let ty' = apply_sub_ct_ty sub ty_coer.ty in
   match ty_coer.term with
-  | Constraint.TyCoercionVar p -> (
+  | Coercion.TyCoercionVar p -> (
       match Assoc.lookup p sub.type_param_to_type_coercions with
       | Some t_coer -> apply_sub_tycoer sub t_coer
       | None -> { ty_coer with ty = ty' })
@@ -168,7 +168,7 @@ let rec apply_sub_tycoer sub ty_coer =
 and apply_sub_tycoer' sub ty_coer =
   match ty_coer with
   | TyCoercionVar _ -> assert false
-  | Constraint.ReflTy -> Constraint.ReflTy
+  | Coercion.ReflTy -> Coercion.ReflTy
   | ArrowCoercion (tycoer1, dirtycoer) ->
       ArrowCoercion
         (apply_sub_tycoer sub tycoer1, apply_sub_dirtycoer sub dirtycoer)
@@ -183,7 +183,7 @@ and apply_sub_tycoer' sub ty_coer =
 and apply_sub_dirtcoer sub drt_coer =
   let drt' = apply_sub_ct_dirt sub drt_coer.ty in
   match drt_coer.term with
-  | Constraint.DirtCoercionVar p -> (
+  | Coercion.DirtCoercionVar p -> (
       match Assoc.lookup p sub.dirt_var_to_dirt_coercions with
       | Some dc -> apply_sub_dirtcoer sub dc
       | None -> { drt_coer with ty = drt' })
@@ -191,17 +191,17 @@ and apply_sub_dirtcoer sub drt_coer =
 
 and apply_sub_dirtcoer' sub ty_coer =
   match ty_coer with
-  | Constraint.ReflDirt -> ty_coer
+  | Coercion.ReflDirt -> ty_coer
   | DirtCoercionVar _ -> assert false
   | Empty -> Empty
   | UnionDirt (es, dirt_coer1) ->
       UnionDirt (es, apply_sub_dirtcoer sub dirt_coer1)
 
 and apply_sub_dirtycoer (sub : t) { term = ty_coer, dirt_coer; _ } :
-    Constraint.dirty_coercion =
+    Coercion.dirty_coercion =
   let ty_coer' = apply_sub_tycoer sub ty_coer
   and dirt_coer' = apply_sub_dirtcoer sub dirt_coer in
-  Constraint.bangCoercion (ty_coer', dirt_coer')
+  Coercion.bangCoercion (ty_coer', dirt_coer')
 
 let rec apply_sub_comp sub computation =
   {
@@ -299,10 +299,10 @@ let apply_substitutions_to_skeleton = apply_sub_skel
 
 let apply_sub1 subs cons =
   match cons with
-  | Constraint.TyOmega (coer_p, (ty1, ty2)) ->
-      Constraint.TyOmega (coer_p, (apply_sub_ty subs ty1, apply_sub_ty subs ty2))
-  | Constraint.DirtOmega (coer_p, (drt1, drt2)) ->
-      Constraint.DirtOmega
+  | Coercion.TyOmega (coer_p, (ty1, ty2)) ->
+      Coercion.TyOmega (coer_p, (apply_sub_ty subs ty1, apply_sub_ty subs ty2))
+  | Coercion.DirtOmega (coer_p, (drt1, drt2)) ->
+      Coercion.DirtOmega
         (coer_p, (apply_sub_dirt subs drt1, apply_sub_dirt subs drt2))
   | _ -> cons
 
@@ -318,7 +318,7 @@ let printy ?at_level ppf = Print.print ?at_level ppf
 let print_type_coercion p t ppf =
   printy ppf "%t ↦ %t"
     (Type.TyCoercionParam.print p)
-    (Constraint.print_ty_coercion t)
+    (Coercion.print_ty_coercion t)
 
 let print_type_param_to_type p t ppf =
   printy ppf "%t ↦ %t" (CoreTypes.TyParam.print p) (Type.print_ty t)
@@ -329,7 +329,7 @@ let print_dirt_var_sub p t ppf =
 let print_dirt_var_coercion p t ppf =
   printy ppf "%t ↦ %t"
     (Type.DirtCoercionParam.print p)
-    (Constraint.print_dirt_coercion t)
+    (Coercion.print_dirt_coercion t)
 
 let print_skel_param_sub p t ppf =
   printy ppf "%t ↦ %t" (Type.SkelParam.print p) (Type.print_skeleton t)

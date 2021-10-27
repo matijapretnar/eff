@@ -2,7 +2,7 @@ open Utils
 module Const = Language.Const
 module Untyped = Language.UntypedSyntax
 module CoreTypes = Language.CoreTypes
-module Constraint = Language.Constraint
+module Coercion = Language.Coercion
 module Term = Language.Term
 module Type = Language.Type
 module TypeDefinitionContext = TypeDefinitionContext
@@ -38,7 +38,7 @@ type state = {
 }
 
 (* A bag/list of constraints *)
-type constraints = Constraint.omega_ct list
+type constraints = Coercion.omega_ct list
 
 (* Add a single term binding to the global typing environment *)
 let extend_var env x ty =
@@ -266,14 +266,14 @@ let rec infer_pattern state (pat : Untyped.pattern) :
 and infer_pattern' state pat =
   match pat.it with
   | Untyped.PVar x ->
-      let alpha = Constraint.fresh_ty_with_fresh_skel () in
+      let alpha = Coercion.fresh_ty_with_fresh_skel () in
       (Term.PVar x, alpha, extend_var state x alpha, [])
   | Untyped.PAnnotated (p, ty) ->
       let ty' = source_to_target state.tydefs ty in
       let p', state' = check_pattern state ty' p in
       (p'.term, ty', state', [])
   | Untyped.PNonbinding ->
-      let alpha = Constraint.fresh_ty_with_fresh_skel () in
+      let alpha = Coercion.fresh_ty_with_fresh_skel () in
       (Term.PNonbinding, alpha, state, [])
   | Untyped.PConst c -> (Term.PConst c, Type.type_const c, state, [])
   | Untyped.PTuple ps ->
@@ -397,7 +397,7 @@ and tcOpCase state
   let tyAi, tyBi = Term.EffectMap.find eff state.effects in
 
   (* 2: Generate fresh variables for the type of the codomain of the continuation *)
-  let dirtyi = Constraint.fresh_dirty_with_fresh_skel () in
+  let dirtyi = Coercion.fresh_dirty_with_fresh_skel () in
 
   (* 3: Typecheck the clause *)
   let abs2, csi (* GEORGE: I don't like the unused types *) =
@@ -420,7 +420,7 @@ and tcOpCase state
 
   (* 5: Generate all the needed constraints *)
   let omega34i, omegaCt34i =
-    Constraint.fresh_dirty_coer ((tyBOpi, dirtDOpi), dirtyOut)
+    Coercion.fresh_dirty_coer ((tyBOpi, dirtDOpi), dirtyOut)
   in
   let leftty = Type.arrow (tyBi, dirtyOut) in
   let rightty = Type.arrow (tyBi, dirtyi) in
@@ -442,7 +442,7 @@ and tcOpCase state
 and tcHandler state (h : Untyped.handler) : tcExprOutput' =
   (* 1: Generate fresh variables for the input and output types *)
   let deltaIn = Type.fresh_dirt () in
-  let ((_, deltaOut) as dirtyOut) = Constraint.fresh_dirty_with_fresh_skel () in
+  let ((_, deltaOut) as dirtyOut) = Coercion.fresh_dirty_with_fresh_skel () in
 
   (* 2: Process the return and the operation clauses *)
   let trgRet, cs1 = tcAbstraction state h.value_clause in
@@ -464,14 +464,14 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
       | EmptyRow -> failwith "deltaOut: IMPOSSIBLE"
     in
 
-    Constraint.fresh_dirt_coer
+    Coercion.fresh_dirt_coer
       (deltaIn, Type.{ effect_set = allOps; row = ParamRow deltaOutVar })
   in
 
   let handlerCo =
-    Constraint.handlerCoercion
-      ( Constraint.bangCoercion (Constraint.reflTy ty_ret_in, omega7),
-        Constraint.reflDirty dirtyOut )
+    Coercion.handlerCoercion
+      ( Coercion.bangCoercion (Coercion.reflTy ty_ret_in, omega7),
+        Coercion.reflDirty dirtyOut )
   in
   let handTy, _ = handlerCo.ty in
   match handTy.term with
@@ -505,7 +505,7 @@ and tcExpr state (e : Untyped.expression) : tcExprOutput =
      (Untyped.print_expression e)
      (Term.print_expression' trm)
      (Type.print_ty ty)
-     (Constraint.print_constraints cnstrs); *)
+     (Coercion.print_constraints cnstrs); *)
   ({ term = trm; ty }, cnstrs)
 
 (* ************************************************************************* *)
@@ -541,7 +541,7 @@ and tcComp state (c : Untyped.computation) : tcCompOutput =
      (Untyped.print_computation c)
      (Term.print_computation' trm)
      (Type.print_dirty ty)
-     (Constraint.print_constraints cnstrs); *)
+     (Coercion.print_constraints cnstrs); *)
   ({ term = trm; ty }, cnstrs)
 
 (* Typecheck a value wrapped in a return *)
@@ -578,18 +578,16 @@ and tcLetCmp state (pat : Untyped.pattern) (c1 : Untyped.computation)
   let delta = Type.fresh_dirt () in
 
   (* 3: Generate the coercions for the dirts *)
-  let omega1, omegaCt1 = Constraint.fresh_dirt_coer (dirtD1, delta) in
+  let omega1, omegaCt1 = Coercion.fresh_dirt_coer (dirtD1, delta) in
   (* s2(D1) <= delta *)
-  let omega2, omegaCt2 = Constraint.fresh_dirt_coer (dirtD2, delta) in
+  let omega2, omegaCt2 = Coercion.fresh_dirt_coer (dirtD2, delta) in
 
   (*    D2  <= delta *)
   let cresC1 =
-    Term.castComp
-      (trgC1, Constraint.bangCoercion (Constraint.reflTy tyA1, omega1))
+    Term.castComp (trgC1, Coercion.bangCoercion (Coercion.reflTy tyA1, omega1))
   in
   let cresC2 =
-    Term.castComp
-      (trgC2, Constraint.bangCoercion (Constraint.reflTy tyA2, omega2))
+    Term.castComp (trgC2, Coercion.bangCoercion (Coercion.reflTy tyA2, omega2))
   in
 
   let outExpr = Term.Bind (cresC1, Term.abstraction (trgPat, cresC2)) in
@@ -611,8 +609,8 @@ and infer_let_rec state defs =
   let defs' =
     List.map
       (fun (x, abs) ->
-        let alpha = Constraint.fresh_ty_with_fresh_skel () in
-        let betadelta = Constraint.fresh_dirty_with_fresh_skel () in
+        let alpha = Coercion.fresh_ty_with_fresh_skel () in
+        let betadelta = Coercion.fresh_dirty_with_fresh_skel () in
         (x, abs, alpha, betadelta, []))
       defs
   in
@@ -681,7 +679,7 @@ and tcNonEmptyMatch state (scr : Untyped.expression) alts : tcCompOutput' =
   assert (List.length alts > 0);
 
   (* 1: Generate fresh variables for the result *)
-  let dirtyOut = Constraint.fresh_dirty_with_fresh_skel () in
+  let dirtyOut = Coercion.fresh_dirty_with_fresh_skel () in
 
   (* 2: Infer a type for the patterns *)
   let cases, patTy, cs2 = infer_cases state dirtyOut alts in
@@ -701,7 +699,7 @@ and tcNonEmptyMatch state (scr : Untyped.expression) alts : tcCompOutput' =
 (* Typecheck an empty case expression *)
 and tcEmptyMatch state (scr : Untyped.expression) : tcCompOutput' =
   (* 1: Generate fresh variables for the result *)
-  let dirtyOut = Constraint.fresh_dirty_with_fresh_skel () in
+  let dirtyOut = Coercion.fresh_dirty_with_fresh_skel () in
 
   (* 2: Typecheck the scrutinee *)
   let trgScr, cs1 = tcExpr state scr in
@@ -719,7 +717,7 @@ and tcApply state (val1 : Untyped.expression) (val2 : Untyped.expression) :
   let trgVal2, cs2 = tcExpr state val2 in
 
   (* Generate fresh variables for the result *)
-  let outType = Constraint.fresh_dirty_with_fresh_skel () in
+  let outType = Coercion.fresh_dirty_with_fresh_skel () in
 
   (* Create the constraint and the cast elaborated expression *)
   let castVal1, omegaCt =
@@ -740,8 +738,8 @@ and tcHandle state (hand : Untyped.expression) (cmp : Untyped.computation) :
   (* Typecheck the computation *)
 
   (* Generate fresh variables *)
-  let dirty1 = Constraint.fresh_dirty_with_fresh_skel () in
-  let dirty2 = Constraint.fresh_dirty_with_fresh_skel () in
+  let dirty1 = Coercion.fresh_dirty_with_fresh_skel () in
+  let dirty2 = Coercion.fresh_dirty_with_fresh_skel () in
 
   (* Create all constraints *)
   let castHand, omegaCt1 =
@@ -769,13 +767,13 @@ and tcCheck (_state : state) (_cmp : Untyped.computation) : tcCompOutput' =
  * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
  * tcTypedVarPat) *)
 and infer_abstraction (state : state) (pat, cmp) :
-    Term.abstraction * Constraint.omega_ct list =
+    Term.abstraction * Coercion.omega_ct list =
   let trgPat, state', cs1 = infer_pattern state pat in
   let trgCmp, cs2 = tcComp state' cmp in
   (Term.abstraction (trgPat, trgCmp), cs1 @ cs2)
 
 and check_abstraction state (pat, cmp) patTy :
-    Term.abstraction * Constraint.omega_ct list =
+    Term.abstraction * Coercion.omega_ct list =
   let trgPat, state' = check_pattern state patTy pat in
   let trgCmp, cs = tcComp state' cmp in
   (Term.abstraction (trgPat, trgCmp), cs)
@@ -785,7 +783,7 @@ and check_abstraction state (pat, cmp) patTy :
  * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
  * tcTypedVarPat) *)
 and check_abstraction2 state (pat1, pat2, cmp) patTy1 patTy2 :
-    Term.abstraction2 * Constraint.omega_ct list =
+    Term.abstraction2 * Coercion.omega_ct list =
   let trgPat1, state' = check_pattern state patTy1 pat1 in
   let trgPat2, state'' = check_pattern state' patTy2 pat2 in
   let trgCmp, cs = tcComp state'' cmp in
@@ -795,19 +793,19 @@ and check_abstraction2 state (pat1, pat2, cmp) patTy1 patTy2 :
 (* ************************************************************************* *)
 
 let monomorphize free_ty_params cnstrs =
-  let free_cnstrs_params = Constraint.free_params_resolved cnstrs in
+  let free_cnstrs_params = Coercion.free_params_resolved cnstrs in
   let free_params = Type.FreeParams.union free_ty_params free_cnstrs_params in
   let monomorphize_skeletons =
     List.map
       (fun sk ->
-        Constraint.SkelEq (Type.SkelParam sk, Type.SkelBasic Const.FloatTy))
+        Coercion.SkelEq (Type.SkelParam sk, Type.SkelBasic Const.FloatTy))
       (Type.SkelParamSet.elements free_params.skel_params)
   and monomorphize_tys =
     List.concat_map
       (fun (t, skels) ->
         List.map
           (fun skel ->
-            Constraint.TyOmega
+            Coercion.TyOmega
               ( Type.TyCoercionParam.fresh (),
                 (Type.tyParam t skel, Type.tyBasic Const.FloatTy) ))
           skels)
@@ -815,7 +813,7 @@ let monomorphize free_ty_params cnstrs =
   and monomorphize_dirts =
     List.map
       (fun d ->
-        Constraint.DirtOmega
+        Coercion.DirtOmega
           ( Type.DirtCoercionParam.fresh (),
             (Type.no_effect_dirt d, Type.empty_dirt) ))
       (Type.DirtParamSet.elements free_params.dirt_params)
@@ -823,14 +821,14 @@ let monomorphize free_ty_params cnstrs =
   let sub, residuals =
     Unification.solve
       (monomorphize_skeletons @ monomorphize_tys @ monomorphize_dirts
-      @ Constraint.unresolve cnstrs)
+     @ Coercion.unresolve cnstrs)
   in
   (* After zapping, there should be no more constraints left to solve. *)
-  assert (Constraint.unresolve residuals = []);
+  assert (Coercion.unresolve residuals = []);
   sub
 
 let generalize free_params cnstrs =
-  let free_cnstrs_params = Constraint.free_params_resolved cnstrs in
+  let free_cnstrs_params = Coercion.free_params_resolved cnstrs in
   let free_params = Type.FreeParams.union free_params free_cnstrs_params in
   let skeleton_params = Type.SkelParamSet.elements free_params.skel_params
   and ty_params =
@@ -883,7 +881,7 @@ let process_computation state comp =
   let comp, residuals = infer_computation state comp in
   (* Print.debug "TERM: %t" (Term.print_computation comp); *)
   (* Print.debug "TYPE: %t" (Type.print_dirty comp.ty); *)
-  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
+  (* Print.debug "CONSTRAINTS: %t" (Coercion.print_constraints residuals); *)
   let free_params = Term.free_params_computation comp in
   let mono_sub = monomorphize free_params residuals in
   (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
