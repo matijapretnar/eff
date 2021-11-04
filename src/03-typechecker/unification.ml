@@ -150,7 +150,10 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
       ( Substitution.add_type_substitution tv ty sub,
         Constraint.empty_resolved,
         cons_subbed )
-  | _, _ -> assert false
+  | ty1, ty2 ->
+      let printer = Type.print_pretty () in
+      Error.typing ~loc:Location.unknown "Cannot resolve inequality %t <= %t"
+        (printer ty1) (printer ty2)
 
 and dirt_omega_step sub paused rest_queue omega dcons =
   match dcons with

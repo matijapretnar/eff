@@ -21,7 +21,8 @@ module Backend : Language.BackendSignature.T = struct
   let process_computation state c =
     let v = Eval.run state c in
     Format.fprintf !Config.output_formatter "@[- : %t = %t@]@."
-      (Type.print_dirty c.ty) (V.print_value v);
+      (Type.print_pretty () (fst c.ty))
+      (V.print_value v);
     state
 
   let process_type_of state c =
@@ -35,18 +36,19 @@ module Backend : Language.BackendSignature.T = struct
     | [] -> state
     | [ (x, (_ws, exp)) ] ->
         let v = Eval.eval_expression state exp in
-        Format.fprintf !Config.output_formatter "@[%t : %t = %t@]@."
+        Format.fprintf !Config.output_formatter "@[val %t : %t = %t@]@."
           (Language.CoreTypes.Variable.print x)
-          (Type.print_ty exp.ty) (V.print_value v);
+          (Type.print_pretty () exp.ty)
+          (V.print_value v);
         Eval.update x v state
     | _ -> failwith __LOC__
 
   let process_top_let_rec state defs =
     Assoc.iter
       (fun (f, (_ws, abs)) ->
-        Format.fprintf !Config.output_formatter "@[%t : %t = <fun>@]@."
+        Format.fprintf !Config.output_formatter "@[val %t : %t = <fun>@]@."
           (Language.CoreTypes.Variable.print f)
-          (Type.print_ty (Type.arrow abs.ty)))
+          (Type.print_pretty () (Type.arrow abs.ty)))
       defs;
     Eval.extend_let_rec state defs
 

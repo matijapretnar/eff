@@ -317,6 +317,49 @@ let fresh_ty_with_skel skel =
       and dtvar2 = fresh_dirty_param_with_skel sk2 in
       handler (dtvar1, dtvar2)
 
+let rec print_pretty_ty ?max_level params ty ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match (ty.term, ty.ty) with
+  | TyParam _, SkelParam s ->
+      let symb =
+        match Assoc.lookup s !params with
+        | Some symb -> symb
+        | None ->
+            let next_index = Assoc.length !params in
+            let symb = "abcdefghijklmnopqrstuvwxyz".[next_index] in
+            params := Assoc.update s symb !params;
+            symb
+      in
+      print "'%c" symb
+  | TyParam _, _ -> assert false
+  | Arrow (t1, (t2, _)), _ ->
+      print ~at_level:3 "%t -> %t"
+        (print_pretty_ty ~max_level:2 params t1)
+        (print_pretty_ty ~max_level:3 params t2)
+  | Apply (t, []), _ -> print "%t" (CoreTypes.TyName.print t)
+  | Apply (t, [ s ]), _ ->
+      print ~at_level:1 "%t %t"
+        (print_pretty_ty ~max_level:1 params s)
+        (CoreTypes.TyName.print t)
+  | Apply (t, ts), _ ->
+      print ~at_level:1 "(%t) %t"
+        (Print.sequence ", " (print_pretty_ty params) ts)
+        (CoreTypes.TyName.print t)
+  | Tuple [], _ -> print "unit"
+  | Tuple tys, _ ->
+      print ~at_level:2 "%t"
+        (Print.sequence " * " (print_pretty_ty ~max_level:1 params) tys)
+  | Handler (drty1, drty2), _ ->
+      print ~at_level:3 "%t => %t"
+        (print_pretty_dirty ~max_level:2 params drty1)
+        (print_pretty_dirty ~max_level:2 params drty2)
+  | TyBasic p, _ -> print "%t" (Const.print_ty p)
+
+and print_pretty_dirty ?max_level params (ty, _) ppf =
+  print_pretty_ty ?max_level params ty ppf
+
+let print_pretty () = print_pretty_ty (ref Assoc.empty)
+
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)
