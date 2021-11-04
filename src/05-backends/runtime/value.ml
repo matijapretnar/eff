@@ -43,19 +43,29 @@ let print_effect eff ppf = Format.fprintf ppf "%t" (CoreTypes.Effect.print eff)
 
 let rec print_value ?max_level v ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match v with
-  | Const c -> Const.print c ppf
-  | Tuple lst -> Print.tuple print_value lst ppf
-  | Record assoc -> Print.record CoreTypes.Field.print print_value assoc ppf
-  | Variant (lbl, None) -> print ~at_level:1 "%t" (CoreTypes.Label.print lbl)
-  | Variant (lbl, Some v) ->
-      print ~at_level:1 "%t @[<hov>%t@]"
-        (CoreTypes.Label.print lbl)
-        (print_value v)
-  | Closure _ -> print "<fun>"
-  | Handler _ -> print "<handler>"
-  | TypeCoercionClosure _ -> print "<ty_coercion>"
-  | DirtCoercionClosure _ -> print "<dir_coercion>"
+  match to_list v with
+  | Some vs -> print "[%t]" (Print.sequence "; " print_value vs)
+  | None -> (
+      match v with
+      | Const c -> Const.print c ppf
+      | Tuple lst -> Print.tuple print_value lst ppf
+      | Record assoc -> Print.record CoreTypes.Field.print print_value assoc ppf
+      | Variant (lbl, None) ->
+          print ~at_level:1 "%t" (CoreTypes.Label.print lbl)
+      | Variant (lbl, Some v) ->
+          print ~at_level:1 "%t @[<hov>%t@]"
+            (CoreTypes.Label.print lbl)
+            (print_value v)
+      | Closure _ -> print "<fun>"
+      | Handler _ -> print "<handler>"
+      | TypeCoercionClosure _ -> print "<ty_coercion>"
+      | DirtCoercionClosure _ -> print "<dir_coercion>")
+
+and to_list = function
+  | Variant (lbl, None) when lbl = CoreTypes.nil -> Some []
+  | Variant (lbl, Some (Tuple [ hd; tl ])) when lbl = CoreTypes.cons ->
+      Option.bind (to_list tl) (fun vs -> Some (hd :: vs))
+  | _ -> None
 
 let print_result r ppf =
   match r with
