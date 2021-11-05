@@ -453,8 +453,6 @@ module Renaming = struct
     ty_params : CoreTypes.TyParam.t TyParamMap.t;
     dirt_params : DirtParam.t DirtParamMap.t;
     skel_params : SkelParam.t SkelParamMap.t;
-    ty_coercion_params : TyCoercionParam.t TyCoercionParamMap.t;
-    dirt_coercion_params : DirtCoercionParam.t DirtCoercionParamMap.t;
   }
 
   let empty =
@@ -462,8 +460,6 @@ module Renaming = struct
       ty_params = TyParamMap.empty;
       dirt_params = DirtParamMap.empty;
       skel_params = SkelParamMap.empty;
-      ty_coercion_params = TyCoercionParamMap.empty;
-      dirt_coercion_params = DirtCoercionParamMap.empty;
     }
 end
 
@@ -481,14 +477,6 @@ let parameters_renaming parameters : Renaming.t =
       parameters.dirt_params
       |> List.map (fun p -> (p, DirtParam.refresh p))
       |> List.to_seq |> DirtParamMap.of_seq;
-    ty_coercion_params =
-      parameters.ty_constraints
-      |> List.map (fun (p, _) -> (p, TyCoercionParam.refresh p))
-      |> List.to_seq |> TyCoercionParamMap.of_seq;
-    dirt_coercion_params =
-      parameters.dirt_constraints
-      |> List.map (fun (p, _) -> (p, DirtCoercionParam.refresh p))
-      |> List.to_seq |> DirtCoercionParamMap.of_seq;
   }
 
 let rec rename_skeleton (sbst : Renaming.t) = function
@@ -561,17 +549,11 @@ let rename_parameters (sbst : Renaming.t) parameters =
         parameters.dirt_params;
     ty_constraints =
       List.map
-        (fun (p, ct) ->
-          ( TyCoercionParamMap.find_opt p sbst.ty_coercion_params
-            |> Option.value ~default:p,
-            rename_ct_ty sbst ct ))
+        (fun (p, ct) -> (p, rename_ct_ty sbst ct))
         parameters.ty_constraints;
     dirt_constraints =
       List.map
-        (fun (p, dt) ->
-          ( DirtCoercionParamMap.find_opt p sbst.dirt_coercion_params
-            |> Option.value ~default:p,
-            rename_ct_dirt sbst dt ))
+        (fun (p, dt) -> (p, rename_ct_dirt sbst dt))
         parameters.dirt_constraints;
   }
 
