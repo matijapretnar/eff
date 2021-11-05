@@ -26,7 +26,13 @@ let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
   | sk2a, SkelParam sp1
     when not (SkelParamSet.mem sp1 (free_params_skeleton sk2a).skel_params) ->
       process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a
-  (* int = int *)
+      (* occurs-check failing *)
+  | SkelParam _, _ | _, SkelParam _ ->
+      let printer = Type.print_pretty () in
+      Error.typing ~loc:Location.unknown
+        "This expression has a forbidden cyclic type %t = %t." (printer sk1)
+        (printer sk2)
+      (* int = int *)
   | SkelBasic ps1, SkelBasic ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
   (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
   | SkelArrow (ska, skb), SkelArrow (skc, skd) ->
@@ -56,8 +62,10 @@ let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
           (List.map2 (fun sk1 sk2 -> Constraint.SkelEq (sk1, sk2)) sks1 sks2)
           rest_queue )
   | _ ->
-      (* Print.debug "%t = %t" (Type.print_skeleton sk1) (Type.print_skeleton sk2); *)
-      assert false
+      let printer = Type.print_pretty () in
+      Error.typing ~loc:Location.unknown
+        "This expression has type %t but it should have type %t." (printer sk1)
+        (printer sk2)
 
 and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
   function
@@ -152,8 +160,9 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
         cons_subbed )
   | ty1, ty2 ->
       let printer = Type.print_pretty () in
-      Error.typing ~loc:Location.unknown "Cannot resolve inequality %t <= %t"
-        (printer ty1) (printer ty2)
+      Error.typing ~loc:Location.unknown
+        "This expression has type %t but it should have type %t."
+        (printer ty1.ty) (printer ty2.ty)
 
 and dirt_omega_step sub paused rest_queue omega dcons =
   match dcons with
