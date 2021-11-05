@@ -641,29 +641,27 @@ let does_not_occur v vars =
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)
 let rec free_params_expression e =
-  Type.FreeParams.union
-    (free_params_expression' e.term)
-    (Type.free_params_ty e.ty)
+  Type.Params.union (free_params_expression' e.term) (Type.free_params_ty e.ty)
 
 and free_params_expression' e =
   match e with
-  | Var _ -> Type.FreeParams.empty
-  | Const _ -> Type.FreeParams.empty
+  | Var _ -> Type.Params.empty
+  | Const _ -> Type.Params.empty
   | Tuple es ->
       List.fold_left
-        (fun free e -> Type.FreeParams.union free (free_params_expression e))
-        Type.FreeParams.empty es
+        (fun free e -> Type.Params.union free (free_params_expression e))
+        Type.Params.empty es
   | Record _ -> failwith __LOC__
   | Variant (_, e) ->
-      Option.default_map Type.FreeParams.empty free_params_expression e
+      Option.default_map Type.Params.empty free_params_expression e
   | Lambda abs -> free_params_abstraction abs
   | Handler h -> free_params_abstraction h.term.value_clause
   | CastExp (e, tc) ->
-      Type.FreeParams.union (free_params_expression e)
+      Type.Params.union (free_params_expression e)
         (Coercion.free_params_ty_coercion tc)
 
 and free_params_computation c =
-  Type.FreeParams.union
+  Type.Params.union
     (free_params_computation' c.term)
     (Type.free_params_dirty c.ty)
 
@@ -671,43 +669,35 @@ and free_params_computation' c =
   match c with
   | Value e -> free_params_expression e
   | LetVal (e, abs) ->
-      Type.FreeParams.union (free_params_expression e)
-        (free_params_abstraction abs)
+      Type.Params.union (free_params_expression e) (free_params_abstraction abs)
   | LetRec (defs, c) ->
       free_params_definitions defs
-      |> Type.FreeParams.union (free_params_computation c)
+      |> Type.Params.union (free_params_computation c)
   | Match (e, cases) ->
       List.fold_left
-        (fun free case ->
-          Type.FreeParams.union free (free_params_abstraction case))
+        (fun free case -> Type.Params.union free (free_params_abstraction case))
         (free_params_expression e) cases
   | Apply (e1, e2) ->
-      Type.FreeParams.union
-        (free_params_expression e1)
-        (free_params_expression e2)
+      Type.Params.union (free_params_expression e1) (free_params_expression e2)
   | Handle (e, c) ->
-      Type.FreeParams.union (free_params_expression e)
-        (free_params_computation c)
+      Type.Params.union (free_params_expression e) (free_params_computation c)
   | Call (_, e, abs) ->
-      Type.FreeParams.union (free_params_expression e)
-        (free_params_abstraction abs)
+      Type.Params.union (free_params_expression e) (free_params_abstraction abs)
   | Bind (c, a) ->
-      Type.FreeParams.union
-        (free_params_computation c)
-        (free_params_abstraction a)
+      Type.Params.union (free_params_computation c) (free_params_abstraction a)
   | CastComp (c, dc) ->
-      Type.FreeParams.union
+      Type.Params.union
         (free_params_computation c)
         (Coercion.free_params_dirty_coercion dc)
 
 and free_params_abstraction abs =
-  Type.FreeParams.union
+  Type.Params.union
     (Type.free_params_abstraction_ty abs.ty)
     (free_params_abstraction' abs.term)
 
 and free_params_abstraction' (_, c) = free_params_computation c
 
 and free_params_definitions defs =
-  Type.FreeParams.union_map
+  Type.Params.union_map
     (fun (_, (_, abs)) -> free_params_abstraction abs)
     (Assoc.to_list defs)

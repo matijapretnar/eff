@@ -86,19 +86,19 @@ let free_params_constraint = function
   | TyOmega (_, ct) -> Type.free_params_ct_ty ct
   | DirtOmega (_, ct) -> Type.free_params_ct_dirt ct
   | SkelEq (sk1, sk2) ->
-      Type.FreeParams.union
+      Type.Params.union
         (Type.free_params_skeleton sk1)
         (Type.free_params_skeleton sk2)
 
-let free_params_constraints = Type.FreeParams.union_map free_params_constraint
+let free_params_constraints = Type.Params.union_map free_params_constraint
 
 let free_params_resolved (res : resolved) =
   let free_params_ty =
-    Type.FreeParams.union_map
+    Type.Params.union_map
       (fun (_, ty1, ty2, skel) ->
-        Type.FreeParams.union
+        Type.Params.union
           {
-            Type.FreeParams.empty with
+            Type.Params.empty with
             ty_params =
               Type.TyParamMap.of_seq
                 (List.to_seq
@@ -107,14 +107,14 @@ let free_params_resolved (res : resolved) =
                      (ty2, [ Type.SkelParam skel ]);
                    ]);
           }
-          (Type.FreeParams.skel_singleton skel))
+          (Type.Params.skel_singleton skel))
       res.ty_constraints
   and free_params_dirt =
-    Type.FreeParams.union_map
+    Type.Params.union_map
       (fun (_, dt) -> Type.free_params_ct_dirt dt)
       res.dirt_constraints
   in
-  Type.FreeParams.union free_params_ty free_params_dirt
+  Type.Params.union free_params_ty free_params_dirt
 
 let cast_expression e ty =
   let omega, cons = fresh_ty_coer (e.ty, ty) in

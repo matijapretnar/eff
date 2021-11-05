@@ -125,6 +125,51 @@ let string_ty = tyBasic Const.StringTy
 
 and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
 
+module Params = struct
+  type t = {
+    ty_params : skeleton list TyParamMap.t;
+    dirt_params : DirtParamSet.t;
+    skel_params : SkelParamSet.t;
+  }
+
+  let empty =
+    {
+      ty_params = TyParamMap.empty;
+      dirt_params = DirtParamSet.empty;
+      skel_params = SkelParamSet.empty;
+    }
+
+  let subset fp1 fp2 =
+    TyParamMap.for_all
+      (fun p1 _ -> TyParamMap.mem p1 fp2.ty_params)
+      fp1.ty_params
+    && DirtParamSet.subset fp1.dirt_params fp2.dirt_params
+    && SkelParamSet.subset fp1.skel_params fp2.skel_params
+
+  let ty_singleton p skel =
+    { empty with ty_params = TyParamMap.singleton p [ skel ] }
+
+  let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
+
+  let skel_singleton p = { empty with skel_params = SkelParamSet.singleton p }
+
+  let union fp1 fp2 =
+    {
+      ty_params =
+        TyParamMap.union
+          (fun _ skels1 skels2 -> Some (skels1 @ skels2))
+          fp1.ty_params fp2.ty_params;
+      dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
+      skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
+    }
+
+  let union_map free_params =
+    List.fold_left (fun fp x -> union fp (free_params x)) empty
+
+  let is_empty fp =
+    DirtParamSet.is_empty fp.dirt_params && SkelParamSet.is_empty fp.skel_params
+end
+
 type parameters = {
   skeleton_params : SkelParam.t list;
   dirt_params : DirtParam.t list;
@@ -360,91 +405,46 @@ let print_pretty () = print_pretty_skel (ref Assoc.empty)
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)
 
-module FreeParams = struct
-  type t = {
-    ty_params : skeleton list TyParamMap.t;
-    dirt_params : DirtParamSet.t;
-    skel_params : SkelParamSet.t;
-  }
-
-  let empty =
-    {
-      ty_params = TyParamMap.empty;
-      dirt_params = DirtParamSet.empty;
-      skel_params = SkelParamSet.empty;
-    }
-
-  let subset fp1 fp2 =
-    TyParamMap.for_all
-      (fun p1 _ -> TyParamMap.mem p1 fp2.ty_params)
-      fp1.ty_params
-    && DirtParamSet.subset fp1.dirt_params fp2.dirt_params
-    && SkelParamSet.subset fp1.skel_params fp2.skel_params
-
-  let ty_singleton p skel =
-    { empty with ty_params = TyParamMap.singleton p [ skel ] }
-
-  let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
-
-  let skel_singleton p = { empty with skel_params = SkelParamSet.singleton p }
-
-  let union fp1 fp2 =
-    {
-      ty_params =
-        TyParamMap.union
-          (fun _ skels1 skels2 -> Some (skels1 @ skels2))
-          fp1.ty_params fp2.ty_params;
-      dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
-      skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
-    }
-
-  let union_map free_params =
-    List.fold_left (fun fp x -> union fp (free_params x)) empty
-
-  let is_empty fp =
-    DirtParamSet.is_empty fp.dirt_params && SkelParamSet.is_empty fp.skel_params
-end
-
 let rec free_params_skeleton = function
-  | SkelParam p -> FreeParams.skel_singleton p
-  | SkelBasic _ -> FreeParams.empty
-  | SkelApply (_, sks) -> FreeParams.union_map free_params_skeleton sks
+  | SkelParam p -> Params.skel_singleton p
+  | SkelBasic _ -> Params.empty
+  | SkelApply (_, sks) -> Params.union_map free_params_skeleton sks
   | SkelArrow (sk1, sk2) ->
-      FreeParams.union (free_params_skeleton sk1) (free_params_skeleton sk2)
+      Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
   | SkelHandler (sk1, sk2) ->
-      FreeParams.union (free_params_skeleton sk1) (free_params_skeleton sk2)
-  | SkelTuple sks -> FreeParams.union_map free_params_skeleton sks
+      Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
+  | SkelTuple sks -> Params.union_map free_params_skeleton sks
 
 let rec free_params_ty ty =
   match ty.term with
-  | TyParam p -> FreeParams.ty_singleton p ty.ty
+  | TyParam p -> Params.ty_singleton p ty.ty
   | Arrow (vty, cty) ->
-      FreeParams.union (free_params_ty vty) (free_params_dirty cty)
-  | Tuple vtys -> FreeParams.union_map free_params_ty vtys
+      Params.union (free_params_ty vty) (free_params_dirty cty)
+  | Tuple vtys -> Params.union_map free_params_ty vtys
   | Handler (cty1, cty2) ->
-      FreeParams.union (free_params_dirty cty1) (free_params_dirty cty2)
-  | TyBasic _prim_ty -> FreeParams.empty
-  | Apply (_, vtys) -> FreeParams.union_map free_params_ty vtys
+      Params.union (free_params_dirty cty1) (free_params_dirty cty2)
+  | TyBasic _prim_ty -> Params.empty
+  | Apply (_, vtys) -> Params.union_map free_params_ty vtys
 
 and free_params_dirty (ty, dirt) =
-  FreeParams.union (free_params_ty ty) (free_params_dirt dirt)
+  Params.union (free_params_ty ty) (free_params_dirt dirt)
 
 and free_params_abstraction_ty (ty_in, drty_out) =
-  FreeParams.union (free_params_ty ty_in) (free_params_dirty drty_out)
+  Params.union (free_params_ty ty_in) (free_params_dirty drty_out)
 
 and free_params_ct_ty (vty1, vty2) =
-  FreeParams.union (free_params_ty vty1) (free_params_ty vty2)
+  Params.union (free_params_ty vty1) (free_params_ty vty2)
 
 and free_params_ct_dirty (cty1, cty2) =
-  FreeParams.union (free_params_dirty cty1) (free_params_dirty cty2)
+  Params.union (free_params_dirty cty1) (free_params_dirty cty2)
 
 and free_params_ct_dirt (dirt1, dirt2) =
-  FreeParams.union (free_params_dirt dirt1) (free_params_dirt dirt2)
+  Params.union (free_params_dirt dirt1) (free_params_dirt dirt2)
 
 and free_params_dirt (dirt : dirt) =
   match dirt.row with
-  | ParamRow p -> FreeParams.dirt_singleton p
-  | EmptyRow -> FreeParams.empty
+  | ParamRow p -> Params.dirt_singleton p
+  | EmptyRow -> Params.empty
 
 (* ************************************************************************* *)
 

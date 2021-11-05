@@ -134,33 +134,31 @@ and print_dirt_coercion ?max_level c ppf =
 (* free variables in target terms *)
 
 let rec free_params_ty_coercion coer =
-  Type.FreeParams.union
+  Type.Params.union
     (free_params_ty_coercion' coer.term)
     (Type.free_params_ct_ty coer.ty)
 
 and free_params_ty_coercion' = function
-  | ReflTy -> Type.FreeParams.empty
+  | ReflTy -> Type.Params.empty
   | ArrowCoercion (tc, dc) ->
-      Type.FreeParams.union
+      Type.Params.union
         (free_params_ty_coercion tc)
         (free_params_dirty_coercion dc)
   | HandlerCoercion (dc1, dc2) ->
-      Type.FreeParams.union
+      Type.Params.union
         (free_params_dirty_coercion dc1)
         (free_params_dirty_coercion dc2)
-  | TyCoercionVar _tcp -> Type.FreeParams.empty
+  | TyCoercionVar _tcp -> Type.Params.empty
   | TupleCoercion tcs ->
       List.fold_left
-        (fun free tc -> Type.FreeParams.union free (free_params_ty_coercion tc))
-        Type.FreeParams.empty tcs
+        (fun free tc -> Type.Params.union free (free_params_ty_coercion tc))
+        Type.Params.empty tcs
   | ApplyCoercion (_ty_name, tcs) ->
       List.fold_left
-        (fun free tc -> Type.FreeParams.union free (free_params_ty_coercion tc))
-        Type.FreeParams.empty tcs
+        (fun free tc -> Type.Params.union free (free_params_ty_coercion tc))
+        Type.Params.empty tcs
 
 and free_params_dirt_coercion coer = Type.free_params_ct_dirt coer.ty
 
 and free_params_dirty_coercion { term = tc, dc; _ } =
-  Type.FreeParams.union
-    (free_params_ty_coercion tc)
-    (free_params_dirt_coercion dc)
+  Type.Params.union (free_params_ty_coercion tc) (free_params_dirt_coercion dc)

@@ -796,7 +796,7 @@ and check_abstraction2 state (pat1, pat2, cmp) patTy1 patTy2 :
 
 let monomorphize free_ty_params cnstrs =
   let free_cnstrs_params = Constraint.free_params_resolved cnstrs in
-  let free_params = Type.FreeParams.union free_ty_params free_cnstrs_params in
+  let free_params = Type.Params.union free_ty_params free_cnstrs_params in
   let monomorphize_skeletons =
     List.map
       (fun sk ->
@@ -831,7 +831,7 @@ let monomorphize free_ty_params cnstrs =
 
 let generalize free_params cnstrs =
   let free_cnstrs_params = Constraint.free_params_resolved cnstrs in
-  let free_params = Type.FreeParams.union free_params free_cnstrs_params in
+  let free_params = Type.Params.union free_params free_cnstrs_params in
   let skeleton_params = Type.SkelParamSet.elements free_params.skel_params
   and ty_params =
     List.map
@@ -891,7 +891,7 @@ let process_computation state comp =
   (* Print.debug "MONO TERM: %t" (Term.print_computation mono_comp); *)
   (* Print.debug "MONO TYPE: %t" (Type.print_dirty mono_comp.ty); *)
   (* We assume that all free variables in the term already appeared in its type or constraints *)
-  assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
+  assert (Type.Params.is_empty (Term.free_params_computation mono_comp));
   Exhaust.check_computation state.tydefs comp;
   mono_comp
 
