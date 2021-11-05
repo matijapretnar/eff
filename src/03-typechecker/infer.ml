@@ -939,12 +939,11 @@ let process_top_let_rec state defs =
   in
   (state', Assoc.of_list defs'')
 
-let add_type_definitions state tydefs =
+let add_type_definitions ~loc state tydefs =
   {
     state with
     tydefs =
-      TypeDefinitionContext.extend_type_definitions ~loc:Location.unknown tydefs
-        state.tydefs;
+      TypeDefinitionContext.extend_type_definitions ~loc tydefs state.tydefs;
   }
 
 let load_primitive_effect state eff prim =

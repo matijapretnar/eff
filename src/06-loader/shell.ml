@@ -178,7 +178,7 @@ module Make (Backend : Language.BackendSignature.T) = struct
           Desugarer.desugar_tydefs state.desugarer_state tydefs
         in
         let type_system_state' =
-          TypeSystem.add_type_definitions state.type_system_state tydefs'
+          TypeSystem.add_type_definitions ~loc state.type_system_state tydefs'
         in
         let tydefs'' =
           Assoc.map
