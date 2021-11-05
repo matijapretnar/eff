@@ -620,6 +620,9 @@ and infer_let_rec state defs =
   let defs'', cnstrs =
     List.fold_right
       (fun (x, abs, alpha, betadelta, cs3) (defs, cnstrs) ->
+        let p, c = abs in
+        Exhaust.is_irrefutable state.tydefs p;
+        Exhaust.check_computation state.tydefs c;
         let abs', cs1 = infer_abstraction state' abs in
         let abs'', cs2 =
           Constraint.full_cast_abstraction abs' alpha betadelta
@@ -877,18 +880,19 @@ let infer_rec_abstraction state defs =
 
 (* Typecheck a top-level expression *)
 let process_computation state comp =
-  let comp, residuals = infer_computation state comp in
+  let comp', residuals = infer_computation state comp in
   (* Print.debug "TERM: %t" (Term.print_computation comp); *)
   (* Print.debug "TYPE: %t" (Type.print_dirty comp.ty); *)
   (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
-  let free_params = Term.free_params_computation comp in
+  let free_params = Term.free_params_computation comp' in
   let mono_sub = monomorphize free_params residuals in
   (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
-  let mono_comp = subInCmp mono_sub comp in
+  let mono_comp = subInCmp mono_sub comp' in
   (* Print.debug "MONO TERM: %t" (Term.print_computation mono_comp); *)
   (* Print.debug "MONO TYPE: %t" (Type.print_dirty mono_comp.ty); *)
   (* We assume that all free variables in the term already appeared in its type or constraints *)
   assert (Type.FreeParams.is_empty (Term.free_params_computation mono_comp));
+  Exhaust.check_computation state.tydefs comp;
   mono_comp
 
 let process_top_let state defs =
@@ -900,6 +904,8 @@ let process_top_let state defs =
         let parameters = generalize free_params residuals in
         let ty_scheme = { Type.parameters; monotype = expr.ty } in
         let state'' = extend_poly_var state' x ty_scheme in
+        Exhaust.is_irrefutable state.tydefs p;
+        Exhaust.check_computation state.tydefs c;
         (state'', (x, (parameters, expr)) :: defs)
     | _ -> failwith __LOC__
   in
