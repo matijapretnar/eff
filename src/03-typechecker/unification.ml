@@ -12,6 +12,18 @@ let apply_substitution new_sub sub paused queue =
     in
     (sub', Constraint.empty_resolved, queue')
 
+let expand_row row ops =
+  match row with
+  | _ when Type.EffectSet.is_empty ops -> (Substitution.empty, row)
+  | ParamRow p ->
+      let p' = Type.DirtParam.refresh p in
+      let row' = ParamRow p' in
+      let sub' =
+        Substitution.add_dirt_substitution_e p { effect_set = ops; row = row' }
+      in
+      (sub', row')
+  | EmptyRow -> Error.typing ~loc:Location.unknown "Cannot extend an empty row."
+
 let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
   match (sk1, sk2) with
   (* ς = ς *)
@@ -67,6 +79,68 @@ let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
       Error.typing ~loc:Location.unknown
         "This expression has type %t but it should have type %t." (printer sk1)
         (printer sk2)
+
+and ty_eq_step sub (paused : Constraint.resolved) rest_queue (ty1 : Type.ty)
+    (ty2 : Type.ty) =
+  match (ty1.term, ty2.term) with
+  (* ς = ς *)
+  | TyParam p1, TyParam p2 when p1 = p2 -> (sub, paused, rest_queue)
+  (* ς₁ = τ₂ / τ₁ = ς₂ *)
+  | TyParam p1, _ when not (TyParamMap.mem p1 (free_params_ty ty2).ty_params) ->
+      let sub1 = Substitution.add_type_substitution_e p1 ty2 in
+      apply_substitution sub1 sub paused rest_queue
+  | _, TyParam p2 when not (TyParamMap.mem p2 (free_params_ty ty1).ty_params) ->
+      let sub1 = Substitution.add_type_substitution_e p2 ty1 in
+      apply_substitution sub1 sub paused rest_queue
+      (* occurs-check failing *)
+  | TyParam _, _ | _, TyParam _ ->
+      let printer = Type.print_pretty () in
+      Error.typing ~loc:Location.unknown
+        "This expression has a forbidden cyclic type %t = %t." (printer ty1.ty)
+        (printer ty2.ty)
+      (* int = int *)
+  | TyBasic ps1, TyBasic ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
+  (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
+  | Arrow (tya, (tyb, drt1)), Arrow (tyc, (tyd, drt2)) ->
+      ( sub,
+        paused,
+        Constraint.add_list_to_constraints
+          [
+            Constraint.TyEq (tya, tyc);
+            Constraint.TyEq (tyb, tyd);
+            Constraint.DirtEq (drt1, drt2);
+          ]
+          rest_queue )
+  (* τ₁₁ => τ₁₂ = τ₂₁ => τ₂₂ *)
+  | Handler ((tya, drta), (tyb, drtb)), Handler ((tyc, drtc), (tyd, drtd)) ->
+      ( sub,
+        paused,
+        Constraint.add_list_to_constraints
+          [
+            Constraint.TyEq (tya, tyc);
+            Constraint.TyEq (tyb, tyd);
+            Constraint.DirtEq (drta, drtc);
+            Constraint.DirtEq (drtb, drtd);
+          ]
+          rest_queue )
+  | Apply (ty_name1, tys1), Apply (ty_name2, tys2)
+    when ty_name1 = ty_name2 && List.length tys1 = List.length tys2 ->
+      ( sub,
+        paused,
+        Constraint.add_list_to_constraints
+          (List.map2 (fun ty1 ty2 -> Constraint.TyEq (ty1, ty2)) tys1 tys2)
+          rest_queue )
+  | Tuple tys1, Tuple tys2 when List.length tys1 = List.length tys2 ->
+      ( sub,
+        paused,
+        Constraint.add_list_to_constraints
+          (List.map2 (fun ty1 ty2 -> Constraint.TyEq (ty1, ty2)) tys1 tys2)
+          rest_queue )
+  | _ ->
+      let printer = Type.print_pretty () in
+      Error.typing ~loc:Location.unknown
+        "This expression has type %t but it should have type %t."
+        (printer ty1.ty) (printer ty2.ty)
 
 and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
   function
@@ -227,6 +301,34 @@ and dirt_omega_step sub resolved unresolved w dcons =
       apply_substitution sub' sub resolved unresolved
   | _ -> assert false
 
+and dirt_eq_step sub paused rest_queue { effect_set = o1; row = row1 }
+    { effect_set = o2; row = row2 } =
+  (*
+  Consider the equation:
+    O ∪ row₁ = O ∪ row₂
+  where row₁ and row₂ are either some parameters δ or the empty row Ø.
+  Any solution to this equation is equivalent to a solution of
+
+      row₁ = (O₂ \ O₁) ∪ row₁'
+      row₂ = (O₁ \ O₂) ∪ row₂'
+      row₁' = row₂'
+
+  *)
+  let sub1, row1' = expand_row row1 (EffectSet.diff o2 o1)
+  and sub2, row2' = expand_row row2 (EffectSet.diff o1 o2) in
+  let row_sub =
+    match (row1', row2') with
+    | EmptyRow, EmptyRow -> Substitution.empty
+    | ParamRow p1, _ ->
+        Substitution.add_dirt_substitution_e p1
+          { effect_set = EffectSet.empty; row = row2' }
+    | _, ParamRow p2 ->
+        Substitution.add_dirt_substitution_e p2
+          { effect_set = EffectSet.empty; row = row1' }
+  in
+  let sub' = Substitution.merge (Substitution.merge sub1 sub2) row_sub in
+  apply_substitution sub' sub paused rest_queue
+
 let rec unify (sub, paused, queue) =
   (* Print.debug "SUB: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "PAUSED: %t" (Constraint.print_constraints paused); *)
@@ -239,12 +341,17 @@ let rec unify (sub, paused, queue) =
         (* τ₁ = τ₂ *)
         | Constraint.SkelEq (sk1, sk2) ->
             skel_eq_step sub paused rest_queue sk1 sk2
+        (* A₁ = A₂ *)
+        | Constraint.TyEq (ty1, ty2) -> ty_eq_step sub paused rest_queue ty1 ty2
         (* ω : A <= B *)
         | Constraint.TyOmega (omega, tycons) ->
             ty_omega_step sub paused cons rest_queue omega tycons
         (* ω : Δ₁ <= Δ₂ *)
         | Constraint.DirtOmega (omega, dcons) ->
             dirt_omega_step sub paused rest_queue omega dcons
+        (* Δ₁ = Δ₂ *)
+        | Constraint.DirtEq (drt1, drt2) ->
+            dirt_eq_step sub paused rest_queue drt1 drt2
       in
       unify new_state
 

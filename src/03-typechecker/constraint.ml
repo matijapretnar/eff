@@ -5,6 +5,8 @@ type omega_ct =
   | TyOmega of (Type.TyCoercionParam.t * Type.ct_ty)
   | DirtOmega of (Type.DirtCoercionParam.t * Type.ct_dirt)
   | SkelEq of Type.skeleton * Type.skeleton
+  | TyEq of Type.ty * Type.ty
+  | DirtEq of Type.dirt * Type.dirt
 
 (* A bag/list of constraints *)
 type constraints = omega_ct list
@@ -62,6 +64,9 @@ let print_omega_ct ?max_level c ppf =
         (Type.print_dirt ty1) (Type.print_dirt ty2)
   | SkelEq (sk1, sk2) ->
       print "%t ~ %t" (Type.print_skeleton sk1) (Type.print_skeleton sk2)
+  | TyEq (ty1, ty2) -> print "%t = %t" (Type.print_ty ty1) (Type.print_ty ty2)
+  | DirtEq (drt1, drt2) ->
+      print "%t = %t" (Type.print_dirt drt1) (Type.print_dirt drt2)
 
 let print_constraints cs = Print.sequence ";" print_omega_ct cs
 
@@ -89,6 +94,12 @@ let free_params_constraint = function
       Type.Params.union
         (Type.free_params_skeleton sk1)
         (Type.free_params_skeleton sk2)
+  | TyEq (ty1, ty2) ->
+      Type.Params.union (Type.free_params_ty ty1) (Type.free_params_ty ty2)
+  | DirtEq (drt1, drt2) ->
+      Type.Params.union
+        (Type.free_params_dirt drt1)
+        (Type.free_params_dirt drt2)
 
 let free_params_constraints = Type.Params.union_map free_params_constraint
 
