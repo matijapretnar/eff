@@ -3,6 +3,8 @@ type ('key, 'value) t = ('key * 'value) list
 
 let empty = []
 
+let is_empty = function [] -> true | _ :: _ -> false
+
 (* Finding elements. *)
 let rec lookup x = function
   | [] -> None

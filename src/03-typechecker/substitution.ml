@@ -22,6 +22,13 @@ let empty =
     skel_param_to_skel_subs = Assoc.empty;
   }
 
+let is_empty sub =
+  Assoc.is_empty sub.type_param_to_type_coercions
+  && Assoc.is_empty sub.dirt_var_to_dirt_coercions
+  && Assoc.is_empty sub.type_param_to_type_subs
+  && Assoc.is_empty sub.dirt_var_to_dirt_subs
+  && Assoc.is_empty sub.skel_param_to_skel_subs
+
 let add_to_empty f a b = f a b empty
 
 let add_type_coercion parameter t_coercion sub =

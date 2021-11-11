@@ -2,18 +2,15 @@ open Utils
 open Language
 open Type
 
-let process_skeleton_parameter_equality sub (paused : Constraint.resolved)
-    rest_queue sp1 sk2a =
-  let k = sp1 in
-  let v = sk2a in
-  let sub1 = Substitution.add_skel_param_substitution_e k v in
-  let cons_subbed =
-    Substitution.apply_substitutions_to_constraints sub1
-      (Constraint.return_resolved paused rest_queue)
-  in
-  ( Substitution.add_skel_param_substitution k v sub,
-    Constraint.empty_resolved,
-    cons_subbed )
+let apply_substitution new_sub sub paused queue =
+  if Substitution.is_empty new_sub then (sub, paused, queue)
+  else
+    let sub' = Substitution.merge new_sub sub in
+    let queue' =
+      Substitution.apply_substitutions_to_constraints sub'
+        (Constraint.return_resolved paused queue)
+    in
+    (sub', Constraint.empty_resolved, queue')
 
 let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
   match (sk1, sk2) with
@@ -22,10 +19,14 @@ let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
   | SkelParam sp1, sk2a
     when not (SkelParamSet.mem sp1 (free_params_skeleton sk2a).skel_params) ->
-      process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a
+      apply_substitution
+        (Substitution.add_skel_param_substitution_e sp1 sk2a)
+        sub paused rest_queue
   | sk2a, SkelParam sp1
     when not (SkelParamSet.mem sp1 (free_params_skeleton sk2a).skel_params) ->
-      process_skeleton_parameter_equality sub paused rest_queue sp1 sk2a
+      apply_substitution
+        (Substitution.add_skel_param_substitution_e sp1 sk2a)
+        sub paused rest_queue
       (* occurs-check failing *)
   | SkelParam _, _ | _, SkelParam _ ->
       let printer = Type.print_pretty () in
@@ -150,14 +151,9 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
   | { term = Type.TyParam tv; ty = skel }, _
   | _, { term = Type.TyParam tv; ty = skel } ->
       let ty = fresh_ty_with_skel skel in
-      let sub1 = Substitution.add_type_substitution_e tv ty in
-      let cons_subbed =
-        Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.return_resolved paused (cons :: rest_queue))
-      in
-      ( Substitution.add_type_substitution tv ty sub,
-        Constraint.empty_resolved,
-        cons_subbed )
+      apply_substitution
+        (Substitution.add_type_substitution_e tv ty)
+        sub paused (cons :: rest_queue)
   | ty1, ty2 ->
       let printer = Type.print_pretty () in
       Error.typing ~loc:Location.unknown
@@ -193,11 +189,7 @@ and dirt_omega_step sub paused rest_queue omega dcons =
           |> Substitution.add_dirt_var_coercion k1' v1'
         in
         let new_cons = Constraint.DirtOmega (omega', omega_ty') in
-        ( Substitution.merge sub sub',
-          Constraint.empty_resolved,
-          Substitution.apply_substitutions_to_constraints sub'
-            (Constraint.return_resolved paused rest_queue
-            |> Constraint.add_to_constraints new_cons) )
+        apply_substitution sub' sub paused (new_cons :: rest_queue)
   (* ω : Ø <= Δ₂ *)
   | { effect_set = s1; row = EmptyRow }, d when Type.EffectSet.is_empty s1 ->
       let k = omega in
@@ -214,10 +206,7 @@ and dirt_omega_step sub paused rest_queue omega dcons =
         Substitution.add_dirt_var_coercion_e k0 v0
         |> Substitution.add_dirt_substitution k1' v1'
       in
-      ( Substitution.merge sub sub1,
-        Constraint.empty_resolved,
-        Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.return_resolved paused rest_queue) )
+      apply_substitution sub1 sub paused rest_queue
   (* ω : O₁ <= O₂ *)
   | { effect_set = s1; row = EmptyRow }, { effect_set = s2; row = EmptyRow } ->
       assert (Type.EffectSet.subset s1 s2);
@@ -244,10 +233,7 @@ and dirt_omega_step sub paused rest_queue omega dcons =
         Substitution.add_dirt_var_coercion_e k0 v0
         |> Substitution.add_dirt_substitution k1 v1
       in
-      ( Substitution.merge sub sub1,
-        Constraint.empty_resolved,
-        Substitution.apply_substitutions_to_constraints sub1
-          (Constraint.return_resolved paused rest_queue) )
+      apply_substitution sub1 sub paused rest_queue
   | _ -> (sub, Constraint.resolve_dirt_constraint paused omega dcons, rest_queue)
 
 let rec unify (sub, paused, queue) =
