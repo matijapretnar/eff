@@ -160,81 +160,72 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
         "This expression has type %t but it should have type %t."
         (printer ty1.ty) (printer ty2.ty)
 
-and dirt_omega_step sub paused rest_queue omega dcons =
+and dirt_omega_step sub resolved unresolved w dcons =
   match dcons with
+  (* ω : δ₁ <= O₂ ∪ δ₂ *)
+  | ( { effect_set = ops1; row = ParamRow _ },
+      { effect_set = _; row = ParamRow _ } )
+    when EffectSet.is_empty ops1 ->
+      (sub, Constraint.resolve_dirt_constraint resolved w dcons, unresolved)
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
-  | ( { effect_set = s1; row = ParamRow v1 },
-      { effect_set = s2; row = ParamRow v2 } ) ->
-      if Type.EffectSet.is_empty s1 then
-        (sub, Constraint.resolve_dirt_constraint paused omega dcons, rest_queue)
-      else
-        let omega' = Type.DirtCoercionParam.fresh () in
-        let diff_set = Type.EffectSet.diff s1 s2 in
-        let union_set = Type.EffectSet.union s1 s2 in
-        let k0 = v2 in
-        let v0 =
-          let open Type in
-          { effect_set = diff_set; row = ParamRow (Type.DirtParam.fresh ()) }
-        in
-        let omega_ty' =
-          ( Type.{ effect_set = Type.EffectSet.empty; row = ParamRow v1 },
-            Type.{ effect_set = union_set; row = ParamRow v2 } )
-        in
-        let k1' = omega in
-        let v1' =
-          Coercion.unionDirt (s1, Coercion.dirtCoercionVar omega' omega_ty')
-        in
-        let sub' =
-          Substitution.add_dirt_substitution_e k0 v0
-          |> Substitution.add_dirt_var_coercion k1' v1'
-        in
-        let new_cons = Constraint.DirtOmega (omega', omega_ty') in
-        apply_substitution sub' sub paused (new_cons :: rest_queue)
+  | ( { effect_set = ops1; row = ParamRow d1 },
+      { effect_set = ops2; row = ParamRow d2 } ) ->
+      let w' = DirtCoercionParam.refresh w in
+      let w_ty' =
+        ( { effect_set = EffectSet.empty; row = ParamRow d1 },
+          { effect_set = EffectSet.union ops1 ops2; row = ParamRow d2 } )
+      in
+      let sub' =
+        Substitution.add_dirt_substitution_e d2
+          {
+            effect_set = EffectSet.diff ops1 ops2;
+            row = ParamRow (DirtParam.refresh d2);
+          }
+        |> Substitution.add_dirt_var_coercion w
+             (Coercion.unionDirt (ops1, Coercion.dirtCoercionVar w' w_ty'))
+      in
+      let new_cons = Constraint.DirtOmega (w', w_ty') in
+      apply_substitution sub' sub resolved (new_cons :: unresolved)
   (* ω : Ø <= Δ₂ *)
-  | { effect_set = s1; row = EmptyRow }, d when Type.EffectSet.is_empty s1 ->
-      let k = omega in
-      let v = Coercion.empty d in
-      (Substitution.add_dirt_var_coercion k v sub, paused, rest_queue)
+  | { effect_set = ops1; row = EmptyRow }, d when EffectSet.is_empty ops1 ->
+      let sub' = Substitution.add_dirt_var_coercion w (Coercion.empty d) sub in
+      (sub', resolved, unresolved)
   (* ω : δ₁ <= Ø *)
-  | { effect_set = s1; row = ParamRow v1 }, { effect_set = s2; row = EmptyRow }
-    when Type.EffectSet.is_empty s1 && Type.EffectSet.is_empty s2 ->
-      let k0 = omega in
-      let v0 = Coercion.empty Type.empty_dirt in
-      let k1' = v1 in
-      let v1' = Type.empty_dirt in
-      let sub1 =
-        Substitution.add_dirt_var_coercion_e k0 v0
-        |> Substitution.add_dirt_substitution k1' v1'
+  | ( { effect_set = ops1; row = ParamRow d1 },
+      { effect_set = ops2; row = EmptyRow } )
+    when EffectSet.is_empty ops1 && EffectSet.is_empty ops2 ->
+      let sub' =
+        Substitution.add_dirt_var_coercion_e w (Coercion.empty empty_dirt)
+        |> Substitution.add_dirt_substitution d1 empty_dirt
       in
-      apply_substitution sub1 sub paused rest_queue
+      apply_substitution sub' sub resolved unresolved
   (* ω : O₁ <= O₂ *)
-  | { effect_set = s1; row = EmptyRow }, { effect_set = s2; row = EmptyRow } ->
-      assert (Type.EffectSet.subset s1 s2);
-      let k = omega in
-      let v =
-        Coercion.unionDirt
-          (s2, Coercion.empty (Type.closed_dirt (Type.EffectSet.diff s2 s1)))
-      in
-      (Substitution.add_dirt_var_coercion k v sub, paused, rest_queue)
-  (* ω : O₁ <= O₂ ∪ δ₂ *)
-  | { effect_set = s1; row = EmptyRow }, { effect_set = s2; row = ParamRow v2 }
+  | { effect_set = ops1; row = EmptyRow }, { effect_set = ops2; row = EmptyRow }
     ->
-      let v2' = Type.DirtParam.fresh () in
-      let k0 = omega in
-      let v0 =
-        Coercion.unionDirt
-          ( s1,
-            Coercion.empty
-              Type.{ effect_set = EffectSet.diff s2 s1; row = ParamRow v2' } )
+      assert (EffectSet.subset ops1 ops2);
+      let sub' =
+        Substitution.add_dirt_var_coercion w
+          (Coercion.unionDirt
+             (ops2, Coercion.empty (closed_dirt (EffectSet.diff ops2 ops1))))
+          sub
       in
-      let k1 = v2 in
-      let v1 = Type.{ effect_set = EffectSet.diff s1 s2; row = ParamRow v2' } in
-      let sub1 =
-        Substitution.add_dirt_var_coercion_e k0 v0
-        |> Substitution.add_dirt_substitution k1 v1
+      (sub', resolved, unresolved)
+  (* ω : O₁ <= O₂ ∪ δ₂ *)
+  | ( { effect_set = ops1; row = EmptyRow },
+      { effect_set = ops2; row = ParamRow d2 } ) ->
+      let d2' = DirtParam.refresh d2 in
+      let sub' =
+        Substitution.add_dirt_var_coercion_e w
+          (Coercion.unionDirt
+             ( ops1,
+               Coercion.empty
+                 { effect_set = EffectSet.diff ops2 ops1; row = ParamRow d2' }
+             ))
+        |> Substitution.add_dirt_substitution d2
+             { effect_set = EffectSet.diff ops1 ops2; row = ParamRow d2' }
       in
-      apply_substitution sub1 sub paused rest_queue
-  | _ -> (sub, Constraint.resolve_dirt_constraint paused omega dcons, rest_queue)
+      apply_substitution sub' sub resolved unresolved
+  | _ -> assert false
 
 let rec unify (sub, paused, queue) =
   (* Print.debug "SUB: %t" (Substitution.print_substitutions sub); *)
