@@ -51,6 +51,22 @@ let resolve_ty_constraint resolved omega ty1 ty2 skel =
 let resolve_dirt_constraint resolved omega ct =
   { resolved with dirt_constraints = (omega, ct) :: resolved.dirt_constraints }
 
+let print_resolved c ppf =
+  let print_dirt_constraint (p, (ty1, ty2)) ppf =
+    Print.print ppf "%t: (%t ≤ %t)"
+      (Type.DirtCoercionParam.print p)
+      (Type.print_dirt ty1) (Type.print_dirt ty2)
+  and print_ty_constraint (p, ty1, ty2, s) ppf =
+    Print.print ppf "%t: (%t ≤ %t) : %t"
+      (Type.TyCoercionParam.print p)
+      (CoreTypes.TyParam.print ty1)
+      (CoreTypes.TyParam.print ty2)
+      (Type.SkelParam.print s)
+  in
+  Print.print ppf "{ %t / %t }"
+    (Print.sequence ";" print_dirt_constraint c.dirt_constraints)
+    (Print.sequence ";" print_ty_constraint c.ty_constraints)
+
 let print_omega_ct ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c with

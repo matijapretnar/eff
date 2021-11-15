@@ -311,7 +311,12 @@ let apply_sub1 subs cons =
   | Constraint.DirtOmega (coer_p, (drt1, drt2)) ->
       Constraint.DirtOmega
         (coer_p, (apply_sub_dirt subs drt1, apply_sub_dirt subs drt2))
-  | _ -> cons
+  | Constraint.SkelEq (skel1, skel2) ->
+      Constraint.SkelEq (apply_sub_skel subs skel1, apply_sub_skel subs skel2)
+  | Constraint.TyEq (ty1, ty2) ->
+      Constraint.TyEq (apply_sub_ty subs ty1, apply_sub_ty subs ty2)
+  | Constraint.DirtEq (drt1, drt2) ->
+      Constraint.DirtEq (apply_sub_dirt subs drt1, apply_sub_dirt subs drt2)
 
 let apply_substitutions_to_constraints subs c_list =
   List.map (apply_sub1 subs) c_list

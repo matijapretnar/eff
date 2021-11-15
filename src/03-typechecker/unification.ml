@@ -83,6 +83,12 @@ let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
 and ty_eq_step sub (paused : Constraint.resolved) rest_queue (ty1 : Type.ty)
     (ty2 : Type.ty) =
   match (ty1.term, ty2.term) with
+  | _, _ when ty1.ty <> ty2.ty ->
+      ( sub,
+        paused,
+        Constraint.SkelEq (ty1.ty, ty2.ty)
+        :: Constraint.TyEq (ty1, ty2)
+        :: rest_queue )
   (* ς = ς *)
   | TyParam p1, TyParam p2 when p1 = p2 -> (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)

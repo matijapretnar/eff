@@ -134,43 +134,12 @@ let subInDirtCt sub (d1, d2) = (subInDirt sub d1, subInDirt sub d2)
 
 (* ************************************************************************* *)
 
-let rec unifier_ty type1 type2 =
-  match (type1.term, type2.term) with
-  | Type.TyParam tv1, _ -> Substitution.add_type_substitution_e tv1 type2
-  | _, Type.TyParam tv2 -> Substitution.add_type_substitution_e tv2 type1
-  | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
-      Substitution.merge (unifier_ty ttya1 ttyb1)
-        (unifier_dirty dirtya1 dirtyb1)
-  | Tuple tys1, Tuple tys2 -> unifier_tys tys1 tys2
-  | Apply (ty_name1, tys1), Apply (ty_name2, tys2) when ty_name1 = ty_name2 ->
-      unifier_tys tys1 tys2
-  | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
-      Substitution.merge
-        (unifier_dirty dirtya1 dirtyb1)
-        (unifier_dirty dirtya2 dirtyb2)
-  | TyBasic ptya, TyBasic ptyb when ptya = ptyb -> Substitution.empty
-  | _ -> failwith __LOC__
-
-and unifier_dirty (ty1, _d1) (ty2, _d2) = unifier_ty ty1 ty2
-
-and unifier_tys tys1 tys2 =
-  match (tys1, tys2) with
-  | [], [] -> Substitution.empty
-  | ty1 :: tys1', ty2 :: tys2' ->
-      Substitution.merge (unifier_ty ty1 ty2) (unifier_tys tys1' tys2')
-  | _ -> failwith __LOC__
-
 let infer_constructor_signature tctx_st lbl =
   match TypeDefinitionContext.infer_variant lbl tctx_st with
   | None -> assert false
   | Some (ty_out, ty_in) ->
       ( Option.map (source_to_target tctx_st) ty_in,
         source_to_target tctx_st ty_out )
-
-let check_constructor_signature tctx_st lbl ty_out =
-  let ty_in, ty_out' = infer_constructor_signature tctx_st lbl in
-  let subst = unifier_ty ty_out ty_out' in
-  Option.map (Substitution.apply_substitutions_to_type subst) ty_in
 
 (* ************************************************************************* *)
 
@@ -218,43 +187,6 @@ let rec tcMany state (xss : 'a list) tc =
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
-let rec check_pattern state ty (pat : Untyped.pattern) : Term.pattern * state =
-  let pat', state' = check_pattern' state ty pat in
-  ({ term = pat'; ty }, state')
-
-and check_pattern' state ty pat =
-  match pat.it with
-  | Untyped.PVar x -> (Term.PVar x, extend_var state x ty)
-  | Untyped.PAnnotated (p, ty') when source_to_target state.tydefs ty' = ty ->
-      let p', state = check_pattern state ty p in
-      (p'.term, state)
-  | Untyped.PNonbinding -> (Term.PNonbinding, state)
-  | Untyped.PConst c when ty = Type.type_const c -> (Term.PConst c, state)
-  | Untyped.PTuple ps -> (
-      match ty.term with
-      | Type.Tuple tys ->
-          let fold p ty (ps', state) =
-            let p', state' = check_pattern state ty p in
-            (p' :: ps', state')
-          in
-          let ps', state' = List.fold_right2 fold ps tys ([], state) in
-          let p = Term.pTuple ps' in
-          (p.term, state')
-      | _ ->
-          Error.typing ~loc:pat.at "Cannot check pattern %t against %t"
-            (Untyped.print_pattern pat)
-            (Type.print_ty ty))
-  | Untyped.PVariant (lbl, p) -> (
-      match (p, check_constructor_signature state.tydefs lbl ty) with
-      | None, None -> (Term.PVariant (lbl, None), state)
-      | Some p, Some in_ty ->
-          let p', state' = check_pattern state in_ty p in
-          (Term.PVariant (lbl, Some p'), state')
-      | _, _ -> assert false)
-  | _ ->
-      Error.typing ~loc:pat.at "check_pattern: Unsupported pattern %t"
-        (Untyped.print_pattern pat)
-
 let rec infer_pattern state (pat : Untyped.pattern) :
     Term.pattern * state * Constraint.constraints =
   let pat', ty, state', cnstrs = infer_pattern' state pat in
@@ -267,8 +199,8 @@ and infer_pattern' state pat =
       (Term.PVar x, alpha, extend_var state x alpha, [])
   | Untyped.PAnnotated (p, ty) ->
       let ty' = source_to_target state.tydefs ty in
-      let p', state' = check_pattern state ty' p in
-      (p'.term, ty', state', [])
+      let p', state', cnstrs = infer_pattern state p in
+      (p'.term, ty', state', Constraint.TyEq (ty', p'.ty) :: cnstrs)
   | Untyped.PNonbinding ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
       (Term.PNonbinding, alpha, state, [])
@@ -285,8 +217,11 @@ and infer_pattern' state pat =
       match (p, infer_constructor_signature state.tydefs lbl) with
       | None, (None, out_ty) -> (Term.PVariant (lbl, None), out_ty, state, [])
       | Some p, (Some in_ty, out_ty) ->
-          let p', state' = check_pattern state in_ty p in
-          (Term.PVariant (lbl, Some p'), out_ty, state', [])
+          let p', state', cnstrs = infer_pattern state p in
+          ( Term.PVariant (lbl, Some p'),
+            out_ty,
+            state',
+            Constraint.TyEq (in_ty, p'.ty) :: cnstrs )
       | _ -> assert false)
   | _ ->
       Error.typing ~loc:pat.at "infer_pattern: Unsupported pattern %t"
@@ -567,7 +502,8 @@ and tcLetCmp state (pat : Untyped.pattern) (c1 : Untyped.computation)
   (* 1: Typecheck c1, the pattern, and c2 *)
   let trgC1, cs1 = tcComp state c1 in
   let tyA1, dirtD1 = trgC1.ty in
-  let trgPat, midState = check_pattern state tyA1 pat in
+  let trgPat, midState, csPat = infer_pattern state pat in
+  let csPat' = Constraint.TyEq (trgPat.ty, tyA1) :: csPat in
   let trgC2, cs2 = tcComp midState c2 in
   let tyA2, dirtD2 = trgC2.ty in
 
@@ -589,7 +525,7 @@ and tcLetCmp state (pat : Untyped.pattern) (c1 : Untyped.computation)
 
   let outExpr = Term.Bind (cresC1, Term.abstraction (trgPat, cresC2)) in
   let outType = (tyA2, delta) in
-  let outCs = (omegaCt1 :: omegaCt2 :: cs1) @ cs2 in
+  let outCs = (omegaCt1 :: omegaCt2 :: cs1) @ cs2 @ csPat' in
 
   ((outExpr, outType), outCs)
 
@@ -658,22 +594,16 @@ and tcMatch state (scr : Untyped.expression) (alts : Untyped.abstraction list) :
   else tcEmptyMatch state scr
 
 and infer_cases state drty (cases : Untyped.abstraction list) =
-  let infer_pattern_ty state (pat, _) =
-    match infer_pattern state pat with
-    | { ty; _ }, _, [] -> Some ty
-    | _, _, _ :: _ -> None
-  and infer_case state ty case (cases', cnstrs) =
-    let case', cnstrs' = check_abstraction state case ty in
-    let case'', cnstrs'' = Constraint.cast_abstraction case' drty in
-    (case'' :: cases', cnstrs'' @ cnstrs' @ cnstrs)
+  let ty = Type.fresh_ty_with_fresh_skel () in
+  let infer_case state case (cases', cnstrs) =
+    let case', cnstrs' = infer_abstraction state case in
+    let ty_in, _ = case'.ty
+    and case'', cnstrs'' = Constraint.cast_abstraction case' drty in
+    ( case'' :: cases',
+      (Constraint.TyEq (ty, ty_in) :: cnstrs'') @ cnstrs' @ cnstrs )
   in
-  match List.filter_map (infer_pattern_ty state) cases with
-  | [] -> failwith "Annotate one case so that it's type may be inferred"
-  | ty :: _ ->
-      let cases', cnstrs =
-        List.fold_right (infer_case state ty) cases ([], [])
-      in
-      (cases', ty, cnstrs)
+  let cases', cnstrs = List.fold_right (infer_case state) cases ([], []) in
+  (cases', ty, cnstrs)
 
 (* Typecheck a non-empty case expression *)
 and tcNonEmptyMatch state (scr : Untyped.expression) alts : tcCompOutput' =
@@ -774,22 +704,34 @@ and infer_abstraction (state : state) (pat, cmp) :
   let trgCmp, cs2 = tcComp state' cmp in
   (Term.abstraction (trgPat, trgCmp), cs1 @ cs2)
 
-and check_abstraction state (pat, cmp) patTy :
+and check_abstraction state abs patTy :
     Term.abstraction * Constraint.omega_ct list =
-  let trgPat, state' = check_pattern state patTy pat in
+  let { term = trgPat, trgCmp; _ }, cs = infer_abstraction state abs in
+  let trgPat' = { trgPat with ty = patTy } in
+  (Term.abstraction (trgPat', trgCmp), Constraint.TyEq (trgPat.ty, patTy) :: cs)
+
+and infer_abstraction2 (state : state) (pat1, pat2, cmp) :
+    Term.abstraction2 * Constraint.omega_ct list =
+  let trgPat1, state', cs1 = infer_pattern state pat1 in
+  let trgPat2, state', cs2 = infer_pattern state' pat2 in
   let trgCmp, cs = tcComp state' cmp in
-  (Term.abstraction (trgPat, trgCmp), cs)
+  (Term.abstraction2 (trgPat1, trgPat2, trgCmp), cs1 @ cs2 @ cs)
 
 (* Typecheck an abstraction where we *know* the type of the pattern. By *know*
  * we mean that we have inferred "some" type (could be instantiated later).
  * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
  * tcTypedVarPat) *)
-and check_abstraction2 state (pat1, pat2, cmp) patTy1 patTy2 :
+and check_abstraction2 state abs2 patTy1 patTy2 :
     Term.abstraction2 * Constraint.omega_ct list =
-  let trgPat1, state' = check_pattern state patTy1 pat1 in
-  let trgPat2, state'' = check_pattern state' patTy2 pat2 in
-  let trgCmp, cs = tcComp state'' cmp in
-  (Term.abstraction2 (trgPat1, trgPat2, trgCmp), cs)
+  let { term = trgPat1, trgPat2, trgCmp; _ }, cs =
+    infer_abstraction2 state abs2
+  in
+  let trgPat1' = { trgPat1 with ty = patTy1 }
+  and trgPat2' = { trgPat2 with ty = patTy2 } in
+  ( Term.abstraction2 (trgPat1', trgPat2', trgCmp),
+    Constraint.TyEq (trgPat1.ty, patTy1)
+    :: Constraint.TyEq (trgPat2.ty, patTy2)
+    :: cs )
 
 (* ************************************************************************* *)
 (* ************************************************************************* *)
