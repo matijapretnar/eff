@@ -52,7 +52,7 @@ type ty = (ty', skeleton) typed
 
 and ty' =
   | TyParam of CoreTypes.TyParam.t
-  | Apply of CoreTypes.TyName.t * ty list
+  | Apply of { ty_name : CoreTypes.TyName.t; ty_args : ty list }
   | Arrow of abs_ty
   | Tuple of ty list
   | Handler of dirty * dirty
@@ -91,10 +91,10 @@ let arrow (ty1, drty2) =
     ty = SkelArrow (skeleton_of_ty ty1, skeleton_of_dirty drty2);
   }
 
-let apply (ty_name, tys) =
+let apply (ty_name, ty_args) =
   {
-    term = Apply (ty_name, tys);
-    ty = SkelApply (ty_name, List.map (fun ty -> skeleton_of_ty ty) tys);
+    term = Apply { ty_name; ty_args };
+    ty = SkelApply (ty_name, List.map (fun ty -> skeleton_of_ty ty) ty_args);
   }
 
 let tuple tup =
@@ -209,14 +209,15 @@ let rec print_ty ?max_level ty ppf =
   | Arrow (t1, (t2, drt)) ->
       print ~at_level:3 "%t -%t→ %t" (print_ty ~max_level:2 t1)
         (print_dirt drt) (print_ty ~max_level:3 t2)
-  | Apply (t, []) -> print "%t" (CoreTypes.TyName.print t)
-  | Apply (t, [ s ]) ->
+  | Apply { ty_name; ty_args = [] } ->
+      print "%t" (CoreTypes.TyName.print ty_name)
+  | Apply { ty_name; ty_args = [ s ] } ->
       print ~at_level:1 "%t %t" (print_ty ~max_level:1 s)
-        (CoreTypes.TyName.print t)
-  | Apply (t, ts) ->
+        (CoreTypes.TyName.print ty_name)
+  | Apply { ty_name; ty_args } ->
       print ~at_level:1 "(%t) %t"
-        (Print.sequence ", " print_ty ts)
-        (CoreTypes.TyName.print t)
+        (Print.sequence ", " print_ty ty_args)
+        (CoreTypes.TyName.print ty_name)
   | Tuple [] -> print "𝟙"
   | Tuple tys ->
       print ~at_level:2 "%t" (Print.sequence "×" (print_ty ~max_level:1) tys)
@@ -291,7 +292,8 @@ let rec equal_ty type1 type2 =
       equal_ty ttya1 ttyb1 && equal_dirty dirtya1 dirtyb1
   | Tuple tys1, Tuple tys2 ->
       List.length tys1 = List.length tys2 && List.for_all2 equal_ty tys1 tys2
-  | Apply (ty_name1, tys1), Apply (ty_name2, tys2) ->
+  | ( Apply { ty_name = ty_name1; ty_args = tys1 },
+      Apply { ty_name = ty_name2; ty_args = tys2 } ) ->
       ty_name1 = ty_name2
       && List.length tys1 = List.length tys2
       && List.for_all2 equal_ty tys1 tys2
@@ -424,7 +426,7 @@ let rec free_params_ty ty =
   | Handler (cty1, cty2) ->
       Params.union (free_params_dirty cty1) (free_params_dirty cty2)
   | TyBasic _prim_ty -> Params.empty
-  | Apply (_, vtys) -> Params.union_map free_params_ty vtys
+  | Apply { ty_args; _ } -> Params.union_map free_params_ty ty_args
 
 and free_params_dirty (ty, dirt) =
   Params.union (free_params_ty ty) (free_params_dirt dirt)
@@ -503,7 +505,8 @@ and rename_ty' sbst = function
   | Handler (cty1, cty2) ->
       Handler (rename_dirty sbst cty1, rename_dirty sbst cty2)
   | TyBasic _ as ty -> ty
-  | Apply (ty_name, vtys) -> Apply (ty_name, List.map (rename_ty sbst) vtys)
+  | Apply { ty_name; ty_args } ->
+      Apply { ty_name; ty_args = List.map (rename_ty sbst) ty_args }
 
 and rename_dirty sbst (ty, dirt) = (rename_ty sbst ty, rename_dirt sbst dirt)
 

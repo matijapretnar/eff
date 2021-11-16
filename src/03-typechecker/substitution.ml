@@ -142,7 +142,8 @@ and apply_sub_ty' sub ty =
       | None -> ty)
   | Arrow (tty1, tty2) ->
       arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
-  | Apply (ty_name, tys) -> Type.apply (ty_name, List.map (apply_sub_ty sub) tys)
+  | Apply { ty_name; ty_args } ->
+      Type.apply (ty_name, List.map (apply_sub_ty sub) ty_args)
   | Tuple ttyl -> Type.tuple (List.map (fun x -> apply_sub_ty sub x) ttyl)
   | Handler (tydrty1, tydrty2) ->
       Type.handler

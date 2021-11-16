@@ -22,7 +22,8 @@ let typefail str =
 let rec elab_ty (ty : ExEffTypes.ty) =
   match ty.term with
   | ExEffTypes.TyParam x -> NoEff.NTyParam x
-  | ExEffTypes.Apply (name, lst) -> NoEff.NTyApply (name, List.map elab_ty lst)
+  | ExEffTypes.Apply { ty_name; ty_args } ->
+      NoEff.NTyApply (ty_name, List.map elab_ty ty_args)
   | ExEffTypes.Arrow (t, dirty) ->
       let elab1 = elab_ty t in
       let elab2 = elab_dirty dirty in
@@ -116,7 +117,7 @@ and elab_dirty_coercion state { term = tcoer, dcoer; _ } =
 let rec value_coercion_from_impure_dirt empty_dirt_params ty =
   match ty.term with
   | ExEffTypes.TyParam _ -> NoEff.NCoerRefl
-  | ExEffTypes.Apply (_, _) -> NoEff.NCoerRefl
+  | ExEffTypes.Apply _ -> NoEff.NCoerRefl
   | ExEffTypes.Arrow (ty1, drty2) ->
       NoEff.NCoerArrow
         ( value_coercion_to_impure_dirt empty_dirt_params ty1,
@@ -183,7 +184,7 @@ and computation_coercion_from_impure_dirt empty_dirt_params (ty1, drt) =
 and value_coercion_to_impure_dirt empty_dirt_params ty =
   match ty.term with
   | ExEffTypes.TyParam _ -> NoEff.NCoerRefl
-  | ExEffTypes.Apply (_, _) -> NoEff.NCoerRefl
+  | ExEffTypes.Apply _ -> NoEff.NCoerRefl
   | ExEffTypes.Arrow (ty1, drty2) ->
       NoEff.NCoerArrow
         ( value_coercion_from_impure_dirt empty_dirt_params ty1,

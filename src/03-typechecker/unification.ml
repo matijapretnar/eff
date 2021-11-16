@@ -129,7 +129,8 @@ and ty_eq_step sub (paused : Constraint.resolved) rest_queue (ty1 : Type.ty)
             Constraint.DirtEq (drtb, drtd);
           ]
           rest_queue )
-  | Apply (ty_name1, tys1), Apply (ty_name2, tys2)
+  | ( Apply { ty_name = ty_name1; ty_args = tys1 },
+      Apply { ty_name = ty_name2; ty_args = tys2 } )
     when ty_name1 = ty_name2 && List.length tys1 = List.length tys2 ->
       ( sub,
         paused,
@@ -186,8 +187,8 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
         Constraint.add_list_to_constraints conss rest_queue )
   (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
   (* we assume that all type parameters are positive *)
-  | ( { term = Type.Apply (ty_name1, tys1); _ },
-      { term = Type.Apply (ty_name2, tys2); _ } )
+  | ( { term = Type.Apply { ty_name = ty_name1; ty_args = tys1 }; _ },
+      { term = Type.Apply { ty_name = ty_name2; ty_args = tys2 }; _ } )
     when ty_name1 = ty_name2 && List.length tys1 = List.length tys2 ->
       let coercions, conss =
         List.fold_right2

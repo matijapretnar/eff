@@ -95,7 +95,8 @@ and of_pattern pat =
 
 and of_type ty =
   match ty.term with
-  | Type.Apply (name, tys) -> TyApply (name, List.map of_type tys)
+  | Type.Apply { ty_name; ty_args } ->
+      TyApply (ty_name, List.map of_type ty_args)
   | Type.TyParam ty_param -> TyParam ty_param
   | Type.TyBasic s -> TyBasic s
   | Type.Tuple tys -> TyTuple (List.map of_type tys)
