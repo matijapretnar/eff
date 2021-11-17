@@ -72,6 +72,148 @@ and ct_dirt = dirt * dirt
 
 and ct_dirty = dirty * dirty
 
+let skeleton_of_ty ty = ty.ty
+
+let skeleton_of_dirty (ty, _) = skeleton_of_ty ty
+
+let tyParam t skel = { term = TyParam t; ty = skel }
+
+let arrow (ty1, drty2) =
+  {
+    term = Arrow (ty1, drty2);
+    ty = SkelArrow (skeleton_of_ty ty1, skeleton_of_dirty drty2);
+  }
+
+let apply (ty_name, ty_args) =
+  {
+    term = Apply { ty_name; ty_args };
+    ty = SkelApply (ty_name, List.map (fun ty -> skeleton_of_ty ty) ty_args);
+  }
+
+let tuple tup =
+  {
+    term = Tuple tup;
+    ty = SkelTuple (List.map (fun ty -> skeleton_of_ty ty) tup);
+  }
+
+let handler (drty1, drty2) =
+  {
+    term = Handler (drty1, drty2);
+    ty = SkelHandler (skeleton_of_dirty drty1, skeleton_of_dirty drty2);
+  }
+
+let tyBasic pt = { term = TyBasic pt; ty = SkelBasic pt }
+
+let unit_ty = tuple []
+
+let empty_ty = apply (CoreTypes.empty_tyname, [])
+
+let int_ty = tyBasic Const.IntegerTy
+
+let float_ty = tyBasic Const.FloatTy
+
+let bool_ty = tyBasic Const.BooleanTy
+
+let string_ty = tyBasic Const.StringTy
+
+and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
+
+module Params = struct
+  type t = {
+    ty_params : skeleton TyParamMap.t;
+    dirt_params : DirtParamSet.t;
+    skel_params : SkelParamSet.t;
+  }
+
+  let empty =
+    {
+      ty_params = TyParamMap.empty;
+      dirt_params = DirtParamSet.empty;
+      skel_params = SkelParamSet.empty;
+    }
+
+  let subset fp1 fp2 =
+    TyParamMap.for_all
+      (fun p1 _ -> TyParamMap.mem p1 fp2.ty_params)
+      fp1.ty_params
+    && DirtParamSet.subset fp1.dirt_params fp2.dirt_params
+    && SkelParamSet.subset fp1.skel_params fp2.skel_params
+
+  let ty_singleton p skel =
+    { empty with ty_params = TyParamMap.singleton p skel }
+
+  let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
+
+  let skel_singleton p = { empty with skel_params = SkelParamSet.singleton p }
+
+  let union fp1 fp2 =
+    {
+      ty_params =
+        TyParamMap.union
+          (fun _ skel1 skel2 ->
+            (* Print.debug "%t = %t" (print_skeleton skel1) (print_skeleton skel2); *)
+            assert (skel1 = skel2);
+            Some skel1)
+          fp1.ty_params fp2.ty_params;
+      dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
+      skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
+    }
+
+  let union_map free_params =
+    List.fold_left (fun fp x -> union fp (free_params x)) empty
+
+  let is_empty fp =
+    DirtParamSet.is_empty fp.dirt_params && SkelParamSet.is_empty fp.skel_params
+end
+
+let rec free_params_skeleton = function
+  | SkelParam p -> Params.skel_singleton p
+  | SkelBasic _ -> Params.empty
+  | SkelApply (_, sks) -> Params.union_map free_params_skeleton sks
+  | SkelArrow (sk1, sk2) ->
+      Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
+  | SkelHandler (sk1, sk2) ->
+      Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
+  | SkelTuple sks -> Params.union_map free_params_skeleton sks
+
+let rec free_params_ty ty =
+  match ty.term with
+  | TyParam p -> Params.ty_singleton p ty.ty
+  | Arrow (vty, cty) ->
+      Params.union (free_params_ty vty) (free_params_dirty cty)
+  | Tuple vtys -> Params.union_map free_params_ty vtys
+  | Handler (cty1, cty2) ->
+      Params.union (free_params_dirty cty1) (free_params_dirty cty2)
+  | TyBasic _prim_ty -> Params.empty
+  | Apply { ty_args; _ } -> Params.union_map free_params_ty ty_args
+
+and free_params_dirty (ty, dirt) =
+  Params.union (free_params_ty ty) (free_params_dirt dirt)
+
+and free_params_abstraction_ty (ty_in, drty_out) =
+  Params.union (free_params_ty ty_in) (free_params_dirty drty_out)
+
+and free_params_ct_ty (vty1, vty2) =
+  Params.union (free_params_ty vty1) (free_params_ty vty2)
+
+and free_params_ct_dirty (cty1, cty2) =
+  Params.union (free_params_dirty cty1) (free_params_dirty cty2)
+
+and free_params_ct_dirt (dirt1, dirt2) =
+  Params.union (free_params_dirt dirt1) (free_params_dirt dirt2)
+
+and free_params_dirt (dirt : dirt) =
+  match dirt.row with
+  | ParamRow p -> Params.dirt_singleton p
+  | EmptyRow -> Params.empty
+
+type tydef =
+  | Record of (CoreTypes.Field.t, ty) Assoc.t
+  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
+  | Inline of ty
+
+type type_data = { params : Params.t; type_def : tydef }
+
 let is_empty_dirt dirt =
   EffectSet.is_empty dirt.effect_set && dirt.row = EmptyRow
 
@@ -160,106 +302,68 @@ and print_abs_ty (ty1, drty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t → %t" (print_ty ty1) (print_dirty drty2)
 
-type tydef =
-  | Record of (CoreTypes.Field.t, ty) Assoc.t
-  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
-  | Inline of ty
-
-module Params = struct
+module Constraints = struct
   type t = {
-    ty_params : skeleton TyParamMap.t;
-    dirt_params : DirtParamSet.t;
-    skel_params : SkelParamSet.t;
+    ty_constraints :
+      (TyCoercionParam.t
+      * CoreTypes.TyParam.t
+      * CoreTypes.TyParam.t
+      * SkelParam.t)
+      list;
+    dirt_constraints : (DirtCoercionParam.t * ct_dirt) list;
   }
 
-  let empty =
+  let empty = { ty_constraints = []; dirt_constraints = [] }
+
+  let add_ty_constraint resolved omega ty1 ty2 skel =
     {
-      ty_params = TyParamMap.empty;
-      dirt_params = DirtParamSet.empty;
-      skel_params = SkelParamSet.empty;
+      resolved with
+      ty_constraints = (omega, ty1, ty2, skel) :: resolved.ty_constraints;
     }
 
-  let subset fp1 fp2 =
-    TyParamMap.for_all
-      (fun p1 _ -> TyParamMap.mem p1 fp2.ty_params)
-      fp1.ty_params
-    && DirtParamSet.subset fp1.dirt_params fp2.dirt_params
-    && SkelParamSet.subset fp1.skel_params fp2.skel_params
-
-  let ty_singleton p skel =
-    { empty with ty_params = TyParamMap.singleton p skel }
-
-  let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
-
-  let skel_singleton p = { empty with skel_params = SkelParamSet.singleton p }
-
-  let union fp1 fp2 =
+  let add_dirt_constraint resolved omega ct =
     {
-      ty_params =
-        TyParamMap.union
-          (fun _ skel1 skel2 ->
-            (* Print.debug "%t = %t" (print_skeleton skel1) (print_skeleton skel2); *)
-            assert (skel1 = skel2);
-            Some skel1)
-          fp1.ty_params fp2.ty_params;
-      dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
-      skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
+      resolved with
+      dirt_constraints = (omega, ct) :: resolved.dirt_constraints;
     }
 
-  let union_map free_params =
-    List.fold_left (fun fp x -> union fp (free_params x)) empty
+  let free_params res =
+    let free_params_ty =
+      Params.union_map
+        (fun (_, ty1, ty2, skel) ->
+          Params.union
+            {
+              Params.empty with
+              ty_params =
+                TyParamMap.of_seq
+                  (List.to_seq [ (ty1, SkelParam skel); (ty2, SkelParam skel) ]);
+            }
+            (Params.skel_singleton skel))
+        res.ty_constraints
+    and free_params_dirt =
+      Params.union_map
+        (fun (_, dt) -> free_params_ct_dirt dt)
+        res.dirt_constraints
+    in
+    Params.union free_params_ty free_params_dirt
 
-  let is_empty fp =
-    DirtParamSet.is_empty fp.dirt_params && SkelParamSet.is_empty fp.skel_params
+  let print c ppf =
+    let print_dirt_constraint (p, (ty1, ty2)) ppf =
+      Print.print ppf "%t: (%t ≤ %t)"
+        (DirtCoercionParam.print p)
+        (print_dirt ty1) (print_dirt ty2)
+    and print_ty_constraint (p, ty1, ty2, s) ppf =
+      Print.print ppf "%t: (%t ≤ %t) : %t" (TyCoercionParam.print p)
+        (CoreTypes.TyParam.print ty1)
+        (CoreTypes.TyParam.print ty2)
+        (SkelParam.print s)
+    in
+    Print.print ppf "{ %t / %t }"
+      (Print.sequence ";" print_dirt_constraint c.dirt_constraints)
+      (Print.sequence ";" print_ty_constraint c.ty_constraints)
 end
 
-type type_data = { params : Params.t; type_def : tydef }
-
-let skeleton_of_ty ty = ty.ty
-
-let skeleton_of_dirty (ty, _) = skeleton_of_ty ty
-
-let tyParam t skel = { term = TyParam t; ty = skel }
-
-let arrow (ty1, drty2) =
-  {
-    term = Arrow (ty1, drty2);
-    ty = SkelArrow (skeleton_of_ty ty1, skeleton_of_dirty drty2);
-  }
-
-let apply (ty_name, ty_args) =
-  {
-    term = Apply { ty_name; ty_args };
-    ty = SkelApply (ty_name, List.map (fun ty -> skeleton_of_ty ty) ty_args);
-  }
-
-let tuple tup =
-  {
-    term = Tuple tup;
-    ty = SkelTuple (List.map (fun ty -> skeleton_of_ty ty) tup);
-  }
-
-let handler (drty1, drty2) =
-  {
-    term = Handler (drty1, drty2);
-    ty = SkelHandler (skeleton_of_dirty drty1, skeleton_of_dirty drty2);
-  }
-
-let tyBasic pt = { term = TyBasic pt; ty = SkelBasic pt }
-
-let unit_ty = tuple []
-
-let empty_ty = apply (CoreTypes.empty_tyname, [])
-
-let int_ty = tyBasic Const.IntegerTy
-
-let float_ty = tyBasic Const.FloatTy
-
-let bool_ty = tyBasic Const.BooleanTy
-
-let string_ty = tyBasic Const.StringTy
-
-and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
+let type_const c = tyBasic (Const.infer_ty c)
 
 type parameters = {
   skeleton_params : SkelParam.t list;
@@ -281,8 +385,6 @@ let empty_parameters =
 type ty_scheme = { parameters : parameters; monotype : ty }
 
 let monotype ty = { parameters = empty_parameters; monotype = ty }
-
-let type_const c = tyBasic (Const.infer_ty c)
 
 (* ************************************************************************* *)
 (*                       PREDICATES ON ty                             *)
@@ -413,47 +515,6 @@ let print_pretty () = print_pretty_skel (ref Assoc.empty)
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)
 (* ************************************************************************* *)
-
-let rec free_params_skeleton = function
-  | SkelParam p -> Params.skel_singleton p
-  | SkelBasic _ -> Params.empty
-  | SkelApply (_, sks) -> Params.union_map free_params_skeleton sks
-  | SkelArrow (sk1, sk2) ->
-      Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
-  | SkelHandler (sk1, sk2) ->
-      Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
-  | SkelTuple sks -> Params.union_map free_params_skeleton sks
-
-let rec free_params_ty ty =
-  match ty.term with
-  | TyParam p -> Params.ty_singleton p ty.ty
-  | Arrow (vty, cty) ->
-      Params.union (free_params_ty vty) (free_params_dirty cty)
-  | Tuple vtys -> Params.union_map free_params_ty vtys
-  | Handler (cty1, cty2) ->
-      Params.union (free_params_dirty cty1) (free_params_dirty cty2)
-  | TyBasic _prim_ty -> Params.empty
-  | Apply { ty_args; _ } -> Params.union_map free_params_ty ty_args
-
-and free_params_dirty (ty, dirt) =
-  Params.union (free_params_ty ty) (free_params_dirt dirt)
-
-and free_params_abstraction_ty (ty_in, drty_out) =
-  Params.union (free_params_ty ty_in) (free_params_dirty drty_out)
-
-and free_params_ct_ty (vty1, vty2) =
-  Params.union (free_params_ty vty1) (free_params_ty vty2)
-
-and free_params_ct_dirty (cty1, cty2) =
-  Params.union (free_params_dirty cty1) (free_params_dirty cty2)
-
-and free_params_ct_dirt (dirt1, dirt2) =
-  Params.union (free_params_dirt dirt1) (free_params_dirt dirt2)
-
-and free_params_dirt (dirt : dirt) =
-  match dirt.row with
-  | ParamRow p -> Params.dirt_singleton p
-  | EmptyRow -> Params.empty
 
 (* ************************************************************************* *)
 

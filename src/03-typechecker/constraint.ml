@@ -16,17 +16,7 @@ let add_to_constraints con constraints = con :: constraints
 let add_list_to_constraints new_constraints old_constraints =
   new_constraints @ old_constraints
 
-type resolved = {
-  ty_constraints :
-    (Type.TyCoercionParam.t
-    * CoreTypes.TyParam.t
-    * CoreTypes.TyParam.t
-    * Type.SkelParam.t)
-    list;
-  dirt_constraints : (Type.DirtCoercionParam.t * Type.ct_dirt) list;
-}
-
-let unresolve resolved =
+let unresolve (resolved : Type.Constraints.t) =
   List.map
     (fun (omega, a, b, skel) ->
       TyOmega
@@ -39,33 +29,6 @@ let unresolve resolved =
       resolved.dirt_constraints
 
 let return_resolved resolved queue = unresolve resolved @ queue
-
-let empty_resolved = { ty_constraints = []; dirt_constraints = [] }
-
-let resolve_ty_constraint resolved omega ty1 ty2 skel =
-  {
-    resolved with
-    ty_constraints = (omega, ty1, ty2, skel) :: resolved.ty_constraints;
-  }
-
-let resolve_dirt_constraint resolved omega ct =
-  { resolved with dirt_constraints = (omega, ct) :: resolved.dirt_constraints }
-
-let print_resolved c ppf =
-  let print_dirt_constraint (p, (ty1, ty2)) ppf =
-    Print.print ppf "%t: (%t ≤ %t)"
-      (Type.DirtCoercionParam.print p)
-      (Type.print_dirt ty1) (Type.print_dirt ty2)
-  and print_ty_constraint (p, ty1, ty2, s) ppf =
-    Print.print ppf "%t: (%t ≤ %t) : %t"
-      (Type.TyCoercionParam.print p)
-      (CoreTypes.TyParam.print ty1)
-      (CoreTypes.TyParam.print ty2)
-      (Type.SkelParam.print s)
-  in
-  Print.print ppf "{ %t / %t }"
-    (Print.sequence ";" print_dirt_constraint c.dirt_constraints)
-    (Print.sequence ";" print_ty_constraint c.ty_constraints)
 
 let print_omega_ct ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -118,27 +81,6 @@ let free_params_constraint = function
         (Type.free_params_dirt drt2)
 
 let free_params_constraints = Type.Params.union_map free_params_constraint
-
-let free_params_resolved (res : resolved) =
-  let free_params_ty =
-    Type.Params.union_map
-      (fun (_, ty1, ty2, skel) ->
-        Type.Params.union
-          {
-            Type.Params.empty with
-            ty_params =
-              Type.TyParamMap.of_seq
-                (List.to_seq
-                   [ (ty1, Type.SkelParam skel); (ty2, Type.SkelParam skel) ]);
-          }
-          (Type.Params.skel_singleton skel))
-      res.ty_constraints
-  and free_params_dirt =
-    Type.Params.union_map
-      (fun (_, dt) -> Type.free_params_ct_dirt dt)
-      res.dirt_constraints
-  in
-  Type.Params.union free_params_ty free_params_dirt
 
 let cast_expression e ty =
   let omega, cons = fresh_ty_coer (e.ty, ty) in

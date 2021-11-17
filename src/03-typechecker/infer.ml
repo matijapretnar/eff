@@ -692,7 +692,7 @@ and check_abstraction2 state abs2 patTy1 patTy2 :
 (* ************************************************************************* *)
 
 let monomorphize free_ty_params cnstrs =
-  let free_cnstrs_params = Constraint.free_params_resolved cnstrs in
+  let free_cnstrs_params = Type.Constraints.free_params cnstrs in
   let free_params = Type.Params.union free_ty_params free_cnstrs_params in
   let monomorphize_skeletons =
     List.map
@@ -724,7 +724,7 @@ let monomorphize free_ty_params cnstrs =
   sub
 
 let generalize free_params cnstrs =
-  let free_cnstrs_params = Constraint.free_params_resolved cnstrs in
+  let free_cnstrs_params = Type.Constraints.free_params cnstrs in
   let free_params = Type.Params.union free_params free_cnstrs_params in
   let skeleton_params = Type.SkelParamSet.elements free_params.skel_params
   and ty_params = Type.TyParamMap.bindings free_params.ty_params

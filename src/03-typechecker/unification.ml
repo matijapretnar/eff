@@ -10,7 +10,7 @@ let apply_substitution new_sub sub paused queue =
       Substitution.apply_substitutions_to_constraints sub'
         (Constraint.return_resolved paused queue)
     in
-    (sub', Constraint.empty_resolved, queue')
+    (sub', Type.Constraints.empty, queue')
 
 let expand_row row ops =
   match row with
@@ -24,7 +24,7 @@ let expand_row row ops =
       (sub', row')
   | EmptyRow -> Error.typing ~loc:Location.unknown "Cannot extend an empty row."
 
-let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
+let skel_eq_step sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
   match (sk1, sk2) with
   (* ς = ς *)
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
@@ -80,7 +80,7 @@ let skel_eq_step sub (paused : Constraint.resolved) rest_queue sk1 sk2 =
         "This expression has type %t but it should have type %t." (printer sk1)
         (printer sk2)
 
-and ty_eq_step sub (paused : Constraint.resolved) rest_queue (ty1 : Type.ty)
+and ty_eq_step sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
     (ty2 : Type.ty) =
   match (ty1.term, ty2.term) with
   | _, _ when ty1.ty <> ty2.ty ->
@@ -149,7 +149,7 @@ and ty_eq_step sub (paused : Constraint.resolved) rest_queue (ty1 : Type.ty)
         "This expression has type %t but it should have type %t."
         (printer ty1.ty) (printer ty2.ty)
 
-and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
+and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
   function
   (* ω : A <= A *)
   | ty1, ty2 when Type.equal_ty ty1 ty2 ->
@@ -219,7 +219,7 @@ and ty_omega_step sub (paused : Constraint.resolved) cons rest_queue omega =
       { term = Type.TyParam p2; ty = SkelParam s2 } )
     when s1 = s2 ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
-      (sub, Constraint.resolve_ty_constraint paused omega p1 p2 s1, rest_queue)
+      (sub, Type.Constraints.add_ty_constraint paused omega p1 p2 s1, rest_queue)
   | { term = Type.TyParam _; ty = SkelParam _ as skel_tv }, a
   | a, { term = Type.TyParam _; ty = SkelParam _ as skel_tv } ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
@@ -247,7 +247,7 @@ and dirt_omega_step sub resolved unresolved w dcons =
   | ( { effect_set = ops1; row = ParamRow _ },
       { effect_set = _; row = ParamRow _ } )
     when EffectSet.is_empty ops1 ->
-      (sub, Constraint.resolve_dirt_constraint resolved w dcons, unresolved)
+      (sub, Type.Constraints.add_dirt_constraint resolved w dcons, unresolved)
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = ops1; row = ParamRow d1 },
       { effect_set = ops2; row = ParamRow d2 } ) ->
@@ -365,7 +365,7 @@ let rec unify (sub, paused, queue) =
 let solve constraints =
   (* Print.debug "constraints: %t" (Constraint.print_constraints constraints); *)
   let solved =
-    unify (Substitution.empty, Constraint.empty_resolved, constraints)
+    unify (Substitution.empty, Type.Constraints.empty, constraints)
   in
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
