@@ -365,3 +365,52 @@ let print_sub_list subs ppf =
     subs.skel_param_to_skel_subs
 
 let print_substitutions subs ppf = print_sub_list subs ppf
+
+let of_parameters (params : Type.Params.t) =
+  let skel_params' =
+    Type.SkelParamSet.elements params.skel_params
+    |> List.map (fun s -> (s, Type.SkelParam.refresh s))
+    |> Assoc.of_list
+  and dirt_params' =
+    Type.DirtParamSet.elements params.dirt_params
+    |> List.map (fun d -> (d, Type.DirtParam.refresh d))
+    |> Assoc.of_list
+  in
+  let subst =
+    {
+      empty with
+      dirt_var_to_dirt_subs =
+        Assoc.map (fun d' -> Type.no_effect_dirt d') dirt_params';
+      skel_param_to_skel_subs =
+        Assoc.map (fun s' -> Type.SkelParam s') skel_params';
+    }
+  in
+  (* Print.debug "SUBSTITUTION: %t" (print_substitutions subst); *)
+  let ty_params' =
+    Type.TyParamMap.bindings params.ty_params
+    |> List.map (fun (p, skels) ->
+           ( p,
+             ( CoreTypes.TyParam.refresh p,
+               apply_substitutions_to_skeleton subst (List.hd skels) ) ))
+    |> Assoc.of_list
+  in
+  let params' =
+    {
+      Type.Params.ty_params =
+        Assoc.values_of ty_params'
+        |> List.map (fun (p', skel) -> (p', [ skel ]))
+        |> List.to_seq |> Type.TyParamMap.of_seq;
+      dirt_params =
+        Assoc.values_of dirt_params' |> List.to_seq |> Type.DirtParamSet.of_seq;
+      skel_params =
+        Assoc.values_of skel_params' |> List.to_seq |> Type.SkelParamSet.of_seq;
+    }
+  and subst' =
+    {
+      subst with
+      type_param_to_type_subs =
+        Assoc.map (fun (p', skel) -> Type.tyParam p' skel) ty_params';
+    }
+  in
+  (* Print.debug "SUBSTITUTION': %t" (print_substitutions subst'); *)
+  (params', subst')

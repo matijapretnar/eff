@@ -2,10 +2,9 @@
 
 open Utils
 open Language
-module T = SimpleType
-module Type = SimpleType
 module Sugared = SugaredSyntax
 module Untyped = UntypedSyntax
+module T = Type
 
 type constructor_kind = Variant of bool | Effect of bool
 
@@ -20,7 +19,9 @@ type state = {
   field_symbols : (string, CoreTypes.Field.t) Assoc.t;
   tyname_symbols : (string, CoreTypes.TyName.t) Assoc.t;
   constructors : (string, CoreTypes.Label.t * constructor_kind) Assoc.t;
-  local_type_annotations : (string, CoreTypes.TyParam.t) Assoc.t;
+  local_type_annotations :
+    (string, CoreTypes.TyParam.t * Type.SkelParam.t) Assoc.t;
+  inlined_types : (string, Type.ty) Assoc.t;
 }
 
 let initial_state =
@@ -37,6 +38,15 @@ let initial_state =
         ("list", CoreTypes.list_tyname);
         ("empty", CoreTypes.empty_tyname);
       ]
+  and inlined_types =
+    Assoc.of_list
+      [
+        ("bool", Type.bool_ty);
+        ("int", Type.int_ty);
+        ("unit", Type.unit_ty);
+        ("string", Type.string_ty);
+        ("float", Type.float_ty);
+      ]
   in
   {
     context = Assoc.empty;
@@ -45,6 +55,7 @@ let initial_state =
     tyname_symbols = initial_types;
     constructors = Assoc.of_list [ list_cons; list_nil ];
     local_type_annotations = Assoc.empty;
+    inlined_types;
   }
 
 let add_loc t loc = { it = t; at = loc }
@@ -85,25 +96,31 @@ let tyname_to_symbol state name =
 let desugar_type type_sbst state =
   let rec desugar_type state { it = t; at = loc } =
     match t with
-    | Sugared.TyApply (t, tys) ->
-        let state', t' = tyname_to_symbol state t in
-        let state'', tys' = List.fold_map desugar_type state' tys in
-        (state'', T.Apply (t', tys'))
+    | Sugared.TyApply (t, tys) -> (
+        match Assoc.lookup t state.inlined_types with
+        | Some ty -> (state, ty)
+        | None ->
+            let state', t' = tyname_to_symbol state t in
+            let state'', tys' = List.fold_map desugar_type state' tys in
+            (state'', T.apply (t', tys')))
     | Sugared.TyParam t -> (
         match Assoc.lookup t type_sbst with
         | None -> Error.syntax ~loc "Unbound type parameter '%s" t
-        | Some p -> (state, T.TyParam p))
+        | Some (p, skel) -> (state, T.tyParam p (Type.SkelParam skel)))
     | Sugared.TyArrow (t1, t2) ->
         let state', t1' = desugar_type state t1 in
-        let state'', t2' = desugar_type state' t2 in
-        (state'', T.Arrow (t1', t2'))
+        let state'', t2' = desugar_dirty_type state' t2 in
+        (state'', T.arrow (t1', t2'))
     | Sugared.TyTuple lst ->
         let state', lst' = List.fold_map desugar_type state lst in
-        (state', T.Tuple lst')
+        (state', T.tuple lst')
     | Sugared.TyHandler (t1, t2) ->
-        let state', t1' = desugar_type state t1 in
-        let state'', t2' = desugar_type state' t2 in
-        (state'', T.Handler { T.value = t1'; T.finally = t2' })
+        let state', t1' = desugar_dirty_type state t1 in
+        let state'', t2' = desugar_dirty_type state' t2 in
+        (state'', T.handler (t1', t2'))
+  and desugar_dirty_type state ty =
+    let state', ty' = desugar_type state ty in
+    (state', T.make_dirty ty')
   in
   desugar_type state
 
@@ -124,7 +141,7 @@ let syntax_to_core_params ts =
 
 (** [desugar_tydef state params def] desugars the type definition with parameters
     [params] and definition [def]. *)
-let desugar_tydef state params def =
+let desugar_tydef state params ty_name def =
   let ty_sbst = syntax_to_core_params params in
   let state', def' =
     match def with
@@ -172,9 +189,26 @@ let desugar_tydef state params def =
         (state', Type.Sum assoc')
     | Sugared.TyInline t ->
         let state', t' = desugar_type ty_sbst state t in
-        (state', Type.Inline t')
+        let state'' =
+          {
+            state' with
+            inlined_types = Assoc.update ty_name t' state'.inlined_types;
+          }
+        in
+        (state'', Type.Inline t')
   in
-  (state', (Assoc.values_of ty_sbst, def'))
+  let params' =
+    {
+      Type.Params.empty with
+      ty_params =
+        Type.TyParamMap.of_seq
+          (List.to_seq
+             (List.map
+                (fun (p, skel) -> (p, [ Type.SkelParam skel ]))
+                (Assoc.values_of ty_sbst)));
+    }
+  in
+  (state', { Type.params = params'; type_def = def' })
 
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let desugar_tydefs state sugared_defs =
@@ -182,8 +216,8 @@ let desugar_tydefs state sugared_defs =
     (* First desugar the type names *)
     let st', sym = tyname_to_symbol st name in
     (* Then the types themselves *)
-    let st'', (params', def') = desugar_tydef st' params def in
-    (st'', (sym, (params', def')))
+    let st'', tydef = desugar_tydef st' params name def in
+    (st'', (sym, tydef))
   in
   Assoc.kfold_map desugar_fold state sugared_defs
 

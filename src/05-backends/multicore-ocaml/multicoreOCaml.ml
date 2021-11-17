@@ -61,7 +61,10 @@ module Backend : Language.BackendSignature.T = struct
     update state (TopLetRec defs')
 
   let process_tydef state tydefs =
-    let converter (ty_params, tydef) = (ty_params, Translate.of_tydef tydef) in
+    let converter Language.Type.{ params; type_def } =
+      ( Language.Type.TyParamMap.bindings params.ty_params |> List.map fst,
+        Translate.of_tydef type_def )
+    in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in
     update state (TyDef tydefs')
 

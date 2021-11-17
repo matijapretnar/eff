@@ -1,25 +1,19 @@
 open Utils
 open Language
-open SimpleType
-module Type = SimpleType
 
-type state = (CoreTypes.TyName.t, type_data) Assoc.t
+type state = (CoreTypes.TyName.t, Type.type_data) Assoc.t
 
 val initial_state : state
 
 val extend_type_definitions :
   loc:Location.t ->
-  (CoreTypes.TyName.t, CoreTypes.TyParam.t list * tydef) Assoc.t ->
+  (CoreTypes.TyName.t, Type.type_data) Assoc.t ->
   state ->
   state
 
 val transparent : loc:Location.t -> CoreTypes.TyName.t -> state -> bool
 
-val ty_apply :
-  loc:Location.t -> CoreTypes.TyName.t -> Type.ty list -> state -> tydef
-
-val infer_variant :
-  CoreTypes.Label.t -> state -> (Type.ty * Type.ty option) option
+val infer_variant : CoreTypes.Label.t -> state -> Type.ty option * Type.ty
 
 val infer_field :
   CoreTypes.Label.t ->
@@ -29,16 +23,14 @@ val infer_field :
 val find_field :
   CoreTypes.Field.t ->
   state ->
-  (CoreTypes.TyName.t
-  * CoreTypes.TyParam.t list
-  * (CoreTypes.Field.t, Type.ty) Assoc.t)
+  (CoreTypes.TyName.t * Type.Params.t * (CoreTypes.Field.t, Type.ty) Assoc.t)
   option
 
 val find_variant :
   CoreTypes.Label.t ->
   state ->
   (CoreTypes.TyName.t
-  * CoreTypes.TyParam.t list
+  * Type.Params.t
   * (CoreTypes.Label.t, Type.ty option) Assoc.t
   * Type.ty option)
   option

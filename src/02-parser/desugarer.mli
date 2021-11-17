@@ -1,6 +1,5 @@
 open Utils
 open Language
-module Type = SimpleType
 
 type state
 
@@ -33,5 +32,4 @@ val desugar_top_let_rec :
 val desugar_tydefs :
   state ->
   (string, SugaredSyntax.typaram list * SugaredSyntax.tydef) Assoc.t ->
-  state
-  * (CoreTypes.TyName.t, CoreTypes.TyParam.t list * SimpleType.tydef) Assoc.t
+  state * (CoreTypes.TyName.t, Type.type_data) Assoc.t

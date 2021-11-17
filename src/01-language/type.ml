@@ -77,7 +77,52 @@ type tydef =
   | Sum of (CoreTypes.Label.t, ty option) Assoc.t
   | Inline of ty
 
-type type_data = { params : CoreTypes.TyParam.t list; type_def : tydef }
+module Params = struct
+  type t = {
+    ty_params : skeleton list TyParamMap.t;
+    dirt_params : DirtParamSet.t;
+    skel_params : SkelParamSet.t;
+  }
+
+  let empty =
+    {
+      ty_params = TyParamMap.empty;
+      dirt_params = DirtParamSet.empty;
+      skel_params = SkelParamSet.empty;
+    }
+
+  let subset fp1 fp2 =
+    TyParamMap.for_all
+      (fun p1 _ -> TyParamMap.mem p1 fp2.ty_params)
+      fp1.ty_params
+    && DirtParamSet.subset fp1.dirt_params fp2.dirt_params
+    && SkelParamSet.subset fp1.skel_params fp2.skel_params
+
+  let ty_singleton p skel =
+    { empty with ty_params = TyParamMap.singleton p [ skel ] }
+
+  let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
+
+  let skel_singleton p = { empty with skel_params = SkelParamSet.singleton p }
+
+  let union fp1 fp2 =
+    {
+      ty_params =
+        TyParamMap.union
+          (fun _ skels1 skels2 -> Some (skels1 @ skels2))
+          fp1.ty_params fp2.ty_params;
+      dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
+      skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
+    }
+
+  let union_map free_params =
+    List.fold_left (fun fp x -> union fp (free_params x)) empty
+
+  let is_empty fp =
+    DirtParamSet.is_empty fp.dirt_params && SkelParamSet.is_empty fp.skel_params
+end
+
+type type_data = { params : Params.t; type_def : tydef }
 
 let skeleton_of_ty ty = ty.ty
 
@@ -124,51 +169,6 @@ let bool_ty = tyBasic Const.BooleanTy
 let string_ty = tyBasic Const.StringTy
 
 and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
-
-module Params = struct
-  type t = {
-    ty_params : skeleton list TyParamMap.t;
-    dirt_params : DirtParamSet.t;
-    skel_params : SkelParamSet.t;
-  }
-
-  let empty =
-    {
-      ty_params = TyParamMap.empty;
-      dirt_params = DirtParamSet.empty;
-      skel_params = SkelParamSet.empty;
-    }
-
-  let subset fp1 fp2 =
-    TyParamMap.for_all
-      (fun p1 _ -> TyParamMap.mem p1 fp2.ty_params)
-      fp1.ty_params
-    && DirtParamSet.subset fp1.dirt_params fp2.dirt_params
-    && SkelParamSet.subset fp1.skel_params fp2.skel_params
-
-  let ty_singleton p skel =
-    { empty with ty_params = TyParamMap.singleton p [ skel ] }
-
-  let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
-
-  let skel_singleton p = { empty with skel_params = SkelParamSet.singleton p }
-
-  let union fp1 fp2 =
-    {
-      ty_params =
-        TyParamMap.union
-          (fun _ skels1 skels2 -> Some (skels1 @ skels2))
-          fp1.ty_params fp2.ty_params;
-      dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
-      skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
-    }
-
-  let union_map free_params =
-    List.fold_left (fun fp x -> union fp (free_params x)) empty
-
-  let is_empty fp =
-    DirtParamSet.is_empty fp.dirt_params && SkelParamSet.is_empty fp.skel_params
-end
 
 type parameters = {
   skeleton_params : SkelParam.t list;
@@ -327,15 +327,19 @@ let fresh_skel () =
   let skel_var = SkelParam.fresh () in
   SkelParam skel_var
 
-let fresh_ty_param_with_skel skel =
+let fresh_ty_param () =
+  let ty_param = CoreTypes.TyParam.fresh () and skel = SkelParam.fresh () in
+  (ty_param, skel)
+
+let fresh_ty_with_skel skel =
   let ty_var = CoreTypes.TyParam.fresh () in
   tyParam ty_var skel
 
 let fresh_dirty_param_with_skel skel =
-  let ty = fresh_ty_param_with_skel skel in
+  let ty = fresh_ty_with_skel skel in
   make_dirty ty
 
-let fresh_ty_with_fresh_skel () = fresh_ty_param_with_skel (fresh_skel ())
+let fresh_ty_with_fresh_skel () = fresh_ty_with_skel (fresh_skel ())
 
 let fresh_dirty_with_fresh_skel () = fresh_dirty_param_with_skel (fresh_skel ())
 
@@ -347,16 +351,16 @@ let fresh_ty_with_skel skel =
   | SkelBasic ps -> tyBasic ps
   (* α : τ₁ -> τ₂ *)
   | SkelArrow (sk1, sk2) ->
-      let tvar1 = fresh_ty_param_with_skel sk1
+      let tvar1 = fresh_ty_with_skel sk1
       and dtvar2 = fresh_dirty_param_with_skel sk2 in
       arrow (tvar1, dtvar2)
   (* α : τ₁ x τ₂ ... *)
   | SkelTuple sks ->
-      let tvars = List.map fresh_ty_param_with_skel sks in
+      let tvars = List.map fresh_ty_with_skel sks in
       tuple tvars
   (* α : ty_name (τ₁, τ₂, ...) *)
   | SkelApply (ty_name, sks) ->
-      let tvars = List.map fresh_ty_param_with_skel sks in
+      let tvars = List.map fresh_ty_with_skel sks in
       apply (ty_name, tvars)
   (* α : τ₁ => τ₂ *)
   | SkelHandler (sk1, sk2) ->

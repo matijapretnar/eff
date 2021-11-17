@@ -54,43 +54,7 @@ let initial_state : state =
 
 (* ************************************************************************* *)
 
-let rec source_to_target tctx_st ty =
-  let loc = Location.unknown in
-  match ty with
-  | Language.SimpleType.Apply (ty_name, _args)
-    when TypeDefinitionContext.transparent ~loc ty_name tctx_st -> (
-      match TypeDefinitionContext.ty_apply ~loc ty_name [] tctx_st with
-      (* We currently support only inlined types with no arguments *)
-      | Language.SimpleType.Inline ty -> source_to_target tctx_st ty
-      (* Other cases should not be transparent *)
-      | Language.SimpleType.Record _ | Language.SimpleType.Sum _ -> assert false
-      )
-  | Language.SimpleType.Apply (ty_name, args) ->
-      Type.apply (ty_name, List.map (source_to_target tctx_st) args)
-  | Language.SimpleType.TyParam p ->
-      Type.tyParam p (Type.SkelParam (Type.SkelParam.fresh ()))
-  | Language.SimpleType.Basic s -> Type.tyBasic s
-  | Language.SimpleType.Tuple l ->
-      Type.tuple (List.map (source_to_target tctx_st) l)
-  | Language.SimpleType.Arrow (ty, dirty) ->
-      Type.arrow ((source_to_target tctx_st) ty, source_to_dirty tctx_st dirty)
-  | Language.SimpleType.Handler
-      { Language.SimpleType.value = dirty1; finally = dirty2 } ->
-      Type.handler
-        (source_to_dirty tctx_st dirty1, source_to_dirty tctx_st dirty2)
-
-and source_to_dirty tctx_st ty = (source_to_target tctx_st ty, Type.empty_dirt)
-
-let source_to_target_tydef tctx_st = function
-  | Language.SimpleType.Record assoc ->
-      Type.Record (Assoc.map (source_to_target tctx_st) assoc)
-  | Language.SimpleType.Sum assoc ->
-      Type.Sum (Assoc.map (Option.map (source_to_target tctx_st)) assoc)
-  | Language.SimpleType.Inline ty -> Type.Inline ((source_to_target tctx_st) ty)
-
 let process_def_effect eff (ty1, ty2) state =
-  let ty1 = source_to_target state.tydefs ty1 in
-  let ty2 = source_to_target state.tydefs ty2 in
   ( { state with effects = Term.EffectMap.add eff (ty1, ty2) state.effects },
     (ty1, ty2) )
 
@@ -133,13 +97,6 @@ let subInTyCt sub (ty1, ty2) = (subInValTy sub ty1, subInValTy sub ty2)
 let subInDirtCt sub (d1, d2) = (subInDirt sub d1, subInDirt sub d2)
 
 (* ************************************************************************* *)
-
-let infer_constructor_signature tctx_st lbl =
-  match TypeDefinitionContext.infer_variant lbl tctx_st with
-  | None -> assert false
-  | Some (ty_out, ty_in) ->
-      ( Option.map (source_to_target tctx_st) ty_in,
-        source_to_target tctx_st ty_out )
 
 (* ************************************************************************* *)
 
@@ -198,9 +155,8 @@ and infer_pattern' state pat =
       let alpha = Type.fresh_ty_with_fresh_skel () in
       (Term.PVar x, alpha, extend_var state x alpha, [])
   | Untyped.PAnnotated (p, ty) ->
-      let ty' = source_to_target state.tydefs ty in
       let p', state', cnstrs = infer_pattern state p in
-      (p'.term, ty', state', Constraint.TyEq (ty', p'.ty) :: cnstrs)
+      (p'.term, ty, state', Constraint.TyEq (ty, p'.ty) :: cnstrs)
   | Untyped.PNonbinding ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
       (Term.PNonbinding, alpha, state, [])
@@ -214,7 +170,7 @@ and infer_pattern' state pat =
       let p = Term.pTuple ps' in
       (p.term, p.ty, state', cnstrs)
   | Untyped.PVariant (lbl, p) -> (
-      match (p, infer_constructor_signature state.tydefs lbl) with
+      match (p, TypeDefinitionContext.infer_variant lbl state.tydefs) with
       | None, (None, out_ty) -> (Term.PVariant (lbl, None), out_ty, state, [])
       | Some p, (Some in_ty, out_ty) ->
           let p', state', cnstrs = infer_pattern state p in
@@ -269,7 +225,7 @@ and tcRecord (_state : state) (_lst : (field, Untyped.expression) Assoc.t) :
 (* Variants *)
 and tcVariant state ((lbl, mbe) : label * Untyped.expression option) :
     tcExprOutput' =
-  match (infer_constructor_signature state.tydefs lbl, mbe) with
+  match (TypeDefinitionContext.infer_variant lbl state.tydefs, mbe) with
   | (None, ty_out), None -> ((Term.Variant (lbl, None), ty_out), [])
   | (Some ty_in, ty_out), Some e ->
       let e', cs1 = tcExpr state e in
@@ -421,8 +377,7 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
 and tcExpr' state : Untyped.plain_expression -> tcExprOutput' = function
   | Untyped.Var x -> tcVar state x
   | Untyped.Const c -> tcConst state c
-  | Untyped.Annotated (e, ty) ->
-      tcAnnotated state (e, source_to_target state.tydefs ty)
+  | Untyped.Annotated (e, ty) -> tcAnnotated state (e, ty)
   | Untyped.Tuple es -> tcTuple state es
   | Untyped.Record lst -> tcRecord state lst
   | Untyped.Variant (lbl, mbe) -> tcVariant state (lbl, mbe)
@@ -437,7 +392,7 @@ and tcExpr state (e : Untyped.expression) : tcExprOutput =
      (Untyped.print_expression e)
      (Term.print_expression' trm)
      (Type.print_ty ty)
-     (Coercion.print_constraints cnstrs); *)
+     (Constraint.print_constraints cnstrs); *)
   ({ term = trm; ty }, cnstrs)
 
 (* ************************************************************************* *)
@@ -473,7 +428,7 @@ and tcComp state (c : Untyped.computation) : tcCompOutput =
      (Untyped.print_computation c)
      (Term.print_computation' trm)
      (Type.print_dirty ty)
-     (Coercion.print_constraints cnstrs); *)
+     (Constraint.print_constraints cnstrs); *)
   ({ term = trm; ty }, cnstrs)
 
 (* Typecheck a value wrapped in a return *)
@@ -781,9 +736,9 @@ let generalize free_params cnstrs =
         match skels with
         | [] -> assert false
         | skel :: skels ->
-            Print.debug "%t"
-              (Print.sequence "," Type.print_skeleton (skel :: skels));
-            (* assert (List.for_all (( = ) skel) skels); *)
+            (* Print.debug "%t"
+               (Print.sequence "," Type.print_skeleton (skel :: skels)); *)
+            assert (List.for_all (( = ) skel) skels);
             (t, skel))
       (Type.TyParamMap.bindings free_params.ty_params)
   and dirt_params = Type.DirtParamSet.elements free_params.dirt_params

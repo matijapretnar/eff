@@ -1,41 +1,49 @@
 open Utils
 open Language
-open SimpleType
-module Type = SimpleType
+open Type
 
 type state = (CoreTypes.TyName.t, type_data) Assoc.t
 
 let initial_state =
   Assoc.of_list
     [
-      (CoreTypes.bool_tyname, { params = []; type_def = Inline bool_ty });
-      (CoreTypes.unit_tyname, { params = []; type_def = Inline unit_ty });
-      (CoreTypes.int_tyname, { params = []; type_def = Inline int_ty });
-      (CoreTypes.string_tyname, { params = []; type_def = Inline string_ty });
-      (CoreTypes.float_tyname, { params = []; type_def = Inline float_ty });
+      ( CoreTypes.bool_tyname,
+        { params = Params.empty; type_def = Inline bool_ty } );
+      ( CoreTypes.unit_tyname,
+        { params = Params.empty; type_def = Inline unit_ty } );
+      (CoreTypes.int_tyname, { params = Params.empty; type_def = Inline int_ty });
+      ( CoreTypes.string_tyname,
+        { params = Params.empty; type_def = Inline string_ty } );
+      ( CoreTypes.float_tyname,
+        { params = Params.empty; type_def = Inline float_ty } );
       ( CoreTypes.list_tyname,
-        let a = fresh_ty_param () in
+        let a, skel = Type.fresh_ty_param () in
+        let a_ty = Type.tyParam a (Type.SkelParam skel) in
         let list_nil = (CoreTypes.nil, None) in
         let list_cons =
           ( CoreTypes.cons,
-            Some
-              (Tuple [ TyParam a; Apply (CoreTypes.list_tyname, [ TyParam a ]) ])
-          )
+            Some (tuple [ a_ty; apply (CoreTypes.list_tyname, [ a_ty ]) ]) )
         in
         {
-          params = [ a ];
+          params =
+            {
+              Params.empty with
+              ty_params = TyParamMap.singleton a [ Type.SkelParam skel ];
+              skel_params = SkelParamSet.singleton skel;
+            };
           type_def = Sum (Assoc.of_list [ list_nil; list_cons ]);
         } );
-      (CoreTypes.empty_tyname, { params = []; type_def = Sum Assoc.empty });
+      ( CoreTypes.empty_tyname,
+        { params = Params.empty; type_def = Sum Assoc.empty } );
     ]
 
-let subst_tydef sbst =
-  let subst = subst_ty sbst in
+(* let subst_tydef sbst =
+  let subst = Substitution.apply_substitutions_to_type sbst in
   function
   | Record tys -> Record (Assoc.map subst tys)
   | Sum tys ->
       Sum (Assoc.map (function None -> None | Some x -> Some (subst x)) tys)
-  | Inline ty -> Inline (subst ty)
+  | Inline ty -> Inline (subst ty) *)
 
 let lookup_tydef ~loc ty_name st =
   match Assoc.lookup ty_name st with
@@ -71,20 +79,27 @@ let find_field fld (st : state) =
   | Some x -> construct x
   | None -> None
 
-let apply_to_params t ps = Apply (t, List.map (fun p -> TyParam p) ps)
+let apply_to_params ty_name (ps : Type.Params.t) =
+  apply
+    ( ty_name,
+      TyParamMap.bindings ps.ty_params
+      |> List.map (fun (p, skel) -> tyParam p (List.hd skel)) )
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
     with refreshed type parameters and additional information needed for type
     inference. *)
 let infer_variant lbl st =
   match find_variant lbl st with
-  | None -> None
+  | None -> assert false
   | Some (ty_name, ps, _, u) ->
-      let ps', fresh_subst = refreshing_subst ps in
+      let ps', fresh_subst = Substitution.of_parameters ps in
       let u' =
-        match u with None -> None | Some x -> Some (subst_ty fresh_subst x)
+        match u with
+        | None -> None
+        | Some x ->
+            Some (Substitution.apply_substitutions_to_type fresh_subst x)
       in
-      Some (apply_to_params ty_name ps', u')
+      (u', apply_to_params ty_name ps')
 
 (** [infer_field fld] finds a record type that defines the field [fld] and returns it with
     refreshed type parameters and additional information needed for type inference. *)
@@ -92,8 +107,10 @@ let infer_field fld st =
   match find_field fld st with
   | None -> None
   | Some (ty_name, ps, us) ->
-      let ps', fresh_subst = refreshing_subst ps in
-      let us' = Assoc.map (subst_ty fresh_subst) us in
+      let ps', fresh_subst = Substitution.of_parameters ps in
+      let us' =
+        Assoc.map (Substitution.apply_substitutions_to_type fresh_subst) us
+      in
       Some (apply_to_params ty_name ps', (ty_name, us'))
 
 let transparent ~loc ty_name st =
@@ -101,7 +118,7 @@ let transparent ~loc ty_name st =
   match type_def with Sum _ | Record _ -> false | Inline _ -> true
 
 (* [ty_apply pos ty_name lst st] applies the type constructor [ty_name] to the given list of arguments. *)
-let ty_apply ~loc ty_name lst st =
+(* let ty_apply ~loc ty_name lst st =
   let { params; type_def } = lookup_tydef ~loc ty_name st in
   if List.length params <> List.length lst then
     Error.typing ~loc "Type constructors %t should be applied to %d arguments"
@@ -109,10 +126,11 @@ let ty_apply ~loc ty_name lst st =
       (List.length params)
   else
     let combined = Assoc.of_list (List.combine params lst) in
-    subst_tydef combined type_def
+    subst_tydef combined type_def *)
 
 (** [check_well_formed ~loc st ty] checks that type [ty] is well-formed. *)
-let check_well_formed ~loc tydef st =
+
+(* let check_well_formed ~loc tydef st =
   let rec check = function
     | Basic _ | TyParam _ -> ()
     | Apply (ty_name, tys) ->
@@ -140,12 +158,13 @@ let check_well_formed ~loc tydef st =
         Error.typing ~loc "Constructors of a sum type must be distinct";
       let checker = function _, None -> () | _, Some ty -> check ty in
       Assoc.iter checker constructors
-  | Inline ty -> check ty
+  | Inline ty -> check ty *)
 
 (** [check_noncyclic ~loc st ty] checks that the definition of type [ty] is non-cyclic. *)
-let check_noncyclic ~loc st =
+
+(* let check_noncyclic ~loc st =
   let rec check forbidden = function
-    | Basic _ | TyParam _ -> ()
+    | TyBasic _ | TyParam _ -> ()
     | Apply (t, lst) ->
         if List.mem t forbidden then
           Error.typing ~loc "Type definition %t is cyclic."
@@ -163,7 +182,7 @@ let check_noncyclic ~loc st =
     | Record fields -> Assoc.iter (fun (_, t) -> check forbidden t) fields
     | Inline ty -> check forbidden ty
   in
-  check_tydef []
+  check_tydef [] *)
 
 (** [check_shadowing ~loc st ty] checks that the definition of type [ty] does
     not shadow any field labels, constructors, or operations.
@@ -197,9 +216,6 @@ let check_shadowing ~loc st = function
     well-formed and returns the extended type context. *)
 let extend_type_definitions ~loc tydefs st =
   (* We wish we wrote this in eff, where we could have transactional memory. *)
-  let tydefs' =
-    Assoc.map (fun (params, type_def) -> { params; type_def }) tydefs
-  in
   let extend_tydef st' (name, { params; type_def }) =
     check_shadowing ~loc st' type_def;
     match Assoc.lookup name st' with
@@ -209,12 +225,12 @@ let extend_type_definitions ~loc tydefs st =
     | None -> Assoc.update name { params; type_def } st'
   in
   try
-    let st = Assoc.fold_left extend_tydef st tydefs' in
-    Assoc.iter
-      (fun (_, { type_def; _ }) -> check_well_formed ~loc type_def st)
-      tydefs';
-    Assoc.iter
-      (fun (_, { type_def; _ }) -> check_noncyclic ~loc st type_def)
-      tydefs';
+    let st = Assoc.fold_left extend_tydef st tydefs in
+    (* Assoc.iter
+       (fun (_, { type_def; _ }) -> check_well_formed ~loc type_def st)
+       tydefs'; *)
+    (* Assoc.iter
+       (fun (_, { type_def; _ }) -> check_noncyclic ~loc st type_def)
+       tydefs'; *)
     st
   with e -> raise e

@@ -111,8 +111,9 @@ module Backend : Language.BackendSignature.T = struct
     { state with primitive_effects = eff :: state.primitive_effects }
 
   let process_tydef state tydefs =
-    let converter (ty_params, tydef) =
-      (ty_params, TranslateExEff2NoEff.elab_tydef tydef)
+    let converter Type.{ params; type_def } =
+      ( Type.TyParamMap.bindings params.ty_params |> List.map fst,
+        TranslateExEff2NoEff.elab_tydef type_def )
     in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in
     { state with prog = SyntaxNoEff.TyDef tydefs' :: state.prog }

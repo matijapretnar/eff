@@ -14,6 +14,7 @@ val is_empty : t -> bool
 (** Empty substitutions *)
 
 (* Adding and merging *)
+val of_parameters : Type.Params.t -> Type.Params.t * t
 
 val add_type_coercion : Type.TyCoercionParam.t -> Coercion.ty_coercion -> t -> t
 (** [add_type_coercion parameter t_coercion sub] Add type [parameter] [t_coercion] to [sub]. *)
