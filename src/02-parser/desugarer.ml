@@ -204,7 +204,7 @@ let desugar_tydef state params ty_name def =
         Type.TyParamMap.of_seq
           (List.to_seq
              (List.map
-                (fun (p, skel) -> (p, [ Type.SkelParam skel ]))
+                (fun (p, skel) -> (p, Type.SkelParam skel))
                 (Assoc.values_of ty_sbst)));
     }
   in

@@ -699,5 +699,9 @@ and free_params_abstraction' (_, c) = free_params_computation c
 
 and free_params_definitions defs =
   Type.Params.union_map
-    (fun (_, (_, abs)) -> free_params_abstraction abs)
+    (fun (_, (_, abs)) ->
+      let ty, drty = abs.ty in
+      Print.debug "%t : %t -> %t" (print_abstraction abs) (Type.print_ty ty)
+        (Type.print_dirty drty);
+      free_params_abstraction abs)
     (Assoc.to_list defs)

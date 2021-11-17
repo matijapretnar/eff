@@ -28,7 +28,7 @@ let initial_state =
           params =
             {
               Params.empty with
-              ty_params = TyParamMap.singleton a [ Type.SkelParam skel ];
+              ty_params = TyParamMap.singleton a (Type.SkelParam skel);
               skel_params = SkelParamSet.singleton skel;
             };
           type_def = Sum (Assoc.of_list [ list_nil; list_cons ]);
@@ -83,7 +83,7 @@ let apply_to_params ty_name (ps : Type.Params.t) =
   apply
     ( ty_name,
       TyParamMap.bindings ps.ty_params
-      |> List.map (fun (p, skel) -> tyParam p (List.hd skel)) )
+      |> List.map (fun (p, skel) -> tyParam p skel) )
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
     with refreshed type parameters and additional information needed for type

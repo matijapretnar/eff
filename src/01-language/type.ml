@@ -72,127 +72,6 @@ and ct_dirt = dirt * dirt
 
 and ct_dirty = dirty * dirty
 
-type tydef =
-  | Record of (CoreTypes.Field.t, ty) Assoc.t
-  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
-  | Inline of ty
-
-module Params = struct
-  type t = {
-    ty_params : skeleton list TyParamMap.t;
-    dirt_params : DirtParamSet.t;
-    skel_params : SkelParamSet.t;
-  }
-
-  let empty =
-    {
-      ty_params = TyParamMap.empty;
-      dirt_params = DirtParamSet.empty;
-      skel_params = SkelParamSet.empty;
-    }
-
-  let subset fp1 fp2 =
-    TyParamMap.for_all
-      (fun p1 _ -> TyParamMap.mem p1 fp2.ty_params)
-      fp1.ty_params
-    && DirtParamSet.subset fp1.dirt_params fp2.dirt_params
-    && SkelParamSet.subset fp1.skel_params fp2.skel_params
-
-  let ty_singleton p skel =
-    { empty with ty_params = TyParamMap.singleton p [ skel ] }
-
-  let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
-
-  let skel_singleton p = { empty with skel_params = SkelParamSet.singleton p }
-
-  let union fp1 fp2 =
-    {
-      ty_params =
-        TyParamMap.union
-          (fun _ skels1 skels2 -> Some (skels1 @ skels2))
-          fp1.ty_params fp2.ty_params;
-      dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
-      skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
-    }
-
-  let union_map free_params =
-    List.fold_left (fun fp x -> union fp (free_params x)) empty
-
-  let is_empty fp =
-    DirtParamSet.is_empty fp.dirt_params && SkelParamSet.is_empty fp.skel_params
-end
-
-type type_data = { params : Params.t; type_def : tydef }
-
-let skeleton_of_ty ty = ty.ty
-
-let skeleton_of_dirty (ty, _) = skeleton_of_ty ty
-
-let tyParam t skel = { term = TyParam t; ty = skel }
-
-let arrow (ty1, drty2) =
-  {
-    term = Arrow (ty1, drty2);
-    ty = SkelArrow (skeleton_of_ty ty1, skeleton_of_dirty drty2);
-  }
-
-let apply (ty_name, ty_args) =
-  {
-    term = Apply { ty_name; ty_args };
-    ty = SkelApply (ty_name, List.map (fun ty -> skeleton_of_ty ty) ty_args);
-  }
-
-let tuple tup =
-  {
-    term = Tuple tup;
-    ty = SkelTuple (List.map (fun ty -> skeleton_of_ty ty) tup);
-  }
-
-let handler (drty1, drty2) =
-  {
-    term = Handler (drty1, drty2);
-    ty = SkelHandler (skeleton_of_dirty drty1, skeleton_of_dirty drty2);
-  }
-
-let tyBasic pt = { term = TyBasic pt; ty = SkelBasic pt }
-
-let unit_ty = tuple []
-
-let empty_ty = apply (CoreTypes.empty_tyname, [])
-
-let int_ty = tyBasic Const.IntegerTy
-
-let float_ty = tyBasic Const.FloatTy
-
-let bool_ty = tyBasic Const.BooleanTy
-
-let string_ty = tyBasic Const.StringTy
-
-and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
-
-type parameters = {
-  skeleton_params : SkelParam.t list;
-  dirt_params : DirtParam.t list;
-  ty_params : (CoreTypes.TyParam.t * skeleton) list;
-  ty_constraints : (TyCoercionParam.t * ct_ty) list;
-  dirt_constraints : (DirtCoercionParam.t * ct_dirt) list;
-}
-
-let empty_parameters =
-  {
-    skeleton_params = [];
-    dirt_params = [];
-    ty_params = [];
-    ty_constraints = [];
-    dirt_constraints = [];
-  }
-
-type ty_scheme = { parameters : parameters; monotype : ty }
-
-let monotype ty = { parameters = empty_parameters; monotype = ty }
-
-let type_const c = tyBasic (Const.infer_ty c)
-
 let is_empty_dirt dirt =
   EffectSet.is_empty dirt.effect_set && dirt.row = EmptyRow
 
@@ -280,6 +159,130 @@ and print_ct_dirt (ty1, ty2) ppf =
 and print_abs_ty (ty1, drty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t → %t" (print_ty ty1) (print_dirty drty2)
+
+type tydef =
+  | Record of (CoreTypes.Field.t, ty) Assoc.t
+  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
+  | Inline of ty
+
+module Params = struct
+  type t = {
+    ty_params : skeleton TyParamMap.t;
+    dirt_params : DirtParamSet.t;
+    skel_params : SkelParamSet.t;
+  }
+
+  let empty =
+    {
+      ty_params = TyParamMap.empty;
+      dirt_params = DirtParamSet.empty;
+      skel_params = SkelParamSet.empty;
+    }
+
+  let subset fp1 fp2 =
+    TyParamMap.for_all
+      (fun p1 _ -> TyParamMap.mem p1 fp2.ty_params)
+      fp1.ty_params
+    && DirtParamSet.subset fp1.dirt_params fp2.dirt_params
+    && SkelParamSet.subset fp1.skel_params fp2.skel_params
+
+  let ty_singleton p skel =
+    { empty with ty_params = TyParamMap.singleton p skel }
+
+  let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
+
+  let skel_singleton p = { empty with skel_params = SkelParamSet.singleton p }
+
+  let union fp1 fp2 =
+    {
+      ty_params =
+        TyParamMap.union
+          (fun _ skel1 skel2 ->
+            (* Print.debug "%t = %t" (print_skeleton skel1) (print_skeleton skel2); *)
+            assert (skel1 = skel2);
+            Some skel1)
+          fp1.ty_params fp2.ty_params;
+      dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
+      skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
+    }
+
+  let union_map free_params =
+    List.fold_left (fun fp x -> union fp (free_params x)) empty
+
+  let is_empty fp =
+    DirtParamSet.is_empty fp.dirt_params && SkelParamSet.is_empty fp.skel_params
+end
+
+type type_data = { params : Params.t; type_def : tydef }
+
+let skeleton_of_ty ty = ty.ty
+
+let skeleton_of_dirty (ty, _) = skeleton_of_ty ty
+
+let tyParam t skel = { term = TyParam t; ty = skel }
+
+let arrow (ty1, drty2) =
+  {
+    term = Arrow (ty1, drty2);
+    ty = SkelArrow (skeleton_of_ty ty1, skeleton_of_dirty drty2);
+  }
+
+let apply (ty_name, ty_args) =
+  {
+    term = Apply { ty_name; ty_args };
+    ty = SkelApply (ty_name, List.map (fun ty -> skeleton_of_ty ty) ty_args);
+  }
+
+let tuple tup =
+  {
+    term = Tuple tup;
+    ty = SkelTuple (List.map (fun ty -> skeleton_of_ty ty) tup);
+  }
+
+let handler (drty1, drty2) =
+  {
+    term = Handler (drty1, drty2);
+    ty = SkelHandler (skeleton_of_dirty drty1, skeleton_of_dirty drty2);
+  }
+
+let tyBasic pt = { term = TyBasic pt; ty = SkelBasic pt }
+
+let unit_ty = tuple []
+
+let empty_ty = apply (CoreTypes.empty_tyname, [])
+
+let int_ty = tyBasic Const.IntegerTy
+
+let float_ty = tyBasic Const.FloatTy
+
+let bool_ty = tyBasic Const.BooleanTy
+
+let string_ty = tyBasic Const.StringTy
+
+and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
+
+type parameters = {
+  skeleton_params : SkelParam.t list;
+  dirt_params : DirtParam.t list;
+  ty_params : (CoreTypes.TyParam.t * skeleton) list;
+  ty_constraints : (TyCoercionParam.t * ct_ty) list;
+  dirt_constraints : (DirtCoercionParam.t * ct_dirt) list;
+}
+
+let empty_parameters =
+  {
+    skeleton_params = [];
+    dirt_params = [];
+    ty_params = [];
+    ty_constraints = [];
+    dirt_constraints = [];
+  }
+
+type ty_scheme = { parameters : parameters; monotype : ty }
+
+let monotype ty = { parameters = empty_parameters; monotype = ty }
+
+let type_const c = tyBasic (Const.infer_ty c)
 
 (* ************************************************************************* *)
 (*                       PREDICATES ON ty                             *)

@@ -700,14 +700,11 @@ let monomorphize free_ty_params cnstrs =
         Constraint.SkelEq (Type.SkelParam sk, Type.SkelBasic Const.FloatTy))
       (Type.SkelParamSet.elements free_params.skel_params)
   and monomorphize_tys =
-    List.concat_map
-      (fun (t, skels) ->
-        List.map
-          (fun skel ->
-            Constraint.TyOmega
-              ( Type.TyCoercionParam.fresh (),
-                (Type.tyParam t skel, Type.tyBasic Const.FloatTy) ))
-          skels)
+    List.map
+      (fun (t, skel) ->
+        Constraint.TyOmega
+          ( Type.TyCoercionParam.fresh (),
+            (Type.tyParam t skel, Type.tyBasic Const.FloatTy) ))
       (Type.TyParamMap.bindings free_params.ty_params)
   and monomorphize_dirts =
     List.map
@@ -730,17 +727,7 @@ let generalize free_params cnstrs =
   let free_cnstrs_params = Constraint.free_params_resolved cnstrs in
   let free_params = Type.Params.union free_params free_cnstrs_params in
   let skeleton_params = Type.SkelParamSet.elements free_params.skel_params
-  and ty_params =
-    List.map
-      (fun (t, skels) ->
-        match skels with
-        | [] -> assert false
-        | skel :: skels ->
-            (* Print.debug "%t"
-               (Print.sequence "," Type.print_skeleton (skel :: skels)); *)
-            assert (List.for_all (( = ) skel) skels);
-            (t, skel))
-      (Type.TyParamMap.bindings free_params.ty_params)
+  and ty_params = Type.TyParamMap.bindings free_params.ty_params
   and dirt_params = Type.DirtParamSet.elements free_params.dirt_params
   and ty_constraints =
     List.map

@@ -338,7 +338,7 @@ and dirt_eq_step sub paused rest_queue { effect_set = o1; row = row1 }
 
 let rec unify (sub, paused, queue) =
   (* Print.debug "SUB: %t" (Substitution.print_substitutions sub); *)
-  (* Print.debug "PAUSED: %t" (Constraint.print_constraints paused); *)
+  (* Print.debug "PAUSED: %t" (Constraint.print_resolved paused); *)
   (* Print.debug "QUEUE: %t" (Constraint.print_constraints queue); *)
   match queue with
   | [] -> (sub, paused)

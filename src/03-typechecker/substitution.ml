@@ -388,18 +388,16 @@ let of_parameters (params : Type.Params.t) =
   (* Print.debug "SUBSTITUTION: %t" (print_substitutions subst); *)
   let ty_params' =
     Type.TyParamMap.bindings params.ty_params
-    |> List.map (fun (p, skels) ->
+    |> List.map (fun (p, skel) ->
            ( p,
              ( CoreTypes.TyParam.refresh p,
-               apply_substitutions_to_skeleton subst (List.hd skels) ) ))
+               apply_substitutions_to_skeleton subst skel ) ))
     |> Assoc.of_list
   in
   let params' =
     {
       Type.Params.ty_params =
-        Assoc.values_of ty_params'
-        |> List.map (fun (p', skel) -> (p', [ skel ]))
-        |> List.to_seq |> Type.TyParamMap.of_seq;
+        Assoc.values_of ty_params' |> List.to_seq |> Type.TyParamMap.of_seq;
       dirt_params =
         Assoc.values_of dirt_params' |> List.to_seq |> Type.DirtParamSet.of_seq;
       skel_params =

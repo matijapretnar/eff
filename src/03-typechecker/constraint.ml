@@ -129,10 +129,7 @@ let free_params_resolved (res : resolved) =
             ty_params =
               Type.TyParamMap.of_seq
                 (List.to_seq
-                   [
-                     (ty1, [ Type.SkelParam skel ]);
-                     (ty2, [ Type.SkelParam skel ]);
-                   ]);
+                   [ (ty1, Type.SkelParam skel); (ty2, Type.SkelParam skel) ]);
           }
           (Type.Params.skel_singleton skel))
       res.ty_constraints
