@@ -2,12 +2,40 @@ open Utils
 open Language
 open Type
 
+let apply_sub1 subs cons =
+  match cons with
+  | Constraint.TyOmega (coer_p, (ty1, ty2)) ->
+      Constraint.TyOmega
+        ( coer_p,
+          ( Substitution.apply_substitutions_to_type subs ty1,
+            Substitution.apply_substitutions_to_type subs ty2 ) )
+  | Constraint.DirtOmega (coer_p, (drt1, drt2)) ->
+      Constraint.DirtOmega
+        ( coer_p,
+          ( Substitution.apply_substitutions_to_dirt subs drt1,
+            Substitution.apply_substitutions_to_dirt subs drt2 ) )
+  | Constraint.SkelEq (skel1, skel2) ->
+      Constraint.SkelEq
+        ( Substitution.apply_substitutions_to_skeleton subs skel1,
+          Substitution.apply_substitutions_to_skeleton subs skel2 )
+  | Constraint.TyEq (ty1, ty2) ->
+      Constraint.TyEq
+        ( Substitution.apply_substitutions_to_type subs ty1,
+          Substitution.apply_substitutions_to_type subs ty2 )
+  | Constraint.DirtEq (drt1, drt2) ->
+      Constraint.DirtEq
+        ( Substitution.apply_substitutions_to_dirt subs drt1,
+          Substitution.apply_substitutions_to_dirt subs drt2 )
+
+let apply_substitutions_to_constraints subs c_list =
+  List.map (apply_sub1 subs) c_list
+
 let apply_substitution new_sub sub paused queue =
   if Substitution.is_empty new_sub then (sub, paused, queue)
   else
     let sub' = Substitution.merge new_sub sub in
     let queue' =
-      Substitution.apply_substitutions_to_constraints sub'
+      apply_substitutions_to_constraints sub'
         (Constraint.return_resolved paused queue)
     in
     (sub', Type.Constraints.empty, queue')

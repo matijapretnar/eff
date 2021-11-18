@@ -1,4 +1,5 @@
 open Utils
+module Substitution = Language.Substitution
 module Const = Language.Const
 module Untyped = Language.UntypedSyntax
 module CoreTypes = Language.CoreTypes

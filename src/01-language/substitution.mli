@@ -4,8 +4,6 @@ Substitutions
 Holds substitutions
 *)
 
-open Language
-
 type t
 
 val empty : t
@@ -54,10 +52,6 @@ val merge : t -> t -> t
 (** [merge subs1 subs2] Combines substitutions from [subs1] and [subs2]. In case of substitution conflicts, the results are unspecified *)
 
 (* Substitution application *)
-
-val apply_substitutions_to_constraints :
-  t -> Constraint.omega_ct list -> Constraint.omega_ct list
-(** [apply_substitutions_to_constraints subs constraints] Applies all substitutions from [subs] to [constraints] *)
 
 val apply_substitutions_to_computation :
   t -> Term.computation -> Term.computation
