@@ -273,8 +273,7 @@ and pp_abs_with_ty state (p, ty, t) ppf =
     (pp_term state t)
 
 and pp_let_rec state lst ppf =
-  let pp_let_rec_def (x, (ws, (p, t))) ppf =
-    assert (ws = []);
+  let pp_let_rec_def (x, (p, t)) ppf =
     print ppf "%t %t = @,%t" (pp_variable state x) (pp_pattern state p)
       (pp_term state t)
   in

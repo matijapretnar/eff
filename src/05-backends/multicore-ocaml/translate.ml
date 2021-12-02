@@ -64,7 +64,7 @@ and of_computation cmp =
       let p, c2 = of_abstraction a in
       Let ([ (p, of_computation c1) ], c2)
   | Term.LetRec (var_abs_lst, c) ->
-      let converter (var, (_, abs)) = (var, of_abstraction abs) in
+      let converter (var, abs) = (var, of_abstraction abs) in
       LetRec (List.map converter (Assoc.to_list var_abs_lst), of_computation c)
   | Term.Match (e, abs_lst) ->
       let converter abs = ValueClause (of_abstraction abs) in

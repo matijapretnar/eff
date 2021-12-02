@@ -13,9 +13,13 @@ module type T = sig
   val process_def_effect : state -> Term.effect -> state
 
   val process_top_let :
-    state -> (Term.variable, Type.parameters * Term.expression) Assoc.t -> state
+    state ->
+    ( Term.variable,
+      Type.Params.t * Type.Constraints.t * Term.expression )
+    Assoc.t ->
+    state
 
-  val process_top_let_rec : state -> Term.rec_definitions -> state
+  val process_top_let_rec : state -> Term.top_rec_definitions -> state
 
   val load_primitive_value :
     state -> Term.variable -> Primitives.primitive_value -> state

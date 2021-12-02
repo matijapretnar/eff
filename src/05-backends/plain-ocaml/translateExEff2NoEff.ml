@@ -257,19 +257,19 @@ and elab_expression' state exp =
   match exp.term with
   | ExEff.Var x ->
       let empty_dirt_params =
-        x.dirts
+        x.instantiation.dirt_var_to_dirt_subs |> Assoc.to_list
         |> List.filter (fun (_, drt) -> is_empty_dirt drt)
         |> List.fold_left
              (fun empty_dirt_params (param, _) ->
                Type.DirtParamSet.add param empty_dirt_params)
              Type.DirtParamSet.empty
       in
+      let coercions =
+        x.instantiation.type_param_to_type_coercions |> Assoc.to_list
+        |> List.map (fun (_, coer) -> (elab_ty_coercion state) coer)
+      in
       NoEff.NCast
-        ( NoEff.NVar
-            {
-              variable = x.variable;
-              coercions = List.map (elab_ty_coercion state) x.ty_coercions;
-            },
+        ( NoEff.NVar { variable = x.variable; coercions },
           value_coercion_from_impure_dirt empty_dirt_params exp.ty )
   | ExEff.Const c -> NoEff.NConst c
   | ExEff.Tuple vs -> NoEff.NTuple (List.map (elab_expression state) vs)
@@ -411,10 +411,7 @@ and elab_computation' state c _is_empty =
   | ExEff.Check _ -> failwith __LOC__
 
 and elab_rec_definitions state defs =
-  Assoc.kmap
-    (fun (x, (ws, abs)) ->
-      (x, (List.map fst ws.ty_constraints, elab_abstraction state abs)))
-    defs
+  Assoc.kmap (fun (x, abs) -> (x, elab_abstraction state abs)) defs
 
 let elab_tydef = function
   | Type.Record assoc -> NoEff.TyDefRecord (Assoc.map elab_ty assoc)
@@ -424,3 +421,11 @@ let elab_tydef = function
   | Inline ty -> NoEff.TyDefInline (elab_ty ty)
 
 let elab_effect (eff, (ty1, ty2)) : n_effect = (eff, (elab_ty ty1, elab_ty ty2))
+
+let elab_top_rec_definitions state defs =
+  Assoc.kmap
+    (fun (x, (_params, cnstrs, abs)) ->
+      ( x,
+        ( List.map (fun (w, _, _, _) -> w) cnstrs.Type.Constraints.ty_constraints,
+          elab_abstraction state abs ) ))
+    defs

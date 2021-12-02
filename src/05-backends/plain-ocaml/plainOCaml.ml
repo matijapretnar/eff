@@ -56,10 +56,10 @@ module Backend : Language.BackendSignature.T = struct
     in
     t'
 
-  let optimize_rec_definitions state defs =
+  let optimize_top_rec_definitions state defs =
     let defs' =
       if !Config.enable_optimization then
-        NoEffOptimizer.optimize_rec_definitions state.no_eff_optimizer_state
+        NoEffOptimizer.optimize_top_rec_definitions state.no_eff_optimizer_state
           defs
       else defs
     in
@@ -87,9 +87,11 @@ module Backend : Language.BackendSignature.T = struct
   let process_top_let state defs =
     let defs' =
       Assoc.kmap
-        (fun (x, (ws, e)) ->
+        (fun (x, (_params, cnstrs, e)) ->
           ( x,
-            ( List.map fst ws.Type.ty_constraints,
+            ( List.map
+                (fun (w, _, _, _) -> w)
+                cnstrs.Type.Constraints.ty_constraints,
               optimize_term state
               @@ TranslateExEff2NoEff.elab_expression translate_exeff_config e
             ) ))
@@ -99,8 +101,9 @@ module Backend : Language.BackendSignature.T = struct
 
   let process_top_let_rec state defs =
     let defs' =
-      optimize_rec_definitions state
-      @@ TranslateExEff2NoEff.elab_rec_definitions translate_exeff_config defs
+      optimize_top_rec_definitions state
+      @@ TranslateExEff2NoEff.elab_top_rec_definitions translate_exeff_config
+           defs
     in
     { state with prog = SyntaxNoEff.TopLetRec defs' :: state.prog }
 

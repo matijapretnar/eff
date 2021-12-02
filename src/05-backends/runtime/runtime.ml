@@ -34,7 +34,7 @@ module Backend : Language.BackendSignature.T = struct
   let process_top_let state defs =
     match Assoc.to_list defs with
     | [] -> state
-    | [ (x, (_ws, exp)) ] ->
+    | [ (x, (_params, _constraints, exp)) ] ->
         let v = Eval.eval_expression state exp in
         Format.fprintf !Config.output_formatter "@[val %t : %t = %t@]@."
           (Language.CoreTypes.Variable.print x)
@@ -44,8 +44,9 @@ module Backend : Language.BackendSignature.T = struct
     | _ -> failwith __LOC__
 
   let process_top_let_rec state defs =
+    let defs = Assoc.map (fun (_params, _constraints, abs) -> abs) defs in
     Assoc.iter
-      (fun (f, (_ws, abs)) ->
+      (fun (f, abs) ->
         Format.fprintf !Config.output_formatter "@[val %t : %t = <fun>@]@."
           (Language.CoreTypes.Variable.print f)
           (Type.print_pretty () (Type.arrow abs.ty).ty))

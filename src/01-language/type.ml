@@ -48,6 +48,29 @@ type skeleton =
   | SkelHandler of skeleton * skeleton
   | SkelTuple of skeleton list
 
+let rec print_skeleton ?max_level sk ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match sk with
+  | SkelParam p -> SkelParam.print p ppf
+  | SkelBasic s -> print "%t" (Const.print_ty s)
+  | SkelArrow (sk1, sk2) ->
+      print "%t → %t" (print_skeleton sk1) (print_skeleton sk2)
+  | SkelApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
+  | SkelApply (t, [ s ]) ->
+      print ~at_level:1 "%t %t"
+        (print_skeleton ~max_level:1 s)
+        (CoreTypes.TyName.print t)
+  | SkelApply (t, ts) ->
+      print ~at_level:1 "(%t) %t"
+        (Print.sequence ", " print_skeleton ts)
+        (CoreTypes.TyName.print t)
+  | SkelTuple [] -> print "𝟙"
+  | SkelTuple sks ->
+      print ~at_level:2 "%t"
+        (Print.sequence "×" (print_skeleton ~max_level:1) sks)
+  | SkelHandler (sk1, sk2) ->
+      print "%t ⇛ %t" (print_skeleton sk1) (print_skeleton sk2)
+
 type ty = (ty', skeleton) typed
 
 and ty' =
@@ -66,7 +89,60 @@ and abs_ty = ty * dirty
 
 and row = ParamRow of DirtParam.t | EmptyRow
 
-and ct_ty = ty * ty
+let is_empty_dirt dirt =
+  EffectSet.is_empty dirt.effect_set && dirt.row = EmptyRow
+
+let rec print_ty ?max_level ty ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match ty.term with
+  | TyParam p ->
+      print ~at_level:4 "%t:%t"
+        (CoreTypes.TyParam.print p)
+        (print_skeleton ty.ty)
+  | Arrow (t1, (t2, drt)) when is_empty_dirt drt ->
+      print ~at_level:3 "%t → %t" (print_ty ~max_level:2 t1)
+        (print_ty ~max_level:3 t2)
+  | Arrow (t1, (t2, drt)) ->
+      print ~at_level:3 "%t -%t→ %t" (print_ty ~max_level:2 t1)
+        (print_dirt drt) (print_ty ~max_level:3 t2)
+  | Apply { ty_name; ty_args = [] } ->
+      print "%t" (CoreTypes.TyName.print ty_name)
+  | Apply { ty_name; ty_args = [ s ] } ->
+      print ~at_level:1 "%t %t" (print_ty ~max_level:1 s)
+        (CoreTypes.TyName.print ty_name)
+  | Apply { ty_name; ty_args } ->
+      print ~at_level:1 "(%t) %t"
+        (Print.sequence ", " print_ty ty_args)
+        (CoreTypes.TyName.print ty_name)
+  | Tuple [] -> print "𝟙"
+  | Tuple tys ->
+      print ~at_level:2 "%t" (Print.sequence "×" (print_ty ~max_level:1) tys)
+  | Handler (drty1, drty2) ->
+      print ~at_level:3 "%t ⇛ %t"
+        (print_dirty ~max_level:2 drty1)
+        (print_dirty ~max_level:2 drty2)
+  | TyBasic p -> print "%t" (Const.print_ty p)
+
+and print_dirt ?max_level drt ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  match (drt.effect_set, drt.row) with
+  | effect_set, EmptyRow -> print "{%t}" (print_effect_set effect_set)
+  | effect_set, ParamRow p when EffectSet.is_empty effect_set ->
+      print "%t" (DirtParam.print p)
+  | effect_set, ParamRow p ->
+      print ~at_level:1 "{%t}∪%t"
+        (print_effect_set effect_set)
+        (DirtParam.print p)
+
+and print_effect_set effect_set =
+  Print.sequence "," CoreTypes.Effect.print (EffectSet.elements effect_set)
+
+and print_dirty ?max_level (t1, drt1) ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
+  print ~at_level:2 "%t!%t" (print_ty ~max_level:0 t1)
+    (print_dirt ~max_level:0 drt1)
+
+type ct_ty = ty * ty
 
 and ct_dirt = dirt * dirt
 
@@ -151,7 +227,9 @@ module Params = struct
       ty_params =
         TyParamMap.union
           (fun _ skel1 skel2 ->
-            (* Print.debug "%t = %t" (print_skeleton skel1) (print_skeleton skel2); *)
+            (* Print.debug "%t %t = %t"
+               (CoreTypes.TyParam.print t)
+               (print_skeleton skel1) (print_skeleton skel2); *)
             assert (skel1 = skel2);
             Some skel1)
           fp1.ty_params fp2.ty_params;
@@ -214,83 +292,7 @@ type tydef =
 
 type type_data = { params : Params.t; type_def : tydef }
 
-let is_empty_dirt dirt =
-  EffectSet.is_empty dirt.effect_set && dirt.row = EmptyRow
-
-let rec print_ty ?max_level ty ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match ty.term with
-  | TyParam p ->
-      print ~at_level:4 "%t:%t"
-        (CoreTypes.TyParam.print p)
-        (print_skeleton ty.ty)
-  | Arrow (t1, (t2, drt)) when is_empty_dirt drt ->
-      print ~at_level:3 "%t → %t" (print_ty ~max_level:2 t1)
-        (print_ty ~max_level:3 t2)
-  | Arrow (t1, (t2, drt)) ->
-      print ~at_level:3 "%t -%t→ %t" (print_ty ~max_level:2 t1)
-        (print_dirt drt) (print_ty ~max_level:3 t2)
-  | Apply { ty_name; ty_args = [] } ->
-      print "%t" (CoreTypes.TyName.print ty_name)
-  | Apply { ty_name; ty_args = [ s ] } ->
-      print ~at_level:1 "%t %t" (print_ty ~max_level:1 s)
-        (CoreTypes.TyName.print ty_name)
-  | Apply { ty_name; ty_args } ->
-      print ~at_level:1 "(%t) %t"
-        (Print.sequence ", " print_ty ty_args)
-        (CoreTypes.TyName.print ty_name)
-  | Tuple [] -> print "𝟙"
-  | Tuple tys ->
-      print ~at_level:2 "%t" (Print.sequence "×" (print_ty ~max_level:1) tys)
-  | Handler (drty1, drty2) ->
-      print ~at_level:3 "%t ⇛ %t"
-        (print_dirty ~max_level:2 drty1)
-        (print_dirty ~max_level:2 drty2)
-  | TyBasic p -> print "%t" (Const.print_ty p)
-
-and print_skeleton ?max_level sk ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match sk with
-  | SkelParam p -> SkelParam.print p ppf
-  | SkelBasic s -> print "%t" (Const.print_ty s)
-  | SkelArrow (sk1, sk2) ->
-      print "%t → %t" (print_skeleton sk1) (print_skeleton sk2)
-  | SkelApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
-  | SkelApply (t, [ s ]) ->
-      print ~at_level:1 "%t %t"
-        (print_skeleton ~max_level:1 s)
-        (CoreTypes.TyName.print t)
-  | SkelApply (t, ts) ->
-      print ~at_level:1 "(%t) %t"
-        (Print.sequence ", " print_skeleton ts)
-        (CoreTypes.TyName.print t)
-  | SkelTuple [] -> print "𝟙"
-  | SkelTuple sks ->
-      print ~at_level:2 "%t"
-        (Print.sequence "×" (print_skeleton ~max_level:1) sks)
-  | SkelHandler (sk1, sk2) ->
-      print "%t ⇛ %t" (print_skeleton sk1) (print_skeleton sk2)
-
-and print_dirt ?max_level drt ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match (drt.effect_set, drt.row) with
-  | effect_set, EmptyRow -> print "{%t}" (print_effect_set effect_set)
-  | effect_set, ParamRow p when EffectSet.is_empty effect_set ->
-      print "%t" (DirtParam.print p)
-  | effect_set, ParamRow p ->
-      print ~at_level:1 "{%t}∪%t"
-        (print_effect_set effect_set)
-        (DirtParam.print p)
-
-and print_effect_set effect_set =
-  Print.sequence "," CoreTypes.Effect.print (EffectSet.elements effect_set)
-
-and print_dirty ?max_level (t1, drt1) ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  print ~at_level:2 "%t!%t" (print_ty ~max_level:0 t1)
-    (print_dirt ~max_level:0 drt1)
-
-and print_ct_ty (ty1, ty2) ppf =
+let print_ct_ty (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t ≤ %t" (print_ty ty1) (print_ty ty2)
 
@@ -365,26 +367,9 @@ end
 
 let type_const c = tyBasic (Const.infer_ty c)
 
-type parameters = {
-  skeleton_params : SkelParam.t list;
-  dirt_params : DirtParam.t list;
-  ty_params : (CoreTypes.TyParam.t * skeleton) list;
-  ty_constraints : (TyCoercionParam.t * ct_ty) list;
-  dirt_constraints : (DirtCoercionParam.t * ct_dirt) list;
-}
+type ty_scheme = { params : Params.t; constraints : Constraints.t; ty : ty }
 
-let empty_parameters =
-  {
-    skeleton_params = [];
-    dirt_params = [];
-    ty_params = [];
-    ty_constraints = [];
-    dirt_constraints = [];
-  }
-
-type ty_scheme = { parameters : parameters; monotype : ty }
-
-let monotype ty = { parameters = empty_parameters; monotype = ty }
+let monotype ty = { params = Params.empty; constraints = Constraints.empty; ty }
 
 (* ************************************************************************* *)
 (*                       PREDICATES ON ty                             *)
@@ -406,7 +391,7 @@ let rec equal_skeleton skel1 skel2 =
   | SkelBasic ptya, SkelBasic ptyb -> ptya = ptyb
   | _, _ -> false
 
-let rec equal_ty ty1 ty2 =
+let rec equal_ty (ty1 : ty) (ty2 : ty) =
   equal_skeleton ty1.ty ty2.ty && equal_ty' ty1.term ty2.term
 
 and equal_ty' ty1' ty2' =
@@ -552,26 +537,33 @@ module Renaming = struct
     }
 end
 
-let parameters_renaming parameters : Renaming.t =
+let params_renaming (params : Params.t) : Renaming.t =
   {
     skel_params =
-      parameters.skeleton_params
-      |> List.map (fun p -> (p, SkelParam.refresh p))
-      |> List.to_seq |> SkelParamMap.of_seq;
+      SkelParamSet.fold
+        (fun p -> SkelParamMap.add p (SkelParam.refresh p))
+        params.skel_params SkelParamMap.empty;
     ty_params =
-      parameters.ty_params
-      |> List.map (fun (p, _skel) -> (p, CoreTypes.TyParam.refresh p))
-      |> List.to_seq |> TyParamMap.of_seq;
+      TyParamMap.mapi
+        (fun p _skel -> CoreTypes.TyParam.refresh p)
+        params.ty_params;
     dirt_params =
-      parameters.dirt_params
-      |> List.map (fun p -> (p, DirtParam.refresh p))
-      |> List.to_seq |> DirtParamMap.of_seq;
+      DirtParamSet.fold
+        (fun d -> DirtParamMap.add d (DirtParam.refresh d))
+        params.dirt_params DirtParamMap.empty;
   }
 
+let rename_skel_param (sbst : Renaming.t) p =
+  SkelParamMap.find_opt p sbst.skel_params |> Option.value ~default:p
+
+let rename_ty_param (sbst : Renaming.t) t =
+  TyParamMap.find_opt t sbst.ty_params |> Option.value ~default:t
+
+let rename_dirt_param (sbst : Renaming.t) d =
+  DirtParamMap.find_opt d sbst.dirt_params |> Option.value ~default:d
+
 let rec rename_skeleton (sbst : Renaming.t) = function
-  | SkelParam p ->
-      SkelParam
-        (SkelParamMap.find_opt p sbst.skel_params |> Option.value ~default:p)
+  | SkelParam p -> SkelParam (rename_skel_param sbst p)
   | SkelBasic _ as skel -> skel
   | SkelApply (ty_name, sks) ->
       SkelApply (ty_name, List.map (rename_skeleton sbst) sks)
@@ -585,8 +577,7 @@ let rec rename_ty (sbst : Renaming.t) ty =
   { term = rename_ty' sbst ty.term; ty = rename_skeleton sbst ty.ty }
 
 and rename_ty' sbst = function
-  | TyParam p ->
-      TyParam (TyParamMap.find_opt p sbst.ty_params |> Option.value ~default:p)
+  | TyParam p -> TyParam (rename_ty_param sbst p)
   | Arrow (vty, cty) -> Arrow (rename_ty sbst vty, rename_dirty sbst cty)
   | Tuple vtys -> Tuple (List.map (rename_ty sbst) vtys)
   | Handler (cty1, cty2) ->
@@ -611,48 +602,43 @@ and rename_ct_dirt sbst (dirt1, dirt2) =
 and rename_dirt (sbst : Renaming.t) dirt =
   match dirt.row with
   | EmptyRow -> dirt
-  | ParamRow p ->
-      {
-        dirt with
-        row =
-          ParamRow
-            (DirtParamMap.find_opt p sbst.dirt_params |> Option.value ~default:p);
-      }
+  | ParamRow p -> { dirt with row = ParamRow (rename_dirt_param sbst p) }
 
-let rename_parameters (sbst : Renaming.t) parameters =
+let rename_params (sbst : Renaming.t) (params : Params.t) =
   {
-    skeleton_params =
-      List.map
-        (fun p ->
-          SkelParamMap.find_opt p sbst.skel_params |> Option.value ~default:p)
-        parameters.skeleton_params;
+    Params.skel_params =
+      SkelParamSet.map (rename_skel_param sbst) params.skel_params;
     ty_params =
+      params.ty_params |> TyParamMap.to_seq
+      |> Seq.map (fun (p, skel) ->
+             (rename_ty_param sbst p, rename_skeleton sbst skel))
+      |> TyParamMap.of_seq;
+    dirt_params = DirtParamSet.map (rename_dirt_param sbst) params.dirt_params;
+  }
+
+let rename_constraints (sbst : Renaming.t) (constraints : Constraints.t) =
+  {
+    Constraints.ty_constraints =
       List.map
-        (fun (p, skel) ->
-          ( TyParamMap.find_opt p sbst.ty_params |> Option.value ~default:p,
-            rename_skeleton sbst skel ))
-        parameters.ty_params;
-    dirt_params =
-      List.map
-        (fun p ->
-          DirtParamMap.find_opt p sbst.dirt_params |> Option.value ~default:p)
-        parameters.dirt_params;
-    ty_constraints =
-      List.map
-        (fun (p, ct) -> (p, rename_ct_ty sbst ct))
-        parameters.ty_constraints;
+        (fun (p, ty1, ty2, skel) ->
+          ( p,
+            rename_ty_param sbst ty1,
+            rename_ty_param sbst ty2,
+            rename_skel_param sbst skel ))
+        constraints.ty_constraints;
     dirt_constraints =
       List.map
         (fun (p, dt) -> (p, rename_ct_dirt sbst dt))
-        parameters.dirt_constraints;
+        constraints.dirt_constraints;
   }
 
 let rename_ty_scheme sbst ty_scheme =
   {
-    parameters = rename_parameters sbst ty_scheme.parameters;
-    monotype = rename_ty sbst ty_scheme.monotype;
+    params = rename_params sbst ty_scheme.params;
+    constraints = rename_constraints sbst ty_scheme.constraints;
+    ty = rename_ty sbst ty_scheme.ty;
   }
 
 let refresh_ty_scheme ty_scheme =
-  let sbst = parameters_renaming ty_scheme.parameters in
+  let sbst = params_renaming ty_scheme.params in
   rename_ty_scheme sbst ty_scheme

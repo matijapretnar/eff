@@ -51,12 +51,12 @@ module Backend : Language.BackendSignature.T = struct
     update state (DefEffect (eff, (ty1', ty2')))
 
   let process_top_let state defs =
-    let converter (x, (_, e)) = (Syntax.PVar x, Translate.of_expression e) in
+    let converter (x, (_, _, e)) = (Syntax.PVar x, Translate.of_expression e) in
     let defs' = List.map converter (Assoc.to_list defs) in
     update state (TopLet defs')
 
   let process_top_let_rec state defs =
-    let converter (_, a) = Translate.of_abstraction a in
+    let converter (_, _, a) = Translate.of_abstraction a in
     let defs' = Assoc.map converter defs |> Assoc.to_list in
     update state (TopLetRec defs')
 

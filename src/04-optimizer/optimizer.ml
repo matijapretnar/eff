@@ -17,7 +17,7 @@ type optimization_config = {
 
 type state = {
   declared_functions :
-    (Language.CoreTypes.Variable.t, Type.parameters * Term.abstraction) Assoc.t;
+    (Language.CoreTypes.Variable.t, Term.abstraction) Assoc.t;
   fuel : int;
   (* Cache of already specialized functions *)
   specialized_functions :
@@ -85,7 +85,7 @@ let keep_used_bindings defs cmp =
   (* Do proper call graph analysis *)
   let free_vars_cmp = Term.free_vars_comp cmp in
   let free_vars_defs =
-    List.map (fun (_, (_ws, a)) -> Term.free_vars_abs a) (Assoc.to_list defs)
+    List.map (fun (_, a) -> Term.free_vars_abs a) (Assoc.to_list defs)
   in
   let free_vars = Term.concat_vars (free_vars_cmp :: free_vars_defs) in
   List.filter
@@ -229,7 +229,7 @@ and optimize_abstraction2' state (pat1, pat2, cmp) =
   (pat1, pat2, optimize_computation state cmp)
 
 and optimize_rec_definitions state defs =
-  Assoc.map (fun (ws, abs) -> (ws, optimize_abstraction state abs)) defs
+  Assoc.map (fun abs -> optimize_abstraction state abs) defs
 
 and cast_expression state exp coer =
   match (exp.term, coer.term) with
@@ -421,14 +421,14 @@ and reduce_computation' state comp =
       let drty_in, _ = hnd.ty in
       let unspecialized_declared_functions =
         List.filter
-          (fun (f, (_ws, { ty = _, drty_out; _ })) ->
+          (fun (f, { ty = _, drty_out; _ }) ->
             Type.equal_dirty drty_in drty_out
             && Option.is_none
                  (Assoc.lookup (fingerprint, f) state.specialized_functions))
           (Assoc.to_list state.declared_functions)
       in
       let attempt_specialization ret_clause_kinds =
-        let add_specialized specialized (f, (_ws, abs)) =
+        let add_specialized specialized (f, abs) =
           let f' = Language.CoreTypes.Variable.refresh f in
           let ret_clause_kind =
             match Assoc.lookup f ret_clause_kinds with
@@ -456,10 +456,10 @@ and reduce_computation' state comp =
         (* TODO: specialize only functions that are used, not just all with matching types *)
         let spec_rec_defs =
           List.map
-            (fun (f, (ws, ({ term = pat, cmp; _ } as abs))) ->
+            (fun (f, ({ term = pat, cmp; _ } as abs)) ->
               match Assoc.lookup (fingerprint, f) specialized_functions' with
               | Some (f', _ty, FixedReturnClause _) ->
-                  (f', (ws, handle_abstraction state' hnd abs))
+                  (f', handle_abstraction state' hnd abs)
               | Some (f', ty, VaryingReturnClause) -> (
                   match ty with
                   | {
@@ -495,7 +495,7 @@ and reduce_computation' state comp =
                       let abs' =
                         Term.abstraction (Term.pTuple [ pat; k_pat ], cmp)
                       in
-                      (f', (ws, handle_abstraction state' hnd' abs'))
+                      (f', handle_abstraction state' hnd' abs')
                   | _ -> assert false)
               | _ -> assert false)
             unspecialized_declared_functions
@@ -514,7 +514,7 @@ and reduce_computation' state comp =
       let state', spec_rec_defs =
         find_best_specializations
           (Assoc.map_of_list
-             (fun (f, (_ws, _)) -> (f, FixedReturnClause hnd.term.value_clause))
+             (fun (f, _) -> (f, FixedReturnClause hnd.term.value_clause))
              unspecialized_declared_functions)
       in
       let cmp' = handle_computation state' hnd cmp in
@@ -550,25 +550,34 @@ let process_computation state comp =
 let process_top_let state defs =
   if !Config.enable_optimization then
     let defs' =
-      Assoc.map (fun (ws, e) -> (ws, optimize_expression state e)) defs
+      Assoc.map
+        (fun (params, cnstrs, e) ->
+          (params, cnstrs, optimize_expression state e))
+        defs
     in
     let state' =
       Assoc.fold_left
-        (fun state (f, (ws, e)) ->
+        (fun state (f, (_, _, e)) ->
           match e.term with
-          | Term.Lambda abs -> add_function state f (ws, abs)
+          | Term.Lambda abs -> add_function state f abs
           | _ -> state)
         state defs'
     in
     (state', defs')
   else (state, defs)
 
+let optimize_top_rec_definitions state defs =
+  Assoc.map
+    (fun (params, cnstrs, abs) ->
+      (params, cnstrs, optimize_abstraction state abs))
+    defs
+
 let process_top_let_rec state defs =
   if !Config.enable_optimization then
-    let defs' = optimize_rec_definitions state defs in
+    let defs' = optimize_top_rec_definitions state defs in
     let state' =
       Assoc.fold_left
-        (fun state (f, abs) -> add_function state f abs)
+        (fun state (f, (_, _, abs)) -> add_function state f abs)
         state defs'
     in
     (state', defs')

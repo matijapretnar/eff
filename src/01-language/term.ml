@@ -45,14 +45,7 @@ type expression = (expression', Type.ty) typed
 (** Pure expressions *)
 
 and expression' =
-  | Var of {
-      variable : variable;
-      skeletons : Type.skeleton list;
-      tys : Type.ty list;
-      dirts : (Type.DirtParam.t * Type.dirt) list;
-      ty_coercions : Coercion.ty_coercion list;
-      dirt_coercions : Coercion.dirt_coercion list;
-    }
+  | Var of { variable : variable; instantiation : Substitution.t }
   | Const of Const.t
   | Tuple of expression list
   | Record of (CoreTypes.Field.t, expression) Assoc.t
@@ -92,51 +85,23 @@ and effect_clauses = {
 and abstraction = (pattern * computation, Type.ty * Type.dirty) typed
 (** Abstractions that take one argument. *)
 
-and rec_definitions = (variable, Type.parameters * abstraction) Assoc.t
+and rec_definitions = (variable, abstraction) Assoc.t
 
 and abstraction2 =
   (pattern * pattern * computation, Type.ty * Type.ty * Type.dirty) typed
 (** Abstractions that take two arguments. *)
 
+type top_rec_definitions =
+  (variable, Type.Params.t * Type.Constraints.t * abstraction) Assoc.t
+
 let mono_var x ty =
-  {
-    term =
-      Var
-        {
-          variable = x;
-          skeletons = [];
-          tys = [];
-          dirts = [];
-          ty_coercions = [];
-          dirt_coercions = [];
-        };
-    ty;
-  }
+  { term = Var { variable = x; instantiation = Substitution.empty }; ty }
 
-let poly_var x skeletons tys dirts ty_coercions dirt_coercions ty =
+let poly_var x instantiation ty =
   {
-    term =
-      Var { variable = x; skeletons; tys; dirts; ty_coercions; dirt_coercions };
-    ty;
+    term = Var { variable = x; instantiation };
+    ty = Substitution.apply_sub_ty instantiation ty;
   }
-
-let poly_var_with_parameters x parameters ty =
-  let skeletons =
-    List.map (fun p -> Type.SkelParam p) parameters.Type.skeleton_params
-  and tys =
-    List.map (fun (p, skel) -> Type.tyParam p skel) parameters.Type.ty_params
-  and dirts =
-    List.map (fun p -> (p, Type.no_effect_dirt p)) parameters.Type.dirt_params
-  and ty_coercions =
-    List.map
-      (fun (p, ct) -> Coercion.tyCoercionVar p ct)
-      parameters.Type.ty_constraints
-  and dirt_coercions =
-    List.map
-      (fun (p, dt) -> Coercion.dirtCoercionVar p dt)
-      parameters.Type.dirt_constraints
-  in
-  poly_var x skeletons tys dirts ty_coercions dirt_coercions ty
 
 let fresh_variable x ty =
   let x' = CoreTypes.Variable.fresh x in
@@ -363,10 +328,110 @@ and print_abstraction2 { term = p1, p2, c; _ } ppf =
 and print_let_abstraction { term = p, c; _ } ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
 
-and print_let_rec_abstraction (f, (_ws, abs)) ppf =
+and print_let_rec_abstraction (f, abs) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)
     (Type.print_ty (Type.arrow abs.ty))
     (print_let_abstraction abs)
+
+let rec apply_sub_comp sub computation =
+  {
+    term = apply_sub_comp' sub computation.term;
+    ty = Substitution.apply_sub_dirty_ty sub computation.ty;
+  }
+
+and apply_sub_comp' sub computation =
+  match computation with
+  | Value e -> Value (apply_sub_exp sub e)
+  | LetVal (e1, abs) -> LetVal (apply_sub_exp sub e1, apply_sub_abs sub abs)
+  | LetRec (defs, c1) ->
+      LetRec (apply_sub_definitions sub defs, apply_sub_comp sub c1)
+  | Match (e, alist) ->
+      Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
+  | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
+  | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
+  | Call (effect, e1, abs) ->
+      Call (effect, apply_sub_exp sub e1, apply_sub_abs sub abs)
+  | Bind (c1, a1) -> Bind (apply_sub_comp sub c1, apply_sub_abs sub a1)
+  | CastComp (c1, dc1) ->
+      CastComp (apply_sub_comp sub c1, Substitution.apply_sub_dirtycoer sub dc1)
+  | Check c -> Check (apply_sub_comp sub c)
+
+and apply_sub_exp sub expression =
+  {
+    term = apply_sub_exp' sub expression.term;
+    ty = Substitution.apply_sub_ty sub expression.ty;
+  }
+
+and apply_sub_exp' sub expression =
+  match expression with
+  | Var v -> Var v
+  | Const c -> Const c
+  | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
+  | Variant (lbl, e1) -> Variant (lbl, Option.map (apply_sub_exp sub) e1)
+  | Lambda abs -> Lambda (apply_sub_abs sub abs)
+  | Handler h -> Handler (apply_sub_handler sub h)
+  | CastExp (e1, tc1) ->
+      CastExp (apply_sub_exp sub e1, Substitution.apply_sub_tycoer sub tc1)
+  | Record flds -> Record (Assoc.map (apply_sub_exp sub) flds)
+
+and apply_sub_abs sub abs =
+  {
+    term = apply_sub_abs' sub abs.term;
+    ty = Substitution.apply_sub_abs_ty sub abs.ty;
+  }
+
+and apply_sub_abs' sub (p, c) = (apply_sub_pat sub p, apply_sub_comp sub c)
+
+and apply_sub_pat sub pat =
+  {
+    term = apply_sub_pat' sub pat.term;
+    ty = Substitution.apply_sub_ty sub pat.ty;
+  }
+
+and apply_sub_pat' sub pat =
+  match pat with
+  | PVar _ -> pat
+  | PAs (p, x) -> PAs (apply_sub_pat sub p, x)
+  | PTuple ps -> PTuple (List.map (apply_sub_pat sub) ps)
+  | PRecord flds -> PRecord (Assoc.map (apply_sub_pat sub) flds)
+  | PVariant (lbl, pat) -> PVariant (lbl, Option.map (apply_sub_pat sub) pat)
+  | PConst _ -> pat
+  | PNonbinding -> pat
+
+and apply_sub_definitions sub defs = Assoc.map (apply_sub_abs sub) defs
+
+and apply_sub_abs2 sub abs2 =
+  {
+    term = apply_sub_abs2' sub abs2.term;
+    ty = Substitution.apply_sub_abs2_ty sub abs2.ty;
+  }
+
+and apply_sub_abs2' sub (p1, p2, c) =
+  (apply_sub_pat sub p1, apply_sub_pat sub p2, apply_sub_comp sub c)
+
+and apply_sub_handler sub h =
+  let drty1, drty2 = h.ty in
+  let eff_clauses = h.term.effect_clauses in
+  let new_value_clause = apply_sub_abs sub h.term.value_clause in
+  let new_eff_clauses =
+    Assoc.map (fun abs2 -> apply_sub_abs2 sub abs2) eff_clauses.effect_part
+  in
+  {
+    term =
+      {
+        effect_clauses = { eff_clauses with effect_part = new_eff_clauses };
+        value_clause = new_value_clause;
+      };
+    ty =
+      ( Substitution.apply_sub_dirty_ty sub drty1,
+        Substitution.apply_sub_dirty_ty sub drty2 );
+  }
+
+let apply_substitutions_to_computation = apply_sub_comp
+
+let apply_substitutions_to_expression = apply_sub_exp
+
+let apply_substitutions_to_abstraction = apply_sub_abs
 
 let refresh_variable x = CoreTypes.Variable.refresh x
 
@@ -441,7 +506,7 @@ and refresh_computation' sbst = function
           (fun (x', abs) -> (x', abs))
           (List.combine new_xs
              (List.map
-                (fun (_, (ws, abs)) -> (ws, refresh_abstraction sbst' abs))
+                (fun (_, abs) -> refresh_abstraction sbst' abs)
                 (Assoc.to_list li)))
       in
       LetRec (Assoc.of_list li', refresh_computation sbst' c1)
@@ -506,9 +571,7 @@ and subst_comp' sbst = function
       (* XXX Should we check that x does not appear in sbst? *)
       LetVal (subst_expr sbst e1, subst_abs sbst abs)
   | LetRec (li, c1) ->
-      LetRec
-        ( Assoc.map (fun (ws, abs) -> (ws, subst_abs sbst abs)) li,
-          subst_comp sbst c1 )
+      LetRec (Assoc.map (fun abs -> subst_abs sbst abs) li, subst_comp sbst c1)
   | Match (e, li) -> Match (subst_expr sbst e, List.map (subst_abs sbst) li)
   | Apply (e1, e2) -> Apply (subst_expr sbst e1, subst_expr sbst e2)
   | Handle (e, c) -> Handle (subst_expr sbst e, subst_comp sbst c)
@@ -602,8 +665,7 @@ let rec free_vars_comp c =
   | LetRec (li, c1) ->
       let xs, vars =
         List.fold_right
-          (fun (x, (_ws, abs)) (xs, vars) ->
-            (x :: xs, free_vars_abs abs @@@ vars))
+          (fun (x, abs) (xs, vars) -> (x :: xs, free_vars_abs abs @@@ vars))
           (Assoc.to_list li)
           ([], free_vars_comp c1)
       in
@@ -710,5 +772,5 @@ and free_params_abstraction' (_, c) = free_params_computation c
 
 and free_params_definitions defs =
   Type.Params.union_map
-    (fun (_, (_, abs)) -> free_params_abstraction abs)
+    (fun (_, abs) -> free_params_abstraction abs)
     (Assoc.to_list defs)

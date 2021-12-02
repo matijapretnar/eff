@@ -23,13 +23,12 @@ let comparison_ty =
   let ty_param = CoreTypes.TyParam.fresh () in
   let ty = Type.tyParam ty_param skel in
   {
-    Type.parameters =
-      {
-        Type.empty_parameters with
-        Type.skeleton_params = [ skel_param ];
-        Type.ty_params = [ (ty_param, skel) ];
-      };
-    Type.monotype = binary_op_ty ty ty bool_ty;
+    Type.params =
+      Type.Params.union
+        (Type.Params.skel_singleton skel_param)
+        (Type.Params.ty_singleton ty_param skel);
+    Type.ty = binary_op_ty ty ty bool_ty;
+    Type.constraints = Constraints.empty;
   }
 
 let primitive_value_type_scheme = function

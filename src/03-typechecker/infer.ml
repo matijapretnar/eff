@@ -8,6 +8,89 @@ module Term = Language.Term
 module Type = Language.Type
 module TypeDefinitionContext = TypeDefinitionContext
 
+let identity_instantiation (params : Type.Params.t)
+    (constraints : Type.Constraints.t) =
+  Substitution.
+    {
+      type_param_to_type_coercions =
+        constraints.ty_constraints
+        |> List.map (fun (w, t1, t2, s) ->
+               let skel = Type.SkelParam s in
+               ( w,
+                 Coercion.tyCoercionVar w
+                   (Type.tyParam t1 skel, Type.tyParam t2 skel) ))
+        |> Assoc.of_list;
+      dirt_var_to_dirt_coercions =
+        constraints.dirt_constraints
+        |> List.map (fun (w, dt) -> (w, Coercion.dirtCoercionVar w dt))
+        |> Assoc.of_list;
+      type_param_to_type_subs =
+        params.ty_params |> Type.TyParamMap.bindings
+        |> List.map (fun (p, skel) -> (p, Type.tyParam p skel))
+        |> Assoc.of_list;
+      dirt_var_to_dirt_subs =
+        params.dirt_params |> Type.DirtParamSet.elements
+        |> List.map (fun d -> (d, Type.no_effect_dirt d))
+        |> Assoc.of_list;
+      skel_param_to_skel_subs =
+        params.skel_params |> Type.SkelParamSet.elements
+        |> List.map (fun s -> (s, Type.SkelParam s))
+        |> Assoc.of_list;
+    }
+
+module TypingEnv = struct
+  type t = (CoreTypes.Variable.t, Type.ty_scheme) Assoc.t
+
+  let empty = Assoc.empty
+
+  let fresh_instantiation (params : Type.Params.t)
+      (constraints : Type.Constraints.t) =
+    let _, subst = Substitution.of_parameters params in
+    let ty_coercions =
+      List.map
+        (fun (p, t1, t2, s) ->
+          let skel = Type.SkelParam s in
+          ( p,
+            Coercion.tyCoercionVar
+              (Type.TyCoercionParam.refresh p)
+              ( Substitution.apply_substitutions_to_type subst
+                  (Type.tyParam t1 skel),
+                Substitution.apply_substitutions_to_type subst
+                  (Type.tyParam t2 skel) ) ))
+        constraints.ty_constraints
+    and dirt_coercions =
+      List.map
+        (fun (p, dt) ->
+          ( p,
+            Coercion.dirtCoercionVar
+              (Type.DirtCoercionParam.refresh p)
+              (Substitution.apply_sub_ct_dirt subst dt) ))
+        constraints.dirt_constraints
+    in
+    Substitution.
+      {
+        subst with
+        type_param_to_type_coercions = Assoc.of_list ty_coercions;
+        dirt_var_to_dirt_coercions = Assoc.of_list dirt_coercions;
+      }
+
+  let lookup ctx x : Term.expression * Constraint.omega_ct list =
+    match Assoc.lookup x ctx with
+    | Some ty_scheme ->
+        let subst =
+          fresh_instantiation ty_scheme.Type.params ty_scheme.constraints
+        in
+        let x = Term.poly_var x subst ty_scheme.ty in
+        let cnstrs = Constraint.return_resolved ty_scheme.constraints [] in
+        let cnstrs =
+          Unification.apply_substitutions_to_constraints subst cnstrs
+        in
+        (x, cnstrs)
+    | None -> assert false
+
+  let update ctx x sch = Assoc.update x sch ctx
+end
+
 (* GEORGE: TODO:
      1. Add debugging output to the new code snippets
      2. Figure out what is wrong with pattern typing (untyped & typed version)
@@ -20,11 +103,6 @@ and then dirt inequalities *)
 type label = CoreTypes.Label.t
 
 type field = CoreTypes.Field.t
-
-(* [WRITER] SUBSTITUTION *)
-
-(* Extend the generated substitution *)
-let extendGenSub acc sub = Substitution.merge acc sub
 
 (* GEORGE: I hope to God for the order to be correct here *)
 
@@ -66,11 +144,11 @@ let process_def_effect eff (ty1, ty2) state =
 (* ************************************************************************* *)
 
 (* Substitute in target values and computations *)
-let subInCmp sub cmp = Substitution.apply_substitutions_to_computation sub cmp
+let subInCmp sub cmp = Term.apply_substitutions_to_computation sub cmp
 
-let subInExp sub exp = Substitution.apply_substitutions_to_expression sub exp
+let subInExp sub exp = Term.apply_substitutions_to_expression sub exp
 
-let subInAbs sub abs = Substitution.apply_substitutions_to_abstraction sub abs
+let subInAbs sub abs = Term.apply_substitutions_to_abstraction sub abs
 
 (* Substitute in target value types, computation types, and dirts *)
 let subInValTy sub ty = Substitution.apply_substitutions_to_type sub ty
@@ -570,10 +648,7 @@ and tcLetRecNoGen state defs (c2 : Untyped.computation) : tcCompOutput' =
   let trgC2, cs2 = tcComp state' c2 in
 
   (* 5: Combine the results *)
-  let outExpr =
-    Term.LetRec
-      (Assoc.map (fun abs -> (Type.empty_parameters, abs)) defs', trgC2)
-  in
+  let outExpr = Term.LetRec (defs', trgC2) in
 
   let outCs = cs1 @ cs2 in
   ((outExpr, trgC2.ty), outCs)
@@ -760,29 +835,6 @@ let monomorphize free_ty_params cnstrs =
   assert (Constraint.unresolve residuals = []);
   sub
 
-let generalize free_params cnstrs =
-  let free_cnstrs_params = Type.Constraints.free_params cnstrs in
-  let free_params = Type.Params.union free_params free_cnstrs_params in
-  let skeleton_params = Type.SkelParamSet.elements free_params.skel_params
-  and ty_params = Type.TyParamMap.bindings free_params.ty_params
-  and dirt_params = Type.DirtParamSet.elements free_params.dirt_params
-  and ty_constraints =
-    List.map
-      (fun (w, t1, t2, skel) ->
-        ( w,
-          ( Type.tyParam t1 (Type.SkelParam skel),
-            Type.tyParam t2 (Type.SkelParam skel) ) ))
-      cnstrs.ty_constraints
-  in
-  Type.
-    {
-      skeleton_params;
-      ty_params;
-      dirt_params;
-      ty_constraints;
-      dirt_constraints = cnstrs.dirt_constraints;
-    }
-
 let infer_computation state comp =
   let comp', cnstrs = tcComp state comp in
   let sub, residuals = Unification.solve cnstrs in
@@ -796,8 +848,7 @@ let infer_expression state expr =
 let infer_rec_abstraction state defs =
   let defs', cnstrs = infer_let_rec state defs in
   let sub, residuals = Unification.solve cnstrs in
-  ( Assoc.map (Substitution.apply_substitutions_to_abstraction sub) defs',
-    residuals )
+  (Assoc.map (Term.apply_substitutions_to_abstraction sub) defs', residuals)
 
 (* Typecheck a top-level expression *)
 let process_computation state comp =
@@ -820,43 +871,50 @@ let process_top_let state defs =
   let fold (p, c) (state', defs) =
     match (p.it, c.it) with
     | Language.UntypedSyntax.PVar x, Language.UntypedSyntax.Value v ->
-        let expr, residuals = infer_expression state v in
-        let free_params = Type.free_params_ty expr.ty in
-        let parameters = generalize free_params residuals in
-        let ty_scheme = { Type.parameters; monotype = expr.ty } in
+        let expr, constraints = infer_expression state v in
+        let params =
+          Type.Params.union
+            (Type.free_params_ty expr.ty)
+            (Type.Constraints.free_params constraints)
+        in
+        let ty_scheme = Type.{ params; constraints; ty = expr.ty } in
         let state'' = extend_poly_var state' x ty_scheme in
         Exhaust.is_irrefutable state.tydefs p;
         Exhaust.check_computation state.tydefs c;
-        (state'', (x, (parameters, expr)) :: defs)
+        (state'', (x, (params, constraints, expr)) :: defs)
     | _ -> failwith __LOC__
   in
   let state', defs' = List.fold_right fold defs (state, []) in
   (state', Assoc.of_list defs')
 
 let process_top_let_rec state defs =
-  let defs, residuals = infer_rec_abstraction state (Assoc.to_list defs) in
-  let free_params =
-    Term.free_params_definitions
-      (Assoc.map (fun def -> (Type.empty_parameters, def)) defs)
-  in
+  let defs, constraints = infer_rec_abstraction state (Assoc.to_list defs) in
+  let defs_params = Term.free_params_definitions defs in
+  let cnstrs_params = Type.Constraints.free_params constraints in
+  let params = Type.Params.union defs_params cnstrs_params in
   let state', defs' =
     Assoc.fold_right
-      (fun (f, abs) (state, defs) ->
-        let parameters = generalize free_params residuals in
-        let ty_scheme = { Type.parameters; monotype = Type.arrow abs.ty } in
+      (fun (f, (abs : Term.abstraction)) (state, defs) ->
+        let (ty_scheme : Type.ty_scheme) =
+          Type.{ params; constraints; ty = Type.arrow abs.ty }
+        in
         let state' = extend_poly_var state f ty_scheme in
-        (state', (f, (parameters, abs)) :: defs))
+        (state', (f, (params, constraints, abs)) :: defs))
       defs (state, [])
   in
   let subst =
     List.map
-      (fun (f, (ws, abs)) ->
-        (f, Term.poly_var_with_parameters f ws (Type.Arrow abs.ty)))
+      (fun (f, (params, constraints, abs)) ->
+        let inst = identity_instantiation params constraints in
+        (f, Term.poly_var f inst (Type.arrow abs.ty)))
       defs'
     |> Assoc.of_list
   in
   let defs'' =
-    List.map (fun (f, (ws, abs)) -> (f, (ws, Term.subst_abs subst abs))) defs'
+    List.map
+      (fun (f, (params, constraints, abs)) ->
+        (f, (params, constraints, Term.subst_abs subst abs)))
+      defs'
   in
   (state', Assoc.of_list defs'')
 

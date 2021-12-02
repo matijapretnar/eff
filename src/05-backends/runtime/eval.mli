@@ -7,8 +7,7 @@ val initial_state : state
 
 val extend : Term.pattern -> Value.value -> state -> state
 
-val extend_let_rec :
-  state -> (Term.variable, Type.parameters * Term.abstraction) Assoc.t -> state
+val extend_let_rec : state -> (Term.variable, Term.abstraction) Assoc.t -> state
 
 val eval_expression : state -> Term.expression -> Value.value
 

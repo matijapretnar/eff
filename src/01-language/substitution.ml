@@ -30,7 +30,6 @@ let is_empty sub =
 
 (* Substitution application *)
 open Type
-open Term
 
 let apply_sub_dirt sub dirt =
   match dirt.row with
@@ -59,7 +58,7 @@ let rec apply_sub_ty sub ty =
   let ty' = apply_sub_ty' sub ty in
   { ty' with ty = apply_sub_skel sub ty'.ty }
 
-and apply_sub_ty' sub ty =
+and apply_sub_ty' sub ty : ty =
   match ty.term with
   | TyParam typ1 -> (
       match Assoc.lookup typ1 sub.type_param_to_type_subs with
@@ -124,95 +123,6 @@ and apply_sub_dirtycoer (sub : t) { term = ty_coer, dirt_coer; _ } :
   let ty_coer' = apply_sub_tycoer sub ty_coer
   and dirt_coer' = apply_sub_dirtcoer sub dirt_coer in
   Coercion.bangCoercion (ty_coer', dirt_coer')
-
-let rec apply_sub_comp sub computation =
-  {
-    term = apply_sub_comp' sub computation.term;
-    ty = apply_sub_dirty_ty sub computation.ty;
-  }
-
-and apply_sub_comp' sub computation =
-  match computation with
-  | Value e -> Value (apply_sub_exp sub e)
-  | LetVal (e1, abs) -> LetVal (apply_sub_exp sub e1, apply_sub_abs sub abs)
-  | LetRec (defs, c1) ->
-      LetRec (apply_sub_definitions sub defs, apply_sub_comp sub c1)
-  | Match (e, alist) ->
-      Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
-  | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
-  | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
-  | Call (effect, e1, abs) ->
-      Call (effect, apply_sub_exp sub e1, apply_sub_abs sub abs)
-  | Bind (c1, a1) -> Bind (apply_sub_comp sub c1, apply_sub_abs sub a1)
-  | CastComp (c1, dc1) ->
-      CastComp (apply_sub_comp sub c1, apply_sub_dirtycoer sub dc1)
-  | Check c -> Check (apply_sub_comp sub c)
-
-and apply_sub_exp sub expression =
-  {
-    term = apply_sub_exp' sub expression.term;
-    ty = apply_sub_ty sub expression.ty;
-  }
-
-and apply_sub_exp' sub expression =
-  match expression with
-  | Var v -> Var v
-  | Const c -> Const c
-  | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
-  | Variant (lbl, e1) -> Variant (lbl, Option.map (apply_sub_exp sub) e1)
-  | Lambda abs -> Lambda (apply_sub_abs sub abs)
-  | Handler h -> Handler (apply_sub_handler sub h)
-  | CastExp (e1, tc1) -> CastExp (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
-  | Record flds -> Record (Assoc.map (apply_sub_exp sub) flds)
-
-and apply_sub_abs sub abs =
-  { term = apply_sub_abs' sub abs.term; ty = apply_sub_abs_ty sub abs.ty }
-
-and apply_sub_abs' sub (p, c) = (apply_sub_pat sub p, apply_sub_comp sub c)
-
-and apply_sub_pat sub pat =
-  { term = apply_sub_pat' sub pat.term; ty = apply_sub_ty sub pat.ty }
-
-and apply_sub_pat' sub pat =
-  match pat with
-  | PVar _ -> pat
-  | PAs (p, x) -> PAs (apply_sub_pat sub p, x)
-  | PTuple ps -> PTuple (List.map (apply_sub_pat sub) ps)
-  | PRecord flds -> PRecord (Assoc.map (apply_sub_pat sub) flds)
-  | PVariant (lbl, pat) -> PVariant (lbl, Option.map (apply_sub_pat sub) pat)
-  | PConst _ -> pat
-  | PNonbinding -> pat
-
-and apply_sub_definitions sub defs =
-  Assoc.map (fun (ws, abs) -> (ws, apply_sub_abs sub abs)) defs
-
-and apply_sub_abs2 sub abs2 =
-  { term = apply_sub_abs2' sub abs2.term; ty = apply_sub_abs2_ty sub abs2.ty }
-
-and apply_sub_abs2' sub (p1, p2, c) =
-  (apply_sub_pat sub p1, apply_sub_pat sub p2, apply_sub_comp sub c)
-
-and apply_sub_handler sub h =
-  let drty1, drty2 = h.ty in
-  let eff_clauses = h.term.effect_clauses in
-  let new_value_clause = apply_sub_abs sub h.term.value_clause in
-  let new_eff_clauses =
-    Assoc.map (fun abs2 -> apply_sub_abs2 sub abs2) eff_clauses.effect_part
-  in
-  {
-    term =
-      {
-        effect_clauses = { eff_clauses with effect_part = new_eff_clauses };
-        value_clause = new_value_clause;
-      };
-    ty = (apply_sub_dirty_ty sub drty1, apply_sub_dirty_ty sub drty2);
-  }
-
-let apply_substitutions_to_computation = apply_sub_comp
-
-let apply_substitutions_to_expression = apply_sub_exp
-
-let apply_substitutions_to_abstraction = apply_sub_abs
 
 let apply_substitutions_to_type = apply_sub_ty
 
