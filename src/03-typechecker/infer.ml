@@ -206,9 +206,12 @@ and tcConst (_state : state) (c : Const.t) : tcExprOutput' =
   ((Term.Const c, Type.type_const c), [])
 
 (* Type-annotated Expressions *)
-and tcAnnotated (_state : state)
-    ((_e, _ty) : Untyped.expression * Language.Type.ty) : tcExprOutput' =
-  failwith __LOC__
+and tcAnnotated (state : state)
+    ((e, ty) : Untyped.expression * Language.Type.ty) : tcExprOutput' =
+  let e', cnstrs = tcExpr state e in
+  let e'', castCt = Constraint.cast_expression e' ty in
+
+  ((e''.term, e''.ty), castCt :: cnstrs)
 
 (* GEORGE: Planned TODO for the future I guess?? *)
 
