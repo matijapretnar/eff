@@ -30,15 +30,33 @@ let apply_sub1 subs cons =
 let apply_substitutions_to_constraints subs c_list =
   List.map (apply_sub1 subs) c_list
 
-let apply_substitution new_sub sub paused queue =
-  if Substitution.is_empty new_sub then (sub, paused, queue)
-  else
-    let sub' = Substitution.merge new_sub sub in
-    let queue' =
-      apply_substitutions_to_constraints sub'
-        (Constraint.return_resolved paused queue)
+let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
+  let substitute_ty_constraint (w, t1, t2, s) (paused, queue) =
+    let skel = Type.SkelParam s in
+    let ty1 = Type.tyParam t1 skel and ty2 = Type.tyParam t2 skel in
+    let ty1', ty2' =
+      ( Substitution.apply_substitutions_to_type new_sub ty1,
+        Substitution.apply_substitutions_to_type new_sub ty2 )
     in
-    (sub', Type.Constraints.empty, queue')
+    if Type.equal_ty ty1 ty1' && Type.equal_ty ty2 ty2' then
+      (Type.Constraints.add_ty_constraint paused w t1 t2 s, queue)
+    else (paused, Constraint.TyOmega (w, (ty1', ty2')) :: queue)
+  and substitute_dirt_constraint (w, (drt1, drt2)) (paused, queue) =
+    let drt1', drt2' =
+      ( Substitution.apply_substitutions_to_dirt new_sub drt1,
+        Substitution.apply_substitutions_to_dirt new_sub drt2 )
+    in
+    if Type.equal_dirt drt1 drt1' && Type.equal_dirt drt2 drt2' then
+      (Type.Constraints.add_dirt_constraint paused w (drt1, drt2), queue)
+    else (paused, Constraint.DirtOmega (w, (drt1', drt2')) :: queue)
+  in
+  let sub' = Substitution.merge new_sub sub in
+  let paused', queue' =
+    (Type.Constraints.empty, apply_substitutions_to_constraints new_sub queue)
+    |> List.fold_right substitute_ty_constraint paused.ty_constraints
+    |> List.fold_right substitute_dirt_constraint paused.dirt_constraints
+  in
+  (sub', paused', queue')
 
 let expand_row row ops =
   match row with
