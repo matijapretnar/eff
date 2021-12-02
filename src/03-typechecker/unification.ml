@@ -280,16 +280,14 @@ and dirt_omega_step sub resolved unresolved w dcons =
   | ( { effect_set = ops1; row = ParamRow d1 },
       { effect_set = ops2; row = ParamRow d2 } ) ->
       let w' = DirtCoercionParam.refresh w in
+      let d2' = DirtParam.refresh d2 in
       let w_ty' =
         ( { effect_set = EffectSet.empty; row = ParamRow d1 },
-          { effect_set = EffectSet.union ops1 ops2; row = ParamRow d2 } )
+          { effect_set = EffectSet.union ops1 ops2; row = ParamRow d2' } )
       in
       let sub' =
         Substitution.add_dirt_substitution_e d2
-          {
-            effect_set = EffectSet.diff ops1 ops2;
-            row = ParamRow (DirtParam.refresh d2);
-          }
+          { effect_set = EffectSet.diff ops1 ops2; row = ParamRow d2' }
         |> Substitution.add_dirt_var_coercion w
              (Coercion.unionDirt (ops1, Coercion.dirtCoercionVar w' w_ty'))
       in
@@ -366,12 +364,13 @@ and dirt_eq_step sub paused rest_queue { effect_set = o1; row = row1 }
 
 let rec unify (sub, paused, queue) =
   (* Print.debug "SUB: %t" (Substitution.print_substitutions sub); *)
-  (* Print.debug "PAUSED: %t" (Constraint.print_resolved paused); *)
+  (* Print.debug "PAUSED: %t" (Type.Constraints.print paused); *)
   (* Print.debug "QUEUE: %t" (Constraint.print_constraints queue); *)
   match queue with
   | [] -> (sub, paused)
   | cons :: rest_queue ->
       let new_state =
+        (* Print.debug "CONS: %t" (Constraint.print_omega_ct cons); *)
         match cons with
         (* τ₁ = τ₂ *)
         | Constraint.SkelEq (sk1, sk2) ->
