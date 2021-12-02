@@ -2,34 +2,6 @@ open Utils
 open Language
 open Type
 
-let apply_sub1 subs cons =
-  match cons with
-  | Constraint.TyOmega (coer_p, (ty1, ty2)) ->
-      Constraint.TyOmega
-        ( coer_p,
-          ( Substitution.apply_substitutions_to_type subs ty1,
-            Substitution.apply_substitutions_to_type subs ty2 ) )
-  | Constraint.DirtOmega (coer_p, (drt1, drt2)) ->
-      Constraint.DirtOmega
-        ( coer_p,
-          ( Substitution.apply_substitutions_to_dirt subs drt1,
-            Substitution.apply_substitutions_to_dirt subs drt2 ) )
-  | Constraint.SkelEq (skel1, skel2) ->
-      Constraint.SkelEq
-        ( Substitution.apply_substitutions_to_skeleton subs skel1,
-          Substitution.apply_substitutions_to_skeleton subs skel2 )
-  | Constraint.TyEq (ty1, ty2) ->
-      Constraint.TyEq
-        ( Substitution.apply_substitutions_to_type subs ty1,
-          Substitution.apply_substitutions_to_type subs ty2 )
-  | Constraint.DirtEq (drt1, drt2) ->
-      Constraint.DirtEq
-        ( Substitution.apply_substitutions_to_dirt subs drt1,
-          Substitution.apply_substitutions_to_dirt subs drt2 )
-
-let apply_substitutions_to_constraints subs c_list =
-  List.map (apply_sub1 subs) c_list
-
 let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
   let substitute_ty_constraint (w, t1, t2, s) (paused, queue) =
     let skel = Type.SkelParam s in
@@ -40,7 +12,7 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
     in
     if Type.equal_ty ty1 ty1' && Type.equal_ty ty2 ty2' then
       (Type.Constraints.add_ty_constraint paused w t1 t2 s, queue)
-    else (paused, Constraint.TyOmega (w, (ty1', ty2')) :: queue)
+    else (paused, Constraint.add_ty_inequality (w, (ty1', ty2')) queue)
   and substitute_dirt_constraint (w, (drt1, drt2)) (paused, queue) =
     let drt1', drt2' =
       ( Substitution.apply_substitutions_to_dirt new_sub drt1,
@@ -48,11 +20,11 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
     in
     if Type.equal_dirt drt1 drt1' && Type.equal_dirt drt2 drt2' then
       (Type.Constraints.add_dirt_constraint paused w (drt1, drt2), queue)
-    else (paused, Constraint.DirtOmega (w, (drt1', drt2')) :: queue)
+    else (paused, Constraint.add_dirt_inequality (w, (drt1', drt2')) queue)
   in
   let sub' = Substitution.merge new_sub sub in
   let paused', queue' =
-    (Type.Constraints.empty, apply_substitutions_to_constraints new_sub queue)
+    (Type.Constraints.empty, Constraint.apply_sub new_sub queue)
     |> List.fold_right substitute_ty_constraint paused.ty_constraints
     |> List.fold_right substitute_dirt_constraint paused.dirt_constraints
   in
@@ -97,29 +69,29 @@ let skel_eq_step sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
   | SkelArrow (ska, skb), SkelArrow (skc, skd) ->
       ( sub,
         paused,
-        Constraint.add_list_to_constraints
-          [ Constraint.SkelEq (ska, skc); Constraint.SkelEq (skb, skd) ]
-          rest_queue )
+        rest_queue
+        |> Constraint.add_skeleton_equality (ska, skc)
+        |> Constraint.add_skeleton_equality (skb, skd) )
   (* τ₁₁ => τ₁₂ = τ₂₁ => τ₂₂ *)
   | SkelHandler (ska, skb), SkelHandler (skc, skd) ->
       ( sub,
         paused,
-        Constraint.add_list_to_constraints
-          [ Constraint.SkelEq (ska, skc); Constraint.SkelEq (skb, skd) ]
-          rest_queue )
+        rest_queue
+        |> Constraint.add_skeleton_equality (ska, skc)
+        |> Constraint.add_skeleton_equality (skb, skd) )
   | SkelApply (ty_name1, sks1), SkelApply (ty_name2, sks2)
     when ty_name1 = ty_name2 && List.length sks1 = List.length sks2 ->
       ( sub,
         paused,
-        Constraint.add_list_to_constraints
-          (List.map2 (fun sk1 sk2 -> Constraint.SkelEq (sk1, sk2)) sks1 sks2)
-          rest_queue )
+        List.fold_right2
+          (fun sk1 sk2 -> Constraint.add_skeleton_equality (sk1, sk2))
+          sks1 sks2 rest_queue )
   | SkelTuple sks1, SkelTuple sks2 when List.length sks1 = List.length sks2 ->
       ( sub,
         paused,
-        Constraint.add_list_to_constraints
-          (List.map2 (fun sk1 sk2 -> Constraint.SkelEq (sk1, sk2)) sks1 sks2)
-          rest_queue )
+        List.fold_right2
+          (fun sk1 sk2 -> Constraint.add_skeleton_equality (sk1, sk2))
+          sks1 sks2 rest_queue )
   | _ ->
       let printer = Type.print_pretty () in
       Error.typing ~loc:Location.unknown
@@ -132,9 +104,9 @@ and ty_eq_step sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
   | _, _ when ty1.ty <> ty2.ty ->
       ( sub,
         paused,
-        Constraint.SkelEq (ty1.ty, ty2.ty)
-        :: Constraint.TyEq (ty1, ty2)
-        :: rest_queue )
+        rest_queue
+        |> Constraint.add_ty_equality (ty1, ty2)
+        |> Constraint.add_skeleton_equality (ty1.ty, ty2.ty) )
   (* ς = ς *)
   | TyParam p1, TyParam p2 when p1 = p2 -> (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
@@ -158,39 +130,33 @@ and ty_eq_step sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
   | Arrow (tya, (tyb, drt1)), Arrow (tyc, (tyd, drt2)) ->
       ( sub,
         paused,
-        Constraint.add_list_to_constraints
-          [
-            Constraint.TyEq (tya, tyc);
-            Constraint.TyEq (tyb, tyd);
-            Constraint.DirtEq (drt1, drt2);
-          ]
-          rest_queue )
+        rest_queue
+        |> Constraint.add_ty_equality (tya, tyc)
+        |> Constraint.add_ty_equality (tyb, tyd)
+        |> Constraint.add_dirt_equality (drt1, drt2) )
   (* τ₁₁ => τ₁₂ = τ₂₁ => τ₂₂ *)
   | Handler ((tya, drta), (tyb, drtb)), Handler ((tyc, drtc), (tyd, drtd)) ->
       ( sub,
         paused,
-        Constraint.add_list_to_constraints
-          [
-            Constraint.TyEq (tya, tyc);
-            Constraint.TyEq (tyb, tyd);
-            Constraint.DirtEq (drta, drtc);
-            Constraint.DirtEq (drtb, drtd);
-          ]
-          rest_queue )
+        rest_queue
+        |> Constraint.add_ty_equality (tya, tyc)
+        |> Constraint.add_ty_equality (tyb, tyd)
+        |> Constraint.add_dirt_equality (drta, drtc)
+        |> Constraint.add_dirt_equality (drtb, drtd) )
   | ( Apply { ty_name = ty_name1; ty_args = tys1 },
       Apply { ty_name = ty_name2; ty_args = tys2 } )
     when ty_name1 = ty_name2 && List.length tys1 = List.length tys2 ->
       ( sub,
         paused,
-        Constraint.add_list_to_constraints
-          (List.map2 (fun ty1 ty2 -> Constraint.TyEq (ty1, ty2)) tys1 tys2)
-          rest_queue )
+        List.fold_right2
+          (fun ty1 ty2 -> Constraint.add_ty_equality (ty1, ty2))
+          tys1 tys2 rest_queue )
   | Tuple tys1, Tuple tys2 when List.length tys1 = List.length tys2 ->
       ( sub,
         paused,
-        Constraint.add_list_to_constraints
-          (List.map2 (fun ty1 ty2 -> Constraint.TyEq (ty1, ty2)) tys1 tys2)
-          rest_queue )
+        List.fold_right2
+          (fun ty1 ty2 -> Constraint.add_ty_equality (ty1, ty2))
+          tys1 tys2 rest_queue )
   | _ ->
       let printer = Type.print_pretty () in
       Error.typing ~loc:Location.unknown
@@ -217,7 +183,7 @@ and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
       in
       ( Substitution.add_type_coercion k v sub,
         paused,
-        Constraint.add_to_constraints ty_cons (rest_queue @ dirty_cnstrs) )
+        Constraint.list_union [ ty_cons; rest_queue; dirty_cnstrs ] )
   (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
   | { term = Type.Tuple tys; _ }, { term = Type.Tuple tys'; _ }
     when List.length tys = List.length tys' ->
@@ -225,14 +191,14 @@ and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
         List.fold_right2
           (fun ty ty' (coercions, conss) ->
             let coercion, ty_cons = Constraint.fresh_ty_coer (ty, ty') in
-            (coercion :: coercions, ty_cons :: conss))
-          tys tys' ([], [])
+            (coercion :: coercions, Constraint.union ty_cons conss))
+          tys tys' ([], Constraint.empty)
       in
       let k = omega in
       let v = Coercion.tupleCoercion coercions in
       ( Substitution.add_type_coercion k v sub,
         paused,
-        Constraint.add_list_to_constraints conss rest_queue )
+        Constraint.union conss rest_queue )
   (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
   (* we assume that all type parameters are positive *)
   | ( { term = Type.Apply { ty_name = ty_name1; ty_args = tys1 }; _ },
@@ -242,14 +208,14 @@ and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
         List.fold_right2
           (fun ty ty' (coercions, conss) ->
             let coercion, ty_cons = Constraint.fresh_ty_coer (ty, ty') in
-            (coercion :: coercions, ty_cons :: conss))
-          tys1 tys2 ([], [])
+            (coercion :: coercions, Constraint.union ty_cons conss))
+          tys1 tys2 ([], Constraint.empty)
       in
       let k = omega in
       let v = Coercion.applyCoercion (ty_name1, coercions) in
       ( Substitution.add_type_coercion k v sub,
         paused,
-        Constraint.add_list_to_constraints conss rest_queue )
+        Constraint.union conss rest_queue )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
   | ( { term = Type.Handler (drty11, drty12); _ },
       { term = Type.Handler (drty21, drty22); _ } ) ->
@@ -261,7 +227,7 @@ and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
       let v = Coercion.handlerCoercion (drty_coer1, drty_coer2) in
       ( Substitution.add_type_coercion k v sub,
         paused,
-        dirty_cons1 @ dirty_cons2 @ rest_queue )
+        Constraint.list_union [ dirty_cons1; dirty_cons2; rest_queue ] )
   (* ω : α <= A /  ω : A <= α *)
   | ( { term = Type.TyParam p1; ty = SkelParam s1 },
       { term = Type.TyParam p2; ty = SkelParam s2 } )
@@ -274,15 +240,16 @@ and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
       let skel_a = Type.skeleton_of_ty a in
       ( sub,
         paused,
-        Constraint.add_to_constraints
-          (Constraint.SkelEq (skel_tv, skel_a))
-          (Constraint.add_to_constraints cons rest_queue) )
+        rest_queue
+        |> Constraint.add_skeleton_equality (skel_tv, skel_a)
+        |> Constraint.union cons )
   | { term = Type.TyParam tv; ty = skel }, _
   | _, { term = Type.TyParam tv; ty = skel } ->
       let ty = fresh_ty_with_skel skel in
       apply_substitution
         (Substitution.add_type_substitution_e tv ty)
-        sub paused (cons :: rest_queue)
+        sub paused
+        (Constraint.union cons rest_queue)
   | ty1, ty2 ->
       let printer = Type.print_pretty () in
       Error.typing ~loc:Location.unknown
@@ -311,8 +278,8 @@ and dirt_omega_step sub resolved unresolved w dcons =
         |> Substitution.add_dirt_var_coercion w
              (Coercion.unionDirt (ops1, Coercion.dirtCoercionVar w' w_ty'))
       in
-      let new_cons = Constraint.DirtOmega (w', w_ty') in
-      apply_substitution sub' sub resolved (new_cons :: unresolved)
+      apply_substitution sub' sub resolved
+        (Constraint.add_dirt_inequality (w', w_ty') unresolved)
   (* ω : Ø <= Δ₂ *)
   | { effect_set = ops1; row = EmptyRow }, d when Effect.Set.is_empty ops1 ->
       let sub' = Substitution.add_dirt_var_coercion w (Coercion.empty d) sub in
@@ -382,32 +349,35 @@ and dirt_eq_step sub paused rest_queue { effect_set = o1; row = row1 }
   let sub' = Substitution.merge (Substitution.merge sub1 sub2) row_sub in
   apply_substitution sub' sub paused rest_queue
 
-let rec unify (sub, paused, queue) =
-  (* Print.debug "SUB: %t" (Substitution.print_substitutions sub); *)
-  (* Print.debug "PAUSED: %t" (Type.Constraints.print paused); *)
-  (* Print.debug "QUEUE: %t" (Constraint.print_constraints queue); *)
+let rec unify (sub, paused, (queue : Constraint.t)) =
+  Print.debug "SUB: %t" (Substitution.print_substitutions sub);
+  Print.debug "PAUSED: %t" (Type.Constraints.print paused);
+  Print.debug "QUEUE: %t" (Constraint.print queue);
   match queue with
-  | [] -> (sub, paused)
-  | cons :: rest_queue ->
-      let new_state =
-        (* Print.debug "CONS: %t" (Constraint.print_omega_ct cons); *)
-        match cons with
-        (* τ₁ = τ₂ *)
-        | Constraint.SkelEq (sk1, sk2) ->
-            skel_eq_step sub paused rest_queue sk1 sk2
-        (* A₁ = A₂ *)
-        | Constraint.TyEq (ty1, ty2) -> ty_eq_step sub paused rest_queue ty1 ty2
-        (* ω : A <= B *)
-        | Constraint.TyOmega (omega, tycons) ->
-            ty_omega_step sub paused cons rest_queue omega tycons
-        (* ω : Δ₁ <= Δ₂ *)
-        | Constraint.DirtOmega (omega, dcons) ->
-            dirt_omega_step sub paused rest_queue omega dcons
-        (* Δ₁ = Δ₂ *)
-        | Constraint.DirtEq (drt1, drt2) ->
-            dirt_eq_step sub paused rest_queue drt1 drt2
+  | { skeleton_equalities = (sk1, sk2) :: skeleton_equalities; _ } ->
+      skel_eq_step sub paused { queue with skeleton_equalities } sk1 sk2
+      |> unify
+  | { dirt_equalities = (drt1, drt2) :: dirt_equalities; _ } ->
+      dirt_eq_step sub paused { queue with dirt_equalities } drt1 drt2 |> unify
+  | { dirt_inequalities = (omega, dcons) :: dirt_inequalities; _ } ->
+      dirt_omega_step sub paused { queue with dirt_inequalities } omega dcons
+      |> unify
+  | { ty_equalities = (ty1, ty2) :: ty_equalities; _ } ->
+      ty_eq_step sub paused { queue with ty_equalities } ty1 ty2 |> unify
+  | { ty_inequalities = (omega, tycons) :: ty_inequalities; _ } ->
+      let cons =
+        Constraint.add_ty_inequality (omega, tycons) Constraint.empty
       in
-      unify new_state
+      ty_omega_step sub paused cons { queue with ty_inequalities } omega tycons
+      |> unify
+  | {
+   skeleton_equalities = [];
+   dirt_equalities = [];
+   dirt_inequalities = [];
+   ty_equalities = [];
+   ty_inequalities = [];
+  } ->
+      (sub, paused)
 
 let solve constraints =
   (* Print.debug "constraints: %t" (Constraint.print_constraints constraints); *)

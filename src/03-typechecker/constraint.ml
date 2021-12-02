@@ -1,86 +1,170 @@
 open Utils
 open Language
 
-type omega_ct =
-  | TyOmega of (Type.TyCoercionParam.t * Type.ct_ty)
-  | DirtOmega of (Type.DirtCoercionParam.t * Type.ct_dirt)
-  | SkelEq of Type.skeleton * Type.skeleton
-  | TyEq of Type.ty * Type.ty
-  | DirtEq of Type.dirt * Type.dirt
-
 (* A bag/list of constraints *)
-type constraints = omega_ct list
+type t = {
+  skeleton_equalities : (Type.skeleton * Type.skeleton) list;
+  dirt_equalities : (Type.dirt * Type.dirt) list;
+  dirt_inequalities : (Type.DirtCoercionParam.t * Type.ct_dirt) list;
+  ty_equalities : (Type.ty * Type.ty) list;
+  ty_inequalities : (Type.TyCoercionParam.t * Type.ct_ty) list;
+}
 
-let add_to_constraints con constraints = con :: constraints
+let empty =
+  {
+    skeleton_equalities = [];
+    dirt_equalities = [];
+    dirt_inequalities = [];
+    ty_equalities = [];
+    ty_inequalities = [];
+  }
 
-let add_list_to_constraints new_constraints old_constraints =
-  new_constraints @ old_constraints
+let add_skeleton_equality con cons =
+  { cons with skeleton_equalities = con :: cons.skeleton_equalities }
 
-let unresolve (resolved : Type.Constraints.t) =
-  List.map
-    (fun (omega, a, b, skel) ->
-      TyOmega
-        ( omega,
-          ( Type.tyParam a (Type.SkelParam skel),
-            Type.tyParam b (Type.SkelParam skel) ) ))
-    resolved.ty_constraints
-  @ List.map
-      (fun (omega, ct) -> DirtOmega (omega, ct))
-      resolved.dirt_constraints
+let add_dirt_equality con cons =
+  { cons with dirt_equalities = con :: cons.dirt_equalities }
 
-let return_resolved resolved queue = unresolve resolved @ queue
+let add_dirt_inequality con cons =
+  { cons with dirt_inequalities = con :: cons.dirt_inequalities }
 
-let print_omega_ct ?max_level c ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match c with
-  | TyOmega (p, (ty1, ty2)) ->
-      print "%t: (%t ≤ %t)"
-        (Type.TyCoercionParam.print p)
-        (Type.print_ty ty1) (Type.print_ty ty2)
-  | DirtOmega (p, (ty1, ty2)) ->
-      print "%t: (%t ≤ %t)"
-        (Type.DirtCoercionParam.print p)
-        (Type.print_dirt ty1) (Type.print_dirt ty2)
-  | SkelEq (sk1, sk2) ->
-      print "%t ~ %t" (Type.print_skeleton sk1) (Type.print_skeleton sk2)
-  | TyEq (ty1, ty2) -> print "%t = %t" (Type.print_ty ty1) (Type.print_ty ty2)
-  | DirtEq (drt1, drt2) ->
-      print "%t = %t" (Type.print_dirt drt1) (Type.print_dirt drt2)
+let add_ty_equality con cons =
+  { cons with ty_equalities = con :: cons.ty_equalities }
 
-let print_constraints cs = Print.sequence ";" print_omega_ct cs
+let add_ty_inequality con cons =
+  { cons with ty_inequalities = con :: cons.ty_inequalities }
+
+let union cons1 cons2 =
+  {
+    skeleton_equalities = cons1.skeleton_equalities @ cons2.skeleton_equalities;
+    dirt_equalities = cons1.dirt_equalities @ cons2.dirt_equalities;
+    dirt_inequalities = cons1.dirt_inequalities @ cons2.dirt_inequalities;
+    ty_equalities = cons1.ty_equalities @ cons2.ty_equalities;
+    ty_inequalities = cons1.ty_inequalities @ cons2.ty_inequalities;
+  }
+
+let list_union conss = List.fold_left union empty conss
+
+let print c ppf =
+  let print_skeleton_equality (sk1, sk2) ppf =
+    Print.print ppf "%t = %t" (Type.print_skeleton sk1)
+      (Type.print_skeleton sk2)
+  and print_dirt_equality (drt1, drt2) ppf =
+    Print.print ppf "%t = %t" (Type.print_dirt drt1) (Type.print_dirt drt2)
+  and print_dirt_inequality (p, (ty1, ty2)) ppf =
+    Print.print ppf "%t: (%t ≤ %t)"
+      (Type.DirtCoercionParam.print p)
+      (Type.print_dirt ty1) (Type.print_dirt ty2)
+  and print_ty_equality (ty1, ty2) ppf =
+    Print.print ppf "%t = %t" (Type.print_ty ty1) (Type.print_ty ty2)
+  and print_ty_inequality (p, (ty1, ty2)) ppf =
+    Print.print ppf "%t: (%t ≤ %t)"
+      (Type.TyCoercionParam.print p)
+      (Type.print_ty ty1) (Type.print_ty ty2)
+  in
+  Print.print ppf "{ %t / %t / %t / %t / %t }"
+    (Print.sequence ";" print_skeleton_equality c.skeleton_equalities)
+    (Print.sequence ";" print_dirt_equality c.dirt_equalities)
+    (Print.sequence ";" print_dirt_inequality c.dirt_inequalities)
+    (Print.sequence ";" print_ty_equality c.ty_equalities)
+    (Print.sequence ";" print_ty_inequality c.ty_inequalities)
+
+let free_params cons =
+  Type.Params.union_map
+    (fun (sk1, sk2) ->
+      Type.Params.union
+        (Type.free_params_skeleton sk1)
+        (Type.free_params_skeleton sk2))
+    cons.skeleton_equalities
+  |> Type.Params.union
+       (Type.Params.union_map
+          (fun (drt1, drt2) ->
+            Type.Params.union
+              (Type.free_params_dirt drt1)
+              (Type.free_params_dirt drt2))
+          cons.dirt_equalities)
+  |> Type.Params.union
+       (Type.Params.union_map
+          (fun (_, ct) -> Type.free_params_ct_dirt ct)
+          cons.dirt_inequalities)
+  |> Type.Params.union
+       (Type.Params.union_map
+          (fun (ty1, ty2) ->
+            Type.Params.union (Type.free_params_ty ty1)
+              (Type.free_params_ty ty2))
+          cons.ty_equalities)
+  |> Type.Params.union
+       (Type.Params.union_map
+          (fun (_, ct) -> Type.free_params_ct_ty ct)
+          cons.ty_inequalities)
+
+let apply_sub subs cons =
+  {
+    skeleton_equalities =
+      List.map
+        (fun (skel1, skel2) ->
+          ( Substitution.apply_substitutions_to_skeleton subs skel1,
+            Substitution.apply_substitutions_to_skeleton subs skel2 ))
+        cons.skeleton_equalities;
+    dirt_equalities =
+      List.map
+        (fun (drt1, drt2) ->
+          ( Substitution.apply_substitutions_to_dirt subs drt1,
+            Substitution.apply_substitutions_to_dirt subs drt2 ))
+        cons.dirt_equalities;
+    dirt_inequalities =
+      List.map
+        (fun (coer_p, (drt1, drt2)) ->
+          ( coer_p,
+            ( Substitution.apply_substitutions_to_dirt subs drt1,
+              Substitution.apply_substitutions_to_dirt subs drt2 ) ))
+        cons.dirt_inequalities;
+    ty_equalities =
+      List.map
+        (fun (ty1, ty2) ->
+          ( Substitution.apply_substitutions_to_type subs ty1,
+            Substitution.apply_substitutions_to_type subs ty2 ))
+        cons.ty_equalities;
+    ty_inequalities =
+      List.map
+        (fun (coer_p, (ty1, ty2)) ->
+          ( coer_p,
+            ( Substitution.apply_substitutions_to_type subs ty1,
+              Substitution.apply_substitutions_to_type subs ty2 ) ))
+        cons.ty_inequalities;
+  }
+
+let return_to_unresolved (resolved : Type.Constraints.t) queue =
+  queue
+  |> List.fold_right add_dirt_inequality resolved.dirt_constraints
+  |> List.fold_right
+       (fun (omega, a, b, skel) ->
+         add_ty_inequality
+           ( omega,
+             ( Type.tyParam a (Type.SkelParam skel),
+               Type.tyParam b (Type.SkelParam skel) ) ))
+       resolved.ty_constraints
+
+let unresolve resolved = return_to_unresolved resolved empty
 
 let fresh_ty_coer cons =
   let param = Type.TyCoercionParam.fresh () in
-  ({ term = Coercion.TyCoercionVar param; ty = cons }, TyOmega (param, cons))
+  ( { term = Coercion.TyCoercionVar param; ty = cons },
+    { empty with ty_inequalities = [ (param, cons) ] } )
 
 let fresh_dirt_coer cons =
   let param = Type.DirtCoercionParam.fresh () in
-  ({ term = Coercion.DirtCoercionVar param; ty = cons }, DirtOmega (param, cons))
+  ( { term = Coercion.DirtCoercionVar param; ty = cons },
+    { empty with dirt_inequalities = [ (param, cons) ] } )
 
 let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
   let ty_coer, ty_cons = fresh_ty_coer (ty1, ty2)
   and drt_coer, drt_cons = fresh_dirt_coer (drt1, drt2) in
-  (Coercion.bangCoercion (ty_coer, drt_coer), [ ty_cons; drt_cons ])
+  (Coercion.bangCoercion (ty_coer, drt_coer), union ty_cons drt_cons)
 
 (* ************************************************************************* *)
 (*                        FREE PARAMETER COMPUTATION                         *)
 (* ************************************************************************* *)
-
-let free_params_constraint = function
-  | TyOmega (_, ct) -> Type.free_params_ct_ty ct
-  | DirtOmega (_, ct) -> Type.free_params_ct_dirt ct
-  | SkelEq (sk1, sk2) ->
-      Type.Params.union
-        (Type.free_params_skeleton sk1)
-        (Type.free_params_skeleton sk2)
-  | TyEq (ty1, ty2) ->
-      Type.Params.union (Type.free_params_ty ty1) (Type.free_params_ty ty2)
-  | DirtEq (drt1, drt2) ->
-      Type.Params.union
-        (Type.free_params_dirt drt1)
-        (Type.free_params_dirt drt2)
-
-let free_params_constraints = Type.Params.union_map free_params_constraint
 
 let cast_expression e ty =
   let omega, cons = fresh_ty_coer (e.ty, ty) in
@@ -99,4 +183,4 @@ let full_cast_abstraction { term = pat, cmp; _ } ty_in dirty_out =
   let exp', cnstrs1 = cast_expression x_var pat.ty in
   let cmp', cnstrs2 = cast_computation cmp dirty_out in
   ( Term.abstraction (x_pat, Term.letVal (exp', Term.abstraction (pat, cmp'))),
-    cnstrs1 :: cnstrs2 )
+    union cnstrs1 cnstrs2 )

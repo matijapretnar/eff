@@ -351,6 +351,9 @@ module Constraints = struct
 
   let empty = { ty_constraints = []; dirt_constraints = [] }
 
+  let is_empty cnstrs =
+    cnstrs.ty_constraints = [] && cnstrs.dirt_constraints = []
+
   let add_ty_constraint resolved omega ty1 ty2 skel =
     {
       resolved with

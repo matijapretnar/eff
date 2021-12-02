@@ -75,17 +75,17 @@ module TypingEnv = struct
           dirt_coercions |> Type.DirtCoercionParam.Map.of_bindings;
       }
 
-  let lookup ctx x : Term.expression * Constraint.omega_ct list =
+  let lookup ctx x : Term.expression * Constraint.t =
     match Assoc.lookup x ctx with
     | Some ty_scheme ->
         let subst =
           fresh_instantiation ty_scheme.Type.params ty_scheme.constraints
         in
         let x = Term.poly_var x subst ty_scheme.ty in
-        let cnstrs = Constraint.return_resolved ty_scheme.constraints [] in
         let cnstrs =
-          Unification.apply_substitutions_to_constraints subst cnstrs
+          Constraint.return_to_unresolved ty_scheme.constraints Constraint.empty
         in
+        let cnstrs = Constraint.apply_sub subst cnstrs in
         (x, cnstrs)
     | None -> assert false
 
@@ -195,7 +195,7 @@ let applyTerm tyCoercions dirtCoercions exp : Term.expression =
 (* ************************************************************************* *)
 
 (* Constraint generation output *)
-type 'a tcOutput = 'a * Constraint.constraints
+type 'a tcOutput = 'a * Constraint.t
 
 (* Value typing output *)
 type tcExprOutput' = (Term.expression' * Type.ty) tcOutput
@@ -210,11 +210,11 @@ type tcCompOutput = Term.computation tcOutput
 (* Typecheck a list of things *)
 let rec tcMany state (xss : 'a list) tc =
   match xss with
-  | [] -> (([], []), [])
+  | [] -> (([], []), Constraint.empty)
   | x :: xs ->
       let y, cs1 = tc state x in
       let (ys, tys), cs2 = tcMany state xs tc in
-      ((y :: ys, y.ty :: tys), cs1 @ cs2)
+      ((y :: ys, y.ty :: tys), Constraint.union cs1 cs2)
 
 (* ************************************************************************* *)
 (*                            PATTERN TYPING                                 *)
@@ -225,7 +225,7 @@ let rec tcMany state (xss : 'a list) tc =
 (* ************************************************************************* *)
 
 let rec infer_pattern state (pat : Untyped.pattern) :
-    Term.pattern * state * Constraint.constraints =
+    Term.pattern * state * Constraint.t =
   let pat', ty, state', cnstrs = infer_pattern' state pat in
   ({ term = pat'; ty }, state', cnstrs)
 
@@ -233,31 +233,35 @@ and infer_pattern' state pat =
   match pat.it with
   | Untyped.PVar x ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
-      (Term.PVar x, alpha, extend_var state x alpha, [])
+      (Term.PVar x, alpha, extend_var state x alpha, Constraint.empty)
   | Untyped.PAnnotated (p, ty) ->
       let p', state', cnstrs = infer_pattern state p in
-      (p'.term, ty, state', Constraint.TyEq (ty, p'.ty) :: cnstrs)
+      (p'.term, ty, state', Constraint.add_ty_equality (ty, p'.ty) cnstrs)
   | Untyped.PNonbinding ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
-      (Term.PNonbinding, alpha, state, [])
-  | Untyped.PConst c -> (Term.PConst c, Type.type_const c, state, [])
+      (Term.PNonbinding, alpha, state, Constraint.empty)
+  | Untyped.PConst c ->
+      (Term.PConst c, Type.type_const c, state, Constraint.empty)
   | Untyped.PTuple ps ->
       let fold p (ps', state, cnstrs) =
         let p', state', cnstrs' = infer_pattern state p in
-        (p' :: ps', state', cnstrs' @ cnstrs)
+        (p' :: ps', state', Constraint.union cnstrs' cnstrs)
       in
-      let ps', state', cnstrs = List.fold_right fold ps ([], state, []) in
+      let ps', state', cnstrs =
+        List.fold_right fold ps ([], state, Constraint.empty)
+      in
       let p = Term.pTuple ps' in
       (p.term, p.ty, state', cnstrs)
   | Untyped.PVariant (lbl, p) -> (
       match (p, TypeDefinitionContext.infer_variant lbl state.tydefs) with
-      | None, (None, out_ty) -> (Term.PVariant (lbl, None), out_ty, state, [])
+      | None, (None, out_ty) ->
+          (Term.PVariant (lbl, None), out_ty, state, Constraint.empty)
       | Some p, (Some in_ty, out_ty) ->
           let p', state', cnstrs = infer_pattern state p in
           ( Term.PVariant (lbl, Some p'),
             out_ty,
             state',
-            Constraint.TyEq (in_ty, p'.ty) :: cnstrs )
+            Constraint.add_ty_equality (in_ty, p'.ty) cnstrs )
       | _ -> assert false)
   | Untyped.PAs (p, x) ->
       let p', state', cnstrs = infer_pattern state p in
@@ -277,10 +281,12 @@ and infer_pattern' state pat =
         | Some fld_ty ->
             ( (fld, p') :: flds',
               state',
-              (Constraint.TyEq (fld_ty, p'.ty) :: cnstrs') @ cnstrs )
+              Constraint.union
+                (Constraint.add_ty_equality (fld_ty, p'.ty) cnstrs')
+                cnstrs )
       in
       let flds', state', cnstrs' =
-        Type.Field.Map.fold fold flds ([], state, [])
+        Type.TyName.Map.fold fold flds ([], state, Constraint.empty)
       in
       (Term.PRecord (Type.Field.Map.of_bindings flds'), out_ty, state', cnstrs')
 
@@ -302,7 +308,7 @@ let rec tcVar state (x : Untyped.variable) : tcExprOutput' =
 
 (* Constants *)
 and tcConst (_state : state) (c : Const.t) : tcExprOutput' =
-  ((Term.Const c, Type.type_const c), [])
+  ((Term.Const c, Type.type_const c), Constraint.empty)
 
 (* Type-annotated Expressions *)
 and tcAnnotated (state : state)
@@ -310,7 +316,7 @@ and tcAnnotated (state : state)
   let e', cnstrs = tcExpr state e in
   let e'', castCt = Constraint.cast_expression e' ty in
 
-  ((e''.term, e''.ty), castCt :: cnstrs)
+  ((e''.term, e''.ty), Constraint.union castCt cnstrs)
 
 (* GEORGE: Planned TODO for the future I guess?? *)
 
@@ -335,9 +341,9 @@ and tcRecord (state : state) (flds : Untyped.expression Type.Field.Map.t) :
           (Type.TyName.print ty_name)
     | Some fld_ty ->
         let e'', cons = Constraint.cast_expression e' fld_ty in
-        ((fld, e'') :: flds', (cons :: cnstrs') @ cnstrs)
+        ((fld, e'') :: flds', Constraint.list_union [ cons; cnstrs'; cnstrs ])
   in
-  let flds', cnstrs' = Type.Field.Map.fold fold flds ([], []) in
+  let flds', cnstrs' = Type.Field.Map.fold fold flds ([], Constraint.empty) in
   ((Term.Record (Type.Field.Map.of_bindings flds'), out_ty), cnstrs')
 
 (* GEORGE: Planned TODO for the future I guess?? *)
@@ -346,18 +352,19 @@ and tcRecord (state : state) (flds : Untyped.expression Type.Field.Map.t) :
 and tcVariant state ((lbl, mbe) : label * Untyped.expression option) :
     tcExprOutput' =
   match (TypeDefinitionContext.infer_variant lbl state.tydefs, mbe) with
-  | (None, ty_out), None -> ((Term.Variant (lbl, None), ty_out), [])
+  | (None, ty_out), None ->
+      ((Term.Variant (lbl, None), ty_out), Constraint.empty)
   | (Some ty_in, ty_out), Some e ->
       let e', cs1 = tcExpr state e in
       (* GEORGE: Investigate how cast_expression works *)
       let castExp, castCt = Constraint.cast_expression e' ty_in in
-      ((Term.Variant (lbl, Some castExp), ty_out), castCt :: cs1)
+      ((Term.Variant (lbl, Some castExp), ty_out), Constraint.union castCt cs1)
   | _, _ -> failwith __LOC__
 
 and tcAbstraction state (pat, cmp) =
   let pat', state', cnstrs1 = infer_pattern state pat in
   let cmp', cnstrs2 = tcComp state' cmp in
-  (Term.abstraction (pat', cmp'), cnstrs1 @ cnstrs2)
+  (Term.abstraction (pat', cmp'), Constraint.union cnstrs1 cnstrs2)
 
 (* Lambda Abstractions *)
 and tcLambda state abs =
@@ -388,11 +395,11 @@ and tcOpCases state (eclauses : (Untyped.effect, Untyped.abstraction2) Assoc.t)
     =
   let rec go cs =
     match Assoc.to_list cs with
-    | [] -> ([], [])
+    | [] -> ([], Constraint.empty)
     | c :: cs ->
         let y, cs1 = tcOpCase state c dirtyOut in
         let ys, cs2 = go (Assoc.of_list cs) in
-        (y :: ys, cs1 @ cs2)
+        (y :: ys, Constraint.union cs1 cs2)
   in
   let allClauses, allCs = go eclauses in
   (Assoc.of_list allClauses, allCs)
@@ -440,7 +447,7 @@ and tcOpCase state
   in
 
   (* 7: Combine the results *)
-  let outCs = omegaCt34i @ (omegaCt5i :: csi) in
+  let outCs = Constraint.list_union [ omegaCt34i; omegaCt5i; csi ] in
   (outExpr, outCs)
 
 (* Handlers *)
@@ -485,7 +492,7 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
       let handler = Term.Handler (Term.handler_clauses trgRet' trgCls drt_in) in
       let outExpr = Term.CastExp ({ term = handler; ty = handTy }, handlerCo) in
       let outType = Type.handler ((ty_ret_in, deltaIn), dirtyOut) in
-      let outCs = ((omegaCt7 :: cnstr_ret) @ cs1) @ cs2 in
+      let outCs = Constraint.list_union [ omegaCt7; cnstr_ret; cs1; cs2 ] in
       (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)
       ((outExpr, outType), outCs)
   | _ -> assert false
@@ -565,7 +572,7 @@ and tcLetValNoGen state (patIn : Untyped.pattern) (e1 : Untyped.expression)
   (* 3: Combine the results *)
   let exp', cnstr = Constraint.cast_expression trgE1 ty_in in
   let outExpr = Term.LetVal (exp', abs) in
-  let outCs = (cnstr :: cs1) @ cs2 in
+  let outCs = Constraint.list_union [ cnstr; cs1; cs2 ] in
   ((outExpr, drty_out), outCs)
 
 (* Typecheck a let when c1 is a computation (== do binding) *)
@@ -575,7 +582,7 @@ and tcLetCmp state (pat : Untyped.pattern) (c1 : Untyped.computation)
   let trgC1, cs1 = tcComp state c1 in
   let tyA1, dirtD1 = trgC1.ty in
   let trgPat, midState, csPat = infer_pattern state pat in
-  let csPat' = Constraint.TyEq (trgPat.ty, tyA1) :: csPat in
+  let csPat' = Constraint.add_ty_equality (trgPat.ty, tyA1) csPat in
   let trgC2, cs2 = tcComp midState c2 in
   let tyA2, dirtD2 = trgC2.ty in
 
@@ -596,8 +603,8 @@ and tcLetCmp state (pat : Untyped.pattern) (c1 : Untyped.computation)
   in
 
   let outExpr = Term.Bind (cresC1, Term.abstraction (trgPat, cresC2)) in
+  let outCs = Constraint.list_union [ omegaCt1; omegaCt2; cs1; cs2; csPat' ] in
   let outType = (tyA2, delta) in
-  let outCs = (omegaCt1 :: omegaCt2 :: cs1) @ cs2 @ csPat' in
 
   ((outExpr, outType), outCs)
 
@@ -616,7 +623,7 @@ and infer_let_rec state defs =
       (fun (x, abs) ->
         let alpha = Type.fresh_ty_with_fresh_skel () in
         let betadelta = Type.fresh_dirty_with_fresh_skel () in
-        (x, abs, alpha, betadelta, []))
+        (x, abs, alpha, betadelta, Constraint.empty))
       defs
   in
   let state' =
@@ -635,8 +642,8 @@ and infer_let_rec state defs =
         let abs'', cs2 =
           Constraint.full_cast_abstraction abs' alpha betadelta
         in
-        ((x, abs'') :: defs, cs1 @ cs2 @ cs3 @ cnstrs))
-      defs' ([], [])
+        ((x, abs'') :: defs, Constraint.list_union [ cs1; cs2; cs3; cnstrs ]))
+      defs' ([], Constraint.empty)
   in
   (Assoc.of_list defs'', cnstrs)
 
@@ -653,7 +660,7 @@ and tcLetRecNoGen state defs (c2 : Untyped.computation) : tcCompOutput' =
   (* 5: Combine the results *)
   let outExpr = Term.LetRec (defs', trgC2) in
 
-  let outCs = cs1 @ cs2 in
+  let outCs = Constraint.union cs1 cs2 in
   ((outExpr, trgC2.ty), outCs)
 
 (* Typecheck a case expression *)
@@ -669,9 +676,12 @@ and infer_cases state drty (cases : Untyped.abstraction list) =
     let ty_in, _ = case'.ty
     and case'', cnstrs'' = Constraint.cast_abstraction case' drty in
     ( case'' :: cases',
-      (Constraint.TyEq (ty, ty_in) :: cnstrs'') @ cnstrs' @ cnstrs )
+      Constraint.add_ty_equality (ty, ty_in)
+        (Constraint.list_union [ cnstrs''; cnstrs'; cnstrs ]) )
   in
-  let cases', cnstrs = List.fold_right (infer_case state) cases ([], []) in
+  let cases', cnstrs =
+    List.fold_right (infer_case state) cases ([], Constraint.empty)
+  in
   (cases', ty, cnstrs)
 
 (* Typecheck a non-empty case expression *)
@@ -694,7 +704,7 @@ and tcNonEmptyMatch state (scr : Untyped.expression) alts : tcCompOutput' =
 
   (* 6: Combine the results *)
   let outExpr = Term.Match (matchExp, cases) in
-  let outCs = (omegaCtScr :: cs1) @ cs2 in
+  let outCs = Constraint.list_union [ omegaCtScr; cs1; cs2 ] in
   ((outExpr, dirtyOut), outCs)
 
 (* Typecheck an empty case expression *)
@@ -725,7 +735,7 @@ and tcApply state (val1 : Untyped.expression) (val2 : Untyped.expression) :
     Constraint.cast_expression trgVal1 (Type.arrow (trgVal2.ty, outType))
   in
   let outExpr = Term.Apply (castVal1, trgVal2) in
-  let outCs = (omegaCt :: cs1) @ cs2 in
+  let outCs = Constraint.list_union [ omegaCt; cs1; cs2 ] in
   ((outExpr, outType), outCs)
 
 (* Typecheck a handle-computation *)
@@ -750,7 +760,7 @@ and tcHandle state (hand : Untyped.expression) (cmp : Untyped.computation) :
 
   (* Combine all the outputs *)
   let outExpr = Term.Handle (castHand, castCmp) in
-  let outCs = (omegaCt1 :: omegaCt23) @ cs1 @ cs2 in
+  let outCs = Constraint.list_union [ omegaCt1; omegaCt23; cs1; cs2 ] in
   ((outExpr, dirty2), outCs)
 
 (* Typecheck a "Check" expression (GEORGE does not know what this means yet *)
@@ -769,39 +779,40 @@ and tcCheck (state : state) (cmp : Untyped.computation) : tcCompOutput' =
  * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
  * tcTypedVarPat) *)
 and infer_abstraction (state : state) (pat, cmp) :
-    Term.abstraction * Constraint.omega_ct list =
+    Term.abstraction * Constraint.t =
   let trgPat, state', cs1 = infer_pattern state pat in
   let trgCmp, cs2 = tcComp state' cmp in
-  (Term.abstraction (trgPat, trgCmp), cs1 @ cs2)
+  (Term.abstraction (trgPat, trgCmp), Constraint.union cs1 cs2)
 
-and check_abstraction state abs patTy :
-    Term.abstraction * Constraint.omega_ct list =
+and check_abstraction state abs patTy : Term.abstraction * Constraint.t =
   let { term = trgPat, trgCmp; _ }, cs = infer_abstraction state abs in
   let trgPat' = { trgPat with ty = patTy } in
-  (Term.abstraction (trgPat', trgCmp), Constraint.TyEq (trgPat.ty, patTy) :: cs)
+  ( Term.abstraction (trgPat', trgCmp),
+    Constraint.add_ty_equality (trgPat.ty, patTy) cs )
 
 and infer_abstraction2 (state : state) (pat1, pat2, cmp) :
-    Term.abstraction2 * Constraint.omega_ct list =
+    Term.abstraction2 * Constraint.t =
   let trgPat1, state', cs1 = infer_pattern state pat1 in
   let trgPat2, state', cs2 = infer_pattern state' pat2 in
   let trgCmp, cs = tcComp state' cmp in
-  (Term.abstraction2 (trgPat1, trgPat2, trgCmp), cs1 @ cs2 @ cs)
+  ( Term.abstraction2 (trgPat1, trgPat2, trgCmp),
+    Constraint.list_union [ cs1; cs2; cs ] )
 
 (* Typecheck an abstraction where we *know* the type of the pattern. By *know*
  * we mean that we have inferred "some" type (could be instantiated later).
  * Hence, we conservatively ask for the pattern to be a variable pattern (cf.
  * tcTypedVarPat) *)
 and check_abstraction2 state abs2 patTy1 patTy2 :
-    Term.abstraction2 * Constraint.omega_ct list =
+    Term.abstraction2 * Constraint.t =
   let { term = trgPat1, trgPat2, trgCmp; _ }, cs =
     infer_abstraction2 state abs2
   in
   let trgPat1' = { trgPat1 with ty = patTy1 }
   and trgPat2' = { trgPat2 with ty = patTy2 } in
   ( Term.abstraction2 (trgPat1', trgPat2', trgCmp),
-    Constraint.TyEq (trgPat1.ty, patTy1)
-    :: Constraint.TyEq (trgPat2.ty, patTy2)
-    :: cs )
+    cs
+    |> Constraint.add_ty_equality (trgPat1.ty, patTy1)
+    |> Constraint.add_ty_equality (trgPat2.ty, patTy2) )
 
 (* ************************************************************************* *)
 (* ************************************************************************* *)
@@ -809,33 +820,31 @@ and check_abstraction2 state abs2 patTy1 patTy2 :
 let monomorphize free_ty_params cnstrs =
   let free_cnstrs_params = Type.Constraints.free_params cnstrs in
   let free_params = Type.Params.union free_ty_params free_cnstrs_params in
-  let monomorphize_skeletons =
-    List.map
-      (fun sk ->
-        Constraint.SkelEq (Type.SkelParam sk, Type.SkelBasic Const.FloatTy))
-      (Type.SkelParam.Set.elements free_params.skel_params)
-  and monomorphize_tys =
-    List.map
-      (fun (t, skel) ->
-        Constraint.TyOmega
-          ( Type.TyCoercionParam.fresh (),
-            (Type.tyParam t skel, Type.tyBasic Const.FloatTy) ))
-      (Type.TyParam.Map.bindings free_params.ty_params)
-  and monomorphize_dirts =
-    List.map
-      (fun d ->
-        Constraint.DirtOmega
-          ( Type.DirtCoercionParam.fresh (),
-            (Type.no_effect_dirt d, Type.empty_dirt) ))
-      (Type.DirtParam.Set.elements free_params.dirt_params)
+  let cnstrs' =
+    Constraint.empty
+    |> List.fold_right
+         (fun sk ->
+           Constraint.add_skeleton_equality
+             (Type.SkelParam sk, Type.SkelBasic Const.FloatTy))
+         (Type.SkelParam.Set.elements free_params.skel_params)
+    |> List.fold_right
+         (fun (t, skel) ->
+           Constraint.add_ty_inequality
+             ( Type.TyCoercionParam.fresh (),
+               (Type.tyParam t skel, Type.tyBasic Const.FloatTy) ))
+         (Type.TyParam.Map.bindings free_params.ty_params)
+    |> List.fold_right
+         (fun d ->
+           Constraint.add_dirt_inequality
+             ( Type.DirtCoercionParam.fresh (),
+               (Type.no_effect_dirt d, Type.empty_dirt) ))
+         (Type.DirtParam.Set.elements free_params.dirt_params)
   in
   let sub, residuals =
-    Unification.solve
-      (monomorphize_skeletons @ monomorphize_tys @ monomorphize_dirts
-      @ Constraint.unresolve cnstrs)
+    Unification.solve (Constraint.union cnstrs' (Constraint.unresolve cnstrs))
   in
   (* After zapping, there should be no more constraints left to solve. *)
-  assert (Constraint.unresolve residuals = []);
+  assert (Type.Constraints.is_empty residuals);
   sub
 
 let infer_computation state comp =
