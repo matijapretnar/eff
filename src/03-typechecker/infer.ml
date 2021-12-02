@@ -639,8 +639,9 @@ and tcHandle state (hand : Untyped.expression) (cmp : Untyped.computation) :
   ((outExpr, dirty2), outCs)
 
 (* Typecheck a "Check" expression (GEORGE does not know what this means yet *)
-and tcCheck (_state : state) (_cmp : Untyped.computation) : tcCompOutput' =
-  failwith __LOC__
+and tcCheck (state : state) (cmp : Untyped.computation) : tcCompOutput' =
+  let cmp', cnstrs = tcComp state cmp in
+  ((Term.Check cmp', Type.pure_ty Type.unit_ty), cnstrs)
 
 (* GEORGE: Planned TODO for the future I guess?? *)
 

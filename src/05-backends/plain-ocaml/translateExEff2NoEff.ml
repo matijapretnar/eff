@@ -408,6 +408,7 @@ and elab_computation' state c _is_empty =
       let elabc = elab_dirty_coercion state coer in
       let coelab = elab_computation state comp in
       NoEff.NCast (coelab, elabc)
+  | ExEff.Check _ -> failwith __LOC__
 
 and elab_rec_definitions state defs =
   Assoc.kmap

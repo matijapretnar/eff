@@ -190,6 +190,7 @@ and optimize_computation' state cmp =
       Term.bind (optimize_computation state cmp, optimize_abstraction state abs)
   | Term.CastComp (cmp, dtcoer) ->
       Term.castComp (optimize_computation state cmp, dtcoer)
+  | Term.Check cmp -> Term.check (optimize_computation state cmp)
 
 and optimize_handler state hnd =
   {
