@@ -389,9 +389,28 @@ let monotype ty = { parameters = empty_parameters; monotype = ty }
 (* ************************************************************************* *)
 (*                       PREDICATES ON ty                             *)
 (* ************************************************************************* *)
+let rec equal_skeleton skel1 skel2 =
+  match (skel1, skel2) with
+  | SkelParam tv1, SkelParam tv2 -> tv1 = tv2
+  | SkelArrow (ttya1, dirtya1), SkelArrow (ttyb1, dirtyb1) ->
+      equal_skeleton ttya1 ttyb1 && equal_skeleton dirtya1 dirtyb1
+  | SkelTuple tys1, SkelTuple tys2 ->
+      List.length tys1 = List.length tys2
+      && List.for_all2 equal_skeleton tys1 tys2
+  | SkelApply (ty_name1, tys1), SkelApply (ty_name2, tys2) ->
+      ty_name1 = ty_name2
+      && List.length tys1 = List.length tys2
+      && List.for_all2 equal_skeleton tys1 tys2
+  | SkelHandler (dirtya1, dirtya2), SkelHandler (dirtyb1, dirtyb2) ->
+      equal_skeleton dirtya1 dirtyb1 && equal_skeleton dirtya2 dirtyb2
+  | SkelBasic ptya, SkelBasic ptyb -> ptya = ptyb
+  | _, _ -> false
 
-let rec equal_ty type1 type2 =
-  match (type1.term, type2.term) with
+let rec equal_ty ty1 ty2 =
+  equal_skeleton ty1.ty ty2.ty && equal_ty' ty1.term ty2.term
+
+and equal_ty' ty1' ty2' =
+  match (ty1', ty2') with
   | TyParam tv1, TyParam tv2 -> tv1 = tv2
   | Arrow (ttya1, dirtya1), Arrow (ttyb1, dirtyb1) ->
       equal_ty ttya1 ttyb1 && equal_dirty dirtya1 dirtyb1
