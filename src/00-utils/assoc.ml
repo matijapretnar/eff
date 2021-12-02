@@ -10,10 +10,6 @@ let rec lookup x = function
   | [] -> None
   | (k, v) :: tl -> if x = k then Some v else lookup x tl
 
-let rec find_if p = function
-  | [] -> None
-  | hd :: tl -> if p hd then Some hd else find_if p tl
-
 let pop = function [] -> None | hd :: tl -> Some (hd, tl)
 
 (* Changing the list. *)

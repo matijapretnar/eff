@@ -148,8 +148,9 @@ let const (c : Const.t) : expression =
 let tuple es =
   { term = Tuple es; ty = Type.tuple (List.map (fun e -> e.ty) es) }
 
-let record (_ : (CoreTypes.Field.t, expression) Assoc.t) : expression =
-  failwith __LOC__
+let record ty (flds : (CoreTypes.Field.t, expression) Assoc.t) : expression =
+  (* Ideally, we could reconstruct ty from the field names *)
+  { term = Record flds; ty }
 
 let variant (lbl, e) ty = { term = Variant (lbl, e); ty }
 
@@ -658,7 +659,9 @@ and free_params_expression' e =
       List.fold_left
         (fun free e -> Type.Params.union free (free_params_expression e))
         Type.Params.empty es
-  | Record _ -> failwith __LOC__
+  | Record flds ->
+      flds |> Assoc.to_list
+      |> Type.Params.union_map (fun (_, e) -> free_params_expression e)
   | Variant (_, e) ->
       Option.default_map Type.Params.empty free_params_expression e
   | Lambda abs -> free_params_abstraction abs

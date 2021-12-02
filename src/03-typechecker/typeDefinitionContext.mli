@@ -18,7 +18,7 @@ val infer_variant : CoreTypes.Label.t -> state -> Type.ty option * Type.ty
 val infer_field :
   CoreTypes.Label.t ->
   state ->
-  (Type.ty * (CoreTypes.TyName.t * (CoreTypes.Field.t, Type.ty) Assoc.t)) option
+  Type.ty * (CoreTypes.TyName.t * (CoreTypes.Field.t, Type.ty) Assoc.t)
 
 val find_field :
   CoreTypes.Field.t ->

@@ -50,6 +50,10 @@ let lookup_tydef ~loc ty_name st =
   | None -> Error.typing ~loc "Unknown type %t" (CoreTypes.TyName.print ty_name)
   | Some tdata -> tdata
 
+let rec find_some f = function
+  | [] -> None
+  | hd :: tl -> ( match f hd with Some y -> Some y | None -> find_some f tl)
+
 (** [find_variant lbl] returns the information about the variant type that defines the
     label [lbl]. *)
 let find_variant lbl st =
@@ -60,9 +64,7 @@ let find_variant lbl st =
         | None -> None)
     | _ -> None
   in
-  match Assoc.find_if (fun x -> construct x <> None) st with
-  | Some x -> construct x
-  | None -> None
+  find_some construct (Assoc.to_list st)
 
 (** [find_field fld] returns the information about the record type that defines the field
     [fld]. *)
@@ -75,9 +77,7 @@ let find_field fld (st : state) =
         | None -> None)
     | _ -> None
   in
-  match Assoc.find_if (fun x -> construct x <> None) st with
-  | Some x -> construct x
-  | None -> None
+  find_some construct (Assoc.to_list st)
 
 let apply_to_params ty_name (ps : Type.Params.t) =
   apply
@@ -105,13 +105,13 @@ let infer_variant lbl st =
     refreshed type parameters and additional information needed for type inference. *)
 let infer_field fld st =
   match find_field fld st with
-  | None -> None
+  | None -> assert false
   | Some (ty_name, ps, us) ->
       let ps', fresh_subst = Substitution.of_parameters ps in
       let us' =
         Assoc.map (Substitution.apply_substitutions_to_type fresh_subst) us
       in
-      Some (apply_to_params ty_name ps', (ty_name, us'))
+      (apply_to_params ty_name ps', (ty_name, us'))
 
 let transparent ~loc ty_name st =
   let { type_def; _ } = lookup_tydef ~loc ty_name st in

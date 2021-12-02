@@ -163,7 +163,7 @@ and apply_sub_exp' sub expression =
   | Lambda abs -> Lambda (apply_sub_abs sub abs)
   | Handler h -> Handler (apply_sub_handler sub h)
   | CastExp (e1, tc1) -> CastExp (apply_sub_exp sub e1, apply_sub_tycoer sub tc1)
-  | _ -> failwith __LOC__
+  | Record flds -> Record (Assoc.map (apply_sub_exp sub) flds)
 
 and apply_sub_abs sub abs =
   { term = apply_sub_abs' sub abs.term; ty = apply_sub_abs_ty sub abs.ty }
