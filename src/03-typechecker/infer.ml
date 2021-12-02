@@ -180,9 +180,10 @@ and infer_pattern' state pat =
             state',
             Constraint.TyEq (in_ty, p'.ty) :: cnstrs )
       | _ -> assert false)
-  | _ ->
-      Error.typing ~loc:pat.at "infer_pattern: Unsupported pattern %t"
-        (Untyped.print_pattern pat)
+  | Untyped.PAs (p, x) ->
+      let p', state', cnstrs = infer_pattern state p in
+      (Term.PAs (p', x), p'.ty, extend_var state' x p'.ty, cnstrs)
+  | Untyped.PRecord _ -> failwith "Record patterns not yet supported"
 
 let isLocatedVarPat (pat : Untyped.pattern) : bool =
   match pat.it with Untyped.PVar _ -> true | _other_pattern -> false
