@@ -157,7 +157,7 @@ let desugar_tydef state params ty_name def =
         let aux_desug st (lbl, cons) =
           let unsugared_lbl =
             match Assoc.lookup lbl st.constructors with
-            | None -> failwith "unreachable"
+            | None -> assert false
             | Some (lbl', _cons_kind) -> lbl'
           in
           match cons with

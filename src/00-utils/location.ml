@@ -47,7 +47,7 @@ let merge loc1 loc2 =
   match (loc1, loc2) with
   | Known loc1, Known loc2 ->
       if loc1.filename <> loc2.filename then
-        failwith "Location.union: locations do not belong to the same file"
+        invalid_arg "Location.merge: locations do not belong to the same file"
       else
         let start_line, start_column =
           min

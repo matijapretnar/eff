@@ -15,10 +15,6 @@ type state = { config : optimization_config }
 
 let initial_state optimization_config = { config = optimization_config }
 
-let typefail str =
-  let message = "ExEff-to-NoEff: " ^ str in
-  failwith message
-
 let rec elab_ty (ty : ExEffTypes.ty) =
   match ty.term with
   | ExEffTypes.TyParam x -> NoEff.NTyParam x
@@ -98,7 +94,7 @@ let rec elab_ty_coercion state coer =
                     && not (has_empty_dirt coerB1)
                     (* Handler coercion - Case 4 *)
                   then NoEff.NCoerHandToFun (elab1, elab2)
-                  else failwith "Ill-typed handler coercion"))
+                  else assert false))
   | Coercion.TyCoercionVar par -> NoEff.NCoerVar par
   | Coercion.ApplyCoercion (name, coer_list) ->
       NoEff.NCoerApply (name, List.map (elab_ty_coercion state) coer_list)
@@ -112,7 +108,7 @@ and elab_dirty_coercion state { term = tcoer, dcoer; _ } =
   if is_empty_dirt d1 && is_empty_dirt d2 then tyelab
   else if is_empty_dirt d1 then NoEff.NCoerReturn tyelab
   else if not (is_empty_dirt d2) then NoEff.NCoerComp tyelab
-  else failwith "Ill-typed bang coercion"
+  else assert false
 
 let rec value_coercion_from_impure_dirt empty_dirt_params ty =
   match ty.term with
@@ -305,7 +301,7 @@ and elab_expression' state exp =
                                 ( NoEff.NCoerRefl,
                                   NoEff.NCoerUnsafe NoEff.NCoerRefl ) ))
                          elabcomp) ) )
-            | _ -> failwith "STIEN: wrong elab handler case 2"
+            | _ -> failwith __LOC__
           in
           let p, ty, c = elabvc in
           NoEff.NHandler
@@ -340,7 +336,7 @@ and elab_expression' state exp =
   | ExEff.Variant (lbl, Some exp) ->
       let elab_e = elab_expression state exp in
       NoEff.NVariant (lbl, Some elab_e)
-  | ExEff.Record _ass -> failwith "records not supported yet"
+  | ExEff.Record _ass -> failwith __LOC__
 
 and elab_abstraction state { term = p, c; _ } =
   let elab2 = elab_computation state c in
@@ -391,7 +387,7 @@ and elab_computation' state c _is_empty =
               (NoEff.NHandle (elabc, velab), NoEff.NCoerUnsafe NoEff.NCoerRefl)
             (* Handle - Case 3 *)
           else NoEff.NHandle (elabc, velab)
-      | _ -> failwith "Ill-typed handler")
+      | _ -> assert false)
   | ExEff.Call ((eff, (ty1, ty2)), value, abs) ->
       let t1 = elab_ty ty1 in
       let t2 = elab_ty ty2 in

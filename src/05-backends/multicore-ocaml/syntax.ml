@@ -122,10 +122,7 @@ let rec print_term t ppf =
       print ppf "@[<hv>@[<hv>%tin@] @,%t@]" (print_let_rec lst) (print_term t)
   | Match (t, []) ->
       (* Absurd case *)
-      print ppf
-        ("@[<hv>(match %t with | _ ->"
-       ^^ " failwith \"void successfully matched\")@]")
-        (print_term t)
+      print ppf "@[<hv>(match %t with | _ -> assert false)@]" (print_term t)
   | Match (t, lst) ->
       print ppf "@[<hv>(match %t with@, | %t)@]" (print_term t)
         (print_sequence "@, | " print_case lst)

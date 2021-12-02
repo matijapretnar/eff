@@ -183,7 +183,7 @@ and infer_pattern' state pat =
   | Untyped.PAs (p, x) ->
       let p', state', cnstrs = infer_pattern state p in
       (Term.PAs (p', x), p'.ty, extend_var state' x p'.ty, cnstrs)
-  | Untyped.PRecord _ -> failwith "Record patterns not yet supported"
+  | Untyped.PRecord _ -> failwith __LOC__
 
 let isLocatedVarPat (pat : Untyped.pattern) : bool =
   match pat.it with Untyped.PVar _ -> true | _other_pattern -> false
@@ -234,7 +234,7 @@ and tcVariant state ((lbl, mbe) : label * Untyped.expression option) :
       (* GEORGE: Investigate how cast_expression works *)
       let castExp, castCt = Constraint.cast_expression e' ty_in in
       ((Term.Variant (lbl, Some castExp), ty_out), castCt :: cs1)
-  | _, _ -> failwith "tcVariant"
+  | _, _ -> failwith __LOC__
 
 and tcAbstraction state (pat, cmp) =
   let pat', state', cnstrs1 = infer_pattern state pat in
@@ -302,10 +302,7 @@ and tcOpCase state
     match kop.term with
     | Term.PVar k -> k
     | Term.PNonbinding -> CoreTypes.Variable.fresh "k"
-    | _ ->
-        failwith
-          "tcOpCase: only variables and underscores allowed in continuation \
-           patterns"
+    | _ -> failwith __LOC__
   in
 
   (* 5: Generate all the needed constraints *)
@@ -351,7 +348,7 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
     let deltaOutVar =
       match deltaOut.row with
       | ParamRow deltaOutVar -> deltaOutVar
-      | EmptyRow -> failwith "deltaOut: IMPOSSIBLE"
+      | EmptyRow -> assert false
     in
 
     Constraint.fresh_dirt_coer
