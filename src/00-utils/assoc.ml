@@ -91,6 +91,10 @@ module ExtMap = struct
     val of_bindings : (key * 'a) list -> 'a t
 
     val union_overwrite : 'a t -> 'a t -> 'a t
+
+    val keys : 'a t -> key list
+
+    val values : 'a t -> 'a list
   end
 
   module Make (Ord : Map.OrderedType) : S with type key = Ord.t = struct
@@ -100,5 +104,9 @@ module ExtMap = struct
       List.fold_left (fun map (key, v) -> add key v map) empty list
 
     let union_overwrite m1 m2 = union (fun _ v1 _ -> Some v1) m1 m2
+
+    let keys m = List.map fst (bindings m)
+
+    let values m = List.map snd (bindings m)
   end
 end

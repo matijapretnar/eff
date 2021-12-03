@@ -87,6 +87,10 @@ module ExtMap : sig
     val of_bindings : (key * 'a) list -> 'a t
 
     val union_overwrite : 'a t -> 'a t -> 'a t
+
+    val keys : 'a t -> key list
+
+    val values : 'a t -> 'a list
   end
 
   module Make (Ord : Map.OrderedType) : S with type key = Ord.t
