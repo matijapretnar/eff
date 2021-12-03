@@ -2,10 +2,9 @@
 
 open Utils
 module V = Value
-module Untyped = Language.UntypedSyntax
 module Type = Language.Type
 
-module Backend : Language.BackendSignature.T = struct
+module Backend : Language.Backend = struct
   type state = Eval.state
 
   let initial_state = Eval.initial_state

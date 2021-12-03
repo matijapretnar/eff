@@ -3,7 +3,7 @@ open Utils
 module Term = Language.Term
 module Type = Language.Type
 
-module Backend : Language.BackendSignature.T = struct
+module Backend : Language.Backend = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 

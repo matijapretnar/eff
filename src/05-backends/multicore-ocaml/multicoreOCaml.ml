@@ -2,7 +2,7 @@
 
 open Utils
 
-module Backend : Language.BackendSignature.T = struct
+module Backend : Language.Backend = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 
