@@ -316,7 +316,7 @@ let pp_tydef (name, (params, tydef)) ppf =
     match tydef with
     | TyDefRecord assoc -> print ppf "%t" (pp_record pp_type ":" assoc)
     | TyDefSum assoc ->
-        let lst = Assoc.to_list assoc in
+        let lst = Type.Field.Map.bindings assoc in
         let print_cons ty_opt ppf =
           match ty_opt with
           | lbl, None -> print ppf "%t" (Type.Label.print lbl)

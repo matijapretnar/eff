@@ -21,7 +21,7 @@ type ty =
 
 type tydef =
   | TyDefRecord of ty Type.Field.Map.t
-  | TyDefSum of (Type.Label.t, ty option) Assoc.t
+  | TyDefSum of ty option Type.Field.Map.t
   | TyDefInline of ty
 
 (** Patterns *)
@@ -173,7 +173,7 @@ and print_tydef (name, (params, tydef)) ppf =
     match tydef with
     | TyDefRecord assoc -> print ppf "%t" (print_record print_type ":" assoc)
     | TyDefSum assoc ->
-        let lst = Assoc.to_list assoc in
+        let lst = Type.Field.Map.bindings assoc in
         let print_cons ty_opt ppf =
           match ty_opt with
           | lbl, None -> print ppf "%t" (Symbol.print_label lbl)

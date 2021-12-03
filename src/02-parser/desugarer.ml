@@ -186,6 +186,7 @@ let desugar_tydef state params ty_name def =
         let state', assoc' =
           Assoc.kfold_map aux_desug { state with constructors } assoc
         in
+        let assoc' = assoc' |> Assoc.to_list |> Type.Field.Map.of_bindings in
         (state', Type.Sum assoc')
     | Sugared.TyInline t ->
         let state', t' = desugar_type ty_sbst state t in

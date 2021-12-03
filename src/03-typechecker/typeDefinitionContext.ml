@@ -27,9 +27,10 @@ let initial_state =
               ty_params = TyParam.Map.singleton a (Type.SkelParam skel);
               skel_params = SkelParam.Set.singleton skel;
             };
-          type_def = Sum (Assoc.of_list [ list_nil; list_cons ]);
+          type_def = Sum (Type.Field.Map.of_bindings [ list_nil; list_cons ]);
         } );
-      (Type.empty_tyname, { params = Params.empty; type_def = Sum Assoc.empty });
+      ( Type.empty_tyname,
+        { params = Params.empty; type_def = Sum Type.Field.Map.empty } );
     ]
 
 (* let subst_tydef sbst =
@@ -54,7 +55,7 @@ let rec find_some f = function
 let find_variant lbl st =
   let construct = function
     | ty_name, { params; type_def = Sum vs } -> (
-        match Assoc.lookup lbl vs with
+        match Type.Field.Map.find_opt lbl vs with
         | Some us -> Some (ty_name, params, vs, us)
         | None -> None)
     | _ -> None
@@ -198,21 +199,21 @@ let check_shadowing ~loc st = function
       in
       Type.Field.Map.iter shadow_check_fld lst
   | Sum lst ->
-      let shadow_check_sum (lbl, _) =
+      let shadow_check_sum lbl _ =
         match find_variant lbl st with
         | Some (u, _, _, _) ->
             Error.typing ~loc "Constructor %t is already used in type %t"
               (Type.Label.print lbl) (Type.TyName.print u)
         | None -> ()
       in
-      Assoc.iter shadow_check_sum lst
+      Type.Field.Map.iter shadow_check_sum lst
   | Inline _ -> ()
 
 (** [extend_type_definitions ~loc tydefs state] checks that the simulatenous type definitions [tydefs] are
     well-formed and returns the extended type context. *)
 let extend_type_definitions ~loc tydefs st =
   (* We wish we wrote this in eff, where we could have transactional memory. *)
-  let extend_tydef st' (name, { params; type_def }) =
+  let extend_tydef name { params; type_def } st' =
     check_shadowing ~loc st' type_def;
     match Assoc.lookup name st' with
     | Some _ ->
@@ -220,7 +221,7 @@ let extend_type_definitions ~loc tydefs st =
     | None -> Assoc.update name { params; type_def } st'
   in
   try
-    let st = Assoc.fold_left extend_tydef st tydefs in
+    let st = Type.Field.Map.fold extend_tydef tydefs st in
     (* Assoc.iter
        (fun (_, { type_def; _ }) -> check_well_formed ~loc type_def st)
        tydefs'; *)

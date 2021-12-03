@@ -110,5 +110,5 @@ and of_tydef = function
   | Type.Record assoc -> TyDefRecord (Type.Field.Map.map of_type assoc)
   | Type.Sum assoc ->
       let converter = function None -> None | Some ty -> Some (of_type ty) in
-      TyDefSum (Assoc.map converter assoc)
+      TyDefSum (Type.Field.Map.map converter assoc)
   | Type.Inline ty -> TyDefInline (of_type ty)

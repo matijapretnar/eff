@@ -6,7 +6,7 @@ type state = (Type.TyName.t, Type.type_data) Assoc.t
 val initial_state : state
 
 val extend_type_definitions :
-  loc:Location.t -> (Type.TyName.t, Type.type_data) Assoc.t -> state -> state
+  loc:Location.t -> Type.type_data Type.Field.Map.t -> state -> state
 
 val transparent : loc:Location.t -> Type.TyName.t -> state -> bool
 
@@ -25,6 +25,6 @@ val find_variant :
   state ->
   (Type.TyName.t
   * Type.Params.t
-  * (Type.Label.t, Type.ty option) Assoc.t
+  * Type.ty option Type.Field.Map.t
   * Type.ty option)
   option

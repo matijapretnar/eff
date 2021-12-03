@@ -325,7 +325,7 @@ and free_params_dirt (dirt : dirt) =
 
 type tydef =
   | Record of ty Field.Map.t
-  | Sum of (Label.t, ty option) Assoc.t
+  | Sum of ty option Field.Map.t
   | Inline of ty
 
 type type_data = { params : Params.t; type_def : tydef }

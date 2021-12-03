@@ -418,7 +418,7 @@ let elab_tydef = function
   | Type.Record assoc -> NoEff.TyDefRecord (Type.Field.Map.map elab_ty assoc)
   | Sum assoc ->
       let converter = function None -> None | Some ty -> Some (elab_ty ty) in
-      NoEff.TyDefSum (Assoc.map converter assoc)
+      NoEff.TyDefSum (Type.Field.Map.map converter assoc)
   | Inline ty -> NoEff.TyDefInline (elab_ty ty)
 
 let elab_effect (eff, (ty1, ty2)) : n_effect = (eff, (elab_ty ty1, elab_ty ty2))

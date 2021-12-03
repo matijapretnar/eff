@@ -178,7 +178,8 @@ module Make (Backend : Language.Backend) = struct
           Desugarer.desugar_tydefs state.desugarer_state tydefs
         in
         let type_system_state' =
-          TypeSystem.add_type_definitions ~loc state.type_system_state tydefs'
+          TypeSystem.add_type_definitions ~loc state.type_system_state
+            (tydefs' |> Assoc.to_list |> Type.Field.Map.of_bindings)
         in
         let backend_state' =
           Backend.process_tydef state.backend_state tydefs'

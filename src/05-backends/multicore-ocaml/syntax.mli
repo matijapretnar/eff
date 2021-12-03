@@ -1,4 +1,3 @@
-open Utils
 open Language
 
 type variable = Term.Variable.t
@@ -19,7 +18,7 @@ type ty =
 
 type tydef =
   | TyDefRecord of ty Type.Field.Map.t
-  | TyDefSum of (Type.Label.t, ty option) Assoc.t
+  | TyDefSum of ty option Type.Field.Map.t
   | TyDefInline of ty
 
 (** Patterns *)

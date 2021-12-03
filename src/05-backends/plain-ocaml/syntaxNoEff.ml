@@ -92,7 +92,7 @@ type n_top_rec_definitions =
 
 type n_tydef =
   | TyDefRecord of n_type Type.Field.Map.t
-  | TyDefSum of (Type.Label.t, n_type option) Assoc.t
+  | TyDefSum of n_type option Type.Field.Map.t
   | TyDefInline of n_type
 
 type cmd =

@@ -121,7 +121,7 @@ let find_constructors tctx lst =
                 let all =
                   List.map
                     (fun (lbl, opt) -> Variant (lbl, opt <> None))
-                    (Assoc.to_list tags)
+                    (Type.Field.Map.bindings tags)
                 in
                 List.list_diff all present)
         (* Only for completeness. *)
