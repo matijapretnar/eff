@@ -256,7 +256,7 @@ and elab_expression' state exp =
   match exp.term with
   | ExEff.Var x ->
       let empty_dirt_params =
-        x.instantiation.dirt_var_to_dirt_subs |> Assoc.to_list
+        x.instantiation.dirt_var_to_dirt_subs |> Type.DirtParam.Map.bindings
         |> List.filter (fun (_, drt) -> is_empty_dirt drt)
         |> List.fold_left
              (fun empty_dirt_params (param, _) ->
@@ -264,7 +264,8 @@ and elab_expression' state exp =
              Type.DirtParam.Set.empty
       in
       let coercions =
-        x.instantiation.type_param_to_type_coercions |> Assoc.to_list
+        x.instantiation.type_param_to_type_coercions
+        |> Type.TyCoercionParam.Map.bindings
         |> List.map (fun (_, coer) -> (elab_ty_coercion state) coer)
       in
       NoEff.NCast
