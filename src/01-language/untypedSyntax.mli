@@ -2,13 +2,13 @@ open Utils
 
 (** Syntax of the core language. *)
 
-type variable = CoreTypes.Variable.t
+type variable = Term.Variable.t
 
-type effect = CoreTypes.Effect.t
+type effect = Type.Effect.t
 
-type label = CoreTypes.Label.t
+type label = Type.Label.t
 
-type field = CoreTypes.Field.t
+type field = Type.Field.t
 
 type pattern = plain_pattern located
 

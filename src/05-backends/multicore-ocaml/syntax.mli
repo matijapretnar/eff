@@ -1,25 +1,25 @@
 open Utils
 open Language
 
-type variable = CoreTypes.Variable.t
+type variable = Term.Variable.t
 
-type effect = CoreTypes.Effect.t
+type effect = Type.Effect.t
 
-type label = CoreTypes.Label.t
+type label = Type.Label.t
 
-type field = CoreTypes.Field.t
+type field = Type.Field.t
 
 (** Types used by MulticoreOcaml. *)
 type ty =
-  | TyApply of CoreTypes.TyName.t * ty list
-  | TyParam of CoreTypes.TyParam.t
+  | TyApply of Type.TyName.t * ty list
+  | TyParam of Type.TyParam.t
   | TyBasic of Const.ty
   | TyTuple of ty list
   | TyArrow of ty * ty
 
 type tydef =
-  | TyDefRecord of (CoreTypes.Field.t, ty) Assoc.t
-  | TyDefSum of (CoreTypes.Label.t, ty option) Assoc.t
+  | TyDefRecord of (Type.Field.t, ty) Assoc.t
+  | TyDefSum of (Type.Label.t, ty option) Assoc.t
   | TyDefInline of ty
 
 (** Patterns *)
@@ -66,7 +66,7 @@ type cmd =
   | TopLet of (pattern * term) list
   | TopLetRec of (variable * abstraction) list
   | RawSource of (variable * string)
-  | TyDef of (label * (CoreTypes.TyParam.t list * tydef)) list
+  | TyDef of (label * (Type.TyParam.t list * tydef)) list
 
 val print_header :
   (effect * (ty * ty) * (string * string * string)) list ->

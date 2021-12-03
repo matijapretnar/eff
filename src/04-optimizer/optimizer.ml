@@ -5,7 +5,7 @@ type return_clause_kind =
   | FixedReturnClause of Term.abstraction
   | VaryingReturnClause
 
-exception ReturnClauseNotFixed of Language.CoreTypes.Variable.t
+exception ReturnClauseNotFixed of Language.Term.Variable.t
 
 type optimization_config = {
   specialize_functions : bool;
@@ -16,12 +16,11 @@ type optimization_config = {
 }
 
 type state = {
-  declared_functions :
-    (Language.CoreTypes.Variable.t, Term.abstraction) Assoc.t;
+  declared_functions : (Language.Term.Variable.t, Term.abstraction) Assoc.t;
   fuel : int;
   (* Cache of already specialized functions *)
   specialized_functions :
-    ( Term.EffectFingerprint.t * Language.CoreTypes.Variable.t,
+    ( Term.EffectFingerprint.t * Language.Term.Variable.t,
       Term.variable * Type.ty * return_clause_kind )
     Assoc.t;
   config : optimization_config;
@@ -60,7 +59,7 @@ type inlinability =
 let abstraction_inlinability { term = pat, cmp; _ } =
   match pat.term with
   | Term.PVar v
-    when CoreTypes.Variable.fold
+    when Term.Variable.fold
            (fun v _ -> String.length v >= 3 && String.sub v 0 3 = "___")
            v ->
       NotInlinable
@@ -429,7 +428,7 @@ and reduce_computation' state comp =
       in
       let attempt_specialization ret_clause_kinds =
         let add_specialized specialized (f, abs) =
-          let f' = Language.CoreTypes.Variable.refresh f in
+          let f' = Language.Term.Variable.refresh f in
           let ret_clause_kind =
             match Assoc.lookup f ret_clause_kinds with
             | Some ret_clause_kind -> ret_clause_kind

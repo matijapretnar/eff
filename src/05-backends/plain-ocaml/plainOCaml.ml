@@ -25,9 +25,7 @@ module Backend : Language.BackendSignature.T = struct
     prog : SyntaxNoEff.cmd list;
     no_eff_optimizer_state : NoEffOptimizer.state;
     primitive_values :
-      ( Language.CoreTypes.Variable.t,
-        Language.Primitives.primitive_value )
-      Assoc.t;
+      (Language.Term.Variable.t, Language.Primitives.primitive_value) Assoc.t;
     primitive_effects : Term.effect list;
   }
 

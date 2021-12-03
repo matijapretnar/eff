@@ -29,7 +29,7 @@ module Make (Backend : Language.BackendSignature.T) = struct
 
   let add_primitive_effect state prim =
     let x =
-      Language.CoreTypes.Variable.fresh (Primitives.primitive_effect_name prim)
+      Language.Term.Variable.fresh (Primitives.primitive_effect_name prim)
     in
     let type_system_state', (ty1, ty2) =
       TypeSystem.load_primitive_effect state.type_system_state x prim
@@ -45,7 +45,7 @@ module Make (Backend : Language.BackendSignature.T) = struct
 
   let add_primitive_value state prim =
     let x =
-      Language.CoreTypes.Variable.fresh (Primitives.primitive_value_name prim)
+      Language.Term.Variable.fresh (Primitives.primitive_value_name prim)
     in
     {
       state with

@@ -7,7 +7,7 @@ and ty_coercion' =
   | ArrowCoercion of ty_coercion * dirty_coercion
   | HandlerCoercion of dirty_coercion * dirty_coercion
   | TyCoercionVar of Type.TyCoercionParam.t
-  | ApplyCoercion of CoreTypes.TyName.t * ty_coercion list
+  | ApplyCoercion of Type.TyName.t * ty_coercion list
   | TupleCoercion of ty_coercion list
 
 and dirt_coercion = (dirt_coercion', Type.ct_dirt) typed
@@ -94,15 +94,15 @@ let rec print_ty_coercion ?max_level c ppf =
         (print_dirty_coercion ~max_level:2 dc1)
         (print_dirty_coercion ~max_level:2 dc2)
   | TyCoercionVar tcp -> print "%t" (Type.TyCoercionParam.print tcp)
-  | ApplyCoercion (t, []) -> print "%t" (CoreTypes.TyName.print t)
+  | ApplyCoercion (t, []) -> print "%t" (Type.TyName.print t)
   | ApplyCoercion (t, [ c ]) ->
       print ~at_level:1 "%t %t"
         (print_ty_coercion ~max_level:1 c)
-        (CoreTypes.TyName.print t)
+        (Type.TyName.print t)
   | ApplyCoercion (t, cs) ->
       print ~at_level:1 "(%t) %t"
         (Print.sequence ", " print_ty_coercion cs)
-        (CoreTypes.TyName.print t)
+        (Type.TyName.print t)
   | TupleCoercion [] -> print "𝟙"
   | TupleCoercion cos ->
       print ~at_level:2 "%t"

@@ -1,17 +1,18 @@
 open Utils
 (** Syntax of the core language. *)
 
-module Variable = CoreTypes.Variable
+module Variable = Symbol.Make (Symbol.String)
+(** variable symbols *)
 
-type variable = CoreTypes.Variable.t
+type variable = Variable.t
 
-type poly_variable = (CoreTypes.Variable.t, Type.ty_scheme) typed
+type poly_variable = (Variable.t, Type.ty_scheme) typed
 
 module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
 
 type effect_fingerprint = EffectFingerprint.t
 
-type effect = CoreTypes.Effect.t * (Type.ty * Type.ty)
+type effect = Type.Effect.t * (Type.ty * Type.ty)
 
 type pattern = (pattern', Type.ty) typed
 
@@ -19,8 +20,8 @@ and pattern' =
   | PVar of variable
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (CoreTypes.Field.t, pattern) Assoc.t
-  | PVariant of CoreTypes.Label.t * pattern option
+  | PRecord of (Type.Field.t, pattern) Assoc.t
+  | PVariant of Type.Label.t * pattern option
   | PConst of Const.t
   | PNonbinding
 
@@ -47,8 +48,8 @@ and expression' =
   | Var of { variable : variable; instantiation : Substitution.t }
   | Const of Const.t
   | Tuple of expression list
-  | Record of (CoreTypes.Field.t, expression) Assoc.t
-  | Variant of CoreTypes.Label.t * expression option
+  | Record of (Type.Field.t, expression) Assoc.t
+  | Variant of Type.Label.t * expression option
   | Lambda of abstraction
   | Handler of handler_clauses
   | CastExp of expression * Coercion.ty_coercion
@@ -103,7 +104,7 @@ let poly_var x instantiation ty =
   }
 
 let fresh_variable x ty =
-  let x' = CoreTypes.Variable.fresh x in
+  let x' = Variable.fresh x in
   (pVar x' ty, mono_var x' ty)
 
 let const (c : Const.t) : expression =
@@ -112,7 +113,7 @@ let const (c : Const.t) : expression =
 let tuple es =
   { term = Tuple es; ty = Type.tuple (List.map (fun e -> e.ty) es) }
 
-let record ty (flds : (CoreTypes.Field.t, expression) Assoc.t) : expression =
+let record ty (flds : (Type.Field.t, expression) Assoc.t) : expression =
   (* Ideally, we could reconstruct ty from the field names *)
   { term = Record flds; ty }
 
@@ -222,10 +223,9 @@ let abstraction (p, c) : abstraction = { term = (p, c); ty = (p.ty, c.ty) }
 let abstraction2 (p1, p2, c) : abstraction2 =
   { term = (p1, p2, c); ty = (p1.ty, p2.ty, c.ty) }
 
-let print_effect (eff, _) ppf =
-  Print.print ppf "%t" (CoreTypes.Effect.print eff)
+let print_effect (eff, _) ppf = Print.print ppf "%t" (Type.Effect.print eff)
 
-let print_variable x = CoreTypes.Variable.print ~safe:true x
+let print_variable x = Variable.print ~safe:true x
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -234,10 +234,10 @@ let rec print_pattern ?max_level p ppf =
   | PAs (p, x) -> print "%t as %t" (print_pattern p) (print_variable x)
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
-  | PRecord lst -> Print.record CoreTypes.Field.print print_pattern lst ppf
-  | PVariant (lbl, None) -> print ~at_level:0 "%t" (CoreTypes.Label.print lbl)
+  | PRecord lst -> Print.record Type.Field.print print_pattern lst ppf
+  | PVariant (lbl, None) -> print ~at_level:0 "%t" (Type.Label.print lbl)
   | PVariant (lbl, Some p) ->
-      print ~at_level:1 "%t %t" (CoreTypes.Label.print lbl) (print_pattern p)
+      print ~at_level:1 "%t %t" (Type.Label.print lbl) (print_pattern p)
   | PNonbinding -> print "_"
 
 let rec print_expression ?max_level e ppf =
@@ -251,11 +251,10 @@ and print_expression' ?max_level e ppf =
   | Var x -> print "%t" (print_variable x.variable)
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
-  | Record lst -> Print.record CoreTypes.Field.print print_expression lst ppf
-  | Variant (lbl, None) -> print ~at_level:0 "%t" (CoreTypes.Label.print lbl)
+  | Record lst -> Print.record Type.Field.print print_expression lst ppf
+  | Variant (lbl, None) -> print ~at_level:0 "%t" (Type.Label.print lbl)
   | Variant (lbl, Some e) ->
-      print ~at_level:1 "%t %t"
-        (CoreTypes.Label.print lbl)
+      print ~at_level:1 "%t %t" (Type.Label.print lbl)
         (print_expression ~max_level:0 e)
   | Lambda { term = x, c; _ } ->
       print ~at_level:2 "λ(%t:%t). %t" (print_pattern x) (Type.print_ty x.ty)
@@ -432,7 +431,7 @@ let apply_substitutions_to_expression = apply_sub_exp
 
 let apply_substitutions_to_abstraction = apply_sub_abs
 
-let refresh_variable x = CoreTypes.Variable.refresh x
+let refresh_variable x = Variable.refresh x
 
 let rec refresh_pattern sbst pat =
   let sbst', pat' = refresh_pattern' sbst pat.term in

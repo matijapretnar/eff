@@ -31,18 +31,18 @@ let print_variable var ppf =
           | _ -> Format.fprintf ppf "_x_%d" n)
       | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
   in
-  CoreTypes.Variable.fold printer var
+  Term.Variable.fold printer var
 
-let print_effect eff ppf = CoreTypes.Effect.print eff ppf
+let print_effect eff ppf = Type.Effect.print eff ppf
 
-let print_label lbl ppf = CoreTypes.Label.print lbl ppf
+let print_label lbl ppf = Type.Label.print lbl ppf
 
-let print_field fld ppf = CoreTypes.Field.print fld ppf
+let print_field fld ppf = Type.Field.print fld ppf
 
 let print_tyname tyname ppf =
   let printer desc _n = Format.fprintf ppf "%s" desc in
-  CoreTypes.TyName.fold printer tyname
+  Type.TyName.fold printer tyname
 
 let print_typaram typaram ppf =
   let printer _desc n = Format.fprintf ppf "'ty_%d" n in
-  CoreTypes.TyParam.fold printer typaram
+  Type.TyParam.fold printer typaram

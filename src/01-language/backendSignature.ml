@@ -27,8 +27,7 @@ module type T = sig
   val load_primitive_effect :
     state -> Term.effect -> Primitives.primitive_effect -> state
 
-  val process_tydef :
-    state -> (CoreTypes.TyName.t, Type.type_data) Assoc.t -> state
+  val process_tydef : state -> (Type.TyName.t, Type.type_data) Assoc.t -> state
 
   val finalize : state -> unit
 end

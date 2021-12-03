@@ -2,11 +2,11 @@
 open Utils
 open Language
 module V = Value
-module RuntimeEnv = CoreTypes.Variable.Map
+module RuntimeEnv = Term.Variable.Map
 
 type state = {
   environment : V.value RuntimeEnv.t;
-  runners : (CoreTypes.Effect.t, V.value -> V.value) Assoc.t;
+  runners : (Type.Effect.t, V.value -> V.value) Assoc.t;
 }
 
 let initial_state = { environment = RuntimeEnv.empty; runners = Assoc.empty }
@@ -120,7 +120,7 @@ and veval state e =
       | Some v -> v
       | None ->
           Error.runtime "Name %t is not defined."
-            (CoreTypes.Variable.print x.variable))
+            (Term.Variable.print x.variable))
   | Term.Const c -> V.Const c
   (* | Term.Annotated (t, _ty) -> veval state t *)
   | Term.Tuple es -> V.Tuple (List.map (veval state) es)

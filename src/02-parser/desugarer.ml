@@ -14,29 +14,28 @@ type constructor_kind = Variant of bool | Effect of bool
 let _ = Effect true
 
 type state = {
-  context : (string, CoreTypes.Variable.t) Assoc.t;
-  effect_symbols : (string, CoreTypes.Effect.t) Assoc.t;
-  field_symbols : (string, CoreTypes.Field.t) Assoc.t;
-  tyname_symbols : (string, CoreTypes.TyName.t) Assoc.t;
-  constructors : (string, CoreTypes.Label.t * constructor_kind) Assoc.t;
-  local_type_annotations :
-    (string, CoreTypes.TyParam.t * Type.SkelParam.t) Assoc.t;
+  context : (string, Term.Variable.t) Assoc.t;
+  effect_symbols : (string, Type.Effect.t) Assoc.t;
+  field_symbols : (string, Type.Field.t) Assoc.t;
+  tyname_symbols : (string, Type.TyName.t) Assoc.t;
+  constructors : (string, Type.Label.t * constructor_kind) Assoc.t;
+  local_type_annotations : (string, Type.TyParam.t * Type.SkelParam.t) Assoc.t;
   inlined_types : (string, Type.ty) Assoc.t;
 }
 
 let initial_state =
-  let list_cons = (CoreTypes.cons_annot, (CoreTypes.cons, Variant true)) in
-  let list_nil = (CoreTypes.nil_annot, (CoreTypes.nil, Variant false)) in
+  let list_cons = (Type.cons_annot, (Type.cons, Variant true)) in
+  let list_nil = (Type.nil_annot, (Type.nil, Variant false)) in
   let initial_types =
     Assoc.of_list
       [
-        ("bool", CoreTypes.bool_tyname);
-        ("int", CoreTypes.int_tyname);
-        ("unit", CoreTypes.unit_tyname);
-        ("string", CoreTypes.string_tyname);
-        ("float", CoreTypes.float_tyname);
-        ("list", CoreTypes.list_tyname);
-        ("empty", CoreTypes.empty_tyname);
+        ("bool", Type.bool_tyname);
+        ("int", Type.int_tyname);
+        ("unit", Type.unit_tyname);
+        ("string", Type.string_tyname);
+        ("float", Type.float_tyname);
+        ("list", Type.list_tyname);
+        ("empty", Type.empty_tyname);
       ]
   and inlined_types =
     Assoc.of_list
@@ -64,7 +63,7 @@ let effect_to_symbol state name =
   match Assoc.lookup name state.effect_symbols with
   | Some sym -> (state, sym)
   | None ->
-      let sym = CoreTypes.Effect.fresh name in
+      let sym = Type.Effect.fresh name in
       let effect_symbols' = Assoc.update name sym state.effect_symbols in
       ({ state with effect_symbols = effect_symbols' }, sym)
 
@@ -72,7 +71,7 @@ let field_to_symbol state name =
   match Assoc.lookup name state.field_symbols with
   | Some sym -> (state, sym)
   | None ->
-      let sym = CoreTypes.Field.fresh name in
+      let sym = Type.Field.fresh name in
       let field_symbols' = Assoc.update name sym state.field_symbols in
       ({ state with field_symbols = field_symbols' }, sym)
 
@@ -80,7 +79,7 @@ let tyname_to_symbol state name =
   match Assoc.lookup name state.tyname_symbols with
   | Some sym -> (state, sym)
   | None ->
-      let sym = CoreTypes.TyName.fresh name in
+      let sym = Type.TyName.fresh name in
       let tyname_symbols' = Assoc.update name sym state.tyname_symbols in
       ({ state with tyname_symbols = tyname_symbols' }, sym)
 
@@ -171,7 +170,7 @@ let desugar_tydef state params ty_name def =
           let aux (lbl, cons) =
             let unsugared_lbl =
               match Assoc.lookup lbl state.constructors with
-              | None -> CoreTypes.Label.fresh lbl
+              | None -> Type.Label.fresh lbl
               | Some (lbl, _) -> lbl
               (* Caught by inference for better error *)
             in
@@ -225,8 +224,8 @@ let desugar_tydefs state sugared_defs =
 
 (** [fresh_var opt] creates a fresh variable on each call *)
 let fresh_var = function
-  | None -> CoreTypes.Variable.fresh "$anon"
-  | Some x -> CoreTypes.Variable.fresh x
+  | None -> Term.Variable.fresh "$anon"
+  | Some x -> Term.Variable.fresh x
 
 let id_abstraction loc =
   let x = fresh_var (Some "$id_par") in
@@ -544,7 +543,7 @@ and desugar_handler loc state
     | Some a2s -> Assoc.replace eff (a2 :: a2s) assoc
   in
   let construct_eff_clause state (eff, eff_cs_lst) =
-    (* transform string name to CoreTypes.Effect.t *)
+    (* transform string name to Type.Effect.t *)
     let state', eff' = effect_to_symbol state eff in
     match eff_cs_lst with
     | [] -> assert false

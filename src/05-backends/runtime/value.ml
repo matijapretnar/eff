@@ -4,14 +4,14 @@ open Language
 type value =
   | Const of Const.t
   | Tuple of value list
-  | Record of (CoreTypes.Field.t, value) Assoc.t
-  | Variant of CoreTypes.Label.t * value option
+  | Record of (Type.Field.t, value) Assoc.t
+  | Variant of Type.Label.t * value option
   | Closure of closure
   | TypeCoercionClosure of (Type.ct_ty -> value)
   | DirtCoercionClosure of (Type.ct_dirt -> value)
   | Handler of (result -> result)
 
-and result = Value of value | Call of CoreTypes.Effect.t * value * closure
+and result = Value of value | Call of Type.Effect.t * value * closure
 
 and closure = value -> result
 
@@ -39,7 +39,7 @@ let to_handler = function
   | Handler h -> h
   | _ -> Error.runtime "A handler expected."
 
-let print_effect eff ppf = Format.fprintf ppf "%t" (CoreTypes.Effect.print eff)
+let print_effect eff ppf = Format.fprintf ppf "%t" (Type.Effect.print eff)
 
 let rec print_value ?max_level v ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -49,12 +49,10 @@ let rec print_value ?max_level v ppf =
       match v with
       | Const c -> Const.print c ppf
       | Tuple lst -> Print.tuple print_value lst ppf
-      | Record assoc -> Print.record CoreTypes.Field.print print_value assoc ppf
-      | Variant (lbl, None) ->
-          print ~at_level:1 "%t" (CoreTypes.Label.print lbl)
+      | Record assoc -> Print.record Type.Field.print print_value assoc ppf
+      | Variant (lbl, None) -> print ~at_level:1 "%t" (Type.Label.print lbl)
       | Variant (lbl, Some v) ->
-          print ~at_level:1 "%t @[<hov>%t@]"
-            (CoreTypes.Label.print lbl)
+          print ~at_level:1 "%t @[<hov>%t@]" (Type.Label.print lbl)
             (print_value v)
       | Closure _ -> print "<fun>"
       | Handler _ -> print "<handler>"
@@ -62,8 +60,8 @@ let rec print_value ?max_level v ppf =
       | DirtCoercionClosure _ -> print "<dir_coercion>")
 
 and to_list = function
-  | Variant (lbl, None) when lbl = CoreTypes.nil -> Some []
-  | Variant (lbl, Some (Tuple [ hd; tl ])) when lbl = CoreTypes.cons ->
+  | Variant (lbl, None) when lbl = Type.nil -> Some []
+  | Variant (lbl, Some (Tuple [ hd; tl ])) when lbl = Type.cons ->
       Option.bind (to_list tl) (fun vs -> Some (hd :: vs))
   | _ -> None
 

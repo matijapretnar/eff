@@ -5,7 +5,7 @@ type optimization_config = { purity_aware_translation : bool }
 
 type state = {
   inlinable_primitives :
-    (Language.CoreTypes.Variable.t, Language.Primitives.primitive_value) Assoc.t;
+    (Language.Term.Variable.t, Language.Primitives.primitive_value) Assoc.t;
   optimization_config : optimization_config;
 }
 
@@ -32,12 +32,12 @@ let pp_tuple pp lst ppf =
   | [] -> print ppf "()"
   | lst -> print ppf "(@[<hov>%t@])" (pp_sequence ", " pp lst)
 
-let pp_label label ppf = CoreTypes.Label.print label ppf
+let pp_label label ppf = Type.Label.print label ppf
 
-let pp_tyname ty_name ppf = CoreTypes.TyName.print ty_name ppf
+let pp_tyname ty_name ppf = Type.TyName.print ty_name ppf
 
 let pp_typaram ty_param ppf =
-  print ppf "'ty%d" (CoreTypes.TyParam.fold (fun _ n -> n) ty_param)
+  print ppf "'ty%d" (Type.TyParam.fold (fun _ n -> n) ty_param)
 
 let protected =
   [ "and"; "as"; "assert"; "asr"; "begin"; "class"; "constraint"; "do"; "done" ]
@@ -75,10 +75,10 @@ let pp_variable ?(safe = true) state var ppf =
               | _ -> Format.fprintf ppf "_x_%d" n)
           | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
       in
-      CoreTypes.Variable.fold printer var
+      Language.Term.Variable.fold printer var
 
 let pp_field pp sep (field, value) ppf =
-  print ppf "%t %s %t" (CoreTypes.Field.print field) sep (pp value)
+  print ppf "%t %s %t" (Type.Field.print field) sep (pp value)
 
 let pp_record pp sep assoc ppf =
   let lst = Assoc.to_list assoc in
@@ -106,14 +106,12 @@ let rec pp_pattern state pat ppf =
       print ppf "%t as %t" (pp_pattern state p) (pp_variable state v)
   | PNTuple pats -> print ppf "%t" (pp_tuple (pp_pattern state) pats)
   | PNRecord rcd -> print ppf "%t" (pp_record (pp_pattern state) "=" rcd)
-  | PNVariant (lbl, None) when lbl = CoreTypes.nil -> print ppf "[]"
-  | PNVariant (lbl, None) -> print ppf "%t" (CoreTypes.Label.print lbl)
-  | PNVariant (lbl, Some (PNTuple [ v1; v2 ])) when lbl = CoreTypes.cons ->
+  | PNVariant (lbl, None) when lbl = Type.nil -> print ppf "[]"
+  | PNVariant (lbl, None) -> print ppf "%t" (Type.Label.print lbl)
+  | PNVariant (lbl, Some (PNTuple [ v1; v2 ])) when lbl = Type.cons ->
       print ppf "(%t :: %t)" (pp_pattern state v1) (pp_pattern state v2)
   | PNVariant (lbl, Some p) ->
-      print ppf "(%t @[<hov>%t@])"
-        (CoreTypes.Label.print lbl)
-        (pp_pattern state p)
+      print ppf "(%t @[<hov>%t@])" (Type.Label.print lbl) (pp_pattern state p)
   | PNConst c -> print ppf "%t" (Const.print c)
   | PNNonbinding -> print ppf "_"
 
@@ -122,7 +120,7 @@ let pp_tuple pp tpl ppf =
   | [] -> print ppf "()"
   | xs -> print ppf "(@[<hov>%t@])" (pp_sequence ", " pp xs)
 
-let pp_effect (e, (_ty1, _ty2)) ppf = CoreTypes.Effect.print e ppf
+let pp_effect (e, (_ty1, _ty2)) ppf = Type.Effect.print e ppf
 
 let rec pp_coercion ?max_level coer ppf =
   (* The cases not matched here should be handled in pp_term *)
@@ -157,7 +155,7 @@ let rec pp_coercion ?max_level coer ppf =
       print ~at_level:1 "coer_tuple_%d %t" (List.length cs)
         (pp_tuple pp_coercion cs)
   | NCoerApply (t, cs) ->
-      print ~at_level:1 "coer_%t %t" (CoreTypes.TyName.print t)
+      print ~at_level:1 "coer_%t %t" (Type.TyName.print t)
         (Print.sequence " " (pp_coercion ~max_level:0) cs)
 
 let pp_lets keyword pp_let_def lst ppf =
@@ -185,10 +183,10 @@ let rec pp_term ?max_level state noEff_term ppf =
   | NTuple ts -> print "%t" (pp_tuple (pp_term state ~max_level:1) ts)
   | NRecord rcd -> print "%t" (pp_record (pp_term state) "=" rcd)
   (* Note that t is not necessarily a pair, it can be coerced *)
-  | NVariant (l, Some t) when l = CoreTypes.cons ->
+  | NVariant (l, Some t) when l = Type.cons ->
       print ~at_level:1 "@[<hov>(fun (x, xs) -> (x :: xs)) (%t)@]"
         (pp_term state ~max_level:0 t)
-  | NVariant (l, None) when l = CoreTypes.nil -> print "[]"
+  | NVariant (l, None) when l = Type.nil -> print "[]"
   | NVariant (l, None) -> print "%t" (pp_label l)
   | NVariant (l, Some t1) ->
       print ~at_level:1 "%t @[<hov>%t@]" (pp_label l)
@@ -304,8 +302,7 @@ let pp_def_effect (eff, (ty1, ty2)) ppf =
   print ppf
     "@[type(_, _) eff_internal_effect += %t : (%t, %t) eff_internal_effect \
      @]@.;;"
-    (CoreTypes.Effect.print eff)
-    (pp_type ty1) (pp_type ty2)
+    (Type.Effect.print eff) (pp_type ty1) (pp_type ty2)
 
 let pp_let_def state (p, (ws, t)) ppf =
   print ppf "%t %t = @,%t" (pp_variable state p) (pp_coercion_vars ws)
@@ -322,20 +319,19 @@ let pp_tydef (name, (params, tydef)) ppf =
         let lst = Assoc.to_list assoc in
         let print_cons ty_opt ppf =
           match ty_opt with
-          | lbl, None -> print ppf "%t" (CoreTypes.Label.print lbl)
+          | lbl, None -> print ppf "%t" (Type.Label.print lbl)
           | lbl, Some ty ->
-              print ppf "%t of %t" (CoreTypes.Label.print lbl) (pp_type ty)
+              print ppf "%t of %t" (Type.Label.print lbl) (pp_type ty)
         in
         print ppf "@[<hov>%t@]" (pp_sequence "@, | " print_cons lst)
     | TyDefInline ty -> print ppf "%t" (pp_type ty)
   in
   match params with
-  | [] -> print ppf "@[%t = %t@]@." (CoreTypes.TyName.print name) (pp_def tydef)
+  | [] -> print ppf "@[%t = %t@]@." (Type.TyName.print name) (pp_def tydef)
   | _lst ->
       print ppf "@[(%t) %t = %t@]@."
         (pp_sequence ", " pp_typaram params)
-        (CoreTypes.TyName.print name)
-        (pp_def tydef)
+        (Type.TyName.print name) (pp_def tydef)
 
 let pp_cmd state cmd ppf =
   match cmd with

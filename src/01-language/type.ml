@@ -1,5 +1,58 @@
 open Utils
 
+module Effect = Symbol.Make (Symbol.String)
+(** effect symbols *)
+
+module Label = Symbol.Make (Symbol.String)
+(** variant labels *)
+
+(** Variants for the built-in list type *)
+let nil_annot = "$0nil"
+
+let nil = Label.fresh nil_annot
+
+let cons_annot = "$1cons"
+
+let cons = Label.fresh cons_annot
+
+module Field = Symbol.Make (Symbol.String)
+(** record fields *)
+
+module TyName = Symbol.Make (Symbol.String)
+(** type names *)
+
+let bool_tyname = TyName.fresh "bool"
+
+let int_tyname = TyName.fresh "int"
+
+let unit_tyname = TyName.fresh "unit"
+
+let string_tyname = TyName.fresh "string"
+
+let float_tyname = TyName.fresh "float"
+
+let list_tyname = TyName.fresh "list"
+
+let empty_tyname = TyName.fresh "empty"
+
+(** type parameters *)
+module TyParam = struct
+  include Symbol.Make (Symbol.Parameter (struct
+    let ascii_symbol = "ty"
+
+    let utf8_symbol = "\207\132"
+  end))
+
+  let print_old ?(poly = []) k ppf =
+    let c = if List.mem k poly then "'" else "'_" in
+    fold
+      (fun _ k ->
+        if 0 <= k && k <= 25 then
+          Format.fprintf ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
+        else Format.fprintf ppf "%sty%i" c (k - 25))
+      k
+end
+
 (** dirt parameters *)
 module DirtParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "drt"
@@ -28,16 +81,13 @@ module DirtCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let utf8_symbol = "ϖ"
 end))
 
-module TyParam = CoreTypes.TyParam
-module Effect = CoreTypes.Effect
-
 type effect_set = Effect.Set.t
 
 type skeleton =
   | SkelParam of SkelParam.t
   | SkelBasic of Const.ty
   | SkelArrow of skeleton * skeleton
-  | SkelApply of CoreTypes.TyName.t * skeleton list
+  | SkelApply of TyName.t * skeleton list
   | SkelHandler of skeleton * skeleton
   | SkelTuple of skeleton list
 
@@ -48,15 +98,13 @@ let rec print_skeleton ?max_level sk ppf =
   | SkelBasic s -> print "%t" (Const.print_ty s)
   | SkelArrow (sk1, sk2) ->
       print "%t → %t" (print_skeleton sk1) (print_skeleton sk2)
-  | SkelApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
+  | SkelApply (t, []) -> print "%t" (TyName.print t)
   | SkelApply (t, [ s ]) ->
-      print ~at_level:1 "%t %t"
-        (print_skeleton ~max_level:1 s)
-        (CoreTypes.TyName.print t)
+      print ~at_level:1 "%t %t" (print_skeleton ~max_level:1 s) (TyName.print t)
   | SkelApply (t, ts) ->
       print ~at_level:1 "(%t) %t"
         (Print.sequence ", " print_skeleton ts)
-        (CoreTypes.TyName.print t)
+        (TyName.print t)
   | SkelTuple [] -> print "𝟙"
   | SkelTuple sks ->
       print ~at_level:2 "%t"
@@ -67,8 +115,8 @@ let rec print_skeleton ?max_level sk ppf =
 type ty = (ty', skeleton) typed
 
 and ty' =
-  | TyParam of CoreTypes.TyParam.t
-  | Apply of { ty_name : CoreTypes.TyName.t; ty_args : ty list }
+  | TyParam of TyParam.t
+  | Apply of { ty_name : TyName.t; ty_args : ty list }
   | Arrow of abs_ty
   | Tuple of ty list
   | Handler of dirty * dirty
@@ -89,24 +137,20 @@ let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty.term with
   | TyParam p ->
-      print ~at_level:4 "%t:%t"
-        (CoreTypes.TyParam.print p)
-        (print_skeleton ty.ty)
+      print ~at_level:4 "%t:%t" (TyParam.print p) (print_skeleton ty.ty)
   | Arrow (t1, (t2, drt)) when is_empty_dirt drt ->
       print ~at_level:3 "%t → %t" (print_ty ~max_level:2 t1)
         (print_ty ~max_level:3 t2)
   | Arrow (t1, (t2, drt)) ->
       print ~at_level:3 "%t -%t→ %t" (print_ty ~max_level:2 t1)
         (print_dirt drt) (print_ty ~max_level:3 t2)
-  | Apply { ty_name; ty_args = [] } ->
-      print "%t" (CoreTypes.TyName.print ty_name)
+  | Apply { ty_name; ty_args = [] } -> print "%t" (TyName.print ty_name)
   | Apply { ty_name; ty_args = [ s ] } ->
-      print ~at_level:1 "%t %t" (print_ty ~max_level:1 s)
-        (CoreTypes.TyName.print ty_name)
+      print ~at_level:1 "%t %t" (print_ty ~max_level:1 s) (TyName.print ty_name)
   | Apply { ty_name; ty_args } ->
       print ~at_level:1 "(%t) %t"
         (Print.sequence ", " print_ty ty_args)
-        (CoreTypes.TyName.print ty_name)
+        (TyName.print ty_name)
   | Tuple [] -> print "𝟙"
   | Tuple tys ->
       print ~at_level:2 "%t" (Print.sequence "×" (print_ty ~max_level:1) tys)
@@ -128,7 +172,7 @@ and print_dirt ?max_level drt ppf =
         (DirtParam.print p)
 
 and print_effect_set effect_set =
-  Print.sequence "," CoreTypes.Effect.print (Effect.Set.elements effect_set)
+  Print.sequence "," Effect.print (Effect.Set.elements effect_set)
 
 and print_dirty ?max_level (t1, drt1) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -175,7 +219,7 @@ let tyBasic pt = { term = TyBasic pt; ty = SkelBasic pt }
 
 let unit_ty = tuple []
 
-let empty_ty = apply (CoreTypes.empty_tyname, [])
+let empty_ty = apply (empty_tyname, [])
 
 let int_ty = tyBasic Const.IntegerTy
 
@@ -221,7 +265,7 @@ module Params = struct
         TyParam.Map.union
           (fun _ skel1 skel2 ->
             (* Print.debug "%t %t = %t"
-               (CoreTypes.TyParam.print t)
+               (TyParam.print t)
                (print_skeleton skel1) (print_skeleton skel2); *)
             assert (skel1 = skel2);
             Some skel1)
@@ -280,8 +324,8 @@ and free_params_dirt (dirt : dirt) =
   | EmptyRow -> Params.empty
 
 type tydef =
-  | Record of (CoreTypes.Field.t, ty) Assoc.t
-  | Sum of (CoreTypes.Label.t, ty option) Assoc.t
+  | Record of (Field.t, ty) Assoc.t
+  | Sum of (Label.t, ty option) Assoc.t
   | Inline of ty
 
 type type_data = { params : Params.t; type_def : tydef }
@@ -301,11 +345,7 @@ and print_abs_ty (ty1, drty2) ppf =
 module Constraints = struct
   type t = {
     ty_constraints :
-      (TyCoercionParam.t
-      * CoreTypes.TyParam.t
-      * CoreTypes.TyParam.t
-      * SkelParam.t)
-      list;
+      (TyCoercionParam.t * TyParam.t * TyParam.t * SkelParam.t) list;
     dirt_constraints : (DirtCoercionParam.t * ct_dirt) list;
   }
 
@@ -350,9 +390,7 @@ module Constraints = struct
         (print_dirt ty1) (print_dirt ty2)
     and print_ty_constraint (p, ty1, ty2, s) ppf =
       Print.print ppf "%t: (%t ≤ %t) : %t" (TyCoercionParam.print p)
-        (CoreTypes.TyParam.print ty1)
-        (CoreTypes.TyParam.print ty2)
-        (SkelParam.print s)
+        (TyParam.print ty1) (TyParam.print ty2) (SkelParam.print s)
     in
     Print.print ppf "{ %t / %t }"
       (Print.sequence ";" print_dirt_constraint c.dirt_constraints)
@@ -431,11 +469,11 @@ let fresh_skel () =
   SkelParam skel_var
 
 let fresh_ty_param () =
-  let ty_param = CoreTypes.TyParam.fresh () and skel = SkelParam.fresh () in
+  let ty_param = TyParam.fresh () and skel = SkelParam.fresh () in
   (ty_param, skel)
 
 let fresh_ty_with_skel skel =
-  let ty_var = CoreTypes.TyParam.fresh () in
+  let ty_var = TyParam.fresh () in
   tyParam ty_var skel
 
 let fresh_dirty_param_with_skel skel =
@@ -489,15 +527,15 @@ let rec print_pretty_skel ?max_level params skel ppf =
       print ~at_level:3 "%t -> %t"
         (print_pretty_skel ~max_level:2 params skel1)
         (print_pretty_skel ~max_level:3 params skel2)
-  | SkelApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
+  | SkelApply (t, []) -> print "%t" (TyName.print t)
   | SkelApply (t, [ s ]) ->
       print ~at_level:1 "%t %t"
         (print_pretty_skel ~max_level:1 params s)
-        (CoreTypes.TyName.print t)
+        (TyName.print t)
   | SkelApply (t, skels) ->
       print ~at_level:1 "(%t) %t"
         (Print.sequence ", " (print_pretty_skel params) skels)
-        (CoreTypes.TyName.print t)
+        (TyName.print t)
   | SkelTuple [] -> print "unit"
   | SkelTuple skels ->
       print ~at_level:2 "%t"
@@ -518,7 +556,7 @@ let print_pretty () = print_pretty_skel (ref Assoc.empty)
 
 module Renaming = struct
   type t = {
-    ty_params : CoreTypes.TyParam.t TyParam.Map.t;
+    ty_params : TyParam.t TyParam.Map.t;
     dirt_params : DirtParam.t DirtParam.Map.t;
     skel_params : SkelParam.t SkelParam.Map.t;
   }
@@ -538,9 +576,7 @@ let params_renaming (params : Params.t) : Renaming.t =
         (fun p -> SkelParam.Map.add p (SkelParam.refresh p))
         params.skel_params SkelParam.Map.empty;
     ty_params =
-      TyParam.Map.mapi
-        (fun p _skel -> CoreTypes.TyParam.refresh p)
-        params.ty_params;
+      TyParam.Map.mapi (fun p _skel -> TyParam.refresh p) params.ty_params;
     dirt_params =
       DirtParam.Set.fold
         (fun d -> DirtParam.Map.add d (DirtParam.refresh d))

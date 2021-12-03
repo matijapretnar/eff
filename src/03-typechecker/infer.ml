@@ -2,7 +2,6 @@ open Utils
 module Substitution = Language.Substitution
 module Const = Language.Const
 module Untyped = Language.UntypedSyntax
-module CoreTypes = Language.CoreTypes
 module Coercion = Language.Coercion
 module Term = Language.Term
 module Type = Language.Type
@@ -39,7 +38,7 @@ let identity_instantiation (params : Type.Params.t)
     }
 
 module TypingEnv = struct
-  type t = (CoreTypes.Variable.t, Type.ty_scheme) Assoc.t
+  type t = (Term.Variable.t, Type.ty_scheme) Assoc.t
 
   let empty = Assoc.empty
 
@@ -100,9 +99,9 @@ end
 (* GEORGE: By convention, in types, type inequalities are qualified over first,
 and then dirt inequalities *)
 
-type label = CoreTypes.Label.t
+type label = Type.Label.t
 
-type field = CoreTypes.Field.t
+type field = Type.Field.t
 
 (* GEORGE: I hope to God for the order to be correct here *)
 
@@ -271,8 +270,8 @@ and infer_pattern' state pat =
         match Assoc.lookup fld fld_tys with
         | None ->
             Error.typing ~loc:pat.at "Field %t does not belong to type %t"
-              (CoreTypes.Field.print fld)
-              (CoreTypes.TyName.print ty_name)
+              (Type.Field.print fld)
+              (Type.TyName.print ty_name)
         | Some fld_ty ->
             ( (fld, p') :: flds',
               state',
@@ -328,8 +327,8 @@ and tcRecord (state : state) (flds : (field, Untyped.expression) Assoc.t) :
     match Assoc.lookup fld fld_tys with
     | None ->
         Error.typing ~loc:e.at "Field %t does not belong to type %t"
-          (CoreTypes.Field.print fld)
-          (CoreTypes.TyName.print ty_name)
+          (Type.Field.print fld)
+          (Type.TyName.print ty_name)
     | Some fld_ty ->
         let e'', cons = Constraint.cast_expression e' fld_ty in
         ((fld, e'') :: flds', (cons :: cnstrs') @ cnstrs)
@@ -416,7 +415,7 @@ and tcOpCase state
   let k =
     match kop.term with
     | Term.PVar k -> k
-    | Term.PNonbinding -> CoreTypes.Variable.fresh "k"
+    | Term.PNonbinding -> Term.Variable.fresh "k"
     | _ -> failwith __LOC__
   in
 

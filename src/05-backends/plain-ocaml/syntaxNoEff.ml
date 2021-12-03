@@ -1,19 +1,18 @@
 open Utils
 (** Syntax of the NoEff language **)
 
-module CoreTypes = Language.CoreTypes
 module Const = Language.Const
 module Type = Language.Type
 module Variable = Symbol.Make (Symbol.String)
 
 type n_type =
   (* Might remove this later to drop all polymorphism *)
-  | NTyParam of CoreTypes.TyParam.t
+  | NTyParam of Type.TyParam.t
   | NTyTuple of n_type list
   | NTyArrow of n_type * n_type
   | NTyHandler of n_type * n_type
   | NTyComp of n_type
-  | NTyApply of CoreTypes.TyName.t * n_type list
+  | NTyApply of Type.TyName.t * n_type list
   | NTyBasic of Const.ty
 
 and n_coerty = n_type * n_type
@@ -28,19 +27,19 @@ type n_coercion =
   | NCoerComp of n_coercion
   | NCoerReturn of n_coercion
   | NCoerUnsafe of n_coercion
-  | NCoerApply of CoreTypes.TyName.t * n_coercion list
+  | NCoerApply of Type.TyName.t * n_coercion list
   | NCoerTuple of n_coercion list
 
 type variable = Variable.t
 
-type n_effect = CoreTypes.Effect.t * (n_type * n_type)
+type n_effect = Type.Effect.t * (n_type * n_type)
 
 type n_pattern =
   | PNVar of variable
   | PNAs of n_pattern * variable
   | PNTuple of n_pattern list
-  | PNRecord of (CoreTypes.Field.t, n_pattern) Assoc.t
-  | PNVariant of CoreTypes.Label.t * n_pattern option
+  | PNRecord of (Type.Field.t, n_pattern) Assoc.t
+  | PNVariant of Type.Label.t * n_pattern option
   | PNConst of Const.t
   | PNNonbinding
 
@@ -71,8 +70,8 @@ type n_term =
   | NConst of Const.t
   | NLetRec of n_rec_definitions * n_term
   | NMatch of n_term * n_abstraction list
-  | NRecord of (CoreTypes.Field.t, n_term) Assoc.t
-  | NVariant of CoreTypes.Label.t * n_term option
+  | NRecord of (Type.Field.t, n_term) Assoc.t
+  | NVariant of Type.Label.t * n_term option
   | NDirectPrimitive of Language.Primitives.primitive_value
 
 and n_handler = {
@@ -92,8 +91,8 @@ type n_top_rec_definitions =
   (variable, Type.TyCoercionParam.t list * n_abstraction) Assoc.t
 
 type n_tydef =
-  | TyDefRecord of (CoreTypes.Field.t, n_type) Assoc.t
-  | TyDefSum of (CoreTypes.Label.t, n_type option) Assoc.t
+  | TyDefRecord of (Type.Field.t, n_type) Assoc.t
+  | TyDefSum of (Type.Label.t, n_type option) Assoc.t
   | TyDefInline of n_type
 
 type cmd =
@@ -101,7 +100,7 @@ type cmd =
   | TopLet of (variable, Type.TyCoercionParam.t list * n_term) Assoc.t
   | TopLetRec of n_top_rec_definitions
   | DefEffect of n_effect
-  | TyDef of (CoreTypes.TyName.t * (CoreTypes.TyParam.t list * n_tydef)) list
+  | TyDef of (Type.TyName.t * (Type.TyParam.t list * n_tydef)) list
 
 let rec subs_var_in_term par subs term =
   match term with
@@ -284,21 +283,21 @@ and free_vars_abs2 (p1, p2, c) =
 let rec print_type ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty with
-  | NTyParam x -> CoreTypes.TyParam.print x ppf
+  | NTyParam x -> Type.TyParam.print x ppf
   | NTyTuple [] -> print "unit"
   | NTyTuple tys -> Print.tuple print_type tys ppf
   | NTyArrow (t1, t2) -> print "%t -> %t" (print_type t1) (print_type t2)
   | NTyHandler (t1, t2) -> print "%t ==> %t" (print_type t1) (print_type t2)
   | NTyComp t -> print "Comp %t" (print_type t)
-  | NTyApply (t, []) -> print "%t" (CoreTypes.TyName.print t)
+  | NTyApply (t, []) -> print "%t" (Type.TyName.print t)
   | NTyApply (t, [ s ]) ->
       print ~at_level:1 "%t %t"
         (print_type ~max_level:1 s)
-        (CoreTypes.TyName.print t)
+        (Type.TyName.print t)
   | NTyApply (t, ts) ->
       print ~at_level:1 "(%t) %t"
         (Print.sequence ", " print_type ts)
-        (CoreTypes.TyName.print t)
+        (Type.TyName.print t)
   | NTyBasic t -> print "%t" (Const.print_ty t)
 
 and print_coerty ?max_level (t1, t2) ppf =
@@ -324,7 +323,7 @@ let rec print_coercion ?max_level coer ppf =
   | NCoerTuple _ls -> print "tuplecoer"
   | NCoerApply (_ty_name, _cs) -> print "applycoer"
 
-let print_variable = CoreTypes.Variable.print ~safe:true
+let print_variable = Language.Term.Variable.print ~safe:true
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -333,10 +332,10 @@ let rec print_pattern ?max_level p ppf =
   | PNAs (_pat, var) ->
       print "As %t = %t" (print_variable var) (print_pattern p)
   | PNTuple ps -> Print.tuple print_pattern ps ppf
-  | PNRecord recs -> Print.record CoreTypes.Field.print print_pattern recs ppf
+  | PNRecord recs -> Print.record Type.Field.print print_pattern recs ppf
   | PNVariant (l, Some t) ->
-      print "Variant %t %t" (CoreTypes.Label.print l) (print_pattern t)
-  | PNVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
+      print "Variant %t %t" (Type.Label.print l) (print_pattern t)
+  | PNVariant (l, None) -> print "Variant %t" (Type.Label.print l)
   | PNConst c -> Const.print c ppf
   | PNNonbinding -> print "_"
 
@@ -383,10 +382,10 @@ let rec print_term ?max_level t ppf =
   | NMatch (t, lst) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_term t)
         (Print.sequence "@, | " print_abstraction lst)
-  | NRecord recs -> Print.record CoreTypes.Field.print print_term recs ppf
+  | NRecord recs -> Print.record Type.Field.print print_term recs ppf
   | NVariant (l, Some t) ->
-      print "Variant %t %t" (CoreTypes.Label.print l) (print_term t)
-  | NVariant (l, None) -> print "Variant %t" (CoreTypes.Label.print l)
+      print "Variant %t %t" (Type.Label.print l) (print_term t)
+  | NVariant (l, None) -> print "Variant %t" (Type.Label.print l)
   | NDirectPrimitive p ->
       print "DirectPrimitive (%s)" (Language.Primitives.primitive_value_name p)
 
@@ -407,7 +406,7 @@ and print_effect_clauses eff_clauses ppf =
         (print_effect_clauses cases)
 
 and print_effect (eff, _) ppf =
-  Print.print ppf "Effect_%t" (CoreTypes.Effect.print eff)
+  Print.print ppf "Effect_%t" (Type.Effect.print eff)
 
 and print_abstraction (t1, t2) ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern t1) (print_term t2)

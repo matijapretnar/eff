@@ -13,7 +13,7 @@ val eval_expression : state -> Term.expression -> Value.value
 
 val run : state -> Term.computation -> Value.value
 
-val update : Language.CoreTypes.Variable.t -> Value.value -> state -> state
+val update : Language.Term.Variable.t -> Value.value -> state -> state
 
 val lookup : Term.variable -> state -> Value.value option
 

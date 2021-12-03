@@ -5,7 +5,7 @@ open Utils
 type t = {
   type_param_to_type_coercions :
     (Type.TyCoercionParam.t, Coercion.ty_coercion) Assoc.t;
-  type_param_to_type_subs : (CoreTypes.TyParam.t, Type.ty) Assoc.t;
+  type_param_to_type_subs : (Type.TyParam.t, Type.ty) Assoc.t;
   dirt_var_to_dirt_coercions :
     (Type.DirtCoercionParam.t, Coercion.dirt_coercion) Assoc.t;
   dirt_var_to_dirt_subs : (Type.DirtParam.t, Type.dirt) Assoc.t;
@@ -142,7 +142,7 @@ let print_type_coercion p t ppf =
     (Coercion.print_ty_coercion t)
 
 let print_type_param_to_type p t ppf =
-  printy ppf "%t ↦ %t" (CoreTypes.TyParam.print p) (Type.print_ty t)
+  printy ppf "%t ↦ %t" (Type.TyParam.print p) (Type.print_ty t)
 
 let print_dirt_var_sub p t ppf =
   printy ppf "%t ↦ %t" (Type.DirtParam.print p) (Type.print_dirt t)
@@ -198,8 +198,8 @@ let of_parameters (params : Type.Params.t) =
     Type.TyParam.Map.bindings params.ty_params
     |> List.map (fun (p, skel) ->
            ( p,
-             ( CoreTypes.TyParam.refresh p,
-               apply_substitutions_to_skeleton subst skel ) ))
+             (Type.TyParam.refresh p, apply_substitutions_to_skeleton subst skel)
+           ))
     |> Assoc.of_list
   in
   let params' =

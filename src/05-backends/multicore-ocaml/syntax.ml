@@ -2,26 +2,26 @@ open Language
 module Assoc = Utils.Assoc
 module Print = Utils.Print
 
-type variable = CoreTypes.Variable.t
+type variable = Term.Variable.t
 (** Syntax of the core language. *)
 
-type effect = CoreTypes.Effect.t
+type effect = Type.Effect.t
 
-type label = CoreTypes.Label.t
+type label = Type.Label.t
 
-type field = CoreTypes.Field.t
+type field = Type.Field.t
 
 (** Types used by MulticoreOcaml. *)
 type ty =
-  | TyApply of CoreTypes.TyName.t * ty list
-  | TyParam of CoreTypes.TyParam.t
+  | TyApply of Type.TyName.t * ty list
+  | TyParam of Type.TyParam.t
   | TyBasic of Const.ty
   | TyTuple of ty list
   | TyArrow of ty * ty
 
 type tydef =
-  | TyDefRecord of (CoreTypes.Field.t, ty) Assoc.t
-  | TyDefSum of (CoreTypes.Label.t, ty option) Assoc.t
+  | TyDefRecord of (Type.Field.t, ty) Assoc.t
+  | TyDefSum of (Type.Label.t, ty option) Assoc.t
   | TyDefInline of ty
 
 (** Patterns *)
@@ -68,7 +68,7 @@ type cmd =
   | TopLet of (pattern * term) list
   | TopLetRec of (variable * abstraction) list
   | RawSource of (variable * string)
-  | TyDef of (label * (CoreTypes.TyParam.t list * tydef)) list
+  | TyDef of (label * (Type.TyParam.t list * tydef)) list
 
 let print = Format.fprintf
 
@@ -105,9 +105,9 @@ let rec print_term t ppf =
   | Annotated (t, ty) -> print ppf "(%t : %t)" (print_term t) (print_type ty)
   | Tuple lst -> print ppf "%t" (print_tuple print_term lst)
   | Record assoc -> print ppf "%t" (print_record print_term "=" assoc)
-  | Variant (lbl, None) when lbl = CoreTypes.nil -> print ppf "[]"
+  | Variant (lbl, None) when lbl = Type.nil -> print ppf "[]"
   | Variant (lbl, None) -> print ppf "%t" (Symbol.print_label lbl)
-  | Variant (lbl, Some (Tuple [ hd; tl ])) when lbl = CoreTypes.cons ->
+  | Variant (lbl, Some (Tuple [ hd; tl ])) when lbl = Type.cons ->
       print ppf "@[<hov>(%t::%t)@]" (print_term hd) (print_term tl)
   | Variant (lbl, Some t) ->
       print ppf "(%t @[<hov>%t@])" (Symbol.print_label lbl) (print_term t)
@@ -146,9 +146,9 @@ and print_pattern p ppf =
   | PConst c -> print ppf "%t" (Const.print c)
   | PTuple lst -> print ppf "%t" (print_tuple print_pattern lst)
   | PRecord assoc -> print ppf "%t" (print_record print_pattern "=" assoc)
-  | PVariant (lbl, None) when lbl = CoreTypes.nil -> print ppf "[]"
+  | PVariant (lbl, None) when lbl = Type.nil -> print ppf "[]"
   | PVariant (lbl, None) -> print ppf "%t" (Symbol.print_label lbl)
-  | PVariant (lbl, Some (PTuple [ hd; tl ])) when lbl = CoreTypes.cons ->
+  | PVariant (lbl, Some (PTuple [ hd; tl ])) when lbl = Type.cons ->
       print ppf "@[<hov>(%t::%t)@]" (print_pattern hd) (print_pattern tl)
   | PVariant (lbl, Some p) ->
       print ppf "(%t @[<hov>%t@])" (Symbol.print_label lbl) (print_pattern p)

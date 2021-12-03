@@ -20,7 +20,7 @@ let binary_string_op_ty =
 let comparison_ty =
   let skel_param = Type.SkelParam.fresh () in
   let skel = Type.SkelParam skel_param in
-  let ty_param = CoreTypes.TyParam.fresh () in
+  let ty_param = Type.TyParam.fresh () in
   let ty = Type.tyParam ty_param skel in
   {
     Type.params =

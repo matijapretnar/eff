@@ -2,7 +2,6 @@
 
 open Utils
 module V = Value
-module CoreTypes = Language.CoreTypes
 module Untyped = Language.UntypedSyntax
 module Type = Language.Type
 
@@ -37,7 +36,7 @@ module Backend : Language.BackendSignature.T = struct
     | [ (x, (_params, _constraints, exp)) ] ->
         let v = Eval.eval_expression state exp in
         Format.fprintf !Config.output_formatter "@[val %t : %t = %t@]@."
-          (Language.CoreTypes.Variable.print x)
+          (Language.Term.Variable.print x)
           (Type.print_pretty () exp.ty.ty)
           (V.print_value v);
         Eval.update x v state
@@ -48,7 +47,7 @@ module Backend : Language.BackendSignature.T = struct
     Assoc.iter
       (fun (f, abs) ->
         Format.fprintf !Config.output_formatter "@[val %t : %t = <fun>@]@."
-          (Language.CoreTypes.Variable.print f)
+          (Language.Term.Variable.print f)
           (Type.print_pretty () (Type.arrow abs.ty).ty))
       defs;
     Eval.extend_let_rec state defs
