@@ -35,7 +35,7 @@ module type S = sig
 
   module Set : Set.S with type elt = t
 
-  module Map : Map.S with type key = t
+  module Map : Assoc.ExtMap.S with type key = t
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t

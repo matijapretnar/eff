@@ -65,7 +65,7 @@ module type S = sig
 
   module Set : Set.S with type elt = t
 
-  module Map : Map.S with type key = t
+  module Map : Assoc.ExtMap.S with type key = t
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t = struct
@@ -98,5 +98,5 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
   end
 
   module Set = Set.Make (Ord)
-  module Map = Map.Make (Ord)
+  module Map = Assoc.ExtMap.Make (Ord)
 end

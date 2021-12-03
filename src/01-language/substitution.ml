@@ -182,11 +182,11 @@ let of_parameters (params : Type.Params.t) =
   let skel_params' =
     Type.SkelParam.Set.elements params.skel_params
     |> List.map (fun s -> (s, Type.SkelParam.refresh s))
-    |> List.to_seq |> Type.SkelParam.Map.of_seq
+    |> Type.SkelParam.Map.of_bindings
   and dirt_params' =
     Type.DirtParam.Set.elements params.dirt_params
     |> List.map (fun d -> (d, Type.DirtParam.refresh d))
-    |> List.to_seq |> Type.DirtParam.Map.of_seq
+    |> Type.DirtParam.Map.of_bindings
   in
   let subst =
     {
@@ -204,82 +204,54 @@ let of_parameters (params : Type.Params.t) =
            ( p,
              (Type.TyParam.refresh p, apply_substitutions_to_skeleton subst skel)
            ))
-    |> Assoc.of_list
   in
   let params' =
     {
       Type.Params.ty_params =
-        Assoc.values_of ty_params' |> List.to_seq |> Type.TyParam.Map.of_seq;
+        ty_params' |> List.map snd |> Type.TyParam.Map.of_bindings;
       dirt_params =
         Type.DirtParam.Map.bindings dirt_params'
-        |> List.map fst |> List.to_seq |> Type.DirtParam.Set.of_seq;
+        |> List.map fst |> Type.DirtParam.Set.of_list;
       skel_params =
         Type.SkelParam.Map.bindings skel_params'
-        |> List.map fst |> List.to_seq |> Type.SkelParam.Set.of_seq;
+        |> List.map fst |> Type.SkelParam.Set.of_list;
     }
   and subst' =
     {
       subst with
       type_param_to_type_subs =
-        Assoc.map (fun (p', skel) -> Type.tyParam p' skel) ty_params'
-        |> Assoc.to_list |> List.to_seq |> Type.TyParam.Map.of_seq;
+        List.map (fun (k, (p', skel)) -> (k, Type.tyParam p' skel)) ty_params'
+        |> Type.TyParam.Map.of_bindings;
     }
   in
   (* Print.debug "SUBSTITUTION': %t" (print_substitutions subst'); *)
   (params', subst')
 
-let update_and_merge updater new_map old_map =
-  Assoc.concat new_map (Assoc.map updater old_map)
-
-let update_and_merge_map updater new_map old_map =
-  Type.TyCoercionParam.Map.union
-    (fun _ v1 _ -> Some v1)
-    new_map
-    (Type.TyCoercionParam.Map.map updater old_map)
-
-let update_and_merge_map' updater new_map old_map =
-  Type.TyParam.Map.union
-    (fun _ v1 _ -> Some v1)
-    new_map
-    (Type.TyParam.Map.map updater old_map)
-
-let update_and_merge_map'' updater new_map old_map =
-  Type.DirtCoercionParam.Map.union
-    (fun _ v1 _ -> Some v1)
-    new_map
-    (Type.DirtCoercionParam.Map.map updater old_map)
-
-let update_and_merge_map''' updater new_map old_map =
-  Type.DirtParam.Map.union
-    (fun _ v1 _ -> Some v1)
-    new_map
-    (Type.DirtParam.Map.map updater old_map)
-
-let update_and_merge_map'''' updater new_map old_map =
-  Type.SkelParam.Map.union
-    (fun _ v1 _ -> Some v1)
-    new_map
-    (Type.SkelParam.Map.map updater old_map)
-
 let merge new_sub old_sub =
   {
     type_param_to_type_coercions =
-      update_and_merge_map (apply_sub_tycoer new_sub)
+      Type.TyCoercionParam.Map.union_overwrite
         new_sub.type_param_to_type_coercions
-        old_sub.type_param_to_type_coercions;
+        (Type.TyCoercionParam.Map.map (apply_sub_tycoer new_sub)
+           old_sub.type_param_to_type_coercions);
     type_param_to_type_subs =
-      update_and_merge_map' (apply_sub_ty new_sub)
-        new_sub.type_param_to_type_subs old_sub.type_param_to_type_subs;
+      Type.TyParam.Map.union_overwrite new_sub.type_param_to_type_subs
+        (Type.TyParam.Map.map (apply_sub_ty new_sub)
+           old_sub.type_param_to_type_subs);
     dirt_var_to_dirt_coercions =
-      update_and_merge_map''
-        (apply_sub_dirtcoer new_sub)
-        new_sub.dirt_var_to_dirt_coercions old_sub.dirt_var_to_dirt_coercions;
+      Type.DirtCoercionParam.Map.union_overwrite
+        new_sub.dirt_var_to_dirt_coercions
+        (Type.DirtCoercionParam.Map.map
+           (apply_sub_dirtcoer new_sub)
+           old_sub.dirt_var_to_dirt_coercions);
     dirt_var_to_dirt_subs =
-      update_and_merge_map''' (apply_sub_dirt new_sub)
-        new_sub.dirt_var_to_dirt_subs old_sub.dirt_var_to_dirt_subs;
+      Type.DirtParam.Map.union_overwrite new_sub.dirt_var_to_dirt_subs
+        (Type.DirtParam.Map.map (apply_sub_dirt new_sub)
+           old_sub.dirt_var_to_dirt_subs);
     skel_param_to_skel_subs =
-      update_and_merge_map'''' (apply_sub_skel new_sub)
-        new_sub.skel_param_to_skel_subs old_sub.skel_param_to_skel_subs;
+      Type.SkelParam.Map.union_overwrite new_sub.skel_param_to_skel_subs
+        (Type.SkelParam.Map.map (apply_sub_skel new_sub)
+           old_sub.skel_param_to_skel_subs);
   }
 
 let add_type_coercion_e parameter t_coercion =

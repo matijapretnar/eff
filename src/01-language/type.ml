@@ -371,8 +371,8 @@ module Constraints = struct
             {
               Params.empty with
               ty_params =
-                TyParam.Map.of_seq
-                  (List.to_seq [ (ty1, SkelParam skel); (ty2, SkelParam skel) ]);
+                TyParam.Map.of_bindings
+                  [ (ty1, SkelParam skel); (ty2, SkelParam skel) ];
             }
             (Params.skel_singleton skel))
         res.ty_constraints

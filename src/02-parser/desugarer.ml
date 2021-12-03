@@ -200,11 +200,10 @@ let desugar_tydef state params ty_name def =
     {
       Type.Params.empty with
       ty_params =
-        Type.TyParam.Map.of_seq
-          (List.to_seq
-             (List.map
-                (fun (p, skel) -> (p, Type.SkelParam skel))
-                (Assoc.values_of ty_sbst)));
+        Type.TyParam.Map.of_bindings
+          (List.map
+             (fun (p, skel) -> (p, Type.SkelParam skel))
+             (Assoc.values_of ty_sbst));
     }
   in
   (state', { Type.params = params'; type_def = def' })

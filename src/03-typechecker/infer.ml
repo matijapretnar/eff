@@ -18,23 +18,23 @@ let identity_instantiation (params : Type.Params.t)
                ( w,
                  Coercion.tyCoercionVar w
                    (Type.tyParam t1 skel, Type.tyParam t2 skel) ))
-        |> List.to_seq |> Type.TyCoercionParam.Map.of_seq;
+        |> Type.TyCoercionParam.Map.of_bindings;
       type_param_to_type_subs =
         params.ty_params |> Type.TyParam.Map.bindings
         |> List.map (fun (p, skel) -> (p, Type.tyParam p skel))
-        |> List.to_seq |> Type.TyParam.Map.of_seq;
+        |> Type.TyParam.Map.of_bindings;
       dirt_var_to_dirt_coercions =
         constraints.dirt_constraints
         |> List.map (fun (w, dt) -> (w, Coercion.dirtCoercionVar w dt))
-        |> List.to_seq |> Type.DirtCoercionParam.Map.of_seq;
+        |> Type.DirtCoercionParam.Map.of_bindings;
       dirt_var_to_dirt_subs =
         params.dirt_params |> Type.DirtParam.Set.elements
         |> List.map (fun d -> (d, Type.no_effect_dirt d))
-        |> List.to_seq |> Type.DirtParam.Map.of_seq;
+        |> Type.DirtParam.Map.of_bindings;
       skel_param_to_skel_subs =
         params.skel_params |> Type.SkelParam.Set.elements
         |> List.map (fun s -> (s, Type.SkelParam s))
-        |> List.to_seq |> Type.SkelParam.Map.of_seq;
+        |> Type.SkelParam.Map.of_bindings;
     }
 
 module TypingEnv = struct
@@ -70,9 +70,9 @@ module TypingEnv = struct
       {
         subst with
         type_param_to_type_coercions =
-          ty_coercions |> List.to_seq |> Type.TyCoercionParam.Map.of_seq;
+          ty_coercions |> Type.TyCoercionParam.Map.of_bindings;
         dirt_var_to_dirt_coercions =
-          dirt_coercions |> List.to_seq |> Type.DirtCoercionParam.Map.of_seq;
+          dirt_coercions |> Type.DirtCoercionParam.Map.of_bindings;
       }
 
   let lookup ctx x : Term.expression * Constraint.omega_ct list =
