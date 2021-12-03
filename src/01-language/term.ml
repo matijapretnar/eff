@@ -298,7 +298,7 @@ and print_computation' ?max_level c ppf =
       print ~at_level:2 "%t(%t; %t)" (print_effect eff)
         (print_expression ~max_level:1 e)
         (print_abstraction a)
-  | Bind (c2, { term = p, c1; _ }) ->
+  | Bind (c1, { term = p, c2; _ }) ->
       print ~at_level:3 "do %t ← %t in %t" (print_pattern p)
         (print_computation c1)
         (print_computation ~max_level:3 c2)
