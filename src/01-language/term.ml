@@ -1,8 +1,7 @@
 open Utils
 (** Syntax of the core language. *)
 
-module EffectMap = Map.Make (CoreTypes.Effect)
-module VariableMap = Map.Make (CoreTypes.Variable)
+module Variable = CoreTypes.Variable
 
 type variable = CoreTypes.Variable.t
 
@@ -202,7 +201,7 @@ let call (eff, e, a) =
   assert (Type.equal_ty out_ty p_ty);
   {
     term = Call (eff, e, a);
-    ty = (r_ty, Type.add_effects (Type.EffectSet.singleton eff_name) r_ty_dirt);
+    ty = (r_ty, Type.add_effects (Type.Effect.Set.singleton eff_name) r_ty_dirt);
   }
 
 let bind (comp1, abs2) =
@@ -648,15 +647,15 @@ let beta_reduce abs exp =
   Option.map (fun sub -> subst_comp sub cmp) sub
 
 let ( @@@ ) occur1 occur2 =
-  VariableMap.merge
+  Variable.Map.merge
     (fun _ oc1 oc2 ->
       Some (Option.value ~default:0 oc1 + Option.value ~default:0 oc2))
     occur1 occur2
 
 let ( --- ) occur bound =
-  VariableMap.filter (fun x _ -> not (List.mem x bound)) occur
+  Variable.Map.filter (fun x _ -> not (List.mem x bound)) occur
 
-let concat_vars vars = List.fold_right ( @@@ ) vars VariableMap.empty
+let concat_vars vars = List.fold_right ( @@@ ) vars Variable.Map.empty
 
 let rec free_vars_comp c =
   match c.term with
@@ -681,15 +680,15 @@ let rec free_vars_comp c =
 
 and free_vars_expr e =
   match e.term with
-  | Var v -> VariableMap.singleton v.variable 1
+  | Var v -> Variable.Map.singleton v.variable 1
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs a
   | Handler h -> free_vars_handler h
   | Record flds ->
       Assoc.values_of flds |> List.map free_vars_expr |> concat_vars
-  | Variant (_, e) -> Option.default_map VariableMap.empty free_vars_expr e
+  | Variant (_, e) -> Option.default_map Variable.Map.empty free_vars_expr e
   | CastExp (e', _tyco) -> free_vars_expr e'
-  | Const _ -> VariableMap.empty
+  | Const _ -> Variable.Map.empty
 
 and free_vars_handler h =
   free_vars_abs h.term.value_clause
@@ -705,7 +704,7 @@ and free_vars_abs2 { term = p1, p2, c; _ } =
   free_vars_comp c --- pattern_vars p2 --- pattern_vars p1
 
 let does_not_occur v vars =
-  match VariableMap.find_opt v vars with Some x -> x = 0 | None -> true
+  match Variable.Map.find_opt v vars with Some x -> x = 0 | None -> true
 
 (* ************************************************************************* *)
 (*                         FREE VARIABLE COMPUTATION                         *)

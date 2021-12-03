@@ -62,6 +62,10 @@ module type S = sig
   val print : ?safe:bool -> t -> Format.formatter -> unit
 
   val fold : (annot -> int -> 'a) -> t -> 'a
+
+  module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t = struct
@@ -86,4 +90,13 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
   let print ?(safe = false) (n, ann) ppf = Annot.print safe ann n ppf
 
   let fold f (n, ann) = f ann n
+
+  module Ord = struct
+    type t = int * annot
+
+    let compare = compare
+  end
+
+  module Set = Set.Make (Ord)
+  module Map = Map.Make (Ord)
 end

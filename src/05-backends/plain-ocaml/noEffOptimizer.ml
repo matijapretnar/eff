@@ -36,7 +36,8 @@ let abstraction_inlinability (pat, cmp) =
         | [] -> NotPresent
         | x :: xs -> (
             let occ =
-              SyntaxNoEff.VariableMap.find_opt x vars |> Option.value ~default:0
+              SyntaxNoEff.Variable.Map.find_opt x vars
+              |> Option.value ~default:0
             in
             if occ > 1 then NotInlinable
             else
@@ -236,7 +237,7 @@ and is_letrec_unused _state defs t =
   if
     List.for_all
       (fun v ->
-        NoEff.VariableMap.find_opt v vars |> Option.value ~default:0 = 0)
+        NoEff.Variable.Map.find_opt v vars |> Option.value ~default:0 = 0)
       (Assoc.keys_of defs)
   then true
   else false

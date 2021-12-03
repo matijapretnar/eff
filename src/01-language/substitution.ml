@@ -176,11 +176,11 @@ let print_substitutions subs ppf = print_sub_list subs ppf
 
 let of_parameters (params : Type.Params.t) =
   let skel_params' =
-    Type.SkelParamSet.elements params.skel_params
+    Type.SkelParam.Set.elements params.skel_params
     |> List.map (fun s -> (s, Type.SkelParam.refresh s))
     |> Assoc.of_list
   and dirt_params' =
-    Type.DirtParamSet.elements params.dirt_params
+    Type.DirtParam.Set.elements params.dirt_params
     |> List.map (fun d -> (d, Type.DirtParam.refresh d))
     |> Assoc.of_list
   in
@@ -195,7 +195,7 @@ let of_parameters (params : Type.Params.t) =
   in
   (* Print.debug "SUBSTITUTION: %t" (print_substitutions subst); *)
   let ty_params' =
-    Type.TyParamMap.bindings params.ty_params
+    Type.TyParam.Map.bindings params.ty_params
     |> List.map (fun (p, skel) ->
            ( p,
              ( CoreTypes.TyParam.refresh p,
@@ -205,11 +205,11 @@ let of_parameters (params : Type.Params.t) =
   let params' =
     {
       Type.Params.ty_params =
-        Assoc.values_of ty_params' |> List.to_seq |> Type.TyParamMap.of_seq;
+        Assoc.values_of ty_params' |> List.to_seq |> Type.TyParam.Map.of_seq;
       dirt_params =
-        Assoc.values_of dirt_params' |> List.to_seq |> Type.DirtParamSet.of_seq;
+        Assoc.values_of dirt_params' |> List.to_seq |> Type.DirtParam.Set.of_seq;
       skel_params =
-        Assoc.values_of skel_params' |> List.to_seq |> Type.SkelParamSet.of_seq;
+        Assoc.values_of skel_params' |> List.to_seq |> Type.SkelParam.Set.of_seq;
     }
   and subst' =
     {
@@ -280,7 +280,7 @@ let add_dirt_substitution dirt_var dirt sub =
   merge (add_dirt_substitution_e dirt_var dirt) sub
 
 let empty_dirt_substitution empty_dirt_params =
-  Type.DirtParamSet.fold
+  Type.DirtParam.Set.fold
     (fun t sbst -> add_dirt_substitution t Type.empty_dirt sbst)
     empty_dirt_params empty
 

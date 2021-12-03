@@ -32,6 +32,10 @@ module type S = sig
   val print : ?safe:bool -> t -> Format.formatter -> unit
 
   val fold : (annot -> int -> 'a) -> t -> 'a
+
+  module Set : Set.S with type elt = t
+
+  module Map : Map.S with type key = t
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t

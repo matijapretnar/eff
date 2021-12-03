@@ -25,15 +25,15 @@ let identity_instantiation (params : Type.Params.t)
         |> List.map (fun (w, dt) -> (w, Coercion.dirtCoercionVar w dt))
         |> Assoc.of_list;
       type_param_to_type_subs =
-        params.ty_params |> Type.TyParamMap.bindings
+        params.ty_params |> Type.TyParam.Map.bindings
         |> List.map (fun (p, skel) -> (p, Type.tyParam p skel))
         |> Assoc.of_list;
       dirt_var_to_dirt_subs =
-        params.dirt_params |> Type.DirtParamSet.elements
+        params.dirt_params |> Type.DirtParam.Set.elements
         |> List.map (fun d -> (d, Type.no_effect_dirt d))
         |> Assoc.of_list;
       skel_param_to_skel_subs =
-        params.skel_params |> Type.SkelParamSet.elements
+        params.skel_params |> Type.SkelParam.Set.elements
         |> List.map (fun s -> (s, Type.SkelParam s))
         |> Assoc.of_list;
     }
@@ -111,7 +111,7 @@ type field = CoreTypes.Field.t
 type state = {
   variables : TypingEnv.t;
   (* Global Typing Environment *)
-  effects : (Type.ty * Type.ty) Term.EffectMap.t;
+  effects : (Type.ty * Type.ty) Type.Effect.Map.t;
   (* Valid Effects             *)
   tydefs : TypeDefinitionContext.state; (* Type definition context *)
 }
@@ -127,14 +127,14 @@ let extend_poly_var env x ty_scheme =
 let initial_state : state =
   {
     variables = TypingEnv.empty;
-    effects = Term.EffectMap.empty;
+    effects = Type.Effect.Map.empty;
     tydefs = TypeDefinitionContext.initial_state;
   }
 
 (* ************************************************************************* *)
 
 let process_def_effect eff (ty1, ty2) state =
-  ( { state with effects = Term.EffectMap.add eff (ty1, ty2) state.effects },
+  ( { state with effects = Type.Effect.Map.add eff (ty1, ty2) state.effects },
     (ty1, ty2) )
 
 (* ... *)
@@ -363,8 +363,8 @@ and tcLambda state abs =
 
 and tcEffect state (eff : Untyped.effect) : tcExprOutput' =
   (* GEORGE: NOTE: This is verbatim copied from the previous implementation *)
-  let in_ty, out_ty = Term.EffectMap.find eff state.effects
-  and s = Type.EffectSet.singleton eff in
+  let in_ty, out_ty = Type.Effect.Map.find eff state.effects
+  and s = Type.Effect.Set.singleton eff in
   let out_drty = (out_ty, Type.closed_dirt s) in
   let x_pat, x_var = Term.fresh_variable "x" in_ty
   and y_pat, y_var = Term.fresh_variable "y" out_ty in
@@ -399,7 +399,7 @@ and tcOpCase state
     ((eff, abs2) : Untyped.effect * Untyped.abstraction2) (* Op clause *)
     (dirtyOut : Type.dirty) (* Expected output type *) =
   (* 1: Lookup the type of Opi *)
-  let tyAi, tyBi = Term.EffectMap.find eff state.effects in
+  let tyAi, tyBi = Type.Effect.Map.find eff state.effects in
 
   (* 2: Generate fresh variables for the type of the codomain of the continuation *)
   let dirtyi = Type.fresh_dirty_with_fresh_skel () in
@@ -456,7 +456,7 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
     let allOps =
       trgCls |> Assoc.to_list
       |> List.map (fun ((eff, _), _) -> eff)
-      |> Type.EffectSet.of_list
+      |> Type.Effect.Set.of_list
     in
 
     (* GEORGE: This should be done in a cleaner way but let's leave it for later *)
@@ -810,21 +810,21 @@ let monomorphize free_ty_params cnstrs =
     List.map
       (fun sk ->
         Constraint.SkelEq (Type.SkelParam sk, Type.SkelBasic Const.FloatTy))
-      (Type.SkelParamSet.elements free_params.skel_params)
+      (Type.SkelParam.Set.elements free_params.skel_params)
   and monomorphize_tys =
     List.map
       (fun (t, skel) ->
         Constraint.TyOmega
           ( Type.TyCoercionParam.fresh (),
             (Type.tyParam t skel, Type.tyBasic Const.FloatTy) ))
-      (Type.TyParamMap.bindings free_params.ty_params)
+      (Type.TyParam.Map.bindings free_params.ty_params)
   and monomorphize_dirts =
     List.map
       (fun d ->
         Constraint.DirtOmega
           ( Type.DirtCoercionParam.fresh (),
             (Type.no_effect_dirt d, Type.empty_dirt) ))
-      (Type.DirtParamSet.elements free_params.dirt_params)
+      (Type.DirtParam.Set.elements free_params.dirt_params)
   in
   let sub, residuals =
     Unification.solve
@@ -927,7 +927,7 @@ let add_type_definitions ~loc state tydefs =
 
 let load_primitive_effect state eff prim =
   let ty1, ty2 = Primitives.primitive_effect_signature prim in
-  ( { state with effects = Term.EffectMap.add eff (ty1, ty2) state.effects },
+  ( { state with effects = Type.Effect.Map.add eff (ty1, ty2) state.effects },
     (ty1, ty2) )
 
 let load_primitive_value state x prim =

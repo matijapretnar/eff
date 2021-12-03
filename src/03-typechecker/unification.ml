@@ -60,7 +60,7 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
 
 let expand_row row ops =
   match row with
-  | _ when Type.EffectSet.is_empty ops -> (Substitution.empty, row)
+  | _ when Type.Effect.Set.is_empty ops -> (Substitution.empty, row)
   | ParamRow p ->
       let p' = Type.DirtParam.refresh p in
       let row' = ParamRow p' in
@@ -76,12 +76,12 @@ let skel_eq_step sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
   | SkelParam sp1, sk2a
-    when not (SkelParamSet.mem sp1 (free_params_skeleton sk2a).skel_params) ->
+    when not (SkelParam.Set.mem sp1 (free_params_skeleton sk2a).skel_params) ->
       apply_substitution
         (Substitution.add_skel_param_substitution_e sp1 sk2a)
         sub paused rest_queue
   | sk2a, SkelParam sp1
-    when not (SkelParamSet.mem sp1 (free_params_skeleton sk2a).skel_params) ->
+    when not (SkelParam.Set.mem sp1 (free_params_skeleton sk2a).skel_params) ->
       apply_substitution
         (Substitution.add_skel_param_substitution_e sp1 sk2a)
         sub paused rest_queue
@@ -138,10 +138,12 @@ and ty_eq_step sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
   (* ς = ς *)
   | TyParam p1, TyParam p2 when p1 = p2 -> (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
-  | TyParam p1, _ when not (TyParamMap.mem p1 (free_params_ty ty2).ty_params) ->
+  | TyParam p1, _ when not (TyParam.Map.mem p1 (free_params_ty ty2).ty_params)
+    ->
       let sub1 = Substitution.add_type_substitution_e p1 ty2 in
       apply_substitution sub1 sub paused rest_queue
-  | _, TyParam p2 when not (TyParamMap.mem p2 (free_params_ty ty1).ty_params) ->
+  | _, TyParam p2 when not (TyParam.Map.mem p2 (free_params_ty ty1).ty_params)
+    ->
       let sub1 = Substitution.add_type_substitution_e p2 ty1 in
       apply_substitution sub1 sub paused rest_queue
       (* occurs-check failing *)
@@ -292,7 +294,7 @@ and dirt_omega_step sub resolved unresolved w dcons =
   (* ω : δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = ops1; row = ParamRow _ },
       { effect_set = _; row = ParamRow _ } )
-    when EffectSet.is_empty ops1 ->
+    when Effect.Set.is_empty ops1 ->
       (sub, Type.Constraints.add_dirt_constraint resolved w dcons, unresolved)
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = ops1; row = ParamRow d1 },
@@ -300,25 +302,25 @@ and dirt_omega_step sub resolved unresolved w dcons =
       let w' = DirtCoercionParam.refresh w in
       let d2' = DirtParam.refresh d2 in
       let w_ty' =
-        ( { effect_set = EffectSet.empty; row = ParamRow d1 },
-          { effect_set = EffectSet.union ops1 ops2; row = ParamRow d2' } )
+        ( { effect_set = Effect.Set.empty; row = ParamRow d1 },
+          { effect_set = Effect.Set.union ops1 ops2; row = ParamRow d2' } )
       in
       let sub' =
         Substitution.add_dirt_substitution_e d2
-          { effect_set = EffectSet.diff ops1 ops2; row = ParamRow d2' }
+          { effect_set = Effect.Set.diff ops1 ops2; row = ParamRow d2' }
         |> Substitution.add_dirt_var_coercion w
              (Coercion.unionDirt (ops1, Coercion.dirtCoercionVar w' w_ty'))
       in
       let new_cons = Constraint.DirtOmega (w', w_ty') in
       apply_substitution sub' sub resolved (new_cons :: unresolved)
   (* ω : Ø <= Δ₂ *)
-  | { effect_set = ops1; row = EmptyRow }, d when EffectSet.is_empty ops1 ->
+  | { effect_set = ops1; row = EmptyRow }, d when Effect.Set.is_empty ops1 ->
       let sub' = Substitution.add_dirt_var_coercion w (Coercion.empty d) sub in
       (sub', resolved, unresolved)
   (* ω : δ₁ <= Ø *)
   | ( { effect_set = ops1; row = ParamRow d1 },
       { effect_set = ops2; row = EmptyRow } )
-    when EffectSet.is_empty ops1 && EffectSet.is_empty ops2 ->
+    when Effect.Set.is_empty ops1 && Effect.Set.is_empty ops2 ->
       let sub' =
         Substitution.add_dirt_var_coercion_e w (Coercion.empty empty_dirt)
         |> Substitution.add_dirt_substitution d1 empty_dirt
@@ -327,11 +329,11 @@ and dirt_omega_step sub resolved unresolved w dcons =
   (* ω : O₁ <= O₂ *)
   | { effect_set = ops1; row = EmptyRow }, { effect_set = ops2; row = EmptyRow }
     ->
-      assert (EffectSet.subset ops1 ops2);
+      assert (Effect.Set.subset ops1 ops2);
       let sub' =
         Substitution.add_dirt_var_coercion w
           (Coercion.unionDirt
-             (ops2, Coercion.empty (closed_dirt (EffectSet.diff ops2 ops1))))
+             (ops2, Coercion.empty (closed_dirt (Effect.Set.diff ops2 ops1))))
           sub
       in
       (sub', resolved, unresolved)
@@ -344,10 +346,10 @@ and dirt_omega_step sub resolved unresolved w dcons =
           (Coercion.unionDirt
              ( ops1,
                Coercion.empty
-                 { effect_set = EffectSet.diff ops2 ops1; row = ParamRow d2' }
+                 { effect_set = Effect.Set.diff ops2 ops1; row = ParamRow d2' }
              ))
         |> Substitution.add_dirt_substitution d2
-             { effect_set = EffectSet.diff ops1 ops2; row = ParamRow d2' }
+             { effect_set = Effect.Set.diff ops1 ops2; row = ParamRow d2' }
       in
       apply_substitution sub' sub resolved unresolved
   | _ -> assert false
@@ -365,17 +367,17 @@ and dirt_eq_step sub paused rest_queue { effect_set = o1; row = row1 }
       row₁' = row₂'
 
   *)
-  let sub1, row1' = expand_row row1 (EffectSet.diff o2 o1)
-  and sub2, row2' = expand_row row2 (EffectSet.diff o1 o2) in
+  let sub1, row1' = expand_row row1 (Effect.Set.diff o2 o1)
+  and sub2, row2' = expand_row row2 (Effect.Set.diff o1 o2) in
   let row_sub =
     match (row1', row2') with
     | EmptyRow, EmptyRow -> Substitution.empty
     | ParamRow p1, _ ->
         Substitution.add_dirt_substitution_e p1
-          { effect_set = EffectSet.empty; row = row2' }
+          { effect_set = Effect.Set.empty; row = row2' }
     | _, ParamRow p2 ->
         Substitution.add_dirt_substitution_e p2
-          { effect_set = EffectSet.empty; row = row1' }
+          { effect_set = Effect.Set.empty; row = row1' }
   in
   let sub' = Substitution.merge (Substitution.merge sub1 sub2) row_sub in
   apply_substitution sub' sub paused rest_queue

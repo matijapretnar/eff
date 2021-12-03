@@ -5,7 +5,6 @@ module CoreTypes = Language.CoreTypes
 module Const = Language.Const
 module Type = Language.Type
 module Variable = Symbol.Make (Symbol.String)
-module VariableMap = Map.Make (Variable)
 
 type n_type =
   (* Might remove this later to drop all polymorphism *)
@@ -234,18 +233,18 @@ let beta_reduce (pat, trm2) trm1 =
 (* Free variables *)
 
 let ( @@@ ) occur1 occur2 =
-  VariableMap.merge
+  Variable.Map.merge
     (fun _ oc1 oc2 ->
       Some (Option.value ~default:0 oc1 + Option.value ~default:0 oc2))
     occur1 occur2
 
 let ( --- ) occur bound =
-  VariableMap.filter (fun x _ -> not (List.mem x bound)) occur
+  Variable.Map.filter (fun x _ -> not (List.mem x bound)) occur
 
-let concat_vars vars = List.fold_right ( @@@ ) vars VariableMap.empty
+let concat_vars vars = List.fold_right ( @@@ ) vars Variable.Map.empty
 
 let rec free_vars = function
-  | NVar v -> VariableMap.singleton v.variable 1
+  | NVar v -> Variable.Map.singleton v.variable 1
   | NTuple l -> concat_vars (List.map free_vars l)
   | NFun abs -> free_vars_abs_with_ty abs
   | NHandle (t1, t2) | NApplyTerm (t1, t2) -> free_vars t1 @@@ free_vars t2
@@ -255,7 +254,7 @@ let rec free_vars = function
   | NLet (e, a) -> free_vars e @@@ free_vars_abs a
   | NCall (_, e, a) -> free_vars e @@@ free_vars_abs_with_ty a
   | NBind (e, a) -> free_vars e @@@ free_vars_abs a
-  | NConst _ | NDirectPrimitive _ -> VariableMap.empty
+  | NConst _ | NDirectPrimitive _ -> Variable.Map.empty
   | NLetRec (li, c1) ->
       let xs, vars =
         List.fold_right
@@ -266,7 +265,7 @@ let rec free_vars = function
       vars --- xs
   | NMatch (e, l) -> free_vars e @@@ concat_vars (List.map free_vars_abs l)
   | NRecord r -> Assoc.values_of r |> List.map free_vars |> concat_vars
-  | NVariant (_, e) -> Option.default_map VariableMap.empty free_vars e
+  | NVariant (_, e) -> Option.default_map Variable.Map.empty free_vars e
 
 and free_vars_handler h =
   free_vars_abs_with_ty h.return_clause

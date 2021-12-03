@@ -28,8 +28,8 @@ let initial_state =
           params =
             {
               Params.empty with
-              ty_params = TyParamMap.singleton a (Type.SkelParam skel);
-              skel_params = SkelParamSet.singleton skel;
+              ty_params = TyParam.Map.singleton a (Type.SkelParam skel);
+              skel_params = SkelParam.Set.singleton skel;
             };
           type_def = Sum (Assoc.of_list [ list_nil; list_cons ]);
         } );
@@ -82,7 +82,7 @@ let find_field fld (st : state) =
 let apply_to_params ty_name (ps : Type.Params.t) =
   apply
     ( ty_name,
-      TyParamMap.bindings ps.ty_params
+      TyParam.Map.bindings ps.ty_params
       |> List.map (fun (p, skel) -> tyParam p skel) )
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it

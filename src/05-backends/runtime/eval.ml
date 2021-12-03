@@ -2,7 +2,7 @@
 open Utils
 open Language
 module V = Value
-module RuntimeEnv = Map.Make (CoreTypes.Variable)
+module RuntimeEnv = CoreTypes.Variable.Map
 
 type state = {
   environment : V.value RuntimeEnv.t;

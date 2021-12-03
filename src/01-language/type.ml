@@ -28,17 +28,10 @@ module DirtCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let utf8_symbol = "ϖ"
 end))
 
-module EffectSet = Set.Make (CoreTypes.Effect)
-module SkelParamSet = Set.Make (SkelParam)
-module SkelParamMap = Map.Make (SkelParam)
-module TyParamSet = Set.Make (CoreTypes.TyParam)
-module TyParamMap = Map.Make (CoreTypes.TyParam)
-module DirtParamSet = Set.Make (DirtParam)
-module DirtParamMap = Map.Make (DirtParam)
-module TyCoercionParamMap = Map.Make (TyCoercionParam)
-module DirtCoercionParamMap = Map.Make (DirtCoercionParam)
+module TyParam = CoreTypes.TyParam
+module Effect = CoreTypes.Effect
 
-type effect_set = EffectSet.t
+type effect_set = Effect.Set.t
 
 type skeleton =
   | SkelParam of SkelParam.t
@@ -90,7 +83,7 @@ and abs_ty = ty * dirty
 and row = ParamRow of DirtParam.t | EmptyRow
 
 let is_empty_dirt dirt =
-  EffectSet.is_empty dirt.effect_set && dirt.row = EmptyRow
+  Effect.Set.is_empty dirt.effect_set && dirt.row = EmptyRow
 
 let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -127,7 +120,7 @@ and print_dirt ?max_level drt ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match (drt.effect_set, drt.row) with
   | effect_set, EmptyRow -> print "{%t}" (print_effect_set effect_set)
-  | effect_set, ParamRow p when EffectSet.is_empty effect_set ->
+  | effect_set, ParamRow p when Effect.Set.is_empty effect_set ->
       print "%t" (DirtParam.print p)
   | effect_set, ParamRow p ->
       print ~at_level:1 "{%t}∪%t"
@@ -135,7 +128,7 @@ and print_dirt ?max_level drt ppf =
         (DirtParam.print p)
 
 and print_effect_set effect_set =
-  Print.sequence "," CoreTypes.Effect.print (EffectSet.elements effect_set)
+  Print.sequence "," CoreTypes.Effect.print (Effect.Set.elements effect_set)
 
 and print_dirty ?max_level (t1, drt1) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -196,36 +189,36 @@ and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
 
 module Params = struct
   type t = {
-    ty_params : skeleton TyParamMap.t;
-    dirt_params : DirtParamSet.t;
-    skel_params : SkelParamSet.t;
+    ty_params : skeleton TyParam.Map.t;
+    dirt_params : DirtParam.Set.t;
+    skel_params : SkelParam.Set.t;
   }
 
   let empty =
     {
-      ty_params = TyParamMap.empty;
-      dirt_params = DirtParamSet.empty;
-      skel_params = SkelParamSet.empty;
+      ty_params = TyParam.Map.empty;
+      dirt_params = DirtParam.Set.empty;
+      skel_params = SkelParam.Set.empty;
     }
 
   let subset fp1 fp2 =
-    TyParamMap.for_all
-      (fun p1 _ -> TyParamMap.mem p1 fp2.ty_params)
+    TyParam.Map.for_all
+      (fun p1 _ -> TyParam.Map.mem p1 fp2.ty_params)
       fp1.ty_params
-    && DirtParamSet.subset fp1.dirt_params fp2.dirt_params
-    && SkelParamSet.subset fp1.skel_params fp2.skel_params
+    && DirtParam.Set.subset fp1.dirt_params fp2.dirt_params
+    && SkelParam.Set.subset fp1.skel_params fp2.skel_params
 
   let ty_singleton p skel =
-    { empty with ty_params = TyParamMap.singleton p skel }
+    { empty with ty_params = TyParam.Map.singleton p skel }
 
-  let dirt_singleton p = { empty with dirt_params = DirtParamSet.singleton p }
+  let dirt_singleton p = { empty with dirt_params = DirtParam.Set.singleton p }
 
-  let skel_singleton p = { empty with skel_params = SkelParamSet.singleton p }
+  let skel_singleton p = { empty with skel_params = SkelParam.Set.singleton p }
 
   let union fp1 fp2 =
     {
       ty_params =
-        TyParamMap.union
+        TyParam.Map.union
           (fun _ skel1 skel2 ->
             (* Print.debug "%t %t = %t"
                (CoreTypes.TyParam.print t)
@@ -233,15 +226,16 @@ module Params = struct
             assert (skel1 = skel2);
             Some skel1)
           fp1.ty_params fp2.ty_params;
-      dirt_params = DirtParamSet.union fp1.dirt_params fp2.dirt_params;
-      skel_params = SkelParamSet.union fp1.skel_params fp2.skel_params;
+      dirt_params = DirtParam.Set.union fp1.dirt_params fp2.dirt_params;
+      skel_params = SkelParam.Set.union fp1.skel_params fp2.skel_params;
     }
 
   let union_map free_params =
     List.fold_left (fun fp x -> union fp (free_params x)) empty
 
   let is_empty fp =
-    DirtParamSet.is_empty fp.dirt_params && SkelParamSet.is_empty fp.skel_params
+    DirtParam.Set.is_empty fp.dirt_params
+    && SkelParam.Set.is_empty fp.skel_params
 end
 
 let rec free_params_skeleton = function
@@ -337,7 +331,7 @@ module Constraints = struct
             {
               Params.empty with
               ty_params =
-                TyParamMap.of_seq
+                TyParam.Map.of_seq
                   (List.to_seq [ (ty1, SkelParam skel); (ty2, SkelParam skel) ]);
             }
             (Params.skel_singleton skel))
@@ -414,23 +408,23 @@ and equal_ty' ty1' ty2' =
 and equal_dirty (ty1, d1) (ty2, d2) = equal_ty ty1 ty2 && equal_dirt d1 d2
 
 and equal_dirt d1 d2 =
-  EffectSet.equal d1.effect_set d2.effect_set && d1.row = d2.row
+  Effect.Set.equal d1.effect_set d2.effect_set && d1.row = d2.row
 
 let no_effect_dirt dirt_param =
-  { effect_set = EffectSet.empty; row = ParamRow dirt_param }
+  { effect_set = Effect.Set.empty; row = ParamRow dirt_param }
 
 let fresh_dirt () = no_effect_dirt (DirtParam.fresh ())
 
 let closed_dirt effect_set = { effect_set; row = EmptyRow }
 
-let empty_dirt = closed_dirt EffectSet.empty
+let empty_dirt = closed_dirt Effect.Set.empty
 
 let make_dirty ty = (ty, fresh_dirt ())
 
 let pure_ty ty = (ty, empty_dirt)
 
 let add_effects effect_set drt =
-  { drt with effect_set = EffectSet.union drt.effect_set effect_set }
+  { drt with effect_set = Effect.Set.union drt.effect_set effect_set }
 
 let fresh_skel () =
   let skel_var = SkelParam.fresh () in
@@ -524,43 +518,43 @@ let print_pretty () = print_pretty_skel (ref Assoc.empty)
 
 module Renaming = struct
   type t = {
-    ty_params : CoreTypes.TyParam.t TyParamMap.t;
-    dirt_params : DirtParam.t DirtParamMap.t;
-    skel_params : SkelParam.t SkelParamMap.t;
+    ty_params : CoreTypes.TyParam.t TyParam.Map.t;
+    dirt_params : DirtParam.t DirtParam.Map.t;
+    skel_params : SkelParam.t SkelParam.Map.t;
   }
 
   let empty =
     {
-      ty_params = TyParamMap.empty;
-      dirt_params = DirtParamMap.empty;
-      skel_params = SkelParamMap.empty;
+      ty_params = TyParam.Map.empty;
+      dirt_params = DirtParam.Map.empty;
+      skel_params = SkelParam.Map.empty;
     }
 end
 
 let params_renaming (params : Params.t) : Renaming.t =
   {
     skel_params =
-      SkelParamSet.fold
-        (fun p -> SkelParamMap.add p (SkelParam.refresh p))
-        params.skel_params SkelParamMap.empty;
+      SkelParam.Set.fold
+        (fun p -> SkelParam.Map.add p (SkelParam.refresh p))
+        params.skel_params SkelParam.Map.empty;
     ty_params =
-      TyParamMap.mapi
+      TyParam.Map.mapi
         (fun p _skel -> CoreTypes.TyParam.refresh p)
         params.ty_params;
     dirt_params =
-      DirtParamSet.fold
-        (fun d -> DirtParamMap.add d (DirtParam.refresh d))
-        params.dirt_params DirtParamMap.empty;
+      DirtParam.Set.fold
+        (fun d -> DirtParam.Map.add d (DirtParam.refresh d))
+        params.dirt_params DirtParam.Map.empty;
   }
 
 let rename_skel_param (sbst : Renaming.t) p =
-  SkelParamMap.find_opt p sbst.skel_params |> Option.value ~default:p
+  SkelParam.Map.find_opt p sbst.skel_params |> Option.value ~default:p
 
 let rename_ty_param (sbst : Renaming.t) t =
-  TyParamMap.find_opt t sbst.ty_params |> Option.value ~default:t
+  TyParam.Map.find_opt t sbst.ty_params |> Option.value ~default:t
 
 let rename_dirt_param (sbst : Renaming.t) d =
-  DirtParamMap.find_opt d sbst.dirt_params |> Option.value ~default:d
+  DirtParam.Map.find_opt d sbst.dirt_params |> Option.value ~default:d
 
 let rec rename_skeleton (sbst : Renaming.t) = function
   | SkelParam p -> SkelParam (rename_skel_param sbst p)
@@ -607,13 +601,13 @@ and rename_dirt (sbst : Renaming.t) dirt =
 let rename_params (sbst : Renaming.t) (params : Params.t) =
   {
     Params.skel_params =
-      SkelParamSet.map (rename_skel_param sbst) params.skel_params;
+      SkelParam.Set.map (rename_skel_param sbst) params.skel_params;
     ty_params =
-      params.ty_params |> TyParamMap.to_seq
+      params.ty_params |> TyParam.Map.to_seq
       |> Seq.map (fun (p, skel) ->
              (rename_ty_param sbst p, rename_skeleton sbst skel))
-      |> TyParamMap.of_seq;
-    dirt_params = DirtParamSet.map (rename_dirt_param sbst) params.dirt_params;
+      |> TyParam.Map.of_seq;
+    dirt_params = DirtParam.Set.map (rename_dirt_param sbst) params.dirt_params;
   }
 
 let rename_constraints (sbst : Renaming.t) (constraints : Constraints.t) =

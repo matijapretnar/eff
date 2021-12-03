@@ -6,7 +6,6 @@ open Language
 module NoEff = SyntaxNoEff
 module ExEffTypes = Type
 module ExEff = Term
-module EffectSet = Set.Make (CoreTypes.Effect)
 module Sub = Language.Substitution
 
 type optimization_config = { purity_aware_translation : bool }
@@ -49,10 +48,10 @@ let has_empty_dirt ((_ty, dirt) : ExEffTypes.dirty) = is_empty_dirt dirt
 
 let rec get_effectset_temp set effects =
   match effects with
-  | ((eff, _), _abs) :: es -> get_effectset_temp (EffectSet.add eff set) es
+  | ((eff, _), _abs) :: es -> get_effectset_temp (Effect.Set.add eff set) es
   | [] -> set
 
-let get_effectset effects = get_effectset_temp EffectSet.empty effects
+let get_effectset effects = get_effectset_temp Effect.Set.empty effects
 
 let rec elab_ty_coercion state coer =
   match coer.term with
@@ -131,8 +130,8 @@ let rec value_coercion_from_impure_dirt empty_dirt_params ty =
         match drt1.row with
         | ParamRow d ->
             if
-              ExEffTypes.DirtParamSet.mem d empty_dirt_params
-              && ExEffTypes.EffectSet.is_empty drt1.effect_set
+              ExEffTypes.DirtParam.Set.mem d empty_dirt_params
+              && ExEffTypes.Effect.Set.is_empty drt1.effect_set
             then
               let coer1 = value_coercion_to_impure_dirt empty_dirt_params ty1 in
               let coer2 =
@@ -163,8 +162,8 @@ and computation_coercion_from_impure_dirt empty_dirt_params (ty1, drt) =
   match drt with
   | _ when is_empty_dirt drt -> noeff_coer
   | { effect_set; row = ParamRow p }
-    when ExEffTypes.DirtParamSet.mem p empty_dirt_params
-         && EffectSet.is_empty effect_set ->
+    when ExEffTypes.DirtParam.Set.mem p empty_dirt_params
+         && Effect.Set.is_empty effect_set ->
       NoEff.NCoerUnsafe noeff_coer
   | _ ->
       assert (
@@ -195,8 +194,8 @@ and value_coercion_to_impure_dirt empty_dirt_params ty =
         match drt1.row with
         | ParamRow d ->
             if
-              ExEffTypes.DirtParamSet.mem d empty_dirt_params
-              && ExEffTypes.EffectSet.is_empty drt1.effect_set
+              ExEffTypes.DirtParam.Set.mem d empty_dirt_params
+              && ExEffTypes.Effect.Set.is_empty drt1.effect_set
             then
               let coer1 =
                 value_coercion_from_impure_dirt empty_dirt_params ty1
@@ -228,8 +227,8 @@ and computation_coercion_to_impure_dirt empty_dirt_params (ty1, drt) =
   match drt with
   | _ when is_empty_dirt drt -> noeff_coer
   | { effect_set; row = ParamRow p }
-    when ExEffTypes.DirtParamSet.mem p empty_dirt_params
-         && EffectSet.is_empty effect_set ->
+    when ExEffTypes.DirtParam.Set.mem p empty_dirt_params
+         && Effect.Set.is_empty effect_set ->
       NoEff.NCoerReturn noeff_coer
   | _ ->
       assert (
@@ -261,8 +260,8 @@ and elab_expression' state exp =
         |> List.filter (fun (_, drt) -> is_empty_dirt drt)
         |> List.fold_left
              (fun empty_dirt_params (param, _) ->
-               Type.DirtParamSet.add param empty_dirt_params)
-             Type.DirtParamSet.empty
+               Type.DirtParam.Set.add param empty_dirt_params)
+             Type.DirtParam.Set.empty
       in
       let coercions =
         x.instantiation.type_param_to_type_coercions |> Assoc.to_list

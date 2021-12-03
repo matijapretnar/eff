@@ -201,7 +201,7 @@ let desugar_tydef state params ty_name def =
     {
       Type.Params.empty with
       ty_params =
-        Type.TyParamMap.of_seq
+        Type.TyParam.Map.of_seq
           (List.to_seq
              (List.map
                 (fun (p, skel) -> (p, Type.SkelParam skel))

@@ -115,7 +115,7 @@ module Backend : Language.BackendSignature.T = struct
 
   let process_tydef state tydefs =
     let converter Type.{ params; type_def } =
-      ( Type.TyParamMap.bindings params.ty_params |> List.map fst,
+      ( Type.TyParam.Map.bindings params.ty_params |> List.map fst,
         TranslateExEff2NoEff.elab_tydef type_def )
     in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in

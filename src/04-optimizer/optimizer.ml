@@ -70,7 +70,7 @@ let abstraction_inlinability { term = pat, cmp; _ } =
         | [] -> NotPresent
         | x :: xs -> (
             let occ =
-              Term.VariableMap.find_opt x free_vars_cmp
+              Term.Variable.Map.find_opt x free_vars_cmp
               |> Option.value ~default:0
             in
             if occ > 1 then NotInlinable
@@ -105,16 +105,16 @@ let recast_computation hnd comp =
   match comp.ty with
   | ty, { Type.effect_set = effs; Type.row = EmptyRow } ->
       let handled_effs =
-        Type.EffectSet.of_list
+        Type.Effect.Set.of_list
           (List.map
              (fun ((eff, _), _) -> eff)
              (Assoc.to_list hnd.term.Term.effect_clauses.effect_part))
       in
-      if Type.EffectSet.disjoint effs handled_effs then
+      if Type.Effect.Set.disjoint effs handled_effs then
         let _, (_, drt_out) = hnd.ty in
         let drt_diff =
           {
-            Type.effect_set = Type.EffectSet.diff drt_out.Type.effect_set effs;
+            Type.effect_set = Type.Effect.Set.diff drt_out.Type.effect_set effs;
             Type.row = drt_out.Type.row;
           }
         in

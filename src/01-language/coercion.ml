@@ -80,9 +80,6 @@ let unionDirt (effs, dcoer) =
 (*                         COERCION VARIABLES OF                             *)
 (* ************************************************************************* *)
 
-module TyCoercionParamSet = Set.Make (Type.TyCoercionParam)
-module DirtCoercionParamSet = Set.Make (Type.DirtCoercionParam)
-
 let rec print_ty_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.term with
