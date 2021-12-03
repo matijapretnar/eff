@@ -20,7 +20,7 @@ type ty =
   | TyArrow of ty * ty
 
 type tydef =
-  | TyDefRecord of (Type.Field.t, ty) Assoc.t
+  | TyDefRecord of ty Type.Field.Map.t
   | TyDefSum of (Type.Label.t, ty option) Assoc.t
   | TyDefInline of ty
 
@@ -30,7 +30,7 @@ type pattern =
   | PAnnotated of pattern * ty
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (field, pattern) Assoc.t
+  | PRecord of pattern Type.Field.Map.t
   | PVariant of label * pattern option
   | PConst of Const.t
   | PNonbinding
@@ -41,7 +41,7 @@ type term =
   | Const of Const.t
   | Annotated of term * ty
   | Tuple of term list
-  | Record of (field, term) Assoc.t
+  | Record of term Type.Field.Map.t
   | Variant of label * term option
   | Lambda of abstraction
   | Function of match_case list
@@ -95,7 +95,7 @@ let print_tuple pp lst ppf =
   | lst -> print ppf "(@[<hov>%t@])" (print_sequence ", " pp lst)
 
 let print_record pp sep assoc ppf =
-  let lst = Assoc.to_list assoc in
+  let lst = Type.Field.Map.bindings assoc in
   print ppf "{@[<hov>%t@]}" (print_sequence "; " (print_field pp sep) lst)
 
 let rec print_term t ppf =

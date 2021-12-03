@@ -80,8 +80,8 @@ let pp_variable ?(safe = true) state var ppf =
 let pp_field pp sep (field, value) ppf =
   print ppf "%t %s %t" (Type.Field.print field) sep (pp value)
 
-let pp_record pp sep assoc ppf =
-  let lst = Assoc.to_list assoc in
+let pp_record pp sep flds ppf =
+  let lst = Type.Field.Map.bindings flds in
   print ppf "{@[<hov>%t@]}" (pp_sequence "; " (pp_field pp sep) lst)
 
 let rec pp_type noeff_ty ppf =

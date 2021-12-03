@@ -20,7 +20,7 @@ and pattern' =
   | PVar of variable
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (Type.Field.t, pattern) Assoc.t
+  | PRecord of pattern Type.Field.Map.t
   | PVariant of Type.Label.t * pattern option
   | PConst of Const.t
   | PNonbinding
@@ -34,8 +34,9 @@ let rec pattern_vars pat =
   match pat.term with
   | PVar x -> [ x ]
   | PAs (p, x) -> x :: pattern_vars p
-  | PTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
-  | PRecord lst -> Assoc.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
+  | PTuple lst -> List.flatten (List.map pattern_vars lst)
+  | PRecord lst ->
+      List.flatten (List.map pattern_vars (Type.Field.Map.values lst))
   | PVariant (_, None) -> []
   | PVariant (_, Some p) -> pattern_vars p
   | PConst _ -> []
@@ -48,7 +49,7 @@ and expression' =
   | Var of { variable : variable; instantiation : Substitution.t }
   | Const of Const.t
   | Tuple of expression list
-  | Record of (Type.Field.t, expression) Assoc.t
+  | Record of expression Type.Field.Map.t
   | Variant of Type.Label.t * expression option
   | Lambda of abstraction
   | Handler of handler_clauses
@@ -113,7 +114,7 @@ let const (c : Const.t) : expression =
 let tuple es =
   { term = Tuple es; ty = Type.tuple (List.map (fun e -> e.ty) es) }
 
-let record ty (flds : (Type.Field.t, expression) Assoc.t) : expression =
+let record ty flds : expression =
   (* Ideally, we could reconstruct ty from the field names *)
   { term = Record flds; ty }
 
@@ -234,7 +235,10 @@ let rec print_pattern ?max_level p ppf =
   | PAs (p, x) -> print "%t as %t" (print_pattern p) (print_variable x)
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
-  | PRecord lst -> Print.record Type.Field.print print_pattern lst ppf
+  | PRecord lst ->
+      Print.record Type.Field.print print_pattern
+        (Type.Field.Map.bindings lst)
+        ppf
   | PVariant (lbl, None) -> print ~at_level:0 "%t" (Type.Label.print lbl)
   | PVariant (lbl, Some p) ->
       print ~at_level:1 "%t %t" (Type.Label.print lbl) (print_pattern p)
@@ -251,7 +255,10 @@ and print_expression' ?max_level e ppf =
   | Var x -> print "%t" (print_variable x.variable)
   | Const c -> print "%t" (Const.print c)
   | Tuple lst -> Print.tuple print_expression lst ppf
-  | Record lst -> Print.record Type.Field.print print_expression lst ppf
+  | Record lst ->
+      Print.record Type.Field.print print_expression
+        (Type.Field.Map.bindings lst)
+        ppf
   | Variant (lbl, None) -> print ~at_level:0 "%t" (Type.Label.print lbl)
   | Variant (lbl, Some e) ->
       print ~at_level:1 "%t %t" (Type.Label.print lbl)
@@ -370,7 +377,7 @@ and apply_sub_exp' sub expression =
   | Handler h -> Handler (apply_sub_handler sub h)
   | CastExp (e1, tc1) ->
       CastExp (apply_sub_exp sub e1, Substitution.apply_sub_tycoer sub tc1)
-  | Record flds -> Record (Assoc.map (apply_sub_exp sub) flds)
+  | Record flds -> Record (Type.Field.Map.map (apply_sub_exp sub) flds)
 
 and apply_sub_abs sub abs =
   {
@@ -391,7 +398,7 @@ and apply_sub_pat' sub pat =
   | PVar _ -> pat
   | PAs (p, x) -> PAs (apply_sub_pat sub p, x)
   | PTuple ps -> PTuple (List.map (apply_sub_pat sub) ps)
-  | PRecord flds -> PRecord (Assoc.map (apply_sub_pat sub) flds)
+  | PRecord flds -> PRecord (Type.Field.Map.map (apply_sub_pat sub) flds)
   | PVariant (lbl, pat) -> PVariant (lbl, Option.map (apply_sub_pat sub) pat)
   | PConst _ -> pat
   | PNonbinding -> pat
@@ -456,11 +463,12 @@ and refresh_pattern' sbst = function
       (sbst, PTuple ps')
   | PRecord flds ->
       let sbst, flds' =
-        Assoc.fold_right
-          (fun (lbl, p) (sbst, flds') ->
+        Type.Field.Map.fold
+          (fun lbl p (sbst, flds') ->
             let sbst, p' = refresh_pattern sbst p in
-            (sbst, Assoc.update lbl p' flds'))
-          flds (sbst, Assoc.empty)
+            (sbst, Type.Field.Map.add lbl p' flds'))
+          flds
+          (sbst, Type.Field.Map.empty)
       in
       (sbst, PRecord flds')
   | PVariant (lbl, Some p) ->
@@ -480,7 +488,7 @@ and refresh_expression' sbst = function
   | Lambda abs -> Lambda (refresh_abstraction sbst abs)
   | Handler h -> Handler (refresh_handler sbst h)
   | Tuple es -> Tuple (List.map (refresh_expression sbst) es)
-  | Record flds -> Record (Assoc.map (refresh_expression sbst) flds)
+  | Record flds -> Record (Type.Field.Map.map (refresh_expression sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, Option.map (refresh_expression sbst) e)
   | CastExp (e1, tyco) -> CastExp (refresh_expression sbst e1, tyco)
   | Const _ as e -> e
@@ -556,7 +564,7 @@ and subst_expr' sbst = function
   | Lambda abs -> Lambda (subst_abs sbst abs)
   | Handler h -> Handler (subst_handler sbst h)
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)
-  | Record flds -> Record (Assoc.map (subst_expr sbst) flds)
+  | Record flds -> Record (Type.Field.Map.map (subst_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, Option.map (subst_expr sbst) e)
   | Const _ as e -> e
   | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
@@ -631,7 +639,10 @@ let pattern_match p e =
               let e = List.assoc f es in
               extend_record ps es (extend_subst p e sbst)
         in
-        extend_record (Assoc.to_list ps) (Assoc.to_list es) (Some sbst)
+        extend_record
+          (Type.Field.Map.bindings ps)
+          (Type.Field.Map.bindings es)
+          (Some sbst)
     | PVariant (lbl, None), Variant (lbl', None) when lbl = lbl' -> Some sbst
     | PVariant (lbl, Some p), Variant (lbl', Some e) when lbl = lbl' ->
         extend_subst p e sbst
@@ -684,7 +695,7 @@ and free_vars_expr e =
   | Lambda a -> free_vars_abs a
   | Handler h -> free_vars_handler h
   | Record flds ->
-      Assoc.values_of flds |> List.map free_vars_expr |> concat_vars
+      Type.Field.Map.values flds |> List.map free_vars_expr |> concat_vars
   | Variant (_, e) -> Option.default_map Variable.Map.empty free_vars_expr e
   | CastExp (e', _tyco) -> free_vars_expr e'
   | Const _ -> Variable.Map.empty
@@ -720,8 +731,8 @@ and free_params_expression' e =
         (fun free e -> Type.Params.union free (free_params_expression e))
         Type.Params.empty es
   | Record flds ->
-      flds |> Assoc.to_list
-      |> Type.Params.union_map (fun (_, e) -> free_params_expression e)
+      flds |> Type.Field.Map.values
+      |> Type.Params.union_map free_params_expression
   | Variant (_, e) ->
       Option.default_map Type.Params.empty free_params_expression e
   | Lambda abs -> free_params_abstraction abs

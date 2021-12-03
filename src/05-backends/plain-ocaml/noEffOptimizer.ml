@@ -195,7 +195,8 @@ and optimize_term' state (n_term : NoEff.n_term) =
       NMatch
         ( optimize_term state term,
           List.map (optimize_abstraction state) abs_list )
-  | NRecord ass -> NRecord (Assoc.map (fun t -> optimize_term state t) ass)
+  | NRecord ass ->
+      NRecord (Language.Type.Field.Map.map (fun t -> optimize_term state t) ass)
   | NVariant (l, opt_term) ->
       NVariant (l, Option.map (optimize_term state) opt_term)
 

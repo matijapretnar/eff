@@ -18,7 +18,7 @@ type ty =
   | TyArrow of ty * ty
 
 type tydef =
-  | TyDefRecord of (Type.Field.t, ty) Assoc.t
+  | TyDefRecord of ty Type.Field.Map.t
   | TyDefSum of (Type.Label.t, ty option) Assoc.t
   | TyDefInline of ty
 
@@ -28,7 +28,7 @@ type pattern =
   | PAnnotated of pattern * ty
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (field, pattern) Assoc.t
+  | PRecord of pattern Type.Field.Map.t
   | PVariant of label * pattern option
   | PConst of Const.t
   | PNonbinding
@@ -39,7 +39,7 @@ type term =
   | Const of Const.t
   | Annotated of term * ty
   | Tuple of term list
-  | Record of (field, term) Assoc.t
+  | Record of term Type.Field.Map.t
   | Variant of label * term option
   | Lambda of abstraction
   | Function of match_case list

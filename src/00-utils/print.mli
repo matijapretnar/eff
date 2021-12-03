@@ -92,7 +92,7 @@ val tuple :
 val record :
   ('f -> Format.formatter -> unit) ->
   ('v -> Format.formatter -> unit) ->
-  ('f, 'v) Assoc.t ->
+  ('f * 'v) list ->
   Format.formatter ->
   unit
 (** [record fpp vpp lst ppf] prints a record given by an associative list of elements

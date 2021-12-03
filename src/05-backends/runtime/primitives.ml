@@ -119,8 +119,8 @@ and compare_record lst1 lst2 =
     | [], _ :: _ -> Less
     | _ :: _, [] -> Greater
   in
-  let lst1' = Assoc.to_list lst1 in
-  let lst2' = Assoc.to_list lst2 in
+  let lst1' = Type.Field.Map.bindings lst1 in
+  let lst2' = Type.Field.Map.bindings lst2 in
   comp
     ( List.sort (fun (fld1, _) (fld2, _) -> Stdlib.compare fld1 fld2) lst1',
       List.sort (fun (fld1, _) (fld2, _) -> Stdlib.compare fld1 fld2) lst2' )

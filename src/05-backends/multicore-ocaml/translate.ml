@@ -16,7 +16,7 @@ and of_expression exp =
   | Term.Var v -> Var v.variable
   | Term.Const const -> Const const
   | Term.Tuple es -> Tuple (List.map of_expression es)
-  | Term.Record assoc -> Record (Assoc.map of_expression assoc)
+  | Term.Record assoc -> Record (Type.Field.Map.map of_expression assoc)
   | Term.Variant (lbl, e_opt) -> (
       match e_opt with
       | None -> Variant (lbl, None)
@@ -84,7 +84,7 @@ and of_pattern pat =
   | Term.PVar var -> PVar var
   | Term.PAs (p, var) -> PAs (of_pattern p, var)
   | Term.PTuple ps -> PTuple (List.map of_pattern ps)
-  | Term.PRecord assoc -> PRecord (Assoc.map of_pattern assoc)
+  | Term.PRecord assoc -> PRecord (Type.Field.Map.map of_pattern assoc)
   | Term.PVariant (lbl, p_opt) -> (
       match p_opt with
       | None -> PVariant (lbl, None)
@@ -107,7 +107,7 @@ and of_type ty =
 and of_dirty (ty, _) = of_type ty
 
 and of_tydef = function
-  | Type.Record assoc -> TyDefRecord (Assoc.map of_type assoc)
+  | Type.Record assoc -> TyDefRecord (Type.Field.Map.map of_type assoc)
   | Type.Sum assoc ->
       let converter = function None -> None | Some ty -> Some (of_type ty) in
       TyDefSum (Assoc.map converter assoc)

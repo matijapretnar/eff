@@ -17,7 +17,7 @@ and plain_pattern =
   | PAnnotated of pattern * Type.ty
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (field, pattern) Assoc.t
+  | PRecord of pattern Type.Field.Map.t
   | PVariant of label * pattern option
   | PConst of Const.t
   | PNonbinding
@@ -30,7 +30,7 @@ and plain_expression =
   | Const of Const.t
   | Annotated of expression * Type.ty
   | Tuple of expression list
-  | Record of (field, expression) Assoc.t
+  | Record of expression Type.Field.Map.t
   | Variant of label * expression option
   | Lambda of abstraction
   | Effect of effect
@@ -69,7 +69,10 @@ let rec print_pattern ?max_level p ppf =
   | PAnnotated (p, _ty) -> print_pattern ?max_level p ppf
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
-  | PRecord assoc -> Print.record Type.Field.print print_pattern assoc ppf
+  | PRecord assoc ->
+      Print.record Type.Field.print print_pattern
+        (Type.Field.Map.bindings assoc)
+        ppf
   | PVariant (lbl, None) when lbl = Type.nil -> print "[]"
   | PVariant (lbl, None) -> print "%t" (Type.Label.print lbl)
   | PVariant (lbl, Some { it = PTuple [ v1; v2 ]; _ }) when lbl = Type.cons ->
@@ -118,7 +121,10 @@ and print_expression ?max_level e ppf =
   | Const c -> print "%t" (Const.print c)
   | Annotated (t, _ty) -> print_expression ?max_level t ppf
   | Tuple lst -> Print.tuple print_expression lst ppf
-  | Record assoc -> Print.record Type.Field.print print_expression assoc ppf
+  | Record assoc ->
+      Print.record Type.Field.print print_expression
+        (Type.Field.Map.bindings assoc)
+        ppf
   | Variant (lbl, None) -> print "%t" (Type.Label.print lbl)
   | Variant (lbl, Some e) ->
       print ~at_level:1 "%t @[<hov>%t@]" (Type.Label.print lbl)

@@ -17,7 +17,7 @@ and plain_pattern =
   | PAnnotated of pattern * Type.ty
   | PAs of pattern * variable
   | PTuple of pattern list
-  | PRecord of (field, pattern) Assoc.t
+  | PRecord of pattern Type.Field.Map.t
   | PVariant of label * pattern option
   | PConst of Const.t
   | PNonbinding
@@ -30,7 +30,7 @@ and plain_expression =
   | Const of Const.t
   | Annotated of expression * Type.ty
   | Tuple of expression list
-  | Record of (field, expression) Assoc.t
+  | Record of expression Type.Field.Map.t
   | Variant of label * expression option
   | Lambda of abstraction
   | Effect of effect

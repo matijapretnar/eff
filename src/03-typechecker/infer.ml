@@ -263,13 +263,13 @@ and infer_pattern' state pat =
       let p', state', cnstrs = infer_pattern state p in
       (Term.PAs (p', x), p'.ty, extend_var state' x p'.ty, cnstrs)
   | Untyped.PRecord flds ->
-      let hd_fld, _ = List.hd (Assoc.to_list flds) in
+      let hd_fld, _ = List.hd (Type.Field.Map.bindings flds) in
       let out_ty, (ty_name, fld_tys) =
         TypeDefinitionContext.infer_field hd_fld state.tydefs
       in
-      let fold (fld, p) (flds', state, cnstrs) =
+      let fold fld p (flds', state, cnstrs) =
         let p', state', cnstrs' = infer_pattern state p in
-        match Assoc.lookup fld fld_tys with
+        match Type.Field.Map.find_opt fld fld_tys with
         | None ->
             Error.typing ~loc:pat.at "Field %t does not belong to type %t"
               (Type.Field.print fld)
@@ -279,8 +279,10 @@ and infer_pattern' state pat =
               state',
               (Constraint.TyEq (fld_ty, p'.ty) :: cnstrs') @ cnstrs )
       in
-      let flds', state', cnstrs' = Assoc.fold_right fold flds ([], state, []) in
-      (Term.PRecord (Assoc.of_list flds'), out_ty, state', cnstrs')
+      let flds', state', cnstrs' =
+        Type.Field.Map.fold fold flds ([], state, [])
+      in
+      (Term.PRecord (Type.Field.Map.of_bindings flds'), out_ty, state', cnstrs')
 
 let isLocatedVarPat (pat : Untyped.pattern) : bool =
   match pat.it with Untyped.PVar _ -> true | _other_pattern -> false
@@ -318,15 +320,15 @@ and tcTuple state (es : Untyped.expression list) : tcExprOutput' =
   ((Term.Tuple es, Type.tuple tys), cs)
 
 (* Records *)
-and tcRecord (state : state) (flds : (field, Untyped.expression) Assoc.t) :
+and tcRecord (state : state) (flds : Untyped.expression Type.Field.Map.t) :
     tcExprOutput' =
-  let hd_fld, _ = List.hd (Assoc.to_list flds) in
+  let hd_fld, _ = List.hd (Type.Field.Map.bindings flds) in
   let out_ty, (ty_name, fld_tys) =
     TypeDefinitionContext.infer_field hd_fld state.tydefs
   in
-  let fold (fld, e) (flds', cnstrs) =
+  let fold fld e (flds', cnstrs) =
     let e', cnstrs' = tcExpr state e in
-    match Assoc.lookup fld fld_tys with
+    match Type.Field.Map.find_opt fld fld_tys with
     | None ->
         Error.typing ~loc:e.at "Field %t does not belong to type %t"
           (Type.Field.print fld)
@@ -335,8 +337,8 @@ and tcRecord (state : state) (flds : (field, Untyped.expression) Assoc.t) :
         let e'', cons = Constraint.cast_expression e' fld_ty in
         ((fld, e'') :: flds', (cons :: cnstrs') @ cnstrs)
   in
-  let flds', cnstrs' = Assoc.fold_right fold flds ([], []) in
-  ((Term.Record (Assoc.of_list flds'), out_ty), cnstrs')
+  let flds', cnstrs' = Type.Field.Map.fold fold flds ([], []) in
+  ((Term.Record (Type.Field.Map.of_bindings flds'), out_ty), cnstrs')
 
 (* GEORGE: Planned TODO for the future I guess?? *)
 

@@ -32,12 +32,12 @@ let rec extend_value p v state =
   | Term.PNonbinding, _ -> state
   | Term.PTuple ps, V.Tuple vs -> List.fold_right2 extend_value ps vs state
   | Term.PRecord ps, V.Record vs -> (
-      let extender state (f, p) =
-        match Assoc.lookup f vs with
+      let extender f p state =
+        match Type.Field.Map.find_opt f vs with
         | None -> raise Not_found
         | Some v -> extend_value p v state
       in
-      try Assoc.fold_left extender state ps
+      try Type.Field.Map.fold extender ps state
       with Not_found -> raise (PatternMatch Location.unknown))
   | Term.PVariant (lbl, None), V.Variant (lbl', None) when lbl = lbl' -> state
   | Term.PVariant (lbl, Some p), V.Variant (lbl', Some v) when lbl = lbl' ->
@@ -124,7 +124,7 @@ and veval state e =
   | Term.Const c -> V.Const c
   (* | Term.Annotated (t, _ty) -> veval state t *)
   | Term.Tuple es -> V.Tuple (List.map (veval state) es)
-  | Term.Record es -> V.Record (Assoc.map (fun e -> veval state e) es)
+  | Term.Record es -> V.Record (Type.Field.Map.map (fun e -> veval state e) es)
   | Term.Variant (lbl, e) -> V.Variant (lbl, Option.map (veval state) e)
   | Term.Lambda a -> V.Closure (eval_closure state a.term)
   | Term.Handler h -> V.Handler (eval_handler state h)

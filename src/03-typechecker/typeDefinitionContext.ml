@@ -67,7 +67,7 @@ let find_variant lbl st =
 let find_field fld (st : state) =
   let construct = function
     | ty_name, { params; type_def = Record flds } -> (
-        match Assoc.lookup fld flds with
+        match Type.Field.Map.find_opt fld flds with
         | Some _ -> Some (ty_name, params, flds)
         | None -> None)
     | _ -> None
@@ -104,7 +104,9 @@ let infer_field fld st =
   | Some (ty_name, ps, us) ->
       let ps', fresh_subst = Substitution.of_parameters ps in
       let us' =
-        Assoc.map (Substitution.apply_substitutions_to_type fresh_subst) us
+        Type.Field.Map.map
+          (Substitution.apply_substitutions_to_type fresh_subst)
+          us
       in
       (apply_to_params ty_name ps', (ty_name, us'))
 
@@ -187,14 +189,14 @@ let transparent ~loc ty_name st =
 *)
 let check_shadowing ~loc st = function
   | Record lst ->
-      let shadow_check_fld (f, _) =
+      let shadow_check_fld f _ =
         match find_field f st with
         | Some (u, _, _) ->
             Error.typing ~loc "Record field label %t is already used in type %t"
               (Type.Field.print f) (Type.TyName.print u)
         | None -> ()
       in
-      Assoc.iter shadow_check_fld lst
+      Type.Field.Map.iter shadow_check_fld lst
   | Sum lst ->
       let shadow_check_sum (lbl, _) =
         match find_variant lbl st with

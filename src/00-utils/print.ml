@@ -37,8 +37,7 @@ let tuple pp lst ppf =
   | [] -> print ppf "()"
   | lst -> print ppf "(@[<hov>%t@])" (sequence ", " pp lst)
 
-let record fpp vpp assoc ppf =
-  let lst = Assoc.to_list assoc in
+let record fpp vpp lst ppf =
   print ppf "{@[<hov>%t@]}" (sequence "; " (field fpp vpp) lst)
 
 let debug_stack = ref []

@@ -143,7 +143,7 @@ and optimize_expression' state exp =
   | Term.Var _ | Term.Const _ -> exp
   | Term.Tuple exps -> Term.tuple (List.map (optimize_expression state) exps)
   | Term.Record flds ->
-      Term.record exp.ty (Assoc.map (optimize_expression state) flds)
+      Term.record exp.ty (Type.Field.Map.map (optimize_expression state) flds)
   | Term.Variant (lbl, arg) ->
       Term.variant (lbl, Option.map (optimize_expression state) arg) exp.ty
   | Term.Lambda abs -> Term.lambda (optimize_abstraction state abs)

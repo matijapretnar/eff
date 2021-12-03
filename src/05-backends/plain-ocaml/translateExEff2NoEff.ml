@@ -245,7 +245,8 @@ let rec elab_pattern state p =
   | PAs (p, x) -> PNAs (elab_pattern state p, x)
   | PTuple ps -> PNTuple (List.map (elab_pattern state) ps)
   | PConst c -> PNConst c
-  | PRecord recs -> NoEff.PNRecord (Assoc.map (elab_pattern state) recs)
+  | PRecord recs ->
+      NoEff.PNRecord (Type.Field.Map.map (elab_pattern state) recs)
   | PVariant (l, None) -> NoEff.PNVariant (l, None)
   | PVariant (l, Some p) -> NoEff.PNVariant (l, Some (elab_pattern state p))
   | PNonbinding -> PNNonbinding
@@ -414,7 +415,7 @@ and elab_rec_definitions state defs =
   Assoc.kmap (fun (x, abs) -> (x, elab_abstraction state abs)) defs
 
 let elab_tydef = function
-  | Type.Record assoc -> NoEff.TyDefRecord (Assoc.map elab_ty assoc)
+  | Type.Record assoc -> NoEff.TyDefRecord (Type.Field.Map.map elab_ty assoc)
   | Sum assoc ->
       let converter = function None -> None | Some ty -> Some (elab_ty ty) in
       NoEff.TyDefSum (Assoc.map converter assoc)

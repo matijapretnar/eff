@@ -38,7 +38,7 @@ type n_pattern =
   | PNVar of variable
   | PNAs of n_pattern * variable
   | PNTuple of n_pattern list
-  | PNRecord of (Type.Field.t, n_pattern) Assoc.t
+  | PNRecord of n_pattern Type.Field.Map.t
   | PNVariant of Type.Label.t * n_pattern option
   | PNConst of Const.t
   | PNNonbinding
@@ -47,9 +47,9 @@ let rec pattern_vars pat =
   match pat with
   | PNVar x -> [ x ]
   | PNAs (p, x) -> x :: pattern_vars p
-  | PNTuple lst -> List.fold_left (fun vs p -> vs @ pattern_vars p) [] lst
+  | PNTuple lst -> List.flatten (List.map pattern_vars lst)
   | PNRecord lst ->
-      Assoc.fold_left (fun vs (_, p) -> vs @ pattern_vars p) [] lst
+      List.flatten (List.map pattern_vars (Type.Field.Map.values lst))
   | PNVariant (_, None) -> []
   | PNVariant (_, Some p) -> pattern_vars p
   | PNConst _ -> []
@@ -70,7 +70,7 @@ type n_term =
   | NConst of Const.t
   | NLetRec of n_rec_definitions * n_term
   | NMatch of n_term * n_abstraction list
-  | NRecord of (Type.Field.t, n_term) Assoc.t
+  | NRecord of n_term Type.Field.Map.t
   | NVariant of Type.Label.t * n_term option
   | NDirectPrimitive of Language.Primitives.primitive_value
 
@@ -91,7 +91,7 @@ type n_top_rec_definitions =
   (variable, Type.TyCoercionParam.t list * n_abstraction) Assoc.t
 
 type n_tydef =
-  | TyDefRecord of (Type.Field.t, n_type) Assoc.t
+  | TyDefRecord of n_type Type.Field.Map.t
   | TyDefSum of (Type.Label.t, n_type option) Assoc.t
   | TyDefInline of n_type
 
@@ -129,7 +129,7 @@ let rec subs_var_in_term par subs term =
   | NMatch (t, abss) ->
       NMatch
         (subs_var_in_term par subs t, List.map (subs_var_in_abs par subs) abss)
-  | NRecord a -> NRecord (Assoc.map (subs_var_in_term par subs) a)
+  | NRecord a -> NRecord (Type.Field.Map.map (subs_var_in_term par subs) a)
   | NVariant (lbl, None) -> NVariant (lbl, None)
   | NVariant (lbl, Some t) -> NVariant (lbl, Some (subs_var_in_term par subs t))
   | NDirectPrimitive _ as t -> t
@@ -165,7 +165,10 @@ let pattern_match p e =
               let e = List.assoc f es in
               extend_record ps es (extend_subst p e sbst)
         in
-        extend_record (Assoc.to_list ps) (Assoc.to_list es) (Some sbst)
+        extend_record
+          (Type.Field.Map.bindings ps)
+          (Type.Field.Map.bindings es)
+          (Some sbst)
     | PNVariant (lbl, None), NVariant (lbl', None) when lbl = lbl' -> Some sbst
     | PNVariant (lbl, Some p), NVariant (lbl', Some e) when lbl = lbl' ->
         extend_subst p e sbst
@@ -207,7 +210,7 @@ let rec substitute_term sbst n_term =
   | NMatch (t, abs) ->
       NMatch
         ((substitute_term sbst) t, List.map (substitute_abstraction sbst) abs)
-  | NRecord recs -> NRecord (Assoc.map (substitute_term sbst) recs)
+  | NRecord recs -> NRecord (Type.Field.Map.map (substitute_term sbst) recs)
   | NVariant (lbl, a) -> NVariant (lbl, Option.map (substitute_term sbst) a)
   | NDirectPrimitive _ as t -> t
 
@@ -263,7 +266,7 @@ let rec free_vars = function
       in
       vars --- xs
   | NMatch (e, l) -> free_vars e @@@ concat_vars (List.map free_vars_abs l)
-  | NRecord r -> Assoc.values_of r |> List.map free_vars |> concat_vars
+  | NRecord r -> Type.Field.Map.values r |> List.map free_vars |> concat_vars
   | NVariant (_, e) -> Option.default_map Variable.Map.empty free_vars e
 
 and free_vars_handler h =
@@ -332,7 +335,10 @@ let rec print_pattern ?max_level p ppf =
   | PNAs (_pat, var) ->
       print "As %t = %t" (print_variable var) (print_pattern p)
   | PNTuple ps -> Print.tuple print_pattern ps ppf
-  | PNRecord recs -> Print.record Type.Field.print print_pattern recs ppf
+  | PNRecord recs ->
+      Print.record Type.Field.print print_pattern
+        (Type.Field.Map.bindings recs)
+        ppf
   | PNVariant (l, Some t) ->
       print "Variant %t %t" (Type.Label.print l) (print_pattern t)
   | PNVariant (l, None) -> print "Variant %t" (Type.Label.print l)
@@ -382,7 +388,10 @@ let rec print_term ?max_level t ppf =
   | NMatch (t, lst) ->
       print ~at_level:2 "(match %t with @[<v>| %t@])" (print_term t)
         (Print.sequence "@, | " print_abstraction lst)
-  | NRecord recs -> Print.record Type.Field.print print_term recs ppf
+  | NRecord recs ->
+      Print.record Type.Field.print print_term
+        (Type.Field.Map.bindings recs)
+        ppf
   | NVariant (l, Some t) ->
       print "Variant %t %t" (Type.Label.print l) (print_term t)
   | NVariant (l, None) -> print "Variant %t" (Type.Label.print l)

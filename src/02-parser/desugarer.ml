@@ -151,6 +151,7 @@ let desugar_tydef state params ty_name def =
           (st'', (f', t'))
         in
         let state', flds' = Assoc.kfold_map field_desugar state flds in
+        let flds' = Type.Field.Map.of_bindings (Assoc.to_list flds') in
         (state', Type.Record flds')
     | Sugared.TySum assoc ->
         let aux_desug st (lbl, cons) =
@@ -276,6 +277,7 @@ let desugar_pattern state ?(initial_forbidden = []) p =
             (st'', (f', p'))
           in
           let state', flds' = Assoc.kfold_map field_desugar state flds in
+          let flds' = flds' |> Assoc.to_list |> Type.Field.Map.of_bindings in
           (state', Untyped.PRecord flds')
       | Sugared.PVariant (lbl, p) -> (
           match Assoc.lookup lbl state.constructors with
@@ -521,13 +523,13 @@ and desugar_expressions state = function
       (state'', w @ ws, e :: es)
 
 and desugar_record_fields state flds =
-  match Assoc.pop flds with
-  | None -> (state, [], Assoc.empty)
-  | Some ((fld, t), flds') ->
-      let state', fld' = field_to_symbol state fld in
+  Assoc.fold_right
+    (fun (fld, t) (st, ws, mp) ->
+      let state', fld' = field_to_symbol st fld in
       let state'', w, e = desugar_expression state' t in
-      let state''', ws, es = desugar_record_fields state'' flds' in
-      (state''', w @ ws, Assoc.update fld' e es)
+      (state'', w @ ws, Type.Field.Map.add fld' e mp))
+    flds
+    (state, [], Type.Field.Map.empty)
 
 and desugar_handler loc state
     {

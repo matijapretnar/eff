@@ -324,7 +324,7 @@ and free_params_dirt (dirt : dirt) =
   | EmptyRow -> Params.empty
 
 type tydef =
-  | Record of (Field.t, ty) Assoc.t
+  | Record of ty Field.Map.t
   | Sum of (Label.t, ty option) Assoc.t
   | Inline of ty
 

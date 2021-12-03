@@ -13,14 +13,12 @@ val transparent : loc:Location.t -> Type.TyName.t -> state -> bool
 val infer_variant : Type.Label.t -> state -> Type.ty option * Type.ty
 
 val infer_field :
-  Type.Label.t ->
-  state ->
-  Type.ty * (Type.TyName.t * (Type.Field.t, Type.ty) Assoc.t)
+  Type.Label.t -> state -> Type.ty * (Type.TyName.t * Type.ty Type.Field.Map.t)
 
 val find_field :
   Type.Field.t ->
   state ->
-  (Type.TyName.t * Type.Params.t * (Type.Field.t, Type.ty) Assoc.t) option
+  (Type.TyName.t * Type.Params.t * Type.ty Type.Field.Map.t) option
 
 val find_variant :
   Type.Label.t ->

@@ -47,14 +47,14 @@ let rec cons_of_pattern tctx { it = p; at = loc } =
   | Untyped.PAnnotated (p, _) -> cons_of_pattern tctx p
   | Untyped.PTuple lst -> Tuple (List.length lst)
   | Untyped.PRecord flds -> (
-      match Assoc.pop flds with
+      match Type.Field.Map.choose_opt flds with
       | None -> assert false
-      | Some ((lbl, _), _) -> (
+      | Some (lbl, _) -> (
           match TypeDefinitionContext.find_field lbl tctx with
           | None ->
               Error.typing ~loc "Unbound record field label %t in a pattern"
                 (Type.Field.print lbl)
-          | Some (_, _, flds) -> Record (Assoc.keys_of flds)))
+          | Some (_, _, flds) -> Record (Type.Field.Map.keys flds)))
   | Untyped.PVariant (lbl, opt) -> Variant (lbl, opt <> None)
   | Untyped.PConst c -> Const c
   | Untyped.PVar _ | Untyped.PNonbinding -> Wildcard
@@ -65,7 +65,8 @@ let pattern_of_cons ~loc c lst =
   let plain =
     match c with
     | Tuple _n -> Untyped.PTuple lst
-    | Record flds -> Untyped.PRecord (Assoc.of_list (List.combine flds lst))
+    | Record flds ->
+        Untyped.PRecord (Type.Field.Map.of_bindings (List.combine flds lst))
     | Const const -> Untyped.PConst const
     | Variant (lbl, opt) ->
         Untyped.PVariant (lbl, if opt then Some (List.hd lst) else None)
@@ -137,7 +138,7 @@ let specialize_vector ~loc con = function
       | Tuple _, Untyped.PTuple l -> Some (l @ lst)
       | Record all, Untyped.PRecord def ->
           let get_pattern defs lbl =
-            match Assoc.lookup lbl defs with
+            match Type.Field.Map.find_opt lbl defs with
             | Some p' -> p'
             | None -> { it = Untyped.PNonbinding; at = loc }
           in
@@ -300,7 +301,7 @@ and check_expression tctx { it = e; _ } =
   | Untyped.Annotated (e, _) -> check_expression tctx e
   | Untyped.Tuple es -> List.iter (check_expression tctx) es
   | Untyped.Record flds ->
-      Assoc.iter (fun (_, e) -> check_expression tctx e) flds
+      Type.Field.Map.iter (fun _ e -> check_expression tctx e) flds
   | Untyped.Variant (_, e) -> Option.iter (check_expression tctx) e
   | Untyped.Lambda a -> check_abstraction tctx a
   | Untyped.Handler

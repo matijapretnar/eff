@@ -4,7 +4,7 @@ open Language
 type value =
   | Const of Const.t
   | Tuple of value list
-  | Record of (Type.Field.t, value) Assoc.t
+  | Record of value Type.Field.Map.t
   | Variant of Type.Label.t * value option
   | Closure of closure
   | TypeCoercionClosure of (Type.ct_ty -> value)
@@ -49,7 +49,10 @@ let rec print_value ?max_level v ppf =
       match v with
       | Const c -> Const.print c ppf
       | Tuple lst -> Print.tuple print_value lst ppf
-      | Record assoc -> Print.record Type.Field.print print_value assoc ppf
+      | Record assoc ->
+          Print.record Type.Field.print print_value
+            (Type.Field.Map.bindings assoc)
+            ppf
       | Variant (lbl, None) -> print ~at_level:1 "%t" (Type.Label.print lbl)
       | Variant (lbl, Some v) ->
           print ~at_level:1 "%t @[<hov>%t@]" (Type.Label.print lbl)
