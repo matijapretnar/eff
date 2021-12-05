@@ -427,6 +427,8 @@ let elab_top_rec_definitions state defs =
   Assoc.kmap
     (fun (x, (_params, cnstrs, abs)) ->
       ( x,
-        ( List.map (fun (w, _, _, _) -> w) cnstrs.Type.Constraints.ty_constraints,
+        ( Type.TyConstraints.fold
+            (fun _ _ _ w lst -> w :: lst)
+            cnstrs.Type.Constraints.ty_constraints [],
           elab_abstraction state abs ) ))
     defs

@@ -342,43 +342,109 @@ and print_abs_ty (ty1, drty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t → %t" (print_ty ty1) (print_dirty drty2)
 
+module TyParamVertex = struct
+  type t = TyCoercionParam.t TyParam.Map.t
+
+  let empty = TyParam.Map.empty
+
+  let is_empty = TyParam.Map.is_empty
+
+  let get_edge t (ty_vertex : t) = TyParam.Map.find_opt t ty_vertex
+
+  let add_edge t w (ty_vertex : t) : t = TyParam.Map.add t w ty_vertex
+
+  let fold f s t (t_vertex : t) acc = TyParam.Map.fold (f s t) t_vertex acc
+
+  let free_params s ty_vertex =
+    TyParam.Map.bindings ty_vertex
+    |> Params.union_map (fun (t, _w) -> Params.ty_singleton t (SkelParam s))
+end
+
+module SkelParamGraph = struct
+  type t = TyParamVertex.t TyParam.Map.t
+
+  let empty = TyParam.Map.empty
+
+  let is_empty = TyParam.Map.for_all (fun _ -> TyParamVertex.is_empty)
+
+  let get_ty_vertex t (ty_graph : t) =
+    TyParam.Map.find_opt t ty_graph |> Option.value ~default:TyParamVertex.empty
+
+  let add_edge t1 t2 w (ty_graph : t) : t =
+    let t1_vertex' = get_ty_vertex t1 ty_graph |> TyParamVertex.add_edge t2 w in
+    TyParam.Map.add t1 t1_vertex' ty_graph
+
+  let fold f s (ty_graph : t) acc =
+    TyParam.Map.fold (TyParamVertex.fold f s) ty_graph acc
+
+  let free_params s (s_graph : t) =
+    TyParam.Map.bindings s_graph
+    |> Params.union_map (fun (t, t_vertex) ->
+           Params.union
+             (Params.ty_singleton t (SkelParam s))
+             (TyParamVertex.free_params s t_vertex))
+end
+
+module TyConstraints = struct
+  type t = SkelParamGraph.t SkelParam.Map.t
+
+  let empty = SkelParam.Map.empty
+
+  let is_empty = SkelParam.Map.for_all (fun _ -> SkelParamGraph.is_empty)
+
+  let get_ty_graph (ty_constraints : t) s =
+    SkelParam.Map.find_opt s ty_constraints
+    |> Option.value ~default:SkelParamGraph.empty
+
+  let add_edge s t1 t2 w (ty_constraints : t) : t =
+    let s_graph' =
+      get_ty_graph ty_constraints s |> SkelParamGraph.add_edge t1 t2 w
+    in
+    SkelParam.Map.add s s_graph' ty_constraints
+
+  let fold f (ty_constraints : t) acc =
+    SkelParam.Map.fold (SkelParamGraph.fold f) ty_constraints acc
+
+  let free_params (ty_constraints : t) =
+    fold
+      (fun s t1 t2 _w params ->
+        let skel = SkelParam s in
+        Params.union
+          (Params.union (Params.skel_singleton s)
+             (Params.union
+                (Params.ty_singleton t1 skel)
+                (Params.ty_singleton t2 skel)))
+          params)
+      ty_constraints Params.empty
+end
+
 module Constraints = struct
   type t = {
-    ty_constraints :
-      (TyCoercionParam.t * TyParam.t * TyParam.t * SkelParam.t) list;
+    ty_constraints : TyConstraints.t;
     dirt_constraints : (DirtCoercionParam.t * ct_dirt) list;
   }
 
-  let empty = { ty_constraints = []; dirt_constraints = [] }
+  let empty = { ty_constraints = TyConstraints.empty; dirt_constraints = [] }
 
-  let is_empty cnstrs =
-    cnstrs.ty_constraints = [] && cnstrs.dirt_constraints = []
+  let is_empty constraints =
+    TyConstraints.is_empty constraints.ty_constraints
+    && constraints.dirt_constraints = []
 
-  let add_ty_constraint resolved omega ty1 ty2 skel =
+  let add_ty_constraint s t1 t2 w constraints =
     {
-      resolved with
-      ty_constraints = (omega, ty1, ty2, skel) :: resolved.ty_constraints;
+      constraints with
+      ty_constraints =
+        TyConstraints.add_edge s t1 t2 w constraints.ty_constraints;
     }
 
-  let add_dirt_constraint resolved omega ct =
+  let add_dirt_constraint constraints omega ct =
     {
-      resolved with
-      dirt_constraints = (omega, ct) :: resolved.dirt_constraints;
+      constraints with
+      dirt_constraints = (omega, ct) :: constraints.dirt_constraints;
     }
 
   let free_params res =
-    let free_params_ty =
-      Params.union_map
-        (fun (_, ty1, ty2, skel) ->
-          Params.union
-            {
-              Params.empty with
-              ty_params =
-                TyParam.Map.of_bindings
-                  [ (ty1, SkelParam skel); (ty2, SkelParam skel) ];
-            }
-            (Params.skel_singleton skel))
-        res.ty_constraints
+    let free_params_ty = TyConstraints.free_params res.ty_constraints
     and free_params_dirt =
       Params.union_map
         (fun (_, dt) -> free_params_ct_dirt dt)
@@ -391,13 +457,14 @@ module Constraints = struct
       Print.print ppf "%t: (%t ≤ %t)"
         (DirtCoercionParam.print p)
         (print_dirt ty1) (print_dirt ty2)
-    and print_ty_constraint (p, ty1, ty2, s) ppf =
-      Print.print ppf "%t: (%t ≤ %t) : %t" (TyCoercionParam.print p)
-        (TyParam.print ty1) (TyParam.print ty2) (SkelParam.print s)
+      (* and print_ty_constraint (p, ty1, ty2, s) ppf =
+         Print.print ppf "%t: (%t ≤ %t) : %t" (TyCoercionParam.print p)
+           (TyParam.print ty1) (TyParam.print ty2) (SkelParam.print s) *)
     in
-    Print.print ppf "{ %t / %t }"
+    Print.print ppf "{ %t }"
       (Print.sequence ";" print_dirt_constraint c.dirt_constraints)
-      (Print.sequence ";" print_ty_constraint c.ty_constraints)
+
+  (* (Print.sequence ";" print_ty_constraint c.ty_constraints) *)
 end
 
 let type_const c = tyBasic (Const.infer_ty c)

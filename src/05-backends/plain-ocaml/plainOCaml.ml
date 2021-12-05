@@ -87,9 +87,9 @@ module Backend : Language.Backend = struct
       Assoc.kmap
         (fun (x, (_params, cnstrs, e)) ->
           ( x,
-            ( List.map
-                (fun (w, _, _, _) -> w)
-                cnstrs.Type.Constraints.ty_constraints,
+            ( Type.TyConstraints.fold
+                (fun _ _ _ w lst -> w :: lst)
+                cnstrs.Type.Constraints.ty_constraints [],
               optimize_term state
               @@ TranslateExEff2NoEff.elab_expression translate_exeff_config e
             ) ))

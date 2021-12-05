@@ -137,12 +137,12 @@ let apply_sub subs cons =
 let return_to_unresolved (resolved : Type.Constraints.t) queue =
   queue
   |> List.fold_right add_dirt_inequality resolved.dirt_constraints
-  |> List.fold_right
-       (fun (omega, a, b, skel) ->
+  |> Type.TyConstraints.fold
+       (fun s t1 t2 w ->
          add_ty_inequality
-           ( omega,
-             ( Type.tyParam a (Type.SkelParam skel),
-               Type.tyParam b (Type.SkelParam skel) ) ))
+           ( w,
+             ( Type.tyParam t1 (Type.SkelParam s),
+               Type.tyParam t2 (Type.SkelParam s) ) ))
        resolved.ty_constraints
 
 let unresolve resolved = return_to_unresolved resolved empty

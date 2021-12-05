@@ -3,7 +3,7 @@ open Language
 open Type
 
 let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
-  let substitute_ty_constraint (w, t1, t2, s) (paused, queue) =
+  let substitute_ty_constraint s t1 t2 w (paused, queue) =
     let skel = Type.SkelParam s in
     let ty1 = Type.tyParam t1 skel and ty2 = Type.tyParam t2 skel in
     let ty1', ty2' =
@@ -11,7 +11,7 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
         Substitution.apply_substitutions_to_type new_sub ty2 )
     in
     if Type.equal_ty ty1 ty1' && Type.equal_ty ty2 ty2' then
-      (Type.Constraints.add_ty_constraint paused w t1 t2 s, queue)
+      (Type.Constraints.add_ty_constraint s t1 t2 w paused, queue)
     else (paused, Constraint.add_ty_inequality (w, (ty1', ty2')) queue)
   and substitute_dirt_constraint (w, (drt1, drt2)) (paused, queue) =
     let drt1', drt2' =
@@ -25,7 +25,7 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
   let sub' = Substitution.merge new_sub sub in
   let paused', queue' =
     (Type.Constraints.empty, Constraint.apply_sub new_sub queue)
-    |> List.fold_right substitute_ty_constraint paused.ty_constraints
+    |> Type.TyConstraints.fold substitute_ty_constraint paused.ty_constraints
     |> List.fold_right substitute_dirt_constraint paused.dirt_constraints
   in
   (sub', paused', queue')
@@ -229,11 +229,11 @@ and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
         paused,
         Constraint.list_union [ dirty_cons1; dirty_cons2; rest_queue ] )
   (* ω : α <= A /  ω : A <= α *)
-  | ( { term = Type.TyParam p1; ty = SkelParam s1 },
-      { term = Type.TyParam p2; ty = SkelParam s2 } )
+  | ( { term = Type.TyParam t1; ty = SkelParam s1 },
+      { term = Type.TyParam t2; ty = SkelParam s2 } )
     when s1 = s2 ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
-      (sub, Type.Constraints.add_ty_constraint paused omega p1 p2 s1, rest_queue)
+      (sub, Type.Constraints.add_ty_constraint s1 t1 t2 omega paused, rest_queue)
   | { term = Type.TyParam _; ty = SkelParam _ as skel_tv }, a
   | a, { term = Type.TyParam _; ty = SkelParam _ as skel_tv } ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
