@@ -17,6 +17,8 @@ module Make (Vertex : Symbol.S) = struct
 
   let empty = Vertex.Map.empty
 
+  let is_empty = Vertex.Map.is_empty
+
   let get_edges t graph =
     Vertex.Map.find_opt t graph |> Option.value ~default:Edges.empty
 

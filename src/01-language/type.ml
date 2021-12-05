@@ -130,6 +130,9 @@ and abs_ty = ty * dirty
 
 and row = ParamRow of DirtParam.t | EmptyRow
 
+let no_effect_dirt dirt_param =
+  { effect_set = Effect.Set.empty; row = ParamRow dirt_param }
+
 let is_empty_dirt dirt =
   Effect.Set.is_empty dirt.effect_set && dirt.row = EmptyRow
 
@@ -342,6 +345,40 @@ and print_abs_ty (ty1, drty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t → %t" (print_ty ty1) (print_dirty drty2)
 
+module DirtConstraints = struct
+  module DirtParamGraph = Graph.Make (DirtParam)
+
+  type t = (DirtCoercionParam.t * Effect.Set.t) DirtParamGraph.t
+
+  let empty = DirtParamGraph.empty
+
+  (* Since we only add and never remove type constraints, the set of constraints
+     is empty if and only iff there are no skeleton graphs in it *)
+  let is_empty = DirtParamGraph.is_empty
+
+  let add_edge d1 d2 w effs dirt_constraints : t =
+    DirtParamGraph.add_edge d1 d2 (w, effs) dirt_constraints
+
+  let fold f (dirt_constraints : t) acc =
+    DirtParamGraph.fold
+      (fun d1 d2 (w, effs) -> f d1 d2 w effs)
+      dirt_constraints acc
+
+  let fold_expanded f =
+    fold (fun d1 d2 w effs ->
+        let drt1 = no_effect_dirt d1
+        and drt2 = { effect_set = effs; row = ParamRow d2 } in
+        f d1 d2 w effs drt1 drt2)
+
+  let free_params (dirt_constraints : t) =
+    fold
+      (fun d1 d2 _w _effs params ->
+        Params.union
+          (Params.union (Params.dirt_singleton d1) (Params.dirt_singleton d2))
+          params)
+      dirt_constraints Params.empty
+end
+
 module TyConstraints = struct
   module TyParamGraph = Graph.Make (TyParam)
 
@@ -388,14 +425,18 @@ end
 module Constraints = struct
   type t = {
     ty_constraints : TyConstraints.t;
-    dirt_constraints : (DirtCoercionParam.t * ct_dirt) list;
+    dirt_constraints : DirtConstraints.t;
   }
 
-  let empty = { ty_constraints = TyConstraints.empty; dirt_constraints = [] }
+  let empty =
+    {
+      ty_constraints = TyConstraints.empty;
+      dirt_constraints = DirtConstraints.empty;
+    }
 
   let is_empty constraints =
     TyConstraints.is_empty constraints.ty_constraints
-    && constraints.dirt_constraints = []
+    && DirtConstraints.is_empty constraints.dirt_constraints
 
   let add_ty_constraint s t1 t2 w constraints =
     {
@@ -404,32 +445,32 @@ module Constraints = struct
         TyConstraints.add_edge s t1 t2 w constraints.ty_constraints;
     }
 
-  let add_dirt_constraint constraints omega ct =
+  let add_dirt_constraint constraints d1 d2 w effs =
     {
       constraints with
-      dirt_constraints = (omega, ct) :: constraints.dirt_constraints;
+      dirt_constraints =
+        DirtConstraints.add_edge d1 d2 w effs constraints.dirt_constraints;
     }
 
-  let free_params res =
-    let free_params_ty = TyConstraints.free_params res.ty_constraints
+  let free_params constraints =
+    let free_params_ty = TyConstraints.free_params constraints.ty_constraints
     and free_params_dirt =
-      Params.union_map
-        (fun (_, dt) -> free_params_ct_dirt dt)
-        res.dirt_constraints
+      DirtConstraints.free_params constraints.dirt_constraints
     in
     Params.union free_params_ty free_params_dirt
 
-  let print c ppf =
-    let print_dirt_constraint (p, (ty1, ty2)) ppf =
-      Print.print ppf "%t: (%t ≤ %t)"
-        (DirtCoercionParam.print p)
-        (print_dirt ty1) (print_dirt ty2)
-      (* and print_ty_constraint (p, ty1, ty2, s) ppf =
-         Print.print ppf "%t: (%t ≤ %t) : %t" (TyCoercionParam.print p)
-           (TyParam.print ty1) (TyParam.print ty2) (SkelParam.print s) *)
-    in
-    Print.print ppf "{ %t }"
-      (Print.sequence ";" print_dirt_constraint c.dirt_constraints)
+  let print _c ppf =
+    (* let print_dirt_constraint (p, (ty1, ty2)) ppf =
+       Print.print ppf "%t: (%t ≤ %t)"
+         (DirtCoercionParam.print p)
+         (print_dirt ty1) (print_dirt ty2) *)
+    (* and print_ty_constraint (p, ty1, ty2, s) ppf =
+       Print.print ppf "%t: (%t ≤ %t) : %t" (TyCoercionParam.print p)
+         (TyParam.print ty1) (TyParam.print ty2) (SkelParam.print s) *)
+    (* in *)
+    Print.print ppf "{ }"
+
+  (* (Print.sequence ";" print_dirt_constraint c.dirt_constraints) *)
 
   (* (Print.sequence ";" print_ty_constraint c.ty_constraints) *)
 end
@@ -484,9 +525,6 @@ and equal_dirty (ty1, d1) (ty2, d2) = equal_ty ty1 ty2 && equal_dirt d1 d2
 
 and equal_dirt d1 d2 =
   Effect.Set.equal d1.effect_set d2.effect_set && d1.row = d2.row
-
-let no_effect_dirt dirt_param =
-  { effect_set = Effect.Set.empty; row = ParamRow dirt_param }
 
 let fresh_dirt () = no_effect_dirt (DirtParam.fresh ())
 

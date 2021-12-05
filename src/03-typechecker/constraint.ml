@@ -136,7 +136,9 @@ let apply_sub subs cons =
 
 let return_to_unresolved (resolved : Type.Constraints.t) queue =
   queue
-  |> List.fold_right add_dirt_inequality resolved.dirt_constraints
+  |> Type.DirtConstraints.fold_expanded
+       (fun _ _ w _ drt1 drt2 -> add_dirt_inequality (w, (drt1, drt2)))
+       resolved.dirt_constraints
   |> Type.TyConstraints.fold_expanded
        (fun _s _t1 _t2 w ty1 ty2 -> add_ty_inequality (w, (ty1, ty2)))
        resolved.ty_constraints

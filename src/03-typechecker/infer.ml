@@ -21,9 +21,11 @@ let identity_instantiation (params : Type.Params.t)
         |> List.map (fun (p, skel) -> (p, Type.tyParam p skel))
         |> Type.TyParam.Map.of_bindings;
       dirt_var_to_dirt_coercions =
-        constraints.dirt_constraints
-        |> List.map (fun (w, dt) -> (w, Coercion.dirtCoercionVar w dt))
-        |> Type.DirtCoercionParam.Map.of_bindings;
+        Type.DirtConstraints.fold_expanded
+          (fun _d1 _d2 w _effs drt1 drt2 ->
+            Type.DirtCoercionParam.Map.add w
+              (Coercion.dirtCoercionVar w (drt1, drt2)))
+          constraints.dirt_constraints Type.DirtCoercionParam.Map.empty;
       dirt_var_to_dirt_subs =
         params.dirt_params |> Type.DirtParam.Set.elements
         |> List.map (fun d -> (d, Type.no_effect_dirt d))
@@ -51,22 +53,17 @@ module TypingEnv = struct
                ( Substitution.apply_substitutions_to_type subst ty1,
                  Substitution.apply_substitutions_to_type subst ty2 )))
         constraints.ty_constraints Type.TyCoercionParam.Map.empty
-    and dirt_coercions =
-      List.map
-        (fun (p, dt) ->
-          ( p,
-            Coercion.dirtCoercionVar
-              (Type.DirtCoercionParam.refresh p)
-              (Substitution.apply_sub_ct_dirt subst dt) ))
-        constraints.dirt_constraints
+    and dirt_var_to_dirt_coercions =
+      Type.DirtConstraints.fold_expanded
+        (fun _d1 _d2 w _effs drt1 drt2 ->
+          Type.DirtCoercionParam.Map.add w
+            (Coercion.dirtCoercionVar
+               (Type.DirtCoercionParam.refresh w)
+               (Substitution.apply_sub_ct_dirt subst (drt1, drt2))))
+        constraints.dirt_constraints Type.DirtCoercionParam.Map.empty
     in
     Substitution.
-      {
-        subst with
-        type_param_to_type_coercions;
-        dirt_var_to_dirt_coercions =
-          dirt_coercions |> Type.DirtCoercionParam.Map.of_bindings;
-      }
+      { subst with type_param_to_type_coercions; dirt_var_to_dirt_coercions }
 
   let lookup ctx x : Term.expression * Constraint.t =
     match Assoc.lookup x ctx with

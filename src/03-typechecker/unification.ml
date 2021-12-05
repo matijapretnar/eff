@@ -11,13 +11,13 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
     if Type.equal_ty ty1 ty1' && Type.equal_ty ty2 ty2' then
       (Type.Constraints.add_ty_constraint s t1 t2 w paused, queue)
     else (paused, Constraint.add_ty_inequality (w, (ty1', ty2')) queue)
-  and substitute_dirt_constraint (w, (drt1, drt2)) (paused, queue) =
+  and substitute_dirt_constraint d1 d2 w effs drt1 drt2 (paused, queue) =
     let drt1', drt2' =
       ( Substitution.apply_substitutions_to_dirt new_sub drt1,
         Substitution.apply_substitutions_to_dirt new_sub drt2 )
     in
     if Type.equal_dirt drt1 drt1' && Type.equal_dirt drt2 drt2' then
-      (Type.Constraints.add_dirt_constraint paused w (drt1, drt2), queue)
+      (Type.Constraints.add_dirt_constraint paused d1 d2 w effs, queue)
     else (paused, Constraint.add_dirt_inequality (w, (drt1', drt2')) queue)
   in
   let sub' = Substitution.merge new_sub sub in
@@ -25,7 +25,8 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
     (Type.Constraints.empty, Constraint.apply_sub new_sub queue)
     |> Type.TyConstraints.fold_expanded substitute_ty_constraint
          paused.ty_constraints
-    |> List.fold_right substitute_dirt_constraint paused.dirt_constraints
+    |> Type.DirtConstraints.fold_expanded substitute_dirt_constraint
+         paused.dirt_constraints
   in
   (sub', paused', queue')
 
@@ -258,10 +259,12 @@ and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
 and dirt_omega_step sub resolved unresolved w dcons =
   match dcons with
   (* ω : δ₁ <= O₂ ∪ δ₂ *)
-  | ( { effect_set = ops1; row = ParamRow _ },
-      { effect_set = _; row = ParamRow _ } )
+  | ( { effect_set = ops1; row = ParamRow d1 },
+      { effect_set = _; row = ParamRow d2 } )
     when Effect.Set.is_empty ops1 ->
-      (sub, Type.Constraints.add_dirt_constraint resolved w dcons, unresolved)
+      ( sub,
+        Type.Constraints.add_dirt_constraint resolved d1 d2 w ops1,
+        unresolved )
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = ops1; row = ParamRow d1 },
       { effect_set = ops2; row = ParamRow d2 } ) ->
