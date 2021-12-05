@@ -342,68 +342,29 @@ and print_abs_ty (ty1, drty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
   print "%t → %t" (print_ty ty1) (print_dirty drty2)
 
-module TyParamVertex = struct
-  type t = TyCoercionParam.t TyParam.Map.t
-
-  let empty = TyParam.Map.empty
-
-  let is_empty = TyParam.Map.is_empty
-
-  let get_edge t (ty_vertex : t) = TyParam.Map.find_opt t ty_vertex
-
-  let add_edge t w (ty_vertex : t) : t = TyParam.Map.add t w ty_vertex
-
-  let fold f s t (t_vertex : t) acc = TyParam.Map.fold (f s t) t_vertex acc
-
-  let free_params s ty_vertex =
-    TyParam.Map.bindings ty_vertex
-    |> Params.union_map (fun (t, _w) -> Params.ty_singleton t (SkelParam s))
-end
-
-module SkelParamGraph = struct
-  type t = TyParamVertex.t TyParam.Map.t
-
-  let empty = TyParam.Map.empty
-
-  let is_empty = TyParam.Map.for_all (fun _ -> TyParamVertex.is_empty)
-
-  let get_ty_vertex t (ty_graph : t) =
-    TyParam.Map.find_opt t ty_graph |> Option.value ~default:TyParamVertex.empty
-
-  let add_edge t1 t2 w (ty_graph : t) : t =
-    let t1_vertex' = get_ty_vertex t1 ty_graph |> TyParamVertex.add_edge t2 w in
-    TyParam.Map.add t1 t1_vertex' ty_graph
-
-  let fold f s (ty_graph : t) acc =
-    TyParam.Map.fold (TyParamVertex.fold f s) ty_graph acc
-
-  let free_params s (s_graph : t) =
-    TyParam.Map.bindings s_graph
-    |> Params.union_map (fun (t, t_vertex) ->
-           Params.union
-             (Params.ty_singleton t (SkelParam s))
-             (TyParamVertex.free_params s t_vertex))
-end
-
 module TyConstraints = struct
-  type t = SkelParamGraph.t SkelParam.Map.t
+  module TyParamGraph = Graph.Make (TyParam)
+
+  type t = TyCoercionParam.t TyParamGraph.t SkelParam.Map.t
 
   let empty = SkelParam.Map.empty
 
-  let is_empty = SkelParam.Map.for_all (fun _ -> SkelParamGraph.is_empty)
+  (* Since we only add and never remove type constraints, the set of constraints
+     is empty if and only iff there are no skeleton graphs in it *)
+  let is_empty = SkelParam.Map.is_empty
 
   let get_ty_graph (ty_constraints : t) s =
     SkelParam.Map.find_opt s ty_constraints
-    |> Option.value ~default:SkelParamGraph.empty
+    |> Option.value ~default:TyParamGraph.empty
 
   let add_edge s t1 t2 w (ty_constraints : t) : t =
     let s_graph' =
-      get_ty_graph ty_constraints s |> SkelParamGraph.add_edge t1 t2 w
+      get_ty_graph ty_constraints s |> TyParamGraph.add_edge t1 t2 w
     in
     SkelParam.Map.add s s_graph' ty_constraints
 
   let fold f (ty_constraints : t) acc =
-    SkelParam.Map.fold (SkelParamGraph.fold f) ty_constraints acc
+    SkelParam.Map.fold (fun s -> TyParamGraph.fold (f s)) ty_constraints acc
 
   let free_params (ty_constraints : t) =
     fold

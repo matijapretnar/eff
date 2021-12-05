@@ -1,6 +1,7 @@
 module Assoc = Assoc
 module Config = Config
 module Error = Error
+module Graph = Graph
 module List = List
 module Location = Location
 module Option = Option
