@@ -12,12 +12,9 @@ let identity_instantiation (params : Type.Params.t)
   Substitution.
     {
       type_param_to_type_coercions =
-        Type.TyConstraints.fold
-          (fun s t1 t2 w ->
-            let skel = Type.SkelParam s in
-            Type.TyCoercionParam.Map.add w
-              (Coercion.tyCoercionVar w
-                 (Type.tyParam t1 skel, Type.tyParam t2 skel)))
+        Type.TyConstraints.fold_expanded
+          (fun _s _t1 _t2 w ty1 ty2 ->
+            Type.TyCoercionParam.Map.add w (Coercion.tyCoercionVar w (ty1, ty2)))
           constraints.ty_constraints Type.TyCoercionParam.Map.empty;
       type_param_to_type_subs =
         params.ty_params |> Type.TyParam.Map.bindings
@@ -46,16 +43,13 @@ module TypingEnv = struct
       (constraints : Type.Constraints.t) =
     let _, subst = Substitution.of_parameters params in
     let type_param_to_type_coercions =
-      Type.TyConstraints.fold
-        (fun s t1 t2 w ->
-          let skel = Type.SkelParam s in
+      Type.TyConstraints.fold_expanded
+        (fun _s _t1 _t2 w ty1 ty2 ->
           Type.TyCoercionParam.Map.add w
             (Coercion.tyCoercionVar
                (Type.TyCoercionParam.refresh w)
-               ( Substitution.apply_substitutions_to_type subst
-                   (Type.tyParam t1 skel),
-                 Substitution.apply_substitutions_to_type subst
-                   (Type.tyParam t2 skel) )))
+               ( Substitution.apply_substitutions_to_type subst ty1,
+                 Substitution.apply_substitutions_to_type subst ty2 )))
         constraints.ty_constraints Type.TyCoercionParam.Map.empty
     and dirt_coercions =
       List.map

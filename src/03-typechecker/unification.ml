@@ -3,9 +3,7 @@ open Language
 open Type
 
 let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
-  let substitute_ty_constraint s t1 t2 w (paused, queue) =
-    let skel = Type.SkelParam s in
-    let ty1 = Type.tyParam t1 skel and ty2 = Type.tyParam t2 skel in
+  let substitute_ty_constraint s t1 t2 w ty1 ty2 (paused, queue) =
     let ty1', ty2' =
       ( Substitution.apply_substitutions_to_type new_sub ty1,
         Substitution.apply_substitutions_to_type new_sub ty2 )
@@ -25,7 +23,8 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
   let sub' = Substitution.merge new_sub sub in
   let paused', queue' =
     (Type.Constraints.empty, Constraint.apply_sub new_sub queue)
-    |> Type.TyConstraints.fold substitute_ty_constraint paused.ty_constraints
+    |> Type.TyConstraints.fold_expanded substitute_ty_constraint
+         paused.ty_constraints
     |> List.fold_right substitute_dirt_constraint paused.dirt_constraints
   in
   (sub', paused', queue')

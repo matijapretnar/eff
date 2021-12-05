@@ -366,6 +366,12 @@ module TyConstraints = struct
   let fold f (ty_constraints : t) acc =
     SkelParam.Map.fold (fun s -> TyParamGraph.fold (f s)) ty_constraints acc
 
+  let fold_expanded f =
+    fold (fun s t1 t2 w ->
+        let skel = SkelParam s in
+        let ty1 = tyParam t1 skel and ty2 = tyParam t2 skel in
+        f s t1 t2 w ty1 ty2)
+
   let free_params (ty_constraints : t) =
     fold
       (fun s t1 t2 _w params ->
