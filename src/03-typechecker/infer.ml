@@ -44,38 +44,41 @@ module TypingEnv = struct
   let fresh_instantiation (params : Type.Params.t)
       (constraints : Type.Constraints.t) =
     let _, subst = Substitution.of_parameters params in
-    let type_param_to_type_coercions =
-      Type.TyConstraints.fold_expanded
-        (fun _s _t1 _t2 w ty1 ty2 ->
-          Type.TyCoercionParam.Map.add w
-            (Coercion.tyCoercionVar
-               (Type.TyCoercionParam.refresh w)
-               ( Substitution.apply_substitutions_to_type subst ty1,
-                 Substitution.apply_substitutions_to_type subst ty2 )))
-        constraints.ty_constraints Type.TyCoercionParam.Map.empty
-    and dirt_var_to_dirt_coercions =
-      Type.DirtConstraints.fold_expanded
-        (fun _d1 _d2 w _effs drt1 drt2 ->
-          Type.DirtCoercionParam.Map.add w
-            (Coercion.dirtCoercionVar
-               (Type.DirtCoercionParam.refresh w)
-               (Substitution.apply_sub_ct_dirt subst (drt1, drt2))))
-        constraints.dirt_constraints Type.DirtCoercionParam.Map.empty
+    let add_dirt_constraint _d1 _d2 w _effs drt1 drt2 (subst, constraints) =
+      let w' = Type.DirtCoercionParam.refresh w
+      and drt1' = Substitution.apply_substitutions_to_dirt subst drt1
+      and drt2' = Substitution.apply_substitutions_to_dirt subst drt2 in
+      let coer' = Coercion.dirtCoercionVar w' (drt1', drt2') in
+      let subst' = Substitution.add_dirt_var_coercion w coer' subst
+      and constraints' =
+        Constraint.add_dirt_inequality (w', (drt1', drt2')) constraints
+      in
+      (subst', constraints')
     in
-    Substitution.
-      { subst with type_param_to_type_coercions; dirt_var_to_dirt_coercions }
+    let add_ty_constraint _s _t1 _t2 w ty1 ty2 (subst, constraints) =
+      let w' = Type.TyCoercionParam.refresh w
+      and ty1' = Substitution.apply_substitutions_to_type subst ty1
+      and ty2' = Substitution.apply_substitutions_to_type subst ty2 in
+      let coer' = Coercion.tyCoercionVar w' (ty1', ty2') in
+      let subst' = Substitution.add_type_coercion w coer' subst
+      and constraints' =
+        Constraint.add_ty_inequality (w', (ty1', ty2')) constraints
+      in
+      (subst', constraints')
+    in
+    (subst, Constraint.empty)
+    |> Type.TyConstraints.fold_expanded add_ty_constraint
+         constraints.ty_constraints
+    |> Type.DirtConstraints.fold_expanded add_dirt_constraint
+         constraints.dirt_constraints
 
   let lookup ctx x : Term.expression * Constraint.t =
     match Assoc.lookup x ctx with
     | Some ty_scheme ->
-        let subst =
+        let subst, cnstrs =
           fresh_instantiation ty_scheme.Type.params ty_scheme.constraints
         in
         let x = Term.poly_var x subst ty_scheme.ty in
-        let cnstrs =
-          Constraint.return_to_unresolved ty_scheme.constraints Constraint.empty
-        in
-        let cnstrs = Constraint.apply_sub subst cnstrs in
         (x, cnstrs)
     | None -> assert false
 
