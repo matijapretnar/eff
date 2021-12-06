@@ -186,9 +186,15 @@ let rec pp_term ?max_level state noEff_term ppf =
   | NTuple ts -> print "%t" (pp_tuple (pp_term state ~max_level:1) ts)
   | NRecord rcd -> print "%t" (pp_record (pp_term state) "=" rcd)
   (* Note that t is not necessarily a pair, it can be coerced *)
-  | NVariant (l, Some t) when l = Type.cons ->
-      print ~at_level:1 "@[<hov>(fun (x, xs) -> (x :: xs)) (%t)@]"
-        (pp_term state ~max_level:0 t)
+  | NVariant (l, Some t) when l = Type.cons -> (
+      match t with
+      | NTuple [ x; xs ] ->
+          print ~at_level:1 "@[<hov>(%t :: %t)@]"
+            (pp_term state ~max_level:0 x)
+            (pp_term state ~max_level:0 xs)
+      | _ ->
+          print ~at_level:1 "@[<hov>(fun (x, xs) -> (x :: xs)) (%t)@]"
+            (pp_term state ~max_level:0 t))
   | NVariant (l, None) when l = Type.nil -> print "[]"
   | NVariant (l, None) -> print "%t" (pp_label l)
   | NVariant (l, Some t1) ->
