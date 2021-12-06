@@ -139,11 +139,13 @@ let apply_substitutions_to_skeleton = apply_sub_skel
 
 let print subs =
   [
-    subs.type_param_to_type_coercions |> Type.TyCoercionParam.Map.print Coercion.print_ty_coercion;
+    subs.type_param_to_type_coercions
+    |> Type.TyCoercionParam.Map.print Coercion.print_ty_coercion;
     subs.type_param_to_type_subs |> Type.TyParam.Map.print Type.print_ty;
     subs.dirt_var_to_dirt_subs |> Dirt.Param.Map.print Dirt.print;
-    subs.dirt_var_to_dirt_coercions |> Type.DirtCoercionParam.Map.print Coercion.print_dirt_coercion;
-    subs.skel_param_to_skel_subs |> Skeleton.Param.Map.print Skeleton.print
+    subs.dirt_var_to_dirt_coercions
+    |> Type.DirtCoercionParam.Map.print Coercion.print_dirt_coercion;
+    subs.skel_param_to_skel_subs |> Skeleton.Param.Map.print Skeleton.print;
   ]
   |> Print.printer_sequence ", "
 
