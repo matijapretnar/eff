@@ -85,13 +85,14 @@ module Backend : Language.Backend = struct
   let process_top_let state defs =
     let defs' =
       List.map
-        (fun (x, _params, cnstrs, e) ->
-          ( x,
+        (fun (pat, _params, cnstrs, comp) ->
+          ( TranslateExEff2NoEff.elab_pattern translate_exeff_config pat,
             Type.TyConstraints.fold
               (fun _ _ _ w lst -> w :: lst)
               cnstrs.Type.Constraints.ty_constraints [],
             optimize_term state
-            @@ TranslateExEff2NoEff.elab_expression translate_exeff_config e ))
+            @@ TranslateExEff2NoEff.elab_computation translate_exeff_config comp
+          ))
         defs
     in
     { state with prog = SyntaxNoEff.TopLet defs' :: state.prog }

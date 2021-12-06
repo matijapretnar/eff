@@ -550,15 +550,17 @@ let process_top_let state defs =
   if !Config.enable_optimization then
     let defs' =
       List.map
-        (fun (pat, params, cnstrs, e) ->
-          (pat, params, cnstrs, optimize_expression state e))
+        (fun (pat, params, cnstrs, cmp) ->
+          (pat, params, cnstrs, optimize_computation state cmp))
         defs
     in
     let state' =
       List.fold_left
-        (fun state (f, _, _, e) ->
-          match e.term with
-          | Term.Lambda abs -> add_function state f abs
+        (fun state (pat, _, _, comp) ->
+          match (pat, comp) with
+          | ( { term = Term.PVar f; _ },
+              { term = Term.Value { term = Term.Lambda abs; _ }; _ } ) ->
+              add_function state f abs
           | _ -> state)
         state defs'
     in

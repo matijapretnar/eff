@@ -99,19 +99,22 @@ let rec pp_type noeff_ty ppf =
       print ppf "@[<h>(%t ->@ %t)@]" (pp_type ty1) (pp_type ty2)
   | NTyComp ty -> print ppf "%t computation" (pp_type ty)
 
-let rec pp_pattern state pat ppf =
+let rec pp_pattern ?(safe = true) state pat ppf =
   match pat with
-  | PNVar v -> print ppf "%t" (pp_variable state v)
+  | PNVar v -> print ppf "%t" (pp_variable ~safe state v)
   | PNAs (p, v) ->
-      print ppf "%t as %t" (pp_pattern state p) (pp_variable state v)
-  | PNTuple pats -> print ppf "%t" (pp_tuple (pp_pattern state) pats)
-  | PNRecord rcd -> print ppf "%t" (pp_record (pp_pattern state) "=" rcd)
+      print ppf "%t as %t" (pp_pattern ~safe state p) (pp_variable state v)
+  | PNTuple pats -> print ppf "%t" (pp_tuple (pp_pattern ~safe state) pats)
+  | PNRecord rcd -> print ppf "%t" (pp_record (pp_pattern ~safe state) "=" rcd)
   | PNVariant (lbl, None) when lbl = Type.nil -> print ppf "[]"
   | PNVariant (lbl, None) -> print ppf "%t" (Type.Label.print lbl)
   | PNVariant (lbl, Some (PNTuple [ v1; v2 ])) when lbl = Type.cons ->
-      print ppf "(%t :: %t)" (pp_pattern state v1) (pp_pattern state v2)
+      print ppf "(%t :: %t)"
+        (pp_pattern ~safe state v1)
+        (pp_pattern ~safe state v2)
   | PNVariant (lbl, Some p) ->
-      print ppf "(%t @[<hov>%t@])" (Type.Label.print lbl) (pp_pattern state p)
+      print ppf "(%t @[<hov>%t@])" (Type.Label.print lbl)
+        (pp_pattern ~safe state p)
   | PNConst c -> print ppf "%t" (Const.print c)
   | PNNonbinding -> print ppf "_"
 
@@ -305,7 +308,7 @@ let pp_def_effect (eff, (ty1, ty2)) ppf =
     (Type.Effect.print eff) (pp_type ty1) (pp_type ty2)
 
 let pp_let_def state (p, ws, t) ppf =
-  print ppf "%t %t = @,%t" (pp_variable state p) (pp_coercion_vars ws)
+  print ppf "%t %t = @,%t" (pp_pattern state p) (pp_coercion_vars ws)
     (pp_term state t)
 
 let pp_external state name symbol_name ppf =
@@ -341,9 +344,9 @@ let pp_cmd state cmd ppf =
       print ppf "%t@.;; let %t = %t@.;;"
         (pp_lets "let" (pp_let_def state) defs)
         (Print.sequence ","
-           (fun (f, _, _) -> pp_variable state ~safe:false f)
+           (fun (f, _, _) -> pp_pattern ~safe:false state f)
            defs)
-        (Print.sequence "," (fun (f, _, _) -> pp_variable state f) defs)
+        (Print.sequence "," (fun (f, _, _) -> pp_pattern state f) defs)
   | TopLetRec defs ->
       print ppf "%t@.;; let %t = %t@.;;"
         (pp_top_let_rec state (Assoc.to_list defs))

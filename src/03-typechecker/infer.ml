@@ -853,18 +853,18 @@ let process_computation state comp =
 let process_top_let state defs =
   let fold (p, c) (state', defs) =
     match (p.it, c.it) with
-    | Language.UntypedSyntax.PVar x, Language.UntypedSyntax.Value v ->
-        let expr, constraints = infer_expression state v in
+    | Language.UntypedSyntax.PVar x, Language.UntypedSyntax.Value _ ->
+        let comp, constraints = infer_computation state c in
         let params =
           Type.Params.union
-            (Type.free_params_ty expr.ty)
+            (Type.free_params_dirty comp.ty)
             (Type.Constraints.free_params constraints)
         in
-        let ty_scheme = Type.{ params; constraints; ty = expr.ty } in
+        let ty_scheme = Type.{ params; constraints; ty = fst comp.ty } in
         let state'' = extend_poly_var state' x ty_scheme in
         Exhaust.is_irrefutable state.tydefs p;
         Exhaust.check_computation state.tydefs c;
-        (state'', (x, params, constraints, expr) :: defs)
+        (state'', (Term.pVar x (fst comp.ty), params, constraints, comp) :: defs)
     | _ -> failwith __LOC__
   in
   List.fold_right fold defs (state, [])

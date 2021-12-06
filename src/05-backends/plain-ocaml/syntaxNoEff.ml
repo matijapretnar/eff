@@ -97,7 +97,7 @@ type n_tydef =
 
 type cmd =
   | Term of n_term
-  | TopLet of (variable * Type.TyCoercionParam.t list * n_term) list
+  | TopLet of (n_pattern * Type.TyCoercionParam.t list * n_term) list
   | TopLetRec of n_top_rec_definitions
   | DefEffect of n_effect
   | TyDef of (Type.TyName.t * (Type.TyParam.t list * n_tydef)) list

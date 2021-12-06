@@ -32,13 +32,13 @@ module Backend : Language.Backend = struct
   let process_top_let state defs =
     match defs with
     | [] -> state
-    | [ (x, _params, _constraints, exp) ] ->
-        let v = Eval.eval_expression state exp in
+    | [ (pat, _params, _constraints, comp) ] ->
+        let v = Eval.run state comp in
         Format.fprintf !Config.output_formatter "@[val %t : %t = %t@]@."
-          (Language.Term.Variable.print x)
-          (Type.print_pretty () exp.ty.ty)
+          (Language.Term.print_pattern pat)
+          (Type.print_pretty () (fst comp.ty).ty)
           (V.print_value v);
-        Eval.update x v state
+        Eval.extend pat v state
     | _ -> failwith __LOC__
 
   let process_top_let_rec state defs =
