@@ -260,10 +260,10 @@ and dirt_omega_step sub resolved unresolved w dcons =
   match dcons with
   (* ω : δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = ops1; row = ParamRow d1 },
-      { effect_set = _; row = ParamRow d2 } )
+      { effect_set = ops2; row = ParamRow d2 } )
     when Effect.Set.is_empty ops1 ->
       ( sub,
-        Type.Constraints.add_dirt_constraint resolved d1 d2 w ops1,
+        Type.Constraints.add_dirt_constraint resolved d1 d2 w ops2,
         unresolved )
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = ops1; row = ParamRow d1 },
