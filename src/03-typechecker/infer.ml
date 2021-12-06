@@ -851,28 +851,32 @@ let process_computation state comp =
   comp'
 
 let process_top_let state defs =
-  let fold (p, c) (state', defs) =
-    match p.it with
-    | Language.UntypedSyntax.PVar x ->
-        let comp, constraints = infer_computation state c in
-        let ty_scheme =
-          match c.it with
-          | Language.UntypedSyntax.Value _ ->
-              let params =
-                Type.Params.union
-                  (Type.free_params_dirty comp.ty)
-                  (Type.Constraints.free_params constraints)
-              in
-              Type.{ params; constraints; ty = fst comp.ty }
-          | _ -> Type.monotype (fst comp.ty)
-        in
-        let state'' = extend_poly_var state' x ty_scheme in
-        Exhaust.is_irrefutable state.tydefs p;
-        Exhaust.check_computation state.tydefs c;
-        ( state'',
-          (Term.pVar x (fst comp.ty), Type.Params.empty, constraints, comp)
-          :: defs )
-    | _ -> failwith __LOC__
+  let fold (pat, cmp) (state, defs) =
+    let pat', vars, cnstrs_pat = infer_pattern state pat
+    and cmp', cnstrs_cmp = tcComp state cmp in
+    let sub, constraints =
+      Unification.solve (Constraint.union cnstrs_pat cnstrs_cmp)
+    in
+    let pat'', cmp'' =
+      (Term.apply_sub_pat sub pat', Term.apply_sub_comp sub cmp')
+    in
+    let vars' = Term.Variable.Map.map (Substitution.apply_sub_ty sub) vars in
+    let params =
+      match cmp.it with
+      | Language.UntypedSyntax.Value _ ->
+          Type.Params.union
+            (Type.free_params_dirty cmp''.ty)
+            (Type.Constraints.free_params constraints)
+      | _ -> Type.Params.empty
+    in
+    let state' =
+      Term.Variable.Map.fold
+        (fun x ty state -> extend_poly_var state x { params; constraints; ty })
+        vars' state
+    in
+    Exhaust.is_irrefutable state.tydefs pat;
+    Exhaust.check_computation state.tydefs cmp;
+    (state', (pat'', params, constraints, cmp'') :: defs)
   in
   List.fold_right fold defs (state, [])
 
