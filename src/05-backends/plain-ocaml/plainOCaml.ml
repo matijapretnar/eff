@@ -63,7 +63,7 @@ module Backend : Language.Backend = struct
     in
     defs'
 
-  let process_computation state c =
+  let process_computation state (_, c, _) =
     let c' =
       optimize_term state
       @@ TranslateExEff2NoEff.elab_computation translate_exeff_config c

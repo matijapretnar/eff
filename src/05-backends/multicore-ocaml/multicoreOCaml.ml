@@ -36,7 +36,7 @@ module Backend : Language.Backend = struct
         (eff, (ty1', ty2'), (x, k, c)) :: state.primitive_effects;
     }
 
-  let process_computation state c =
+  let process_computation state (_, c, _) =
     let t = Translate.of_computation c in
     update state (Term t)
 

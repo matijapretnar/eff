@@ -100,9 +100,15 @@ module Make (Backend : Language.Backend) = struct
         { state with backend_state = backend_state' }
     | Commands.TypeOf t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
-        let c' = TypeSystem.process_computation state.type_system_state c in
-        let c'' = Optimizer.process_computation state.optimizer_state c' in
-        let backend_state' = Backend.process_type_of state.backend_state c'' in
+        let top_comp =
+          TypeSystem.process_computation state.type_system_state c
+        in
+        let top_comp' =
+          Optimizer.process_computation state.optimizer_state top_comp
+        in
+        let backend_state' =
+          Backend.process_type_of state.backend_state top_comp'
+        in
         { state with backend_state = backend_state' }
     | Commands.Help ->
         let help_text =

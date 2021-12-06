@@ -296,8 +296,10 @@ let rec free_params_skeleton = function
   | SkelTuple sks -> Params.union_map free_params_skeleton sks
 
 let rec free_params_ty ty =
-  match ty.term with
-  | TyParam p -> Params.ty_singleton p ty.ty
+  Params.union (free_params_ty' ty.ty ty.term) (free_params_skeleton ty.ty)
+
+and free_params_ty' skel = function
+  | TyParam p -> Params.ty_singleton p skel
   | Arrow (vty, cty) ->
       Params.union (free_params_ty vty) (free_params_dirty cty)
   | Tuple vtys -> Params.union_map free_params_ty vtys
@@ -653,7 +655,7 @@ let fresh_ty_with_skel skel =
       and dtvar2 = fresh_dirty_param_with_skel sk2 in
       handler (dtvar1, dtvar2)
 
-let rec print_pretty_skel ?max_level params skel ppf =
+let rec print_pretty_skel ?max_level free params skel ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match skel with
   | SkelParam s ->
@@ -666,28 +668,30 @@ let rec print_pretty_skel ?max_level params skel ppf =
             params := Assoc.update s symb !params;
             symb
       in
-      print "'%c" symb
+      if SkelParam.Set.mem s free then print "'%c" symb else print "'_%c" symb
   | SkelArrow (skel1, skel2) ->
       print ~at_level:3 "%t -> %t"
-        (print_pretty_skel ~max_level:2 params skel1)
-        (print_pretty_skel ~max_level:3 params skel2)
+        (print_pretty_skel ~max_level:2 free params skel1)
+        (print_pretty_skel ~max_level:3 free params skel2)
   | SkelApply (t, []) -> print "%t" (TyName.print t)
   | SkelApply (t, [ s ]) ->
       print ~at_level:1 "%t %t"
-        (print_pretty_skel ~max_level:1 params s)
+        (print_pretty_skel ~max_level:1 free params s)
         (TyName.print t)
   | SkelApply (t, skels) ->
       print ~at_level:1 "(%t) %t"
-        (Print.sequence ", " (print_pretty_skel params) skels)
+        (Print.sequence ", " (print_pretty_skel free params) skels)
         (TyName.print t)
   | SkelTuple [] -> print "unit"
   | SkelTuple skels ->
       print ~at_level:2 "%t"
-        (Print.sequence " * " (print_pretty_skel ~max_level:1 params) skels)
+        (Print.sequence " * "
+           (print_pretty_skel free ~max_level:1 params)
+           skels)
   | SkelHandler (skel1, skel2) ->
       print ~at_level:3 "%t => %t"
-        (print_pretty_skel ~max_level:2 params skel1)
-        (print_pretty_skel ~max_level:2 params skel2)
+        (print_pretty_skel free ~max_level:2 params skel1)
+        (print_pretty_skel free ~max_level:2 params skel2)
   | SkelBasic p -> print "%t" (Const.print_ty p)
 
-let print_pretty () = print_pretty_skel (ref Assoc.empty)
+let print_pretty free = print_pretty_skel free (ref Assoc.empty)

@@ -842,13 +842,18 @@ let infer_rec_abstraction state defs =
   (Assoc.map (Term.apply_substitutions_to_abstraction sub) defs', residuals)
 
 (* Typecheck a top-level expression *)
-let process_computation state comp =
-  let comp', _residuals = infer_computation state comp in
-  (* Print.debug "TERM: %t" (Term.print_computation comp); *)
-  (* Print.debug "TYPE: %t" (Type.print_dirty comp.ty); *)
-  (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
-  Exhaust.check_computation state.tydefs comp;
-  comp'
+let process_computation state cmp =
+  let cmp', constraints = infer_computation state cmp in
+  let params =
+    match cmp.it with
+    | Language.UntypedSyntax.Value _ ->
+        Type.Params.union
+          (Type.free_params_dirty cmp'.ty)
+          (Type.Constraints.free_params constraints)
+    | _ -> Type.Params.empty
+  in
+  Exhaust.check_computation state.tydefs cmp;
+  (params, cmp', constraints)
 
 let process_top_let state defs =
   let fold (pat, cmp) (state', defs) =

@@ -543,8 +543,10 @@ and reduce_computation' state comp =
       match reduce_constant_match state c abs with Some t -> t | None -> comp)
   | _ -> comp
 
-let process_computation state comp =
-  if !Config.enable_optimization then optimize_computation state comp else comp
+let process_computation state ((params, comp, constraints) as top_comp) =
+  if !Config.enable_optimization then
+    (params, optimize_computation state comp, constraints)
+  else top_comp
 
 let process_top_let state defs =
   if !Config.enable_optimization then

@@ -11,9 +11,11 @@ module type Backend = sig
 
   val initial_state : state
 
-  val process_computation : state -> Term.computation -> state
+  val process_computation :
+    state -> Type.Params.t * Term.computation * Type.Constraints.t -> state
 
-  val process_type_of : state -> Term.computation -> state
+  val process_type_of :
+    state -> Type.Params.t * Term.computation * Type.Constraints.t -> state
 
   val process_def_effect : state -> Term.effect -> state
 

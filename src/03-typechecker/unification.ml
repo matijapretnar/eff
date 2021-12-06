@@ -59,7 +59,7 @@ let skel_eq_step sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
         sub paused rest_queue
       (* occurs-check failing *)
   | SkelParam _, _ | _, SkelParam _ ->
-      let printer = Type.print_pretty () in
+      let printer = Type.print_pretty SkelParam.Set.empty in
       Error.typing ~loc:Location.unknown
         "This expression has a forbidden cyclic type %t = %t." (printer sk1)
         (printer sk2)
@@ -93,7 +93,7 @@ let skel_eq_step sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
           (fun sk1 sk2 -> Constraint.add_skeleton_equality (sk1, sk2))
           sks1 sks2 rest_queue )
   | _ ->
-      let printer = Type.print_pretty () in
+      let printer = Type.print_pretty SkelParam.Set.empty in
       Error.typing ~loc:Location.unknown
         "This expression has type %t but it should have type %t." (printer sk1)
         (printer sk2)
@@ -120,7 +120,7 @@ and ty_eq_step sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
       apply_substitution sub1 sub paused rest_queue
       (* occurs-check failing *)
   | TyParam _, _ | _, TyParam _ ->
-      let printer = Type.print_pretty () in
+      let printer = Type.print_pretty SkelParam.Set.empty in
       Error.typing ~loc:Location.unknown
         "This expression has a forbidden cyclic type %t = %t." (printer ty1.ty)
         (printer ty2.ty)
@@ -158,7 +158,7 @@ and ty_eq_step sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
           (fun ty1 ty2 -> Constraint.add_ty_equality (ty1, ty2))
           tys1 tys2 rest_queue )
   | _ ->
-      let printer = Type.print_pretty () in
+      let printer = Type.print_pretty SkelParam.Set.empty in
       Error.typing ~loc:Location.unknown
         "This expression has type %t but it should have type %t."
         (printer ty1.ty) (printer ty2.ty)
@@ -251,7 +251,7 @@ and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
         sub paused
         (Constraint.union cons rest_queue)
   | ty1, ty2 ->
-      let printer = Type.print_pretty () in
+      let printer = Type.print_pretty SkelParam.Set.empty in
       Error.typing ~loc:Location.unknown
         "This expression has type %t but it should have type %t."
         (printer ty1.ty) (printer ty2.ty)
