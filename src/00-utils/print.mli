@@ -84,6 +84,13 @@ val sequence :
 (** [sequence sep pp lst ppf] uses pretty-printer [pp] to print elements of
     [lst] separated by [sep] to the formatter [ppf]. *)
 
+val printer_sequence :
+  string -> (Format.formatter -> unit) list -> Format.formatter -> unit
+(** [printer_sequence sep pps ppf] calls pretty-printers [pps] which have already
+    received all their inputs apart from the formatter and applies them to the
+    formatter [ppf]. This is useful for printing heterogeneous sequences, such as
+    substitutions, constraints, ... *)
+
 val tuple :
   ('a -> Format.formatter -> unit) -> 'a list -> Format.formatter -> unit
 (** [tuple pp lst ppf] prints a tuple given by a list of elements [lst] using

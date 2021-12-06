@@ -30,6 +30,9 @@ let rec sequence sep pp vs ppf =
   | [ v ] -> pp v ppf
   | v :: vs -> Format.fprintf ppf "%t%s@,%t" (pp v) sep (sequence sep pp vs)
 
+let printer_sequence sep printers ppf =
+  sequence sep (fun printer ppf -> printer ppf) printers ppf
+
 let field fpp vpp (f, v) ppf = print ppf "%t = %t" (fpp f) (vpp v)
 
 let tuple pp lst ppf =

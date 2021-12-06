@@ -45,7 +45,7 @@ let union cons1 cons2 =
 
 let list_union conss = List.fold_left union empty conss
 
-let print c ppf =
+let print c =
   let print_skeleton_equality (sk1, sk2) ppf =
     Print.print ppf "%t = %t" (Type.print_skeleton sk1)
       (Type.print_skeleton sk2)
@@ -62,12 +62,15 @@ let print c ppf =
       (Type.TyCoercionParam.print p)
       (Type.print_ty ty1) (Type.print_ty ty2)
   in
-  Print.print ppf "{ %t / %t / %t / %t / %t }"
-    (Print.sequence ";" print_skeleton_equality c.skeleton_equalities)
-    (Print.sequence ";" print_dirt_equality c.dirt_equalities)
-    (Print.sequence ";" print_dirt_inequality c.dirt_inequalities)
-    (Print.sequence ";" print_ty_equality c.ty_equalities)
-    (Print.sequence ";" print_ty_inequality c.ty_inequalities)
+  [
+    List.map print_skeleton_equality c.skeleton_equalities;
+    List.map print_dirt_equality c.dirt_equalities;
+    List.map print_dirt_inequality c.dirt_inequalities;
+    List.map print_ty_equality c.ty_equalities;
+    List.map print_ty_inequality c.ty_inequalities;
+  ]
+  |> List.concat
+  |> Print.printer_sequence ", "
 
 let free_params cons =
   Type.Params.union_map

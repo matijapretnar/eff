@@ -553,20 +553,24 @@ module Constraints = struct
       (Print.sequence "\n" print_skeleton_graph skeleton_graphs)
       (print_dirt_graph c.dirt_constraints)
 
-  let print _c ppf =
-    (* let print_dirt_constraint (p, (ty1, ty2)) ppf =
-       Print.print ppf "%t: (%t ≤ %t)"
-         (DirtCoercionParam.print p)
-         (print_dirt ty1) (print_dirt ty2) *)
-    (* and print_ty_constraint (p, ty1, ty2, s) ppf =
-       Print.print ppf "%t: (%t ≤ %t) : %t" (TyCoercionParam.print p)
-         (TyParam.print ty1) (TyParam.print ty2) (SkelParam.print s) *)
-    (* in *)
-    Print.print ppf "{ }"
-
-  (* (Print.sequence ";" print_dirt_constraint c.dirt_constraints) *)
-
-  (* (Print.sequence ";" print_ty_constraint c.ty_constraints) *)
+  let print c =
+    let print_dirt_constraint w drt1 drt2 ppf =
+      Print.print ppf "%t: (%t ≤ %t)"
+        (DirtCoercionParam.print w)
+        (print_dirt drt1) (print_dirt drt2)
+    and print_ty_constraint s t1 t2 w ppf =
+      Print.print ppf "%t: (%t ≤ %t) : %t" (TyCoercionParam.print w)
+        (TyParam.print t1) (TyParam.print t2) (SkelParam.print s)
+    in
+    []
+    |> DirtConstraints.fold_expanded
+         (fun _d1 _d2 w _effs drt1 drt2 printouts ->
+           print_dirt_constraint w drt1 drt2 :: printouts)
+         c.dirt_constraints
+    |> TyConstraints.fold
+         (fun s t1 t2 w printouts -> print_ty_constraint s t1 t2 w :: printouts)
+         c.ty_constraints
+    |> Print.printer_sequence ", "
 end
 
 let type_const c = tyBasic (Const.infer_ty c)
