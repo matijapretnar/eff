@@ -194,7 +194,7 @@ let of_parameters (params : Type.Params.t) =
         Type.SkelParam.Map.map (fun s' -> Type.SkelParam s') skel_params';
     }
   in
-  (* Print.debug "SUBSTITUTION: %t" (print_substitutions subst); *)
+  (* Print.debug "SUBSTITUTION: %t" (print subst); *)
   let ty_params' =
     Type.TyParam.Map.bindings params.ty_params
     |> List.map (fun (p, skel) ->
@@ -221,7 +221,7 @@ let of_parameters (params : Type.Params.t) =
         |> Type.TyParam.Map.of_bindings;
     }
   in
-  (* Print.debug "SUBSTITUTION': %t" (print_substitutions subst'); *)
+  (* Print.debug "SUBSTITUTION': %t" (print subst'); *)
   (params', subst')
 
 let merge new_sub old_sub =

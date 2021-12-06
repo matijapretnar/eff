@@ -505,8 +505,7 @@ and tcExpr state (e : Untyped.expression) : tcExprOutput =
   (* Print.debug "%t -> %t : %t / %t"
      (Untyped.print_expression e)
      (Term.print_expression' trm)
-     (Type.print_ty ty)
-     (Constraint.print_constraints cnstrs); *)
+     (Type.print_ty ty) (Constraint.print cnstrs); *)
   ({ term = trm; ty }, cnstrs)
 
 (* ************************************************************************* *)
@@ -541,8 +540,7 @@ and tcComp state (c : Untyped.computation) : tcCompOutput =
   (* Print.debug "%t -> %t : %t / %t"
      (Untyped.print_computation c)
      (Term.print_computation' trm)
-     (Type.print_dirty ty)
-     (Constraint.print_constraints cnstrs); *)
+     (Type.print_dirty ty) (Constraint.print cnstrs); *)
   ({ term = trm; ty }, cnstrs)
 
 (* Typecheck a value wrapped in a return *)

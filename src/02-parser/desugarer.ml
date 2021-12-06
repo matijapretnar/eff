@@ -199,14 +199,11 @@ let desugar_tydef state params ty_name def =
         (state'', Type.Inline t')
   in
   let params' =
-    {
-      Type.Params.empty with
-      ty_params =
-        Type.TyParam.Map.of_bindings
-          (List.map
-             (fun (p, skel) -> (p, Type.SkelParam skel))
-             (Assoc.values_of ty_sbst));
-    }
+    ty_sbst |> Assoc.values_of
+    |> Type.Params.union_map (fun (p, skel) ->
+           Type.Params.union
+             (Type.Params.ty_singleton p (Type.SkelParam skel))
+             (Type.Params.skel_singleton skel))
   in
   (state', { Type.params = params'; type_def = def' })
 

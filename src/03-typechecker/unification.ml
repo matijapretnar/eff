@@ -352,9 +352,9 @@ and dirt_eq_step sub paused rest_queue { effect_set = o1; row = row1 }
   apply_substitution sub' sub paused rest_queue
 
 let rec unify (sub, paused, (queue : Constraint.t)) =
-  Print.debug "SUB: %t" (Substitution.print sub);
-  Print.debug "PAUSED: %t" (Type.Constraints.print paused);
-  Print.debug "QUEUE: %t" (Constraint.print queue);
+  (* Print.debug "SUB: %t" (Substitution.print sub); *)
+  (* Print.debug "PAUSED: %t" (Type.Constraints.print paused); *)
+  (* Print.debug "QUEUE: %t" (Constraint.print queue); *)
   match queue with
   | { skeleton_equalities = (sk1, sk2) :: skeleton_equalities; _ } ->
       skel_eq_step sub paused { queue with skeleton_equalities } sk1 sk2
