@@ -79,19 +79,3 @@ val of_list : ('k * 'v) list -> ('k, 'v) t
 (** Switch to lists and back. *)
 
 val to_list : ('k, 'v) t -> ('k * 'v) list
-
-module ExtMap : sig
-  module type S = sig
-    include Map.S
-
-    val of_bindings : (key * 'a) list -> 'a t
-
-    val union_overwrite : 'a t -> 'a t -> 'a t
-
-    val keys : 'a t -> key list
-
-    val values : 'a t -> 'a list
-  end
-
-  module Make (Ord : Map.OrderedType) : S with type key = Ord.t
-end

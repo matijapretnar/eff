@@ -65,7 +65,17 @@ module type S = sig
 
   module Set : Set.S with type elt = t
 
-  module Map : Assoc.ExtMap.S with type key = t
+  module Map : sig
+    include Map.S with type key = t
+
+    val of_bindings : (key * 'a) list -> 'a t
+
+    val compatible_union : 'a t -> 'a t -> 'a t
+
+    val keys : 'a t -> key list
+
+    val values : 'a t -> 'a list
+  end
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t = struct
@@ -98,5 +108,22 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
   end
 
   module Set = Set.Make (Ord)
-  module Map = Assoc.ExtMap.Make (Ord)
+
+  module Map = struct
+    include Map.Make (Ord)
+
+    let of_bindings list =
+      List.fold_left (fun map (key, v) -> add key v map) empty list
+
+    let compatible_union m1 m2 =
+      union
+        (fun _ v1 v2 ->
+          assert (v1 = v2);
+          Some v1)
+        m1 m2
+
+    let keys m = List.map fst (bindings m)
+
+    let values m = List.map snd (bindings m)
+  end
 end

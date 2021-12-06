@@ -35,7 +35,17 @@ module type S = sig
 
   module Set : Set.S with type elt = t
 
-  module Map : Assoc.ExtMap.S with type key = t
+  module Map : sig
+    include Map.S with type key = t
+
+    val of_bindings : (key * 'a) list -> 'a t
+
+    val compatible_union : 'a t -> 'a t -> 'a t
+
+    val keys : 'a t -> key list
+
+    val values : 'a t -> 'a list
+  end
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t

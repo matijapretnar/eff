@@ -83,30 +83,3 @@ let concat assoc1 assoc2 = assoc1 @ assoc2
 let of_list lst = lst
 
 let to_list assoc = assoc
-
-module ExtMap = struct
-  module type S = sig
-    include Map.S
-
-    val of_bindings : (key * 'a) list -> 'a t
-
-    val union_overwrite : 'a t -> 'a t -> 'a t
-
-    val keys : 'a t -> key list
-
-    val values : 'a t -> 'a list
-  end
-
-  module Make (Ord : Map.OrderedType) : S with type key = Ord.t = struct
-    include Map.Make (Ord)
-
-    let of_bindings list =
-      List.fold_left (fun map (key, v) -> add key v map) empty list
-
-    let union_overwrite m1 m2 = union (fun _ v1 _ -> Some v1) m1 m2
-
-    let keys m = List.map fst (bindings m)
-
-    let values m = List.map snd (bindings m)
-  end
-end
