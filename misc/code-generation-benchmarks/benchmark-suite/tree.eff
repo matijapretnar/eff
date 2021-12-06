@@ -1,5 +1,3 @@
-let x = 1 + "bla"
-
 type tree
  = Empty
  | Node of tree * int * tree
