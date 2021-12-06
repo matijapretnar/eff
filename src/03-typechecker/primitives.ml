@@ -17,19 +17,12 @@ let binary_float_op_ty = Type.monotype (binary_op_ty float_ty float_ty float_ty)
 let binary_string_op_ty =
   Type.monotype (binary_op_ty string_ty string_ty string_ty)
 
-let comparison_ty =
-  let skel_param = Type.SkelParam.fresh () in
-  let skel = Type.SkelParam skel_param in
-  let ty_param = Type.TyParam.fresh () in
-  let ty = Type.tyParam ty_param skel in
-  {
-    Type.params =
-      Type.Params.union
-        (Type.Params.skel_singleton skel_param)
-        (Type.Params.ty_singleton ty_param skel);
-    Type.ty = binary_op_ty ty ty bool_ty;
-    Type.constraints = Constraints.empty;
-  }
+let poly_ty ty_body =
+  let ty = Type.fresh_ty_with_fresh_skel () in
+  let params = Type.free_params_ty ty in
+  { Type.params; Type.ty = ty_body ty; Type.constraints = Constraints.empty }
+
+let comparison_ty = poly_ty (fun ty -> binary_op_ty ty ty bool_ty)
 
 let primitive_value_type_scheme = function
   | Language.Primitives.CompareEq -> comparison_ty
@@ -69,12 +62,12 @@ let primitive_value_type_scheme = function
   | IntOfFloat -> Type.monotype (pure_arrow float_ty int_ty)
   | StringConcat -> binary_string_op_ty
   | StringLength -> Type.monotype (pure_arrow string_ty int_ty)
-  | StringOfFloat -> Type.monotype (pure_arrow string_ty float_ty)
-  | StringOfInt -> Type.monotype (pure_arrow string_ty int_ty)
+  | StringOfFloat -> Type.monotype (pure_arrow float_ty string_ty)
+  | StringOfInt -> Type.monotype (pure_arrow int_ty string_ty)
   | StringSub ->
       Type.monotype
         (pure_arrow string_ty (pure_arrow int_ty (pure_arrow int_ty string_ty)))
-  | ToString -> Type.monotype (pure_arrow int_ty string_ty)
+  | ToString -> poly_ty (fun ty -> pure_arrow ty string_ty)
 
 let primitive_effect_signature = function
   | Primitives.Print -> (string_ty, Type.unit_ty)
