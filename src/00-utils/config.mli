@@ -37,6 +37,8 @@ val error_formatter : Format.formatter ref
 val enable_optimization : bool ref
 (** Should compiled computations be optimized? *)
 
+val print_graph : bool ref
+
 val profiling : bool ref
 (** Should profiling be enabled? *)
 

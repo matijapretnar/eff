@@ -22,7 +22,7 @@ module Backend : Language.Backend = struct
       }
 
   type state = {
-    prog : SyntaxNoEff.cmd list;
+    prog : (SyntaxNoEff.cmd * Language.Constraints.t list) list;
     no_eff_optimizer_state : NoEffOptimizer.state;
     primitive_values :
       (Language.Term.Variable.t, Language.Primitives.primitive_value) Assoc.t;
@@ -71,7 +71,7 @@ module Backend : Language.Backend = struct
     {
       state with
       prog =
-        SyntaxNoEff.Term (TranslateExEff2NoEff.elab_constraints cnstrs, c')
+        (SyntaxNoEff.Term (TranslateExEff2NoEff.elab_constraints cnstrs, c'), [])
         :: state.prog;
     }
 
@@ -83,30 +83,37 @@ module Backend : Language.Backend = struct
     {
       state with
       prog =
-        SyntaxNoEff.DefEffect (TranslateExEff2NoEff.elab_effect eff)
+        (SyntaxNoEff.DefEffect (TranslateExEff2NoEff.elab_effect eff), [])
         :: state.prog;
     }
 
   let process_top_let state defs =
-    let defs' =
-      List.map
-        (fun (pat, _params, cnstrs, comp) ->
-          ( TranslateExEff2NoEff.elab_pattern translate_exeff_config pat,
-            TranslateExEff2NoEff.elab_constraints cnstrs,
-            optimize_term state
-            @@ TranslateExEff2NoEff.elab_computation translate_exeff_config comp
-          ))
-        defs
+    let constraints, defs' =
+      List.fold_map
+        (fun constraints (pat, _params, cnstrs, comp) ->
+          ( cnstrs :: constraints,
+            ( TranslateExEff2NoEff.elab_pattern translate_exeff_config pat,
+              TranslateExEff2NoEff.elab_constraints cnstrs,
+              optimize_term state
+              @@ TranslateExEff2NoEff.elab_computation translate_exeff_config
+                   comp ) ))
+        [] defs
     in
-    { state with prog = SyntaxNoEff.TopLet defs' :: state.prog }
+    { state with prog = (SyntaxNoEff.TopLet defs', constraints) :: state.prog }
 
   let process_top_let_rec state defs =
+    let constraints =
+      defs |> Assoc.values_of |> List.map (fun (_, c, _) -> c)
+    in
     let defs' =
       optimize_top_rec_definitions state
       @@ TranslateExEff2NoEff.elab_top_rec_definitions translate_exeff_config
            defs
     in
-    { state with prog = SyntaxNoEff.TopLetRec defs' :: state.prog }
+    {
+      state with
+      prog = (SyntaxNoEff.TopLetRec defs', constraints) :: state.prog;
+    }
 
   let load_primitive_value state x prim =
     { state with primitive_values = Assoc.update x prim state.primitive_values }
@@ -120,7 +127,7 @@ module Backend : Language.Backend = struct
         TranslateExEff2NoEff.elab_tydef type_def )
     in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in
-    { state with prog = SyntaxNoEff.TyDef tydefs' :: state.prog }
+    { state with prog = (SyntaxNoEff.TyDef tydefs', []) :: state.prog }
 
   let finalize state =
     let pp_state =
@@ -136,8 +143,17 @@ module Backend : Language.Backend = struct
           (TranslateNoEff2Ocaml.pp_def_effect eff'))
       (List.rev state.primitive_effects);
     List.iter
-      (fun cmd ->
+      (fun (cmd, constraints) ->
         Format.fprintf !Config.output_formatter "%t\n"
-          (TranslateNoEff2Ocaml.pp_cmd pp_state cmd))
+          (TranslateNoEff2Ocaml.pp_cmd pp_state cmd);
+        match constraints with
+        | _ when !Config.print_graph ->
+            List.iter
+              (fun c ->
+                Format.fprintf !Config.output_formatter
+                  "(* Constraints graph:\n %t \n*)"
+                  (Language.Constraints.print_dot c))
+              constraints
+        | _ -> ())
       (List.rev state.prog)
 end

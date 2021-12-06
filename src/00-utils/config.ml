@@ -26,6 +26,8 @@ let enable_optimization = ref true
 
 let profiling = ref false
 
+let print_graph = ref false
+
 let optimization_fuel = ref 5
 
 type 'a optimizator_base_config = {
