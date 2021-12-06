@@ -346,9 +346,21 @@ and print_abs_ty (ty1, drty2) ppf =
   print "%t → %t" (print_ty ty1) (print_dirty drty2)
 
 module DirtConstraints = struct
-  module DirtParamGraph = Graph.Make (DirtParam)
+  module DirtParamGraph =
+    Graph.Make
+      (DirtParam)
+      (struct
+        type t = DirtCoercionParam.t * Effect.Set.t
 
-  type t = (DirtCoercionParam.t * Effect.Set.t) DirtParamGraph.t
+        let[@warning "-27"] print ?(safe = false) (edge, effect_set) ppf =
+          let print_effect_set ppf =
+            if Effect.Set.is_empty effect_set then Print.print ppf ""
+            else Print.print ppf " U {%t}" (print_effect_set effect_set)
+          in
+          Print.print ppf "%t%t" (DirtCoercionParam.print edge) print_effect_set
+      end)
+
+  type t = DirtParamGraph.t
 
   let empty = DirtParamGraph.empty
 
@@ -380,9 +392,9 @@ module DirtConstraints = struct
 end
 
 module TyConstraints = struct
-  module TyParamGraph = Graph.Make (TyParam)
+  module TyParamGraph = Graph.Make (TyParam) (TyCoercionParam)
 
-  type t = TyCoercionParam.t TyParamGraph.t SkelParam.Map.t
+  type t = TyParamGraph.t SkelParam.Map.t
 
   let empty = SkelParam.Map.empty
 
@@ -475,80 +487,39 @@ module Constraints = struct
   let print_dirt_edge (source, (edge, effect_set), sink) ppf : unit =
     let print_effect_set ppf =
       if Effect.Set.is_empty effect_set then Print.print ppf ""
-      else Print.print ppf "{%t}" (print_effect_set effect_set)
+      else Print.print ppf " U {%t}" (print_effect_set effect_set)
     in
-    Print.print ppf "node_%t -> node_%t [label=\"%t U %t\"]"
+    Print.print ppf "@[<h>node_%t -> node_%t [label=\"%t%t\"]@]"
       (DirtParam.print source) (DirtParam.print sink)
       (DirtCoercionParam.print edge)
       print_effect_set
 
-  let print_skeleton_graph
-      ((skel_param, graph) :
-        SkelParam.t * TyCoercionParam.t TyParam.Map.t TyParam.Map.t) ppf : unit
-      =
-    let indent = "    " in
-    let indent2 = "      " in
-    let skel_print = SkelParam.print skel_param in
-    let bindings = TyParam.Map.bindings graph in
-    (* Not all vertices are source vertices *)
-    let implicit_vertices =
-      List.map (fun (_, m) -> TyParam.Map.keys m) bindings |> List.flatten
-    in
-    let vertices =
-      List.map fst bindings @ implicit_vertices
-      |> TyParam.Set.of_list |> TyParam.Set.elements
-    in
-    let edges =
-      List.map
-        (fun (from, targets) ->
-          TyParam.Map.bindings targets
-          |> List.map (fun (target, edge) -> (from, edge, target)))
-        bindings
-      |> List.flatten
-    in
-    Print.print ppf
-      "%ssubgraph cluster_%t {\n\
-       %slabel=\"Skeleton param: %t\";\n\
-       %s//nodes\n\
-       %s%t\n\n\
-       %s//edges\n\
-       %s%t\n\n\
-       %s}"
-      indent skel_print indent2 skel_print indent2 indent2
-      (Print.sequence ("\n" ^ indent2) print_ty_param_vertex vertices)
-      indent2 indent2
-      (Print.sequence ("\n" ^ indent2) print_edge edges)
-      indent
+  let print_skeleton_graph (skel_param, graph) ppf : unit =
+    TyConstraints.TyParamGraph.print_dot graph
+      (fun ppf -> Print.print ppf "cluster_%t" (SkelParam.print skel_param))
+      (fun ppf ->
+        Print.print ppf "label=\"Skeleton param: %t\""
+          (SkelParam.print skel_param))
+      ppf
 
   let print_dirt_graph graph ppf : unit =
-    let indent = "  " in
-    (* Not all vertices are source vertices *)
-    let vertices, edges =
-      DirtConstraints.fold
-        (fun source sink coercion set (vertices, edges) ->
-          ( vertices |> DirtParam.Set.add source |> DirtParam.Set.add sink,
-            (source, (coercion, set), sink) :: edges ))
-        graph (DirtParam.Set.empty, [])
-    in
-    let vertices = DirtParam.Set.elements vertices in
-    Print.print ppf "%s//nodes\n%s%t\n\n%s//edges\n%s%t\n\n" indent indent
-      (Print.sequence ("\n" ^ indent) print_dirt_param_vertex vertices)
-      indent indent
-      (Print.sequence ("\n" ^ indent) print_dirt_edge edges)
+    DirtConstraints.DirtParamGraph.print_dot graph
+      (fun ppf -> Print.print ppf "cluster_dirt_graph")
+      (fun ppf -> Print.print ppf "label=\"Dirt constraints\"")
+      ppf
 
   let print_dot c ppf =
     let skeleton_graphs = SkelParam.Map.bindings c.ty_constraints in
 
     Print.print ppf
       "digraph {\n\
+       //Type params\n\
       \  subgraph cluster_skeleton {\n\n\
       \  label=\"Type constraints\";\n\
        %t\n\
        }\n\
-      \  subgraph cluster_dirt {\n\n\
-      \  label=\"Dirt constraints\";\n\
-       %t\n\
-       }\n\n\
+       // Dirt\n\
+      \       %t\n\
       \ }"
       (Print.sequence "\n" print_skeleton_graph skeleton_graphs)
       (print_dirt_graph c.dirt_constraints)
