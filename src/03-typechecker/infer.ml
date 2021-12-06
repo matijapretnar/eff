@@ -217,55 +217,63 @@ let rec tcMany state (xss : 'a list) tc =
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
-let rec infer_pattern state (pat : Untyped.pattern) :
-    Term.pattern * state * Constraint.t =
-  let pat', ty, state', cnstrs = infer_pattern' state pat in
-  ({ term = pat'; ty }, state', cnstrs)
+let rec infer_pattern (state : state) (pat : Untyped.pattern) :
+    Term.pattern * Type.ty Term.Variable.Map.t * Constraint.t =
+  let pat', ty, vars, cnstrs = infer_pattern' state pat in
+  ({ term = pat'; ty }, vars, cnstrs)
 
 and infer_pattern' state pat =
   match pat.it with
   | Untyped.PVar x ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
-      (Term.PVar x, alpha, extend_var state x alpha, Constraint.empty)
+      (Term.PVar x, alpha, Term.Variable.Map.singleton x alpha, Constraint.empty)
   | Untyped.PAnnotated (p, ty) ->
-      let p', state', cnstrs = infer_pattern state p in
-      (p'.term, ty, state', Constraint.add_ty_equality (ty, p'.ty) cnstrs)
+      let p', vars, cnstrs = infer_pattern state p in
+      (p'.term, ty, vars, Constraint.add_ty_equality (ty, p'.ty) cnstrs)
   | Untyped.PNonbinding ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
-      (Term.PNonbinding, alpha, state, Constraint.empty)
+      (Term.PNonbinding, alpha, Term.Variable.Map.empty, Constraint.empty)
   | Untyped.PConst c ->
-      (Term.PConst c, Type.type_const c, state, Constraint.empty)
+      ( Term.PConst c,
+        Type.type_const c,
+        Term.Variable.Map.empty,
+        Constraint.empty )
   | Untyped.PTuple ps ->
-      let fold p (ps', state, cnstrs) =
-        let p', state', cnstrs' = infer_pattern state p in
-        (p' :: ps', state', Constraint.union cnstrs' cnstrs)
+      let fold p (ps', vars, cnstrs) =
+        let p', vars', cnstrs' = infer_pattern state p in
+        ( p' :: ps',
+          Term.Variable.Map.compatible_union vars vars',
+          Constraint.union cnstrs' cnstrs )
       in
-      let ps', state', cnstrs =
-        List.fold_right fold ps ([], state, Constraint.empty)
+      let ps', vars, cnstrs =
+        List.fold_right fold ps ([], Term.Variable.Map.empty, Constraint.empty)
       in
       let p = Term.pTuple ps' in
-      (p.term, p.ty, state', cnstrs)
+      (p.term, p.ty, vars, cnstrs)
   | Untyped.PVariant (lbl, p) -> (
       match (p, TypeDefinitionContext.infer_variant lbl state.tydefs) with
       | None, (None, out_ty) ->
-          (Term.PVariant (lbl, None), out_ty, state, Constraint.empty)
+          ( Term.PVariant (lbl, None),
+            out_ty,
+            Term.Variable.Map.empty,
+            Constraint.empty )
       | Some p, (Some in_ty, out_ty) ->
-          let p', state', cnstrs = infer_pattern state p in
+          let p', vars, cnstrs = infer_pattern state p in
           ( Term.PVariant (lbl, Some p'),
             out_ty,
-            state',
+            vars,
             Constraint.add_ty_equality (in_ty, p'.ty) cnstrs )
       | _ -> assert false)
   | Untyped.PAs (p, x) ->
-      let p', state', cnstrs = infer_pattern state p in
-      (Term.PAs (p', x), p'.ty, extend_var state' x p'.ty, cnstrs)
+      let p', vars, cnstrs = infer_pattern state p in
+      (Term.PAs (p', x), p'.ty, Term.Variable.Map.add x p'.ty vars, cnstrs)
   | Untyped.PRecord flds ->
       let hd_fld, _ = List.hd (Type.Field.Map.bindings flds) in
       let out_ty, (ty_name, fld_tys) =
         TypeDefinitionContext.infer_field hd_fld state.tydefs
       in
-      let fold fld p (flds', state, cnstrs) =
-        let p', state', cnstrs' = infer_pattern state p in
+      let fold fld p (flds', vars, cnstrs) =
+        let p', vars', cnstrs' = infer_pattern state p in
         match Type.Field.Map.find_opt fld fld_tys with
         | None ->
             Error.typing ~loc:pat.at "Field %t does not belong to type %t"
@@ -273,18 +281,22 @@ and infer_pattern' state pat =
               (Type.TyName.print ty_name)
         | Some fld_ty ->
             ( (fld, p') :: flds',
-              state',
+              Term.Variable.Map.compatible_union vars vars',
               Constraint.union
                 (Constraint.add_ty_equality (fld_ty, p'.ty) cnstrs')
                 cnstrs )
       in
-      let flds', state', cnstrs' =
-        Type.TyName.Map.fold fold flds ([], state, Constraint.empty)
+      let flds', vars, cnstrs' =
+        Type.TyName.Map.fold fold flds
+          ([], Term.Variable.Map.empty, Constraint.empty)
       in
-      (Term.PRecord (Type.Field.Map.of_bindings flds'), out_ty, state', cnstrs')
+      (Term.PRecord (Type.Field.Map.of_bindings flds'), out_ty, vars, cnstrs')
 
 let isLocatedVarPat (pat : Untyped.pattern) : bool =
   match pat.it with Untyped.PVar _ -> true | _other_pattern -> false
+
+let extend_state vars state =
+  Term.Variable.Map.fold (fun x ty state -> extend_var state x ty) vars state
 
 (* ************************************************************************* *)
 (* ************************************************************************* *)
@@ -355,7 +367,8 @@ and tcVariant state ((lbl, mbe) : label * Untyped.expression option) :
   | _, _ -> failwith __LOC__
 
 and tcAbstraction state (pat, cmp) =
-  let pat', state', cnstrs1 = infer_pattern state pat in
+  let pat', vars, cnstrs1 = infer_pattern state pat in
+  let state' = extend_state vars state in
   let cmp', cnstrs2 = tcComp state' cmp in
   (Term.abstraction (pat', cmp'), Constraint.union cnstrs1 cnstrs2)
 
@@ -572,7 +585,8 @@ and tcLetCmp state (pat : Untyped.pattern) (c1 : Untyped.computation)
   (* 1: Typecheck c1, the pattern, and c2 *)
   let trgC1, cs1 = tcComp state c1 in
   let tyA1, dirtD1 = trgC1.ty in
-  let trgPat, midState, csPat = infer_pattern state pat in
+  let trgPat, vars, csPat = infer_pattern state pat in
+  let midState = extend_state vars state in
   let csPat' = Constraint.add_ty_equality (trgPat.ty, tyA1) csPat in
   let trgC2, cs2 = tcComp midState c2 in
   let tyA2, dirtD2 = trgC2.ty in
@@ -771,7 +785,8 @@ and tcCheck (state : state) (cmp : Untyped.computation) : tcCompOutput' =
  * tcTypedVarPat) *)
 and infer_abstraction (state : state) (pat, cmp) :
     Term.abstraction * Constraint.t =
-  let trgPat, state', cs1 = infer_pattern state pat in
+  let trgPat, vars, cs1 = infer_pattern state pat in
+  let state' = extend_state vars state in
   let trgCmp, cs2 = tcComp state' cmp in
   (Term.abstraction (trgPat, trgCmp), Constraint.union cs1 cs2)
 
@@ -783,8 +798,11 @@ and check_abstraction state abs patTy : Term.abstraction * Constraint.t =
 
 and infer_abstraction2 (state : state) (pat1, pat2, cmp) :
     Term.abstraction2 * Constraint.t =
-  let trgPat1, state', cs1 = infer_pattern state pat1 in
-  let trgPat2, state', cs2 = infer_pattern state' pat2 in
+  let trgPat1, vars1, cs1 = infer_pattern state pat1 in
+  let trgPat2, vars2, cs2 = infer_pattern state pat2 in
+  let state' =
+    extend_state (Term.Variable.Map.compatible_union vars1 vars2) state
+  in
   let trgCmp, cs = tcComp state' cmp in
   ( Term.abstraction2 (trgPat1, trgPat2, trgCmp),
     Constraint.list_union [ cs1; cs2; cs ] )
