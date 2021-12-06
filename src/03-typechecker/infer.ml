@@ -805,36 +805,6 @@ and check_abstraction2 state abs2 patTy1 patTy2 :
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
-let monomorphize free_ty_params cnstrs =
-  let free_cnstrs_params = Type.Constraints.free_params cnstrs in
-  let free_params = Type.Params.union free_ty_params free_cnstrs_params in
-  let cnstrs' =
-    Constraint.empty
-    |> List.fold_right
-         (fun sk ->
-           Constraint.add_skeleton_equality
-             (Type.SkelParam sk, Type.SkelBasic Const.FloatTy))
-         (Type.SkelParam.Set.elements free_params.skel_params)
-    |> List.fold_right
-         (fun (t, skel) ->
-           Constraint.add_ty_inequality
-             ( Type.TyCoercionParam.fresh (),
-               (Type.tyParam t skel, Type.tyBasic Const.FloatTy) ))
-         (Type.TyParam.Map.bindings free_params.ty_params)
-    |> List.fold_right
-         (fun d ->
-           Constraint.add_dirt_inequality
-             ( Type.DirtCoercionParam.fresh (),
-               (Type.no_effect_dirt d, Type.empty_dirt) ))
-         (Type.DirtParam.Set.elements free_params.dirt_params)
-  in
-  let sub, residuals =
-    Unification.solve (Constraint.union cnstrs' (Constraint.unresolve cnstrs))
-  in
-  (* After zapping, there should be no more constraints left to solve. *)
-  assert (Type.Constraints.is_empty residuals);
-  sub
-
 let infer_computation state comp =
   let comp', cnstrs = tcComp state comp in
   let sub, residuals = Unification.solve cnstrs in
@@ -852,20 +822,12 @@ let infer_rec_abstraction state defs =
 
 (* Typecheck a top-level expression *)
 let process_computation state comp =
-  let comp', residuals = infer_computation state comp in
+  let comp', _residuals = infer_computation state comp in
   (* Print.debug "TERM: %t" (Term.print_computation comp); *)
   (* Print.debug "TYPE: %t" (Type.print_dirty comp.ty); *)
   (* Print.debug "CONSTRAINTS: %t" (Constraint.print_constraints residuals); *)
-  let free_params = Term.free_params_computation comp' in
-  let mono_sub = monomorphize free_params residuals in
-  (* Print.debug "SUB: %t" (Substitution.print_substitutions mono_sub); *)
-  let mono_comp = subInCmp mono_sub comp' in
-  (* Print.debug "MONO TERM: %t" (Term.print_computation mono_comp); *)
-  (* Print.debug "MONO TYPE: %t" (Type.print_dirty mono_comp.ty); *)
-  (* We assume that all free variables in the term already appeared in its type or constraints *)
-  assert (Type.Params.is_empty (Term.free_params_computation mono_comp));
   Exhaust.check_computation state.tydefs comp;
-  mono_comp
+  comp'
 
 let process_top_let state defs =
   let fold (p, c) (state', defs) =
