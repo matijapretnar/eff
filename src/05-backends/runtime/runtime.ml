@@ -30,9 +30,9 @@ module Backend : Language.Backend = struct
   let process_def_effect state _ = state
 
   let process_top_let state defs =
-    match Assoc.to_list defs with
+    match defs with
     | [] -> state
-    | [ (x, (_params, _constraints, exp)) ] ->
+    | [ (x, _params, _constraints, exp) ] ->
         let v = Eval.eval_expression state exp in
         Format.fprintf !Config.output_formatter "@[val %t : %t = %t@]@."
           (Language.Term.Variable.print x)

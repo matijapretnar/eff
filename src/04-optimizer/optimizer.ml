@@ -549,14 +549,14 @@ let process_computation state comp =
 let process_top_let state defs =
   if !Config.enable_optimization then
     let defs' =
-      Assoc.map
-        (fun (params, cnstrs, e) ->
-          (params, cnstrs, optimize_expression state e))
+      List.map
+        (fun (pat, params, cnstrs, e) ->
+          (pat, params, cnstrs, optimize_expression state e))
         defs
     in
     let state' =
-      Assoc.fold_left
-        (fun state (f, (_, _, e)) ->
+      List.fold_left
+        (fun state (f, _, _, e) ->
           match e.term with
           | Term.Lambda abs -> add_function state f abs
           | _ -> state)

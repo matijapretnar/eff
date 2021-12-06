@@ -84,15 +84,14 @@ module Backend : Language.Backend = struct
 
   let process_top_let state defs =
     let defs' =
-      Assoc.kmap
-        (fun (x, (_params, cnstrs, e)) ->
+      List.map
+        (fun (x, _params, cnstrs, e) ->
           ( x,
-            ( Type.TyConstraints.fold
-                (fun _ _ _ w lst -> w :: lst)
-                cnstrs.Type.Constraints.ty_constraints [],
-              optimize_term state
-              @@ TranslateExEff2NoEff.elab_expression translate_exeff_config e
-            ) ))
+            Type.TyConstraints.fold
+              (fun _ _ _ w lst -> w :: lst)
+              cnstrs.Type.Constraints.ty_constraints [],
+            optimize_term state
+            @@ TranslateExEff2NoEff.elab_expression translate_exeff_config e ))
         defs
     in
     { state with prog = SyntaxNoEff.TopLet defs' :: state.prog }

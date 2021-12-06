@@ -304,7 +304,7 @@ let pp_def_effect (eff, (ty1, ty2)) ppf =
      @]@.;;"
     (Type.Effect.print eff) (pp_type ty1) (pp_type ty2)
 
-let pp_let_def state (p, (ws, t)) ppf =
+let pp_let_def state (p, ws, t) ppf =
   print ppf "%t %t = @,%t" (pp_variable state p) (pp_coercion_vars ws)
     (pp_term state t)
 
@@ -339,13 +339,11 @@ let pp_cmd state cmd ppf =
   | DefEffect e -> pp_def_effect e ppf
   | TopLet defs ->
       print ppf "%t@.;; let %t = %t@.;;"
-        (pp_lets "let" (pp_let_def state) (Assoc.to_list defs))
+        (pp_lets "let" (pp_let_def state) defs)
         (Print.sequence ","
-           (fun (f, _) -> pp_variable state ~safe:false f)
-           (Assoc.to_list defs))
-        (Print.sequence ","
-           (fun (f, _) -> pp_variable state f)
-           (Assoc.to_list defs))
+           (fun (f, _, _) -> pp_variable state ~safe:false f)
+           defs)
+        (Print.sequence "," (fun (f, _, _) -> pp_variable state f) defs)
   | TopLetRec defs ->
       print ppf "%t@.;; let %t = %t@.;;"
         (pp_top_let_rec state (Assoc.to_list defs))

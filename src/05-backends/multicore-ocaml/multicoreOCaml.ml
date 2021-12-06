@@ -51,8 +51,8 @@ module Backend : Language.Backend = struct
     update state (DefEffect (eff, (ty1', ty2')))
 
   let process_top_let state defs =
-    let converter (x, (_, _, e)) = (Syntax.PVar x, Translate.of_expression e) in
-    let defs' = List.map converter (Assoc.to_list defs) in
+    let converter (x, _, _, e) = (Syntax.PVar x, Translate.of_expression e) in
+    let defs' = List.map converter defs in
     update state (TopLet defs')
 
   let process_top_let_rec state defs =

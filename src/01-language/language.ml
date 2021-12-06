@@ -19,9 +19,7 @@ module type Backend = sig
 
   val process_top_let :
     state ->
-    ( Term.variable,
-      Type.Params.t * Type.Constraints.t * Term.expression )
-    Utils.Assoc.t ->
+    (Term.variable * Type.Params.t * Type.Constraints.t * Term.expression) list ->
     state
 
   val process_top_let_rec : state -> Term.top_rec_definitions -> state

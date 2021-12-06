@@ -864,11 +864,10 @@ let process_top_let state defs =
         let state'' = extend_poly_var state' x ty_scheme in
         Exhaust.is_irrefutable state.tydefs p;
         Exhaust.check_computation state.tydefs c;
-        (state'', (x, (params, constraints, expr)) :: defs)
+        (state'', (x, params, constraints, expr) :: defs)
     | _ -> failwith __LOC__
   in
-  let state', defs' = List.fold_right fold defs (state, []) in
-  (state', Assoc.of_list defs')
+  List.fold_right fold defs (state, [])
 
 let process_top_let_rec state defs =
   let defs, constraints = infer_rec_abstraction state (Assoc.to_list defs) in
