@@ -851,11 +851,14 @@ let process_computation state comp =
   comp'
 
 let process_top_let state defs =
-  let fold (pat, cmp) (state, defs) =
-    let pat', vars, cnstrs_pat = infer_pattern state pat
-    and cmp', cnstrs_cmp = tcComp state cmp in
+  let fold (pat, cmp) (state', defs) =
+    let pat', vars, cnstrs_pat = infer_pattern state pat in
+    let cmp', cnstrs_cmp = tcComp state cmp in
     let sub, constraints =
-      Unification.solve (Constraint.union cnstrs_pat cnstrs_cmp)
+      Unification.solve
+        (Constraint.add_ty_equality
+           (pat'.ty, fst cmp'.ty)
+           (Constraint.union cnstrs_pat cnstrs_cmp))
     in
     let pat'', cmp'' =
       (Term.apply_sub_pat sub pat', Term.apply_sub_comp sub cmp')
@@ -869,14 +872,14 @@ let process_top_let state defs =
             (Type.Constraints.free_params constraints)
       | _ -> Type.Params.empty
     in
-    let state' =
+    let state'' =
       Term.Variable.Map.fold
         (fun x ty state -> extend_poly_var state x { params; constraints; ty })
-        vars' state
+        vars' state'
     in
     Exhaust.is_irrefutable state.tydefs pat;
     Exhaust.check_computation state.tydefs cmp;
-    (state', (pat'', params, constraints, cmp'') :: defs)
+    (state'', (pat'', params, constraints, cmp'') :: defs)
   in
   List.fold_right fold defs (state, [])
 
