@@ -139,7 +139,7 @@ module Backend : Language.Backend = struct
     List.iter
       (fun eff ->
         let eff' = TranslateExEff2NoEff.elab_effect eff in
-        Format.fprintf !Config.output_formatter "%t (* primitive effect *)\n"
+        Format.fprintf !Config.output_formatter "(* primitive effect *) %t\n"
           (TranslateNoEff2Ocaml.pp_def_effect eff'))
       (List.rev state.primitive_effects);
     List.iter
