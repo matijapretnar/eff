@@ -6,21 +6,26 @@ let pure_arrow t1 t2 = Type.arrow (t1, pure_ty t2)
 
 let binary_op_ty t1 t2 ty = Type.arrow (t1, pure_ty (pure_arrow t2 ty))
 
-let unary_integer_op_ty = Type.monotype (pure_arrow int_ty int_ty)
+let unary_integer_op_ty = TyScheme.monotype (pure_arrow int_ty int_ty)
 
-let binary_integer_op_ty = Type.monotype (binary_op_ty int_ty int_ty int_ty)
+let binary_integer_op_ty = TyScheme.monotype (binary_op_ty int_ty int_ty int_ty)
 
-let unary_float_op_ty = Type.monotype (pure_arrow float_ty float_ty)
+let unary_float_op_ty = TyScheme.monotype (pure_arrow float_ty float_ty)
 
-let binary_float_op_ty = Type.monotype (binary_op_ty float_ty float_ty float_ty)
+let binary_float_op_ty =
+  TyScheme.monotype (binary_op_ty float_ty float_ty float_ty)
 
 let binary_string_op_ty =
-  Type.monotype (binary_op_ty string_ty string_ty string_ty)
+  TyScheme.monotype (binary_op_ty string_ty string_ty string_ty)
 
 let poly_ty ty_body =
   let ty = Type.fresh_ty_with_fresh_skel () in
   let params = Type.free_params_ty ty in
-  { Type.params; Type.ty = ty_body ty; Type.constraints = Constraints.empty }
+  {
+    TyScheme.params;
+    TyScheme.ty = ty_body ty;
+    TyScheme.constraints = Constraints.empty;
+  }
 
 let comparison_ty = poly_ty (fun ty -> binary_op_ty ty ty bool_ty)
 
@@ -39,14 +44,14 @@ let primitive_value_type_scheme = function
   | FloatDiv -> binary_float_op_ty
   | FloatExp -> unary_float_op_ty
   | FloatExpm1 -> unary_float_op_ty
-  | FloatInfinity -> Type.monotype float_ty
+  | FloatInfinity -> TyScheme.monotype float_ty
   | FloatLog -> unary_float_op_ty
   | FloatLog1p -> unary_float_op_ty
   | FloatMul -> binary_float_op_ty
-  | FloatNaN -> Type.monotype float_ty
+  | FloatNaN -> TyScheme.monotype float_ty
   | FloatNeg -> unary_float_op_ty
-  | FloatNegInfinity -> Type.monotype float_ty
-  | FloatOfInt -> Type.monotype (pure_arrow int_ty float_ty)
+  | FloatNegInfinity -> TyScheme.monotype float_ty
+  | FloatOfInt -> TyScheme.monotype (pure_arrow int_ty float_ty)
   | FloatSin -> binary_float_op_ty
   | FloatSqrt -> binary_float_op_ty
   | FloatSub -> binary_float_op_ty
@@ -59,13 +64,13 @@ let primitive_value_type_scheme = function
   | IntegerAbs -> unary_integer_op_ty
   | IntegerPow -> binary_integer_op_ty
   | IntegerSub -> binary_integer_op_ty
-  | IntOfFloat -> Type.monotype (pure_arrow float_ty int_ty)
+  | IntOfFloat -> TyScheme.monotype (pure_arrow float_ty int_ty)
   | StringConcat -> binary_string_op_ty
-  | StringLength -> Type.monotype (pure_arrow string_ty int_ty)
-  | StringOfFloat -> Type.monotype (pure_arrow float_ty string_ty)
-  | StringOfInt -> Type.monotype (pure_arrow int_ty string_ty)
+  | StringLength -> TyScheme.monotype (pure_arrow string_ty int_ty)
+  | StringOfFloat -> TyScheme.monotype (pure_arrow float_ty string_ty)
+  | StringOfInt -> TyScheme.monotype (pure_arrow int_ty string_ty)
   | StringSub ->
-      Type.monotype
+      TyScheme.monotype
         (pure_arrow string_ty (pure_arrow int_ty (pure_arrow int_ty string_ty)))
   | ToString -> poly_ty (fun ty -> pure_arrow ty string_ty)
 

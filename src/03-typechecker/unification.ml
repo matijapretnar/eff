@@ -2,14 +2,14 @@ open Utils
 open Language
 open Type
 
-let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
+let apply_substitution new_sub sub (paused : Constraints.t) queue =
   let substitute_ty_constraint s t1 t2 w ty1 ty2 (paused, queue) =
     let ty1', ty2' =
       ( Substitution.apply_substitutions_to_type new_sub ty1,
         Substitution.apply_substitutions_to_type new_sub ty2 )
     in
     if Type.equal_ty ty1 ty1' && Type.equal_ty ty2 ty2' then
-      (Type.Constraints.add_ty_constraint s t1 t2 w paused, queue)
+      (Constraints.add_ty_constraint s t1 t2 w paused, queue)
     else (paused, Constraint.add_ty_inequality (w, (ty1', ty2')) queue)
   and substitute_dirt_constraint d1 d2 w effs drt1 drt2 (paused, queue) =
     let drt1', drt2' =
@@ -17,15 +17,15 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
         Substitution.apply_substitutions_to_dirt new_sub drt2 )
     in
     if Type.equal_dirt drt1 drt1' && Type.equal_dirt drt2 drt2' then
-      (Type.Constraints.add_dirt_constraint paused d1 d2 w effs, queue)
+      (Constraints.add_dirt_constraint paused d1 d2 w effs, queue)
     else (paused, Constraint.add_dirt_inequality (w, (drt1', drt2')) queue)
   in
   let sub' = Substitution.merge new_sub sub in
   let paused', queue' =
-    (Type.Constraints.empty, Constraint.apply_sub new_sub queue)
-    |> Type.TyConstraints.fold_expanded substitute_ty_constraint
+    (Constraints.empty, Constraint.apply_sub new_sub queue)
+    |> Constraints.TyConstraints.fold_expanded substitute_ty_constraint
          paused.ty_constraints
-    |> Type.DirtConstraints.fold_expanded substitute_dirt_constraint
+    |> Constraints.DirtConstraints.fold_expanded substitute_dirt_constraint
          paused.dirt_constraints
   in
   (sub', paused', queue')
@@ -42,7 +42,7 @@ let expand_row ~loc row ops =
       (sub', row')
   | Dirt.Row.Empty -> Error.typing ~loc "Cannot extend an empty row."
 
-let skel_eq_step ~loc sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
+let skel_eq_step ~loc sub (paused : Constraints.t) rest_queue sk1 sk2 =
   match (sk1, sk2) with
   (* ς = ς *)
   | Skeleton.Param sp1, Skeleton.Param sp2 when sp1 = sp2 ->
@@ -102,7 +102,7 @@ let skel_eq_step ~loc sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
         "This expression has type %t but it should have type %t." (printer sk1)
         (printer sk2)
 
-and ty_eq_step ~loc sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
+and ty_eq_step ~loc sub (paused : Constraints.t) rest_queue (ty1 : Type.ty)
     (ty2 : Type.ty) =
   match (ty1.term, ty2.term) with
   | _, _ when ty1.ty <> ty2.ty ->
@@ -166,7 +166,7 @@ and ty_eq_step ~loc sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
         "This expression has type %t but it should have type %t."
         (printer ty1.ty) (printer ty2.ty)
 
-and ty_omega_step ~loc sub (paused : Type.Constraints.t) cons rest_queue omega =
+and ty_omega_step ~loc sub (paused : Constraints.t) cons rest_queue omega =
   function
   (* ω : A <= A *)
   | ty1, ty2 when Type.equal_ty ty1 ty2 ->
@@ -236,7 +236,7 @@ and ty_omega_step ~loc sub (paused : Type.Constraints.t) cons rest_queue omega =
       { term = Type.TyParam t2; ty = Skeleton.Param s2 } )
     when s1 = s2 ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
-      (sub, Type.Constraints.add_ty_constraint s1 t1 t2 omega paused, rest_queue)
+      (sub, Constraints.add_ty_constraint s1 t1 t2 omega paused, rest_queue)
   | { term = Type.TyParam _; ty = Skeleton.Param _ as skel_tv }, a
   | a, { term = Type.TyParam _; ty = Skeleton.Param _ as skel_tv } ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
@@ -265,9 +265,7 @@ and dirt_omega_step sub resolved unresolved w dcons =
   | ( { Dirt.effect_set = ops1; row = Dirt.Row.Param d1 },
       { Dirt.effect_set = ops2; row = Dirt.Row.Param d2 } )
     when Effect.Set.is_empty ops1 ->
-      ( sub,
-        Type.Constraints.add_dirt_constraint resolved d1 d2 w ops2,
-        unresolved )
+      (sub, Constraints.add_dirt_constraint resolved d1 d2 w ops2, unresolved)
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
       { effect_set = ops2; row = Dirt.Row.Param d2 } ) ->
@@ -365,7 +363,7 @@ and dirt_eq_step ~loc sub paused rest_queue { Dirt.effect_set = o1; row = row1 }
 
 let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
   (* Print.debug "SUB: %t" (Substitution.print sub); *)
-  (* Print.debug "PAUSED: %t" (Type.Constraints.print paused); *)
+  (* Print.debug "PAUSED: %t" (Constraints.print paused); *)
   (* Print.debug "QUEUE: %t" (Constraint.print queue); *)
   match queue with
   | { skeleton_equalities = (sk1, sk2) :: skeleton_equalities; _ } ->
@@ -400,7 +398,7 @@ let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
 let solve ~loc constraints =
   (* Print.debug "constraints: %t" (Constraint.print_constraints constraints); *)
   let solved =
-    unify ~loc (Substitution.empty, Type.Constraints.empty, constraints)
+    unify ~loc (Substitution.empty, Constraints.empty, constraints)
   in
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)

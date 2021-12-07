@@ -136,12 +136,12 @@ let apply_sub subs cons =
         cons.ty_inequalities;
   }
 
-let return_to_unresolved (resolved : Type.Constraints.t) queue =
+let return_to_unresolved (resolved : Constraints.t) queue =
   queue
-  |> Type.DirtConstraints.fold_expanded
+  |> Constraints.DirtConstraints.fold_expanded
        (fun _ _ w _ drt1 drt2 -> add_dirt_inequality (w, (drt1, drt2)))
        resolved.dirt_constraints
-  |> Type.TyConstraints.fold_expanded
+  |> Constraints.TyConstraints.fold_expanded
        (fun _s _t1 _t2 w ty1 ty2 -> add_ty_inequality (w, (ty1, ty2)))
        resolved.ty_constraints
 

@@ -417,9 +417,9 @@ let elab_tydef = function
 let elab_effect (eff, (ty1, ty2)) : n_effect = (eff, (elab_ty ty1, elab_ty ty2))
 
 let elab_constraints cnstrs =
-  Type.TyConstraints.fold
+  Constraints.TyConstraints.fold
     (fun _ _ _ w lst -> w :: lst)
-    cnstrs.Type.Constraints.ty_constraints []
+    cnstrs.Constraints.ty_constraints []
 
 let elab_top_rec_definitions state defs =
   Assoc.kmap

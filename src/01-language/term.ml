@@ -6,7 +6,7 @@ module Variable = Symbol.Make (Symbol.String)
 
 type variable = Variable.t
 
-type poly_variable = (Variable.t, Type.ty_scheme) typed
+type poly_variable = (Variable.t, TyScheme.t) typed
 
 module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
 
@@ -93,7 +93,7 @@ and abstraction2 =
 (** Abstractions that take two arguments. *)
 
 type top_rec_definitions =
-  (variable, Type.Params.t * Type.Constraints.t * abstraction) Assoc.t
+  (variable, Type.Params.t * Constraints.t * abstraction) Assoc.t
 
 let mono_var x ty =
   { term = Var { variable = x; instantiation = Substitution.empty }; ty }

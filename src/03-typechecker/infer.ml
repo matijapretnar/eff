@@ -4,11 +4,11 @@ open Language
 module Untyped = UntypedSyntax
 
 let identity_instantiation (params : Type.Params.t)
-    (constraints : Type.Constraints.t) =
+    (constraints : Constraints.t) =
   Substitution.
     {
       type_param_to_type_coercions =
-        Type.TyConstraints.fold_expanded
+        Constraints.TyConstraints.fold_expanded
           (fun _s _t1 _t2 w ty1 ty2 ->
             Type.TyCoercionParam.Map.add w (Coercion.tyCoercionVar w (ty1, ty2)))
           constraints.ty_constraints Type.TyCoercionParam.Map.empty;
@@ -17,7 +17,7 @@ let identity_instantiation (params : Type.Params.t)
         |> List.map (fun (p, skel) -> (p, Type.tyParam p skel))
         |> Type.TyParam.Map.of_bindings;
       dirt_var_to_dirt_coercions =
-        Type.DirtConstraints.fold_expanded
+        Constraints.DirtConstraints.fold_expanded
           (fun _d1 _d2 w _effs drt1 drt2 ->
             Type.DirtCoercionParam.Map.add w
               (Coercion.dirtCoercionVar w (drt1, drt2)))
@@ -33,12 +33,12 @@ let identity_instantiation (params : Type.Params.t)
     }
 
 module TypingEnv = struct
-  type t = (Term.Variable.t, Type.ty_scheme) Assoc.t
+  type t = (Term.Variable.t, TyScheme.t) Assoc.t
 
   let empty = Assoc.empty
 
-  let fresh_instantiation (params : Type.Params.t)
-      (constraints : Type.Constraints.t) =
+  let fresh_instantiation (params : Type.Params.t) (constraints : Constraints.t)
+      =
     let _, subst = Substitution.of_parameters params in
     let add_dirt_constraint _d1 _d2 w _effs drt1 drt2 (subst, constraints) =
       let w' = Type.DirtCoercionParam.refresh w
@@ -63,16 +63,16 @@ module TypingEnv = struct
       (subst', constraints')
     in
     (subst, Constraint.empty)
-    |> Type.TyConstraints.fold_expanded add_ty_constraint
+    |> Constraints.TyConstraints.fold_expanded add_ty_constraint
          constraints.ty_constraints
-    |> Type.DirtConstraints.fold_expanded add_dirt_constraint
+    |> Constraints.DirtConstraints.fold_expanded add_dirt_constraint
          constraints.dirt_constraints
 
   let lookup ctx x : Term.expression * Constraint.t =
     match Assoc.lookup x ctx with
     | Some ty_scheme ->
         let subst, cnstrs =
-          fresh_instantiation ty_scheme.Type.params ty_scheme.constraints
+          fresh_instantiation ty_scheme.TyScheme.params ty_scheme.constraints
         in
         let x = Term.poly_var x subst ty_scheme.ty in
         (x, cnstrs)
@@ -108,7 +108,10 @@ type state = {
 
 (* Add a single term binding to the global typing environment *)
 let extend_var env x ty =
-  { env with variables = TypingEnv.update env.variables x (Type.monotype ty) }
+  {
+    env with
+    variables = TypingEnv.update env.variables x (TyScheme.monotype ty);
+  }
 
 let extend_poly_var env x ty_scheme =
   { env with variables = TypingEnv.update env.variables x ty_scheme }
@@ -845,7 +848,7 @@ let process_computation state cmp =
     | Language.UntypedSyntax.Value _ ->
         Type.Params.union
           (Type.free_params_dirty cmp'.ty)
-          (Type.Constraints.free_params constraints)
+          (Constraints.free_params constraints)
     | _ -> Type.Params.empty
   in
   Exhaust.check_computation state.tydefs cmp;
@@ -870,7 +873,7 @@ let process_top_let ~loc state defs =
       | Language.UntypedSyntax.Value _ ->
           Type.Params.union
             (Type.free_params_dirty cmp''.ty)
-            (Type.Constraints.free_params constraints)
+            (Constraints.free_params constraints)
       | _ -> Type.Params.empty
     in
     let state'' =
@@ -889,13 +892,13 @@ let process_top_let_rec ~loc state defs =
     infer_rec_abstraction ~loc state (Assoc.to_list defs)
   in
   let defs_params = Term.free_params_definitions defs in
-  let cnstrs_params = Type.Constraints.free_params constraints in
+  let cnstrs_params = Constraints.free_params constraints in
   let params = Type.Params.union defs_params cnstrs_params in
   let state', defs' =
     Assoc.fold_right
       (fun (f, (abs : Term.abstraction)) (state, defs) ->
-        let (ty_scheme : Type.ty_scheme) =
-          Type.{ params; constraints; ty = Type.arrow abs.ty }
+        let (ty_scheme : TyScheme.t) =
+          TyScheme.{ params; constraints; ty = Type.arrow abs.ty }
         in
         let state' = extend_poly_var state f ty_scheme in
         (state', (f, (params, constraints, abs)) :: defs))

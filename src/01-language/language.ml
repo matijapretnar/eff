@@ -1,5 +1,6 @@
 module Coercion = Coercion
 module Const = Const
+module Constraints = Constraints
 module Dirt = Dirt
 module Effect = Effect
 module Primitives = Primitives
@@ -8,6 +9,7 @@ module Substitution = Substitution
 module Term = Term
 module Type = Type
 module TyName = TyName
+module TyScheme = TyScheme
 module UntypedSyntax = UntypedSyntax
 
 module type Backend = sig
@@ -16,16 +18,16 @@ module type Backend = sig
   val initial_state : state
 
   val process_computation :
-    state -> Type.Params.t * Term.computation * Type.Constraints.t -> state
+    state -> Type.Params.t * Term.computation * Constraints.t -> state
 
   val process_type_of :
-    state -> Type.Params.t * Term.computation * Type.Constraints.t -> state
+    state -> Type.Params.t * Term.computation * Constraints.t -> state
 
   val process_def_effect : state -> Term.effect -> state
 
   val process_top_let :
     state ->
-    (Term.pattern * Type.Params.t * Type.Constraints.t * Term.computation) list ->
+    (Term.pattern * Type.Params.t * Constraints.t * Term.computation) list ->
     state
 
   val process_top_let_rec : state -> Term.top_rec_definitions -> state
