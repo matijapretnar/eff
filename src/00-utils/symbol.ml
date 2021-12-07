@@ -139,7 +139,7 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
 
     let print pp m =
       Print.sequence ","
-        (fun (k, v) ppf -> Format.fprintf ppf "%t %t" (print k) (pp v))
+        (fun (k, v) ppf -> Format.fprintf ppf "%t ↦ %t" (print k) (pp v))
         (bindings m)
   end
 end

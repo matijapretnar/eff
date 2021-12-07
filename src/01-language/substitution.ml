@@ -137,41 +137,14 @@ let apply_substitutions_to_skeleton = apply_sub_skel
 
 (* Printing and other debug stuff *)
 
-let printy ?at_level ppf = Print.print ?at_level ppf
-
-let print_type_coercion p t ppf =
-  printy ppf "%t ↦ %t"
-    (Type.TyCoercionParam.print p)
-    (Coercion.print_ty_coercion t)
-
-let print_type_param_to_type p t ppf =
-  printy ppf "%t ↦ %t" (Type.TyParam.print p) (Type.print_ty t)
-
-let print_dirt_var_sub p t ppf =
-  printy ppf "%t ↦ %t" (Dirt.Param.print p) (Dirt.print t)
-
-let print_dirt_var_coercion p t ppf =
-  printy ppf "%t ↦ %t"
-    (Type.DirtCoercionParam.print p)
-    (Coercion.print_dirt_coercion t)
-
-let print_skel_param_sub p t ppf =
-  printy ppf "%t ↦ %t" (Skeleton.Param.print p) (Skeleton.print t)
-
 let print subs =
   [
-    subs.type_param_to_type_coercions |> Type.TyCoercionParam.Map.bindings
-    |> List.map (fun (x, y) -> print_type_coercion x y);
-    subs.type_param_to_type_subs |> Type.TyParam.Map.bindings
-    |> List.map (fun (x, y) -> print_type_param_to_type x y);
-    subs.dirt_var_to_dirt_subs |> Dirt.Param.Map.bindings
-    |> List.map (fun (x, y) -> print_dirt_var_sub x y);
-    subs.dirt_var_to_dirt_coercions |> Type.DirtCoercionParam.Map.bindings
-    |> List.map (fun (x, y) -> print_dirt_var_coercion x y);
-    subs.skel_param_to_skel_subs |> Skeleton.Param.Map.bindings
-    |> List.map (fun (x, y) -> print_skel_param_sub x y);
+    subs.type_param_to_type_coercions |> Type.TyCoercionParam.Map.print Coercion.print_ty_coercion;
+    subs.type_param_to_type_subs |> Type.TyParam.Map.print Type.print_ty;
+    subs.dirt_var_to_dirt_subs |> Dirt.Param.Map.print Dirt.print;
+    subs.dirt_var_to_dirt_coercions |> Type.DirtCoercionParam.Map.print Coercion.print_dirt_coercion;
+    subs.skel_param_to_skel_subs |> Skeleton.Param.Map.print Skeleton.print
   ]
-  |> List.concat
   |> Print.printer_sequence ", "
 
 let of_parameters (params : Type.Params.t) =
