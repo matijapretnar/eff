@@ -1,8 +1,7 @@
 open Utils
 (** Syntax of the NoEff language **)
 
-module Const = Language.Const
-module Type = Language.Type
+open Language
 module Variable = Symbol.Make (Symbol.String)
 
 type n_type =
@@ -32,7 +31,7 @@ type n_coercion =
 
 type variable = Variable.t
 
-type n_effect = Type.Effect.t * (n_type * n_type)
+type n_effect = Effect.t * (n_type * n_type)
 
 type n_pattern =
   | PNVar of variable
@@ -414,8 +413,7 @@ and print_effect_clauses eff_clauses ppf =
         (print_abstraction2 a2)
         (print_effect_clauses cases)
 
-and print_effect (eff, _) ppf =
-  Print.print ppf "Effect_%t" (Type.Effect.print eff)
+and print_effect (eff, _) ppf = Print.print ppf "Effect_%t" (Effect.print eff)
 
 and print_abstraction (t1, t2) ppf =
   Format.fprintf ppf "%t ->@;<1 2> %t" (print_pattern t1) (print_term t2)

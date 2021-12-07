@@ -4,7 +4,7 @@ open Utils
 
 type variable = Term.Variable.t
 
-type effect = Type.Effect.t
+type effect = Effect.t
 
 type label = Type.Label.t
 
@@ -134,7 +134,7 @@ and print_expression ?max_level e ppf =
       print "{effect_clauses = %t; value_clause = (%t)}"
         (Print.sequence " | " effect_clause (Assoc.to_list h.effect_clauses))
         (abstraction h.value_clause)
-  | Effect eff -> print "%t" (Type.Effect.print eff)
+  | Effect eff -> print "%t" (Effect.print eff)
 
 and abstraction (p, c) ppf =
   Format.fprintf ppf "%t -> %t" (print_pattern p) (print_computation c)
@@ -149,7 +149,7 @@ and letrec_abstraction (v, (p, c)) ppf =
 and case a ppf = Format.fprintf ppf "%t" (abstraction a)
 
 and effect_clause (eff, a2) ppf =
-  Format.fprintf ppf "| %t -> %t" (Type.Effect.print eff) (abstraction2 a2)
+  Format.fprintf ppf "| %t -> %t" (Effect.print eff) (abstraction2 a2)
 
 and abstraction2 (p1, p2, c) ppf =
   Format.fprintf ppf "%t %t -> %t" (print_pattern p1) (print_pattern p2)

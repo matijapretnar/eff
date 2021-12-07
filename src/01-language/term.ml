@@ -12,7 +12,7 @@ module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
 
 type effect_fingerprint = EffectFingerprint.t
 
-type effect = Type.Effect.t * (Type.ty * Type.ty)
+type effect = Effect.t * (Type.ty * Type.ty)
 
 type pattern = (pattern', Type.ty) typed
 
@@ -203,7 +203,7 @@ let call (eff, e, a) =
   assert (Type.equal_ty out_ty p_ty);
   {
     term = Call (eff, e, a);
-    ty = (r_ty, Type.add_effects (Type.Effect.Set.singleton eff_name) r_ty_dirt);
+    ty = (r_ty, Dirt.add_effects (Effect.Set.singleton eff_name) r_ty_dirt);
   }
 
 let bind (comp1, abs2) =
@@ -225,7 +225,7 @@ let abstraction (p, c) : abstraction = { term = (p, c); ty = (p.ty, c.ty) }
 let abstraction2 (p1, p2, c) : abstraction2 =
   { term = (p1, p2, c); ty = (p1.ty, p2.ty, c.ty) }
 
-let print_effect (eff, _) ppf = Print.print ppf "%t" (Type.Effect.print eff)
+let print_effect (eff, _) ppf = Print.print ppf "%t" (Effect.print eff)
 
 let print_variable x = Variable.print ~safe:true x
 

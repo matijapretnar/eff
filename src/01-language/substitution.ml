@@ -8,7 +8,7 @@ type t = {
   type_param_to_type_subs : Type.ty Type.TyParam.Map.t;
   dirt_var_to_dirt_coercions :
     Coercion.dirt_coercion Type.DirtCoercionParam.Map.t;
-  dirt_var_to_dirt_subs : Type.dirt Type.DirtParam.Map.t;
+  dirt_var_to_dirt_subs : Dirt.t Dirt.Param.Map.t;
   skel_param_to_skel_subs : Skeleton.t Skeleton.Param.Map.t;
 }
 
@@ -17,7 +17,7 @@ let empty =
     type_param_to_type_coercions = Type.TyCoercionParam.Map.empty;
     type_param_to_type_subs = Type.TyParam.Map.empty;
     dirt_var_to_dirt_coercions = Type.DirtCoercionParam.Map.empty;
-    dirt_var_to_dirt_subs = Type.DirtParam.Map.empty;
+    dirt_var_to_dirt_subs = Dirt.Param.Map.empty;
     skel_param_to_skel_subs = Skeleton.Param.Map.empty;
   }
 
@@ -25,19 +25,19 @@ let is_empty sub =
   Type.TyCoercionParam.Map.is_empty sub.type_param_to_type_coercions
   && Type.TyParam.Map.is_empty sub.type_param_to_type_subs
   && Type.DirtCoercionParam.Map.is_empty sub.dirt_var_to_dirt_coercions
-  && Type.DirtParam.Map.is_empty sub.dirt_var_to_dirt_subs
+  && Dirt.Param.Map.is_empty sub.dirt_var_to_dirt_subs
   && Skeleton.Param.Map.is_empty sub.skel_param_to_skel_subs
 
 (* Substitution application *)
 open Type
 
-let apply_sub_dirt sub dirt =
+let apply_sub_dirt sub (dirt : Dirt.t) =
   match dirt.row with
-  | ParamRow p -> (
-      match Type.DirtParam.Map.find_opt p sub.dirt_var_to_dirt_subs with
-      | Some drt2 -> Type.add_effects dirt.effect_set drt2
+  | Dirt.Row.Param p -> (
+      match Dirt.Param.Map.find_opt p sub.dirt_var_to_dirt_subs with
+      | Some drt2 -> Dirt.add_effects dirt.effect_set drt2
       | None -> dirt)
-  | EmptyRow -> dirt
+  | Dirt.Row.Empty -> dirt
 
 let rec apply_sub_skel sub skeleton =
   match skeleton with
@@ -148,7 +148,7 @@ let print_type_param_to_type p t ppf =
   printy ppf "%t ↦ %t" (Type.TyParam.print p) (Type.print_ty t)
 
 let print_dirt_var_sub p t ppf =
-  printy ppf "%t ↦ %t" (Type.DirtParam.print p) (Type.print_dirt t)
+  printy ppf "%t ↦ %t" (Dirt.Param.print p) (Dirt.print t)
 
 let print_dirt_var_coercion p t ppf =
   printy ppf "%t ↦ %t"
@@ -164,7 +164,7 @@ let print subs =
     |> List.map (fun (x, y) -> print_type_coercion x y);
     subs.type_param_to_type_subs |> Type.TyParam.Map.bindings
     |> List.map (fun (x, y) -> print_type_param_to_type x y);
-    subs.dirt_var_to_dirt_subs |> Type.DirtParam.Map.bindings
+    subs.dirt_var_to_dirt_subs |> Dirt.Param.Map.bindings
     |> List.map (fun (x, y) -> print_dirt_var_sub x y);
     subs.dirt_var_to_dirt_coercions |> Type.DirtCoercionParam.Map.bindings
     |> List.map (fun (x, y) -> print_dirt_var_coercion x y);
@@ -180,15 +180,15 @@ let of_parameters (params : Type.Params.t) =
     |> List.map (fun s -> (s, Skeleton.Param.refresh s))
     |> Skeleton.Param.Map.of_bindings
   and dirt_params' =
-    Type.DirtParam.Set.elements params.dirt_params
-    |> List.map (fun d -> (d, Type.DirtParam.refresh d))
-    |> Type.DirtParam.Map.of_bindings
+    Dirt.Param.Set.elements params.dirt_params
+    |> List.map (fun d -> (d, Dirt.Param.refresh d))
+    |> Dirt.Param.Map.of_bindings
   in
   let subst =
     {
       empty with
       dirt_var_to_dirt_subs =
-        Type.DirtParam.Map.map (fun d' -> Type.no_effect_dirt d') dirt_params';
+        Dirt.Param.Map.map (fun d' -> Dirt.no_effect d') dirt_params';
       skel_param_to_skel_subs =
         Skeleton.Param.Map.map (fun s' -> Skeleton.Param s') skel_params';
     }
@@ -206,8 +206,8 @@ let of_parameters (params : Type.Params.t) =
       Type.Params.ty_params =
         ty_params' |> List.map snd |> Type.TyParam.Map.of_bindings;
       dirt_params =
-        Type.DirtParam.Map.bindings dirt_params'
-        |> List.map fst |> Type.DirtParam.Set.of_list;
+        Dirt.Param.Map.bindings dirt_params'
+        |> List.map fst |> Dirt.Param.Set.of_list;
       skel_params =
         Skeleton.Param.Map.bindings skel_params'
         |> List.map fst |> Skeleton.Param.Set.of_list;
@@ -236,8 +236,7 @@ let apply_substitutions_to_substitution new_sub old_sub =
         (apply_sub_dirtcoer new_sub)
         old_sub.dirt_var_to_dirt_coercions;
     dirt_var_to_dirt_subs =
-      Type.DirtParam.Map.map (apply_sub_dirt new_sub)
-        old_sub.dirt_var_to_dirt_subs;
+      Dirt.Param.Map.map (apply_sub_dirt new_sub) old_sub.dirt_var_to_dirt_subs;
     skel_param_to_skel_subs =
       Skeleton.Param.Map.map (apply_sub_skel new_sub)
         old_sub.skel_param_to_skel_subs;
@@ -257,7 +256,7 @@ let merge new_sub old_sub =
       Type.DirtCoercionParam.Map.compatible_union
         new_sub.dirt_var_to_dirt_coercions old_sub'.dirt_var_to_dirt_coercions;
     dirt_var_to_dirt_subs =
-      Type.DirtParam.Map.compatible_union new_sub.dirt_var_to_dirt_subs
+      Dirt.Param.Map.compatible_union new_sub.dirt_var_to_dirt_subs
         old_sub'.dirt_var_to_dirt_subs;
     skel_param_to_skel_subs =
       Skeleton.Param.Map.compatible_union new_sub.skel_param_to_skel_subs
@@ -297,18 +296,15 @@ let add_dirt_var_coercion dirt_var dc sub =
   merge (add_dirt_var_coercion_e dirt_var dc) sub
 
 let add_dirt_substitution_e dirt_var dirt =
-  {
-    empty with
-    dirt_var_to_dirt_subs = Type.DirtParam.Map.singleton dirt_var dirt;
-  }
+  { empty with dirt_var_to_dirt_subs = Dirt.Param.Map.singleton dirt_var dirt }
 
 let add_dirt_substitution dirt_var dirt sub =
   assert (dirt = apply_sub_dirt sub dirt);
   merge (add_dirt_substitution_e dirt_var dirt) sub
 
 let empty_dirt_substitution empty_dirt_params =
-  Type.DirtParam.Set.fold
-    (fun t sbst -> add_dirt_substitution t Type.empty_dirt sbst)
+  Dirt.Param.Set.fold
+    (fun t sbst -> add_dirt_substitution t Dirt.empty sbst)
     empty_dirt_params empty
 
 let add_skel_param_substitution_e param skel =

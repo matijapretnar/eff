@@ -2,7 +2,7 @@ open Language
 
 type variable = Term.Variable.t
 
-type effect = Type.Effect.t
+type effect = Effect.t
 
 type label = Type.Label.t
 

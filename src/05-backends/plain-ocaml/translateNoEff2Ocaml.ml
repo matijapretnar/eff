@@ -1,5 +1,7 @@
 open Utils
 open SyntaxNoEff
+module OurPrimitives = Primitives
+open Language
 
 type optimization_config = { purity_aware_translation : bool }
 
@@ -53,7 +55,7 @@ let protected =
 
 let pp_variable ?(safe = true) state var ppf =
   match Assoc.lookup var state.inlinable_primitives with
-  | Some s -> Format.fprintf ppf "%s" (Primitives.primitive_source s)
+  | Some s -> Format.fprintf ppf "%s" (OurPrimitives.primitive_source s)
   | None ->
       let printer desc n =
         (* [mod] has privileges because otherwise it's stupid *)
@@ -123,7 +125,7 @@ let pp_tuple pp tpl ppf =
   | [] -> print ppf "()"
   | xs -> print ppf "(@[<hov>%t@])" (pp_sequence ", " pp xs)
 
-let pp_effect (e, (_ty1, _ty2)) ppf = Type.Effect.print e ppf
+let pp_effect (e, (_ty1, _ty2)) ppf = Effect.print e ppf
 
 let rec pp_coercion ?max_level coer ppf =
   (* The cases not matched here should be handled in pp_term *)
@@ -270,7 +272,7 @@ let rec pp_term ?max_level state noEff_term ppf =
         (pp_term state ~max_level:1 t2)
         (pp_term state ~max_level:0 t1)
   | NDirectPrimitive p ->
-      print ~at_level:1 "(%s)" (Primitives.primitive_source p)
+      print ~at_level:1 "(%s)" (OurPrimitives.primitive_source p)
 
 and pp_abs state (p, t) ppf =
   print ppf "@[<h> %t ->@ %t@]" (pp_pattern state p) (pp_term state t)
@@ -311,7 +313,7 @@ let pp_def_effect (eff, (ty1, ty2)) ppf =
   print ppf
     "@[type(_, _) eff_internal_effect += %t : (%t, %t) eff_internal_effect \
      @]@.;;"
-    (Type.Effect.print eff) (pp_type ty1) (pp_type ty2)
+    (Effect.print eff) (pp_type ty1) (pp_type ty2)
 
 let pp_let_def state (p, ws, t) ppf =
   print ppf "%t %t = @,%t" (pp_pattern state p) (pp_coercion_vars ws)

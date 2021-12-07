@@ -32,15 +32,15 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
 
 let expand_row ~loc row ops =
   match row with
-  | _ when Type.Effect.Set.is_empty ops -> (Substitution.empty, row)
-  | ParamRow p ->
-      let p' = Type.DirtParam.refresh p in
-      let row' = ParamRow p' in
+  | _ when Effect.Set.is_empty ops -> (Substitution.empty, row)
+  | Dirt.Row.Param p ->
+      let p' = Dirt.Param.refresh p in
+      let row' = Dirt.Row.Param p' in
       let sub' =
         Substitution.add_dirt_substitution_e p { effect_set = ops; row = row' }
       in
       (sub', row')
-  | EmptyRow -> Error.typing ~loc "Cannot extend an empty row."
+  | Dirt.Row.Empty -> Error.typing ~loc "Cannot extend an empty row."
 
 let skel_eq_step ~loc sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
   match (sk1, sk2) with
@@ -262,72 +262,81 @@ and ty_omega_step ~loc sub (paused : Type.Constraints.t) cons rest_queue omega =
 and dirt_omega_step sub resolved unresolved w dcons =
   match dcons with
   (* ω : δ₁ <= O₂ ∪ δ₂ *)
-  | ( { effect_set = ops1; row = ParamRow d1 },
-      { effect_set = ops2; row = ParamRow d2 } )
+  | ( { Dirt.effect_set = ops1; row = Dirt.Row.Param d1 },
+      { Dirt.effect_set = ops2; row = Dirt.Row.Param d2 } )
     when Effect.Set.is_empty ops1 ->
       ( sub,
         Type.Constraints.add_dirt_constraint resolved d1 d2 w ops2,
         unresolved )
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
-  | ( { effect_set = ops1; row = ParamRow d1 },
-      { effect_set = ops2; row = ParamRow d2 } ) ->
+  | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
+      { effect_set = ops2; row = Dirt.Row.Param d2 } ) ->
       let w' = DirtCoercionParam.refresh w in
-      let d2' = DirtParam.refresh d2 in
+      let d2' = Dirt.Param.refresh d2 in
       let w_ty' =
-        ( { effect_set = Effect.Set.empty; row = ParamRow d1 },
-          { effect_set = Effect.Set.union ops1 ops2; row = ParamRow d2' } )
+        ( { Dirt.effect_set = Effect.Set.empty; row = Dirt.Row.Param d1 },
+          {
+            Dirt.effect_set = Effect.Set.union ops1 ops2;
+            row = Dirt.Row.Param d2';
+          } )
       in
       let sub' =
         Substitution.add_dirt_substitution_e d2
-          { effect_set = Effect.Set.diff ops1 ops2; row = ParamRow d2' }
+          { effect_set = Effect.Set.diff ops1 ops2; row = Dirt.Row.Param d2' }
         |> Substitution.add_dirt_var_coercion w
              (Coercion.unionDirt (ops1, Coercion.dirtCoercionVar w' w_ty'))
       in
       apply_substitution sub' sub resolved
         (Constraint.add_dirt_inequality (w', w_ty') unresolved)
   (* ω : Ø <= Δ₂ *)
-  | { effect_set = ops1; row = EmptyRow }, d when Effect.Set.is_empty ops1 ->
+  | { effect_set = ops1; row = Dirt.Row.Empty }, d when Effect.Set.is_empty ops1
+    ->
       let sub' = Substitution.add_dirt_var_coercion w (Coercion.empty d) sub in
       (sub', resolved, unresolved)
   (* ω : δ₁ <= Ø *)
-  | ( { effect_set = ops1; row = ParamRow d1 },
-      { effect_set = ops2; row = EmptyRow } )
+  | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
+      { effect_set = ops2; row = Dirt.Row.Empty } )
     when Effect.Set.is_empty ops1 && Effect.Set.is_empty ops2 ->
       let sub' =
-        Substitution.add_dirt_var_coercion_e w (Coercion.empty empty_dirt)
-        |> Substitution.add_dirt_substitution d1 empty_dirt
+        Substitution.add_dirt_var_coercion_e w (Coercion.empty Dirt.empty)
+        |> Substitution.add_dirt_substitution d1 Dirt.empty
       in
       apply_substitution sub' sub resolved unresolved
   (* ω : O₁ <= O₂ *)
-  | { effect_set = ops1; row = EmptyRow }, { effect_set = ops2; row = EmptyRow }
-    ->
+  | ( { effect_set = ops1; row = Dirt.Row.Empty },
+      { effect_set = ops2; row = Dirt.Row.Empty } ) ->
       assert (Effect.Set.subset ops1 ops2);
       let sub' =
         Substitution.add_dirt_var_coercion w
           (Coercion.unionDirt
-             (ops2, Coercion.empty (closed_dirt (Effect.Set.diff ops2 ops1))))
+             (ops2, Coercion.empty (Dirt.closed (Effect.Set.diff ops2 ops1))))
           sub
       in
       (sub', resolved, unresolved)
   (* ω : O₁ <= O₂ ∪ δ₂ *)
-  | ( { effect_set = ops1; row = EmptyRow },
-      { effect_set = ops2; row = ParamRow d2 } ) ->
-      let d2' = DirtParam.refresh d2 in
+  | ( { effect_set = ops1; row = Dirt.Row.Empty },
+      { effect_set = ops2; row = Dirt.Row.Param d2 } ) ->
+      let d2' = Dirt.Param.refresh d2 in
       let sub' =
         Substitution.add_dirt_var_coercion_e w
           (Coercion.unionDirt
              ( ops1,
                Coercion.empty
-                 { effect_set = Effect.Set.diff ops2 ops1; row = ParamRow d2' }
-             ))
+                 {
+                   Dirt.effect_set = Effect.Set.diff ops2 ops1;
+                   row = Dirt.Row.Param d2';
+                 } ))
         |> Substitution.add_dirt_substitution d2
-             { effect_set = Effect.Set.diff ops1 ops2; row = ParamRow d2' }
+             {
+               effect_set = Effect.Set.diff ops1 ops2;
+               row = Dirt.Row.Param d2';
+             }
       in
       apply_substitution sub' sub resolved unresolved
   | _ -> assert false
 
-and dirt_eq_step ~loc sub paused rest_queue { effect_set = o1; row = row1 }
-    { effect_set = o2; row = row2 } =
+and dirt_eq_step ~loc sub paused rest_queue { Dirt.effect_set = o1; row = row1 }
+    { Dirt.effect_set = o2; row = row2 } =
   (*
   Consider the equation:
     O ∪ row₁ = O ∪ row₂
@@ -343,11 +352,11 @@ and dirt_eq_step ~loc sub paused rest_queue { effect_set = o1; row = row1 }
   and sub2, row2' = expand_row ~loc row2 (Effect.Set.diff o1 o2) in
   let row_sub =
     match (row1', row2') with
-    | EmptyRow, EmptyRow -> Substitution.empty
-    | ParamRow p1, _ ->
+    | Dirt.Row.Empty, Dirt.Row.Empty -> Substitution.empty
+    | Dirt.Row.Param p1, _ ->
         Substitution.add_dirt_substitution_e p1
           { effect_set = Effect.Set.empty; row = row2' }
-    | _, ParamRow p2 ->
+    | _, Dirt.Row.Param p2 ->
         Substitution.add_dirt_substitution_e p2
           { effect_set = Effect.Set.empty; row = row1' }
   in

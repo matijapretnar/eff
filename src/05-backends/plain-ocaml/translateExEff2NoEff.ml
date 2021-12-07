@@ -1,8 +1,8 @@
 open Utils
 open SyntaxNoEff
-open Type
 open Language.Term
 open Language
+open Type
 module NoEff = SyntaxNoEff
 module ExEffTypes = Type
 module ExEff = Term
@@ -25,10 +25,7 @@ let rec elab_ty (ty : ExEffTypes.ty) =
       NoEff.NTyArrow (elab1, elab2)
   | ExEffTypes.Handler ((type1, dirt1), (type2, dirt2)) ->
       let elab1 = elab_ty type1 in
-      if
-        ExEffTypes.is_empty_dirt dirt1
-        (* Handler type - Case 1: empty input dirt *)
-      then
+      if Dirt.is_empty dirt1 (* Handler type - Case 1: empty input dirt *) then
         let elab2 = elab_dirty (type2, dirt2) in
         NoEff.NTyArrow (elab1, elab2)
         (* Handler type - Case 2: non-empty input dirt *)
@@ -42,9 +39,9 @@ let rec elab_ty (ty : ExEffTypes.ty) =
 
 and elab_dirty (ty, dirt) =
   let elab = elab_ty ty in
-  if ExEffTypes.is_empty_dirt dirt then elab else NoEff.NTyComp elab
+  if Dirt.is_empty dirt then elab else NoEff.NTyComp elab
 
-let has_empty_dirt ((_ty, dirt) : ExEffTypes.dirty) = is_empty_dirt dirt
+let has_empty_dirt ((_ty, dirt) : ExEffTypes.dirty) = Dirt.is_empty dirt
 
 let rec get_effectset_temp set effects =
   match effects with
@@ -104,9 +101,9 @@ let rec elab_ty_coercion state coer =
 and elab_dirty_coercion state { term = tcoer, dcoer; _ } =
   let tyelab = elab_ty_coercion state tcoer in
   let d1, d2 = dcoer.ty in
-  if is_empty_dirt d1 && is_empty_dirt d2 then tyelab
-  else if is_empty_dirt d1 then NoEff.NCoerReturn tyelab
-  else if not (is_empty_dirt d2) then NoEff.NCoerComp tyelab
+  if Dirt.is_empty d1 && Dirt.is_empty d2 then tyelab
+  else if Dirt.is_empty d1 then NoEff.NCoerReturn tyelab
+  else if not (Dirt.is_empty d2) then NoEff.NCoerComp tyelab
   else assert false
 
 let rec value_coercion_from_impure_dirt empty_dirt_params ty =
@@ -121,24 +118,24 @@ let rec value_coercion_from_impure_dirt empty_dirt_params ty =
       NoEff.NCoerTuple
         (List.map (value_coercion_from_impure_dirt empty_dirt_params) tys)
   | ExEffTypes.Handler ((ty1, drt1), (ty2, drt2)) -> (
-      if is_empty_dirt drt1 then
+      if Dirt.is_empty drt1 then
         NoEff.NCoerArrow
           ( value_coercion_to_impure_dirt empty_dirt_params ty1,
             computation_coercion_from_impure_dirt empty_dirt_params (ty2, drt2)
           )
       else
         match drt1.row with
-        | ParamRow d ->
+        | Dirt.Row.Param d ->
             if
-              ExEffTypes.DirtParam.Set.mem d empty_dirt_params
-              && ExEffTypes.Effect.Set.is_empty drt1.effect_set
+              Dirt.Param.Set.mem d empty_dirt_params
+              && Effect.Set.is_empty drt1.effect_set
             then
               let coer1 = value_coercion_to_impure_dirt empty_dirt_params ty1 in
               let coer2 =
                 value_coercion_from_impure_dirt empty_dirt_params ty2
               in
               if
-                is_empty_dirt
+                Dirt.is_empty
                   (Substitution.apply_substitutions_to_dirt
                      (Substitution.empty_dirt_substitution empty_dirt_params)
                      drt2)
@@ -149,26 +146,26 @@ let rec value_coercion_from_impure_dirt empty_dirt_params ty =
                 ( computation_coercion_to_impure_dirt empty_dirt_params
                     (ty1, drt1),
                   computation_coercion_from_impure_dirt empty_dirt_params
-                    (ty2, ExEffTypes.fresh_dirt ()) )
-        | EmptyRow ->
+                    (ty2, Dirt.fresh ()) )
+        | Dirt.Row.Empty ->
             NoEff.NCoerHandler
               ( computation_coercion_to_impure_dirt empty_dirt_params (ty1, drt1),
                 computation_coercion_from_impure_dirt empty_dirt_params
-                  (ty2, ExEffTypes.fresh_dirt ()) ))
+                  (ty2, Dirt.fresh ()) ))
   | ExEffTypes.TyBasic _ -> NoEff.NCoerRefl
 
 and computation_coercion_from_impure_dirt empty_dirt_params (ty1, drt) =
   let noeff_coer = value_coercion_from_impure_dirt empty_dirt_params ty1 in
   match drt with
-  | _ when is_empty_dirt drt -> noeff_coer
-  | { effect_set; row = ParamRow p }
-    when ExEffTypes.DirtParam.Set.mem p empty_dirt_params
+  | _ when Dirt.is_empty drt -> noeff_coer
+  | { effect_set; row = Dirt.Row.Param p }
+    when Dirt.Param.Set.mem p empty_dirt_params
          && Effect.Set.is_empty effect_set ->
       NoEff.NCoerUnsafe noeff_coer
   | _ ->
       assert (
         not
-          (is_empty_dirt
+          (Dirt.is_empty
              (Substitution.apply_substitutions_to_dirt
                 (Substitution.empty_dirt_substitution empty_dirt_params)
                 drt)));
@@ -186,23 +183,23 @@ and value_coercion_to_impure_dirt empty_dirt_params ty =
       NoEff.NCoerTuple
         (List.map (value_coercion_to_impure_dirt empty_dirt_params) tys)
   | ExEffTypes.Handler ((ty1, drt1), (ty2, drt2)) -> (
-      if is_empty_dirt drt1 then
+      if Dirt.is_empty drt1 then
         NoEff.NCoerArrow
           ( value_coercion_from_impure_dirt empty_dirt_params ty1,
             computation_coercion_to_impure_dirt empty_dirt_params (ty2, drt2) )
       else
         match drt1.row with
-        | ParamRow d ->
+        | Dirt.Row.Param d ->
             if
-              ExEffTypes.DirtParam.Set.mem d empty_dirt_params
-              && ExEffTypes.Effect.Set.is_empty drt1.effect_set
+              Dirt.Param.Set.mem d empty_dirt_params
+              && Effect.Set.is_empty drt1.effect_set
             then
               let coer1 =
                 value_coercion_from_impure_dirt empty_dirt_params ty1
               in
               let coer2 = value_coercion_to_impure_dirt empty_dirt_params ty2 in
               if
-                is_empty_dirt
+                Dirt.is_empty
                   (Substitution.apply_substitutions_to_dirt
                      (Substitution.empty_dirt_substitution empty_dirt_params)
                      drt2)
@@ -213,27 +210,27 @@ and value_coercion_to_impure_dirt empty_dirt_params ty =
                 ( computation_coercion_from_impure_dirt empty_dirt_params
                     (ty1, drt1),
                   computation_coercion_to_impure_dirt empty_dirt_params
-                    (ty2, ExEffTypes.fresh_dirt ()) )
-        | EmptyRow ->
+                    (ty2, Dirt.fresh ()) )
+        | Dirt.Row.Empty ->
             NoEff.NCoerHandler
               ( computation_coercion_from_impure_dirt empty_dirt_params
                   (ty1, drt1),
                 computation_coercion_to_impure_dirt empty_dirt_params
-                  (ty2, ExEffTypes.fresh_dirt ()) ))
+                  (ty2, Dirt.fresh ()) ))
   | ExEffTypes.TyBasic _ -> NoEff.NCoerRefl
 
 and computation_coercion_to_impure_dirt empty_dirt_params (ty1, drt) =
   let noeff_coer = value_coercion_to_impure_dirt empty_dirt_params ty1 in
   match drt with
-  | _ when is_empty_dirt drt -> noeff_coer
-  | { effect_set; row = ParamRow p }
-    when ExEffTypes.DirtParam.Set.mem p empty_dirt_params
+  | _ when Dirt.is_empty drt -> noeff_coer
+  | { effect_set; row = Dirt.Row.Param p }
+    when Dirt.Param.Set.mem p empty_dirt_params
          && Effect.Set.is_empty effect_set ->
       NoEff.NCoerReturn noeff_coer
   | _ ->
       assert (
         not
-          (is_empty_dirt
+          (Dirt.is_empty
              (Substitution.apply_substitutions_to_dirt
                 (Substitution.empty_dirt_substitution empty_dirt_params)
                 drt)));
@@ -257,12 +254,12 @@ and elab_expression' state exp =
   match exp.term with
   | ExEff.Var x ->
       let empty_dirt_params =
-        x.instantiation.dirt_var_to_dirt_subs |> Type.DirtParam.Map.bindings
-        |> List.filter (fun (_, drt) -> is_empty_dirt drt)
+        x.instantiation.dirt_var_to_dirt_subs |> Dirt.Param.Map.bindings
+        |> List.filter (fun (_, drt) -> Dirt.is_empty drt)
         |> List.fold_left
              (fun empty_dirt_params (param, _) ->
-               Type.DirtParam.Set.add param empty_dirt_params)
-             Type.DirtParam.Set.empty
+               Dirt.Param.Set.add param empty_dirt_params)
+             Dirt.Param.Set.empty
       in
       let coercions =
         x.instantiation.type_param_to_type_coercions
@@ -278,11 +275,10 @@ and elab_expression' state exp =
   | ExEff.Handler h ->
       let elabvc = elab_abstraction_with_param_ty state h.term.value_clause in
       let (_, drt_in), _ = h.ty in
-      if ExEffTypes.is_empty_dirt drt_in (* Handler - Case 1 *) then
-        NoEff.NFun elabvc
+      if Dirt.is_empty drt_in (* Handler - Case 1 *) then NoEff.NFun elabvc
       else
         let _, (_ty, dirt) = h.term.value_clause.ty in
-        if ExEffTypes.is_empty_dirt dirt (* Handler - Case 2 *) then
+        if Dirt.is_empty dirt (* Handler - Case 2 *) then
           let subst_cont_effect ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
               =
             let elab1 = elab_ty ty1 in
@@ -347,7 +343,7 @@ and elab_abstraction_with_param_ty state { term = p, c; ty = param_ty, _ } =
   (elab_pattern state p, elab_ty param_ty, elab2)
 
 and elab_computation state { term; ty = _ty, drt } =
-  elab_computation' state term (is_empty_dirt drt)
+  elab_computation' state term (Dirt.is_empty drt)
 
 and elab_computation' state c _is_empty =
   match c with
@@ -380,13 +376,14 @@ and elab_computation' state c _is_empty =
       match vtype.term with
       | ExEffTypes.Handler ((vty1, _vdirt1), (_vty2, vdirt2)) when ctype = vty1
         ->
-          if Type.is_empty_dirt cdirt (* Handle - Case 1 *) then
-            NoEff.NApplyTerm (velab, elabc)
-          else if Type.is_empty_dirt vdirt2 (* Handle - Case 2 *) then
+          if Dirt.is_empty cdirt (* Handle - Case 1 *) then (
+            NoEff.NApplyTerm (velab, elabc))
+          else if Dirt.is_empty vdirt2 (* Handle - Case 2 *) then (
             NoEff.NCast
               (NoEff.NHandle (elabc, velab), NoEff.NCoerUnsafe NoEff.NCoerRefl)
-            (* Handle - Case 3 *)
-          else NoEff.NHandle (elabc, velab)
+            (* Handle - Case 3 *))
+          else (
+            NoEff.NHandle (elabc, velab))
       | _ -> assert false)
   | ExEff.Call ((eff, (ty1, ty2)), value, abs) ->
       let t1 = elab_ty ty1 in
@@ -399,10 +396,8 @@ and elab_computation' state c _is_empty =
       and elab1 = elab_computation state c1
       and _ty1', (_ty2, dirt2) = abs.ty
       and elababs = elab_abstraction state abs in
-      if
-        ExEffTypes.is_empty_dirt dirt1 && ExEffTypes.is_empty_dirt dirt2
-        (* Bind - Case 1 *)
-      then NoEff.NLet (elab1, elababs) (* Bind - Case 2 *)
+      if Dirt.is_empty dirt1 && Dirt.is_empty dirt2 (* Bind - Case 1 *) then
+        NoEff.NLet (elab1, elababs) (* Bind - Case 2 *)
       else NoEff.NBind (elab1, elababs)
   | ExEff.CastComp (comp, coer) ->
       let elabc = elab_dirty_coercion state coer in

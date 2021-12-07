@@ -11,7 +11,7 @@ type value =
   | DirtCoercionClosure of (Type.ct_dirt -> value)
   | Handler of (result -> result)
 
-and result = Value of value | Call of Type.Effect.t * value * closure
+and result = Value of value | Call of Effect.t * value * closure
 
 and closure = value -> result
 
@@ -39,7 +39,7 @@ let to_handler = function
   | Handler h -> h
   | _ -> Error.runtime "A handler expected."
 
-let print_effect eff ppf = Format.fprintf ppf "%t" (Type.Effect.print eff)
+let print_effect eff ppf = Format.fprintf ppf "%t" (Effect.print eff)
 
 let rec print_value ?max_level v ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

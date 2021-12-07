@@ -6,7 +6,7 @@ module RuntimeEnv = Term.Variable.Map
 
 type state = {
   environment : V.value RuntimeEnv.t;
-  runners : (Type.Effect.t, V.value -> V.value) Assoc.t;
+  runners : (Effect.t, V.value -> V.value) Assoc.t;
 }
 
 let initial_state = { environment = RuntimeEnv.empty; runners = Assoc.empty }

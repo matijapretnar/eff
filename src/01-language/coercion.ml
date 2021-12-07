@@ -16,7 +16,7 @@ and dirt_coercion' =
   | ReflDirt
   | DirtCoercionVar of Type.DirtCoercionParam.t
   | Empty
-  | UnionDirt of (Type.effect_set * dirt_coercion)
+  | UnionDirt of (Effect.Set.t * dirt_coercion)
 
 and dirty_coercion = (ty_coercion * dirt_coercion, Type.ct_dirty) typed
 
@@ -67,13 +67,13 @@ let reflDirt drt = { term = ReflDirt; ty = (drt, drt) }
 
 let reflDirty (ty, drt) = bangCoercion (reflTy ty, reflDirt drt)
 
-let empty drt = { term = Empty; ty = (Type.empty_dirt, drt) }
+let empty drt = { term = Empty; ty = (Dirt.empty, drt) }
 
 let unionDirt (effs, dcoer) =
   let drt, drt' = dcoer.ty in
   {
     term = UnionDirt (effs, dcoer);
-    ty = (Type.add_effects effs drt, Type.add_effects effs drt');
+    ty = (Dirt.add_effects effs drt, Dirt.add_effects effs drt');
   }
 
 (* ************************************************************************* *)
@@ -117,13 +117,13 @@ and print_dirty_coercion ?max_level { term = tc, dirtc; _ } ppf =
 and print_dirt_coercion ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match c.term with
-  | ReflDirt -> print "⟨%t⟩" (Type.print_dirt (fst c.ty))
+  | ReflDirt -> print "⟨%t⟩" (Dirt.print (fst c.ty))
   | DirtCoercionVar tcp -> print "%t" (Type.DirtCoercionParam.print tcp)
   | Empty ->
-      print ~at_level:1 "∅↪︎%t" (Type.print_dirt ~max_level:0 (snd c.ty))
+      print ~at_level:1 "∅↪︎%t" (Dirt.print ~max_level:0 (snd c.ty))
   | UnionDirt (eset, dc) ->
       print ~at_level:2 "{%t}∪%t"
-        (Type.print_effect_set eset)
+        (Dirt.print_effect_set eset)
         (print_dirt_coercion ~max_level:2 dc)
 
 (* ************************************************************************* *)

@@ -33,7 +33,7 @@ let print_variable var ppf =
   in
   Term.Variable.fold printer var
 
-let print_effect eff ppf = Type.Effect.print eff ppf
+let print_effect eff ppf = Effect.print eff ppf
 
 let print_label lbl ppf = Type.Label.print lbl ppf
 

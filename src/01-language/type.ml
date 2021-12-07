@@ -1,6 +1,5 @@
 open Utils
 
-module Effect = Symbol.Make (Symbol.String)
 (** effect symbols *)
 
 module Label = Symbol.Make (Symbol.String)
@@ -50,13 +49,6 @@ module TyParam = struct
       k
 end
 
-(** dirt parameters *)
-module DirtParam = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "drt"
-
-  let utf8_symbol = "δ"
-end))
-
 (** type coercion parameters *)
 module TyCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "tycoer"
@@ -71,8 +63,6 @@ module DirtCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let utf8_symbol = "ϖ"
 end))
 
-type effect_set = Effect.Set.t
-
 type ty = (ty', Skeleton.t) typed
 
 and ty' =
@@ -83,31 +73,21 @@ and ty' =
   | Handler of dirty * dirty
   | TyBasic of Const.ty
 
-and dirty = ty * dirt
-
-and dirt = { effect_set : effect_set; row : row }
+and dirty = ty * Dirt.t
 
 and abs_ty = ty * dirty
-
-and row = ParamRow of DirtParam.t | EmptyRow
-
-let no_effect_dirt dirt_param =
-  { effect_set = Effect.Set.empty; row = ParamRow dirt_param }
-
-let is_empty_dirt dirt =
-  Effect.Set.is_empty dirt.effect_set && dirt.row = EmptyRow
 
 let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty.term with
   | TyParam p ->
       print ~at_level:4 "%t:%t" (TyParam.print p) (Skeleton.print ty.ty)
-  | Arrow (t1, (t2, drt)) when is_empty_dirt drt ->
+  | Arrow (t1, (t2, drt)) when Dirt.is_empty drt ->
       print ~at_level:3 "%t → %t" (print_ty ~max_level:2 t1)
         (print_ty ~max_level:3 t2)
   | Arrow (t1, (t2, drt)) ->
       print ~at_level:3 "%t -%t→ %t" (print_ty ~max_level:2 t1)
-        (print_dirt drt) (print_ty ~max_level:3 t2)
+        (Dirt.print drt) (print_ty ~max_level:3 t2)
   | Apply { ty_name; ty_args = [] } -> print "%t" (TyName.print ty_name)
   | Apply { ty_name; ty_args = [ s ] } ->
       print ~at_level:1 "%t %t" (print_ty ~max_level:1 s) (TyName.print ty_name)
@@ -124,28 +104,14 @@ let rec print_ty ?max_level ty ppf =
         (print_dirty ~max_level:2 drty2)
   | TyBasic p -> print "%t" (Const.print_ty p)
 
-and print_dirt ?max_level drt ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match (drt.effect_set, drt.row) with
-  | effect_set, EmptyRow -> print "{%t}" (print_effect_set effect_set)
-  | effect_set, ParamRow p when Effect.Set.is_empty effect_set ->
-      print "%t" (DirtParam.print p)
-  | effect_set, ParamRow p ->
-      print ~at_level:1 "{%t}∪%t"
-        (print_effect_set effect_set)
-        (DirtParam.print p)
-
-and print_effect_set effect_set =
-  Print.sequence "," Effect.print (Effect.Set.elements effect_set)
-
 and print_dirty ?max_level (t1, drt1) ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   print ~at_level:2 "%t!%t" (print_ty ~max_level:0 t1)
-    (print_dirt ~max_level:0 drt1)
+    (Dirt.print ~max_level:0 drt1)
 
 type ct_ty = ty * ty
 
-and ct_dirt = dirt * dirt
+and ct_dirt = Dirt.t * Dirt.t
 
 and ct_dirty = dirty * dirty
 
@@ -198,14 +164,14 @@ and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
 module Params = struct
   type t = {
     ty_params : Skeleton.t TyParam.Map.t;
-    dirt_params : DirtParam.Set.t;
+    dirt_params : Dirt.Param.Set.t;
     skel_params : Skeleton.Param.Set.t;
   }
 
   let empty =
     {
       ty_params = TyParam.Map.empty;
-      dirt_params = DirtParam.Set.empty;
+      dirt_params = Dirt.Param.Set.empty;
       skel_params = Skeleton.Param.Set.empty;
     }
 
@@ -213,13 +179,13 @@ module Params = struct
     TyParam.Map.for_all
       (fun p1 _ -> TyParam.Map.mem p1 fp2.ty_params)
       fp1.ty_params
-    && DirtParam.Set.subset fp1.dirt_params fp2.dirt_params
+    && Dirt.Param.Set.subset fp1.dirt_params fp2.dirt_params
     && Skeleton.Param.Set.subset fp1.skel_params fp2.skel_params
 
   let ty_singleton p skel =
     { empty with ty_params = TyParam.Map.singleton p skel }
 
-  let dirt_singleton p = { empty with dirt_params = DirtParam.Set.singleton p }
+  let dirt_singleton p = { empty with dirt_params = Dirt.Param.Set.singleton p }
 
   let skel_singleton p =
     { empty with skel_params = Skeleton.Param.Set.singleton p }
@@ -235,7 +201,7 @@ module Params = struct
             assert (skel1 = skel2);
             Some skel1)
           fp1.ty_params fp2.ty_params;
-      dirt_params = DirtParam.Set.union fp1.dirt_params fp2.dirt_params;
+      dirt_params = Dirt.Param.Set.union fp1.dirt_params fp2.dirt_params;
       skel_params = Skeleton.Param.Set.union fp1.skel_params fp2.skel_params;
     }
 
@@ -243,7 +209,7 @@ module Params = struct
     List.fold_left (fun fp x -> union fp (free_params x)) empty
 
   let is_empty fp =
-    DirtParam.Set.is_empty fp.dirt_params
+    Dirt.Param.Set.is_empty fp.dirt_params
     && Skeleton.Param.Set.is_empty fp.skel_params
 end
 
@@ -285,10 +251,10 @@ and free_params_ct_dirty (cty1, cty2) =
 and free_params_ct_dirt (dirt1, dirt2) =
   Params.union (free_params_dirt dirt1) (free_params_dirt dirt2)
 
-and free_params_dirt (dirt : dirt) =
+and free_params_dirt (dirt : Dirt.t) =
   match dirt.row with
-  | ParamRow p -> Params.dirt_singleton p
-  | EmptyRow -> Params.empty
+  | Dirt.Row.Param p -> Params.dirt_singleton p
+  | Dirt.Row.Empty -> Params.empty
 
 type tydef =
   | Record of ty Field.Map.t
@@ -303,7 +269,7 @@ let print_ct_ty (ty1, ty2) ppf =
 
 and print_ct_dirt (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
-  print "%t ≤ %t" (print_dirt ty1) (print_dirt ty2)
+  print "%t ≤ %t" (Dirt.print ty1) (Dirt.print ty2)
 
 and print_abs_ty (ty1, drty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
@@ -312,14 +278,14 @@ and print_abs_ty (ty1, drty2) ppf =
 module DirtConstraints = struct
   module DirtParamGraph =
     Graph.Make
-      (DirtParam)
+      (Dirt.Param)
       (struct
         type t = DirtCoercionParam.t * Effect.Set.t
 
         let[@warning "-27"] print ?(safe = false) (edge, effect_set) ppf =
           let print_effect_set ppf =
             if Effect.Set.is_empty effect_set then Print.print ppf ""
-            else Print.print ppf " U {%t}" (print_effect_set effect_set)
+            else Print.print ppf " U {%t}" (Dirt.print_effect_set effect_set)
           in
           Print.print ppf "%t%t" (DirtCoercionParam.print edge) print_effect_set
       end)
@@ -342,8 +308,8 @@ module DirtConstraints = struct
 
   let fold_expanded f =
     fold (fun d1 d2 w effs ->
-        let drt1 = no_effect_dirt d1
-        and drt2 = { effect_set = effs; row = ParamRow d2 } in
+        let drt1 = Dirt.no_effect d1
+        and drt2 = { Dirt.effect_set = effs; row = Dirt.Row.Param d2 } in
         f d1 d2 w effs drt1 drt2)
 
   let free_params (dirt_constraints : t) =
@@ -442,7 +408,7 @@ module Constraints = struct
     Print.print ppf "node_%t[label=\"%t\"];" vertex vertex
 
   let print_dirt_param_vertex ty_param ppf : unit =
-    let vertex = DirtParam.print ty_param in
+    let vertex = Dirt.Param.print ty_param in
     Print.print ppf "node_%t[label=\"%t\"];" vertex vertex
 
   let print_edge (source, edge, sink) ppf : unit =
@@ -453,10 +419,10 @@ module Constraints = struct
   let print_dirt_edge (source, (edge, effect_set), sink) ppf : unit =
     let print_effect_set ppf =
       if Effect.Set.is_empty effect_set then Print.print ppf ""
-      else Print.print ppf " U {%t}" (print_effect_set effect_set)
+      else Print.print ppf " U {%t}" (Dirt.print_effect_set effect_set)
     in
     Print.print ppf "@[<h>node_%t -> node_%t [label=\"%t%t\"]@]"
-      (DirtParam.print source) (DirtParam.print sink)
+      (Dirt.Param.print source) (Dirt.Param.print sink)
       (DirtCoercionParam.print edge)
       print_effect_set
 
@@ -495,7 +461,7 @@ module Constraints = struct
     let print_dirt_constraint w drt1 drt2 ppf =
       Print.print ppf "%t: (%t ≤ %t)"
         (DirtCoercionParam.print w)
-        (print_dirt drt1) (print_dirt drt2)
+        (Dirt.print drt1) (Dirt.print drt2)
     and print_ty_constraint s t1 t2 w ppf =
       Print.print ppf "%t: (%t ≤ %t) : %t" (TyCoercionParam.print w)
         (TyParam.print t1) (TyParam.print t2) (Skeleton.Param.print s)
@@ -546,18 +512,9 @@ and equal_dirty (ty1, d1) (ty2, d2) = equal_ty ty1 ty2 && equal_dirt d1 d2
 and equal_dirt d1 d2 =
   Effect.Set.equal d1.effect_set d2.effect_set && d1.row = d2.row
 
-let fresh_dirt () = no_effect_dirt (DirtParam.fresh ())
+let make_dirty ty = (ty, Dirt.fresh ())
 
-let closed_dirt effect_set = { effect_set; row = EmptyRow }
-
-let empty_dirt = closed_dirt Effect.Set.empty
-
-let make_dirty ty = (ty, fresh_dirt ())
-
-let pure_ty ty = (ty, empty_dirt)
-
-let add_effects effect_set drt =
-  { drt with effect_set = Effect.Set.union drt.effect_set effect_set }
+let pure_ty ty = (ty, Dirt.empty)
 
 let fresh_skel () =
   let skel_var = Skeleton.Param.fresh () in

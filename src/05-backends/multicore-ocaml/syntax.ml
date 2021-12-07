@@ -5,7 +5,7 @@ module Print = Utils.Print
 type variable = Term.Variable.t
 (** Syntax of the core language. *)
 
-type effect = Type.Effect.t
+type effect = Effect.t
 
 type label = Type.Label.t
 

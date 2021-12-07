@@ -4,7 +4,7 @@ open Language
 (* A bag/list of constraints *)
 type t = {
   skeleton_equalities : (Skeleton.t * Skeleton.t) list;
-  dirt_equalities : (Type.dirt * Type.dirt) list;
+  dirt_equalities : (Dirt.t * Dirt.t) list;
   dirt_inequalities : (Type.DirtCoercionParam.t * Type.ct_dirt) list;
   ty_equalities : (Type.ty * Type.ty) list;
   ty_inequalities : (Type.TyCoercionParam.t * Type.ct_ty) list;
@@ -49,11 +49,11 @@ let print c =
   let print_skeleton_equality (sk1, sk2) ppf =
     Print.print ppf "%t = %t" (Skeleton.print sk1) (Skeleton.print sk2)
   and print_dirt_equality (drt1, drt2) ppf =
-    Print.print ppf "%t = %t" (Type.print_dirt drt1) (Type.print_dirt drt2)
+    Print.print ppf "%t = %t" (Dirt.print drt1) (Dirt.print drt2)
   and print_dirt_inequality (p, (ty1, ty2)) ppf =
     Print.print ppf "%t: (%t ≤ %t)"
       (Type.DirtCoercionParam.print p)
-      (Type.print_dirt ty1) (Type.print_dirt ty2)
+      (Dirt.print ty1) (Dirt.print ty2)
   and print_ty_equality (ty1, ty2) ppf =
     Print.print ppf "%t = %t" (Type.print_ty ty1) (Type.print_ty ty2)
   and print_ty_inequality (p, (ty1, ty2)) ppf =

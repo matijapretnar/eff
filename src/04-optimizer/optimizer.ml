@@ -102,19 +102,19 @@ let rec extract_cast_value comp =
 
 let recast_computation hnd comp =
   match comp.ty with
-  | ty, { Type.effect_set = effs; Type.row = EmptyRow } ->
+  | ty, { Dirt.effect_set = effs; Dirt.row = Dirt.Row.Empty } ->
       let handled_effs =
-        Type.Effect.Set.of_list
+        Effect.Set.of_list
           (List.map
              (fun ((eff, _), _) -> eff)
              (Assoc.to_list hnd.term.Term.effect_clauses.effect_part))
       in
-      if Type.Effect.Set.disjoint effs handled_effs then
+      if Effect.Set.disjoint effs handled_effs then
         let _, (_, drt_out) = hnd.ty in
         let drt_diff =
           {
-            Type.effect_set = Type.Effect.Set.diff drt_out.Type.effect_set effs;
-            Type.row = drt_out.Type.row;
+            Dirt.effect_set = Effect.Set.diff drt_out.Dirt.effect_set effs;
+            Dirt.row = drt_out.Dirt.row;
           }
         in
         let ty_coer = Coercion.reflTy ty

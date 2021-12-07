@@ -1,5 +1,7 @@
 module Coercion = Coercion
 module Const = Const
+module Dirt = Dirt
+module Effect = Effect
 module Primitives = Primitives
 module Skeleton = Skeleton
 module Substitution = Substitution

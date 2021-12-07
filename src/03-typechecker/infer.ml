@@ -1,11 +1,7 @@
 open Utils
-module Substitution = Language.Substitution
-module Const = Language.Const
-module Untyped = Language.UntypedSyntax
-module Coercion = Language.Coercion
-module Term = Language.Term
-module Type = Language.Type
-module TypeDefinitionContext = TypeDefinitionContext
+module TypeCheckerPrimitives = Primitives
+open Language
+module Untyped = UntypedSyntax
 
 let identity_instantiation (params : Type.Params.t)
     (constraints : Type.Constraints.t) =
@@ -27,9 +23,9 @@ let identity_instantiation (params : Type.Params.t)
               (Coercion.dirtCoercionVar w (drt1, drt2)))
           constraints.dirt_constraints Type.DirtCoercionParam.Map.empty;
       dirt_var_to_dirt_subs =
-        params.dirt_params |> Type.DirtParam.Set.elements
-        |> List.map (fun d -> (d, Type.no_effect_dirt d))
-        |> Type.DirtParam.Map.of_bindings;
+        params.dirt_params |> Dirt.Param.Set.elements
+        |> List.map (fun d -> (d, Dirt.no_effect d))
+        |> Dirt.Param.Map.of_bindings;
       skel_param_to_skel_subs =
         params.skel_params |> Language.Skeleton.Param.Set.elements
         |> List.map (fun s -> (s, Language.Skeleton.Param s))
@@ -105,7 +101,7 @@ type field = Type.Field.t
 type state = {
   variables : TypingEnv.t;
   (* Global Typing Environment *)
-  effects : (Type.ty * Type.ty) Type.Effect.Map.t;
+  effects : (Type.ty * Type.ty) Effect.Map.t;
   (* Valid Effects             *)
   tydefs : TypeDefinitionContext.state; (* Type definition context *)
 }
@@ -121,14 +117,14 @@ let extend_poly_var env x ty_scheme =
 let initial_state : state =
   {
     variables = TypingEnv.empty;
-    effects = Type.Effect.Map.empty;
+    effects = Effect.Map.empty;
     tydefs = TypeDefinitionContext.initial_state;
   }
 
 (* ************************************************************************* *)
 
 let process_def_effect eff (ty1, ty2) state =
-  ( { state with effects = Type.Effect.Map.add eff (ty1, ty2) state.effects },
+  ( { state with effects = Effect.Map.add eff (ty1, ty2) state.effects },
     (ty1, ty2) )
 
 (* ... *)
@@ -379,9 +375,9 @@ and tcLambda state abs =
 
 and tcEffect state (eff : Untyped.effect) : tcExprOutput' =
   (* GEORGE: NOTE: This is verbatim copied from the previous implementation *)
-  let in_ty, out_ty = Type.Effect.Map.find eff state.effects
-  and s = Type.Effect.Set.singleton eff in
-  let out_drty = (out_ty, Type.closed_dirt s) in
+  let in_ty, out_ty = Effect.Map.find eff state.effects
+  and s = Effect.Set.singleton eff in
+  let out_drty = (out_ty, Dirt.closed s) in
   let x_pat, x_var = Term.fresh_variable "x" in_ty
   and y_pat, y_var = Term.fresh_variable "y" out_ty in
   let ret, cnstrs = Constraint.cast_computation (Term.value y_var) out_drty in
@@ -415,7 +411,7 @@ and tcOpCase state
     ((eff, abs2) : Untyped.effect * Untyped.abstraction2) (* Op clause *)
     (dirtyOut : Type.dirty) (* Expected output type *) =
   (* 1: Lookup the type of Opi *)
-  let tyAi, tyBi = Type.Effect.Map.find eff state.effects in
+  let tyAi, tyBi = Effect.Map.find eff state.effects in
 
   (* 2: Generate fresh variables for the type of the codomain of the continuation *)
   let dirtyi = Type.fresh_dirty_with_fresh_skel () in
@@ -459,7 +455,7 @@ and tcOpCase state
 (* Handlers *)
 and tcHandler state (h : Untyped.handler) : tcExprOutput' =
   (* 1: Generate fresh variables for the input and output types *)
-  let deltaIn = Type.fresh_dirt () in
+  let deltaIn = Dirt.fresh () in
   let ((_, deltaOut) as dirtyOut) = Type.fresh_dirty_with_fresh_skel () in
 
   (* 2: Process the return and the operation clauses *)
@@ -472,18 +468,18 @@ and tcHandler state (h : Untyped.handler) : tcExprOutput' =
     let allOps =
       trgCls |> Assoc.to_list
       |> List.map (fun ((eff, _), _) -> eff)
-      |> Type.Effect.Set.of_list
+      |> Effect.Set.of_list
     in
 
     (* GEORGE: This should be done in a cleaner way but let's leave it for later *)
     let deltaOutVar =
       match deltaOut.row with
-      | ParamRow deltaOutVar -> deltaOutVar
-      | EmptyRow -> assert false
+      | Dirt.Row.Param deltaOutVar -> deltaOutVar
+      | Dirt.Row.Empty -> assert false
     in
 
     Constraint.fresh_dirt_coer
-      (deltaIn, Type.{ effect_set = allOps; row = ParamRow deltaOutVar })
+      (deltaIn, Dirt.{ effect_set = allOps; row = Dirt.Row.Param deltaOutVar })
   in
 
   let handlerCo =
@@ -562,7 +558,7 @@ and tcComp state (c : Untyped.computation) : tcCompOutput =
 (* Typecheck a value wrapped in a return *)
 and tcValue state (exp : Untyped.expression) : tcCompOutput' =
   let outExpr, outCs = tcExpr state exp in
-  ((Term.Value outExpr, (outExpr.ty, Type.empty_dirt)), outCs)
+  ((Term.Value outExpr, (outExpr.ty, Dirt.empty)), outCs)
 
 (* Typecheck a let where c1 is a value *)
 and tcLetValNoGen state (patIn : Untyped.pattern) (e1 : Untyped.expression)
@@ -592,7 +588,7 @@ and tcLetCmp state (pat : Untyped.pattern) (c1 : Untyped.computation)
   let tyA2, dirtD2 = trgC2.ty in
 
   (* 2: Generate a fresh dirt variable for the result *)
-  let delta = Type.fresh_dirt () in
+  let delta = Dirt.fresh () in
 
   (* 3: Generate the coercions for the dirts *)
   let omega1, omegaCt1 = Constraint.fresh_dirt_coer (dirtD1, delta) in
@@ -929,10 +925,10 @@ let add_type_definitions ~loc state tydefs =
   }
 
 let load_primitive_effect state eff prim =
-  let ty1, ty2 = Primitives.primitive_effect_signature prim in
-  ( { state with effects = Type.Effect.Map.add eff (ty1, ty2) state.effects },
+  let ty1, ty2 = TypeCheckerPrimitives.primitive_effect_signature prim in
+  ( { state with effects = Effect.Map.add eff (ty1, ty2) state.effects },
     (ty1, ty2) )
 
 let load_primitive_value state x prim =
-  let ty = Primitives.primitive_value_type_scheme prim in
+  let ty = TypeCheckerPrimitives.primitive_value_type_scheme prim in
   extend_poly_var state x ty

@@ -15,7 +15,7 @@ let _ = Effect true
 
 type state = {
   context : (string, Term.Variable.t) Assoc.t;
-  effect_symbols : (string, Type.Effect.t) Assoc.t;
+  effect_symbols : (string, Effect.t) Assoc.t;
   field_symbols : (string, Type.Field.t) Assoc.t;
   tyname_symbols : (string, TyName.t) Assoc.t;
   constructors : (string, Type.Label.t * constructor_kind) Assoc.t;
@@ -63,7 +63,7 @@ let effect_to_symbol state name =
   match Assoc.lookup name state.effect_symbols with
   | Some sym -> (state, sym)
   | None ->
-      let sym = Type.Effect.fresh name in
+      let sym = Effect.fresh name in
       let effect_symbols' = Assoc.update name sym state.effect_symbols in
       ({ state with effect_symbols = effect_symbols' }, sym)
 
@@ -542,7 +542,7 @@ and desugar_handler loc state
     | Some a2s -> Assoc.replace eff (a2 :: a2s) assoc
   in
   let construct_eff_clause state (eff, eff_cs_lst) =
-    (* transform string name to Type.Effect.t *)
+    (* transform string name to Effect.t *)
     let state', eff' = effect_to_symbol state eff in
     match eff_cs_lst with
     | [] -> assert false
