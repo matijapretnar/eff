@@ -63,7 +63,11 @@ module type S = sig
 
   val fold : (annot -> int -> 'a) -> t -> 'a
 
-  module Set : Set.S with type elt = t
+  module Set : sig
+    include Set.S with type elt = t
+
+    val print : t -> Format.formatter -> unit
+  end
 
   module Map : sig
     include Map.S with type key = t
@@ -75,6 +79,9 @@ module type S = sig
     val keys : 'a t -> key list
 
     val values : 'a t -> 'a list
+
+    val print :
+      ('a -> Format.formatter -> unit) -> 'a t -> Format.formatter -> unit
   end
 end
 
@@ -107,7 +114,11 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
     let compare = compare
   end
 
-  module Set = Set.Make (Ord)
+  module Set = struct
+    include Set.Make (Ord)
+
+    let print set = Print.sequence "," print (elements set)
+  end
 
   module Map = struct
     include Map.Make (Ord)
@@ -125,5 +136,10 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
     let keys m = List.map fst (bindings m)
 
     let values m = List.map snd (bindings m)
+
+    let print pp m =
+      Print.sequence ","
+        (fun (k, v) ppf -> Format.fprintf ppf "%t %t" (print k) (pp v))
+        (bindings m)
   end
 end

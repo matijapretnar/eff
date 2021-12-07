@@ -285,7 +285,7 @@ module DirtConstraints = struct
         let[@warning "-27"] print ?(safe = false) (edge, effect_set) ppf =
           let print_effect_set ppf =
             if Effect.Set.is_empty effect_set then Print.print ppf ""
-            else Print.print ppf " U {%t}" (Dirt.print_effect_set effect_set)
+            else Print.print ppf " U {%t}" (Effect.Set.print effect_set)
           in
           Print.print ppf "%t%t" (DirtCoercionParam.print edge) print_effect_set
       end)
@@ -419,7 +419,7 @@ module Constraints = struct
   let print_dirt_edge (source, (edge, effect_set), sink) ppf : unit =
     let print_effect_set ppf =
       if Effect.Set.is_empty effect_set then Print.print ppf ""
-      else Print.print ppf " U {%t}" (Dirt.print_effect_set effect_set)
+      else Print.print ppf " U {%t}" (Effect.Set.print effect_set)
     in
     Print.print ppf "@[<h>node_%t -> node_%t [label=\"%t%t\"]@]"
       (Dirt.Param.print source) (Dirt.Param.print sink)

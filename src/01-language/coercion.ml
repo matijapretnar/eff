@@ -122,8 +122,7 @@ and print_dirt_coercion ?max_level c ppf =
   | Empty ->
       print ~at_level:1 "∅↪︎%t" (Dirt.print ~max_level:0 (snd c.ty))
   | UnionDirt (eset, dc) ->
-      print ~at_level:2 "{%t}∪%t"
-        (Dirt.print_effect_set eset)
+      print ~at_level:2 "{%t}∪%t" (Effect.Set.print eset)
         (print_dirt_coercion ~max_level:2 dc)
 
 (* ************************************************************************* *)

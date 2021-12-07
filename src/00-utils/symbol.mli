@@ -33,7 +33,11 @@ module type S = sig
 
   val fold : (annot -> int -> 'a) -> t -> 'a
 
-  module Set : Set.S with type elt = t
+  module Set : sig
+    include Set.S with type elt = t
+
+    val print : t -> Format.formatter -> unit
+  end
 
   module Map : sig
     include Map.S with type key = t
@@ -45,6 +49,9 @@ module type S = sig
     val keys : 'a t -> key list
 
     val values : 'a t -> 'a list
+
+    val print :
+      ('a -> Format.formatter -> unit) -> 'a t -> Format.formatter -> unit
   end
 end
 

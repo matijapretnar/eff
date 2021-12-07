@@ -376,14 +376,13 @@ and elab_computation' state c _is_empty =
       match vtype.term with
       | ExEffTypes.Handler ((vty1, _vdirt1), (_vty2, vdirt2)) when ctype = vty1
         ->
-          if Dirt.is_empty cdirt (* Handle - Case 1 *) then (
-            NoEff.NApplyTerm (velab, elabc))
-          else if Dirt.is_empty vdirt2 (* Handle - Case 2 *) then (
+          if Dirt.is_empty cdirt (* Handle - Case 1 *) then
+            NoEff.NApplyTerm (velab, elabc)
+          else if Dirt.is_empty vdirt2 (* Handle - Case 2 *) then
             NoEff.NCast
               (NoEff.NHandle (elabc, velab), NoEff.NCoerUnsafe NoEff.NCoerRefl)
-            (* Handle - Case 3 *))
-          else (
-            NoEff.NHandle (elabc, velab))
+            (* Handle - Case 3 *)
+          else NoEff.NHandle (elabc, velab)
       | _ -> assert false)
   | ExEff.Call ((eff, (ty1, ty2)), value, abs) ->
       let t1 = elab_ty ty1 in
