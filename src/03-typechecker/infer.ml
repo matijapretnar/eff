@@ -828,17 +828,17 @@ and check_abstraction2 state abs2 patTy1 patTy2 :
 
 let infer_computation state comp =
   let comp', cnstrs = tcComp state comp in
-  let sub, residuals = Unification.solve cnstrs in
+  let sub, residuals = Unification.solve ~loc:comp.at cnstrs in
   (subInCmp sub comp', residuals)
 
 let infer_expression state expr =
   let expr', cnstrs = tcExpr state expr in
-  let sub, residuals = Unification.solve cnstrs in
+  let sub, residuals = Unification.solve ~loc:expr.at cnstrs in
   (subInExp sub expr', residuals)
 
-let infer_rec_abstraction state defs =
+let infer_rec_abstraction ~loc state defs =
   let defs', cnstrs = infer_let_rec state defs in
-  let sub, residuals = Unification.solve cnstrs in
+  let sub, residuals = Unification.solve ~loc cnstrs in
   (Assoc.map (Term.apply_substitutions_to_abstraction sub) defs', residuals)
 
 (* Typecheck a top-level expression *)
@@ -855,12 +855,12 @@ let process_computation state cmp =
   Exhaust.check_computation state.tydefs cmp;
   (params, cmp', constraints)
 
-let process_top_let state defs =
+let process_top_let ~loc state defs =
   let fold (pat, cmp) (state', defs) =
     let pat', vars, cnstrs_pat = infer_pattern state pat in
     let cmp', cnstrs_cmp = tcComp state cmp in
     let sub, constraints =
-      Unification.solve
+      Unification.solve ~loc
         (Constraint.add_ty_equality
            (pat'.ty, fst cmp'.ty)
            (Constraint.union cnstrs_pat cnstrs_cmp))
@@ -888,8 +888,10 @@ let process_top_let state defs =
   in
   List.fold_right fold defs (state, [])
 
-let process_top_let_rec state defs =
-  let defs, constraints = infer_rec_abstraction state (Assoc.to_list defs) in
+let process_top_let_rec ~loc state defs =
+  let defs, constraints =
+    infer_rec_abstraction ~loc state (Assoc.to_list defs)
+  in
   let defs_params = Term.free_params_definitions defs in
   let cnstrs_params = Type.Constraints.free_params constraints in
   let params = Type.Params.union defs_params cnstrs_params in

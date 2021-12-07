@@ -145,7 +145,7 @@ module Make (Backend : Language.Backend) = struct
           Desugarer.desugar_top_let state.desugarer_state defs
         in
         let type_system_state', defs'' =
-          TypeSystem.process_top_let state.type_system_state defs'
+          TypeSystem.process_top_let ~loc state.type_system_state defs'
         in
         let optimizer_state', defs''' =
           Optimizer.process_top_let state.optimizer_state defs''
@@ -165,7 +165,7 @@ module Make (Backend : Language.Backend) = struct
         in
         let defs'' = Assoc.of_list defs' in
         let type_system_state', defs''' =
-          TypeSystem.process_top_let_rec state.type_system_state defs''
+          TypeSystem.process_top_let_rec ~loc state.type_system_state defs''
         in
         let optimizer_state', defs'''' =
           Optimizer.process_top_let_rec state.optimizer_state defs'''

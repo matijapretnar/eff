@@ -30,7 +30,7 @@ let apply_substitution new_sub sub (paused : Type.Constraints.t) queue =
   in
   (sub', paused', queue')
 
-let expand_row row ops =
+let expand_row ~loc row ops =
   match row with
   | _ when Type.Effect.Set.is_empty ops -> (Substitution.empty, row)
   | ParamRow p ->
@@ -40,9 +40,9 @@ let expand_row row ops =
         Substitution.add_dirt_substitution_e p { effect_set = ops; row = row' }
       in
       (sub', row')
-  | EmptyRow -> Error.typing ~loc:Location.unknown "Cannot extend an empty row."
+  | EmptyRow -> Error.typing ~loc "Cannot extend an empty row."
 
-let skel_eq_step sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
+let skel_eq_step ~loc sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
   match (sk1, sk2) with
   (* ς = ς *)
   | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
@@ -60,9 +60,8 @@ let skel_eq_step sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
       (* occurs-check failing *)
   | SkelParam _, _ | _, SkelParam _ ->
       let printer = Type.print_pretty SkelParam.Set.empty in
-      Error.typing ~loc:Location.unknown
-        "This expression has a forbidden cyclic type %t = %t." (printer sk1)
-        (printer sk2)
+      Error.typing ~loc "This expression has a forbidden cyclic type %t = %t."
+        (printer sk1) (printer sk2)
       (* int = int *)
   | SkelBasic ps1, SkelBasic ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
   (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
@@ -94,11 +93,11 @@ let skel_eq_step sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
           sks1 sks2 rest_queue )
   | _ ->
       let printer = Type.print_pretty SkelParam.Set.empty in
-      Error.typing ~loc:Location.unknown
+      Error.typing ~loc
         "This expression has type %t but it should have type %t." (printer sk1)
         (printer sk2)
 
-and ty_eq_step sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
+and ty_eq_step ~loc sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
     (ty2 : Type.ty) =
   match (ty1.term, ty2.term) with
   | _, _ when ty1.ty <> ty2.ty ->
@@ -121,9 +120,8 @@ and ty_eq_step sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
       (* occurs-check failing *)
   | TyParam _, _ | _, TyParam _ ->
       let printer = Type.print_pretty SkelParam.Set.empty in
-      Error.typing ~loc:Location.unknown
-        "This expression has a forbidden cyclic type %t = %t." (printer ty1.ty)
-        (printer ty2.ty)
+      Error.typing ~loc "This expression has a forbidden cyclic type %t = %t."
+        (printer ty1.ty) (printer ty2.ty)
       (* int = int *)
   | TyBasic ps1, TyBasic ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
   (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
@@ -159,11 +157,11 @@ and ty_eq_step sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
           tys1 tys2 rest_queue )
   | _ ->
       let printer = Type.print_pretty SkelParam.Set.empty in
-      Error.typing ~loc:Location.unknown
+      Error.typing ~loc
         "This expression has type %t but it should have type %t."
         (printer ty1.ty) (printer ty2.ty)
 
-and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
+and ty_omega_step ~loc sub (paused : Type.Constraints.t) cons rest_queue omega =
   function
   (* ω : A <= A *)
   | ty1, ty2 when Type.equal_ty ty1 ty2 ->
@@ -252,7 +250,7 @@ and ty_omega_step sub (paused : Type.Constraints.t) cons rest_queue omega =
         (Constraint.union cons rest_queue)
   | ty1, ty2 ->
       let printer = Type.print_pretty SkelParam.Set.empty in
-      Error.typing ~loc:Location.unknown
+      Error.typing ~loc
         "This expression has type %t but it should have type %t."
         (printer ty1.ty) (printer ty2.ty)
 
@@ -323,7 +321,7 @@ and dirt_omega_step sub resolved unresolved w dcons =
       apply_substitution sub' sub resolved unresolved
   | _ -> assert false
 
-and dirt_eq_step sub paused rest_queue { effect_set = o1; row = row1 }
+and dirt_eq_step ~loc sub paused rest_queue { effect_set = o1; row = row1 }
     { effect_set = o2; row = row2 } =
   (*
   Consider the equation:
@@ -336,8 +334,8 @@ and dirt_eq_step sub paused rest_queue { effect_set = o1; row = row1 }
       row₁' = row₂'
 
   *)
-  let sub1, row1' = expand_row row1 (Effect.Set.diff o2 o1)
-  and sub2, row2' = expand_row row2 (Effect.Set.diff o1 o2) in
+  let sub1, row1' = expand_row ~loc row1 (Effect.Set.diff o2 o1)
+  and sub2, row2' = expand_row ~loc row2 (Effect.Set.diff o1 o2) in
   let row_sub =
     match (row1', row2') with
     | EmptyRow, EmptyRow -> Substitution.empty
@@ -351,27 +349,31 @@ and dirt_eq_step sub paused rest_queue { effect_set = o1; row = row1 }
   let sub' = Substitution.merge (Substitution.merge sub1 sub2) row_sub in
   apply_substitution sub' sub paused rest_queue
 
-let rec unify (sub, paused, (queue : Constraint.t)) =
+let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
   (* Print.debug "SUB: %t" (Substitution.print sub); *)
   (* Print.debug "PAUSED: %t" (Type.Constraints.print paused); *)
   (* Print.debug "QUEUE: %t" (Constraint.print queue); *)
   match queue with
   | { skeleton_equalities = (sk1, sk2) :: skeleton_equalities; _ } ->
-      skel_eq_step sub paused { queue with skeleton_equalities } sk1 sk2
-      |> unify
+      skel_eq_step ~loc sub paused { queue with skeleton_equalities } sk1 sk2
+      |> unify ~loc
   | { dirt_equalities = (drt1, drt2) :: dirt_equalities; _ } ->
-      dirt_eq_step sub paused { queue with dirt_equalities } drt1 drt2 |> unify
+      dirt_eq_step ~loc sub paused { queue with dirt_equalities } drt1 drt2
+      |> unify ~loc
   | { dirt_inequalities = (omega, dcons) :: dirt_inequalities; _ } ->
       dirt_omega_step sub paused { queue with dirt_inequalities } omega dcons
-      |> unify
+      |> unify ~loc
   | { ty_equalities = (ty1, ty2) :: ty_equalities; _ } ->
-      ty_eq_step sub paused { queue with ty_equalities } ty1 ty2 |> unify
+      ty_eq_step ~loc sub paused { queue with ty_equalities } ty1 ty2
+      |> unify ~loc
   | { ty_inequalities = (omega, tycons) :: ty_inequalities; _ } ->
       let cons =
         Constraint.add_ty_inequality (omega, tycons) Constraint.empty
       in
-      ty_omega_step sub paused cons { queue with ty_inequalities } omega tycons
-      |> unify
+      ty_omega_step ~loc sub paused cons
+        { queue with ty_inequalities }
+        omega tycons
+      |> unify ~loc
   | {
    skeleton_equalities = [];
    dirt_equalities = [];
@@ -381,10 +383,10 @@ let rec unify (sub, paused, (queue : Constraint.t)) =
   } ->
       (sub, paused)
 
-let solve constraints =
+let solve ~loc constraints =
   (* Print.debug "constraints: %t" (Constraint.print_constraints constraints); *)
   let solved =
-    unify (Substitution.empty, Type.Constraints.empty, constraints)
+    unify ~loc (Substitution.empty, Type.Constraints.empty, constraints)
   in
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
