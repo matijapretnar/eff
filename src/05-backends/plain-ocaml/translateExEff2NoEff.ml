@@ -277,10 +277,9 @@ and elab_expression' state exp =
   | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty state abs)
   | ExEff.Handler h ->
       let elabvc = elab_abstraction_with_param_ty state h.term.value_clause in
-      if
-        Assoc.length h.term.effect_clauses.effect_part = 0
-        (* Handler - Case 1 *)
-      then NoEff.NFun elabvc
+      let (_, drt_in), _ = h.ty in
+      if ExEffTypes.is_empty_dirt drt_in (* Handler - Case 1 *) then
+        NoEff.NFun elabvc
       else
         let _, (_ty, dirt) = h.term.value_clause.ty in
         if ExEffTypes.is_empty_dirt dirt (* Handler - Case 2 *) then
