@@ -1,18 +1,4 @@
-module Coercion = Coercion
-module Const = Const
-module Constraints = Constraints
-module Dirt = Dirt
-module Effect = Effect
-module Primitives = Primitives
-module Skeleton = Skeleton
-module Substitution = Substitution
-module Term = Term
-module Type = Type
-module TyName = TyName
-module TyScheme = TyScheme
-module UntypedSyntax = UntypedSyntax
-
-module type Backend = sig
+module type S = sig
   type state
 
   val initial_state : state

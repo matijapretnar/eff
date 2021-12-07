@@ -2,7 +2,7 @@
 
 open Utils
 
-module Backend : Language.Backend = struct
+module Backend : Language.Backend.S = struct
   (* ------------------------------------------------------------------------ *)
   (* Setup *)
 

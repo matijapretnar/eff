@@ -185,7 +185,7 @@ let main =
   (* Files were listed in the wrong order, so we reverse them *)
   file_queue := List.rev !file_queue;
   try
-    let (module Backend : Language.Backend) =
+    let (module Backend : Language.Backend.S) =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
       | Config.Multicore -> (module MulticoreOCaml.Backend)

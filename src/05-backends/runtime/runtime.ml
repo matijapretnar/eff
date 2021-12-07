@@ -4,7 +4,7 @@ open Utils
 module V = Value
 module Type = Language.Type
 
-module Backend : Language.Backend = struct
+module Backend : Language.Backend.S = struct
   type state = Eval.state
 
   let initial_state = Eval.initial_state
