@@ -397,9 +397,11 @@ let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
 
 let solve ~loc constraints =
   (* Print.debug "constraints: %t" (Constraint.print_constraints constraints); *)
-  let solved =
+  let sub, constraints =
     unify ~loc (Substitution.empty, Constraints.empty, constraints)
   in
+
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
-  solved
+  let subs', constraints' = Constraints.garbage_collect constraints in
+  (Substitution.merge subs' sub, constraints')

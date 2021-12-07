@@ -90,6 +90,111 @@ module TyConstraints = struct
                 (Params.ty_singleton t2 skel)))
           params)
       ty_constraints Params.empty
+
+  let garbage_collect (constraints : t) =
+    (* Skeleton component *)
+    let garbage_collect_skeleton_component skel (graph : TyParamGraph.t)
+        (subs, cmps) =
+      let pack ty_param =
+        { term = TyParam ty_param; ty = Skeleton.Param skel }
+      in
+      let substitute_ty_param ty_param sub =
+        match
+          (Substitution.apply_substitutions_to_type sub (pack ty_param)).term
+        with
+        | TyParam ty_param' -> ty_param'
+        | _ -> assert false
+      in
+      let dummy_type : Type.ty = Type.unit_ty in
+      let substitute_coercion coercion sub =
+        match
+          (Substitution.apply_sub_tycoer sub
+             { term = TyCoercionVar coercion; ty = (dummy_type, dummy_type) })
+            .term
+        with
+        | TyCoercionVar ty_param' -> Some ty_param'
+        | ReflTy -> None
+        | _ -> assert false
+      in
+      let components = TyParamGraph.scc graph in
+      (* For each component: pick one and update substitutions  *)
+      let subs', new_components =
+        List.fold
+          (fun (subs, cmps) component ->
+            match TyParam.Set.elements component with
+            | [] -> assert false
+            (* Select the first one as representative *)
+            | top :: rest ->
+                let subs =
+                  List.fold
+                    (fun subs param ->
+                      Substitution.add_type_substitution param (pack top) subs)
+                    subs rest
+                in
+                (* find inner loops, there must be a more optimal way to do this, maybe implement tarjan to get factor graph  *)
+                let refl_coercions =
+                  TyParam.Set.fold
+                    (fun source internal ->
+                      let packed_source = pack source in
+                      let edges = TyParamGraph.get_edges source graph in
+                      let internal =
+                        TyParam.Map.fold
+                          (fun target edge internal ->
+                            if TyParam.Set.mem target component then
+                              let new_sub =
+                                Substitution.add_type_coercion_e edge
+                                  {
+                                    term = Coercion.ReflTy;
+                                    ty = (packed_source, pack target);
+                                  }
+                              in
+                              Substitution.merge new_sub internal
+                            else internal)
+                          edges internal
+                      in
+                      internal)
+                    component Substitution.empty
+                in
+                ( Substitution.merge refl_coercions subs,
+                  (top, component) :: cmps ))
+          (Substitution.empty, []) components
+      in
+      let new_graph =
+        TyParam.Map.fold
+          (fun source edges s ->
+            let source = substitute_ty_param source subs' in
+            let outgoing =
+              TyParam.Map.bindings edges
+              |> List.filter_map (fun (target, e) ->
+                     match substitute_coercion e subs' with
+                     | Some c -> Some (substitute_ty_param target subs', c)
+                     | None -> None)
+            in
+            List.fold
+              (fun new_graph (target, e) ->
+                TyParamGraph.add_edge source target e new_graph)
+              s outgoing)
+          graph TyParamGraph.empty
+      in
+
+      ( Substitution.merge subs' subs,
+        ((skel, new_graph), new_components) :: cmps )
+    in
+
+    let (subs, components)
+          : Substitution.t
+            * ((Skeleton.Param.t * TyParamGraph.t)
+              * (TyParam.t * TyParam.Set.t) list)
+              list =
+      Skeleton.Param.Map.fold garbage_collect_skeleton_component constraints
+        (Substitution.empty, [])
+    in
+
+    let full_graph =
+      components |> List.map fst |> Skeleton.Param.Map.of_bindings
+    in
+
+    (subs, full_graph)
 end
 
 type t = {
@@ -126,6 +231,12 @@ let free_params constraints =
     DirtConstraints.free_params constraints.dirt_constraints
   in
   Params.union free_params_ty free_params_dirt
+
+let garbage_collect constraints =
+  let subs, ty_constraints =
+    TyConstraints.garbage_collect constraints.ty_constraints
+  in
+  (subs, { constraints with ty_constraints })
 
 let print_ty_param_vertex ty_param ppf : unit =
   let vertex = TyParam.print ty_param in
