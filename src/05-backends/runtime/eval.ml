@@ -20,7 +20,7 @@ let lookup x state =
 let add_runner (eff, _) runner state =
   { state with runners = Assoc.update eff runner state.runners }
 
-exception PatternMatch of Location.t
+exception PatternMatch
 
 let rec extend_value p v state =
   match (p.term, v) with
@@ -38,16 +38,16 @@ let rec extend_value p v state =
         | Some v -> extend_value p v state
       in
       try Type.Field.Map.fold extender ps state
-      with Not_found -> raise (PatternMatch Location.unknown))
+      with Not_found -> raise PatternMatch)
   | Term.PVariant (lbl, None), V.Variant (lbl', None) when lbl = lbl' -> state
   | Term.PVariant (lbl, Some p), V.Variant (lbl', Some v) when lbl = lbl' ->
       extend_value p v state
   | Term.PConst c, V.Const c' when Const.equal c c' -> state
-  | _, _ -> raise (PatternMatch Location.unknown)
+  | _, _ -> raise PatternMatch
 
 let extend p v state =
   try extend_value p v state
-  with PatternMatch _loc -> Error.runtime "Pattern match failure."
+  with PatternMatch -> Error.runtime "Pattern match failure."
 
 let rec sequence k = function
   | V.Value v -> k v
@@ -70,7 +70,7 @@ let rec ceval state c =
         | a :: lst -> (
             let p, c = a.term in
             try ceval (extend_value p v state) c
-            with PatternMatch _ -> eval_case lst)
+            with PatternMatch -> eval_case lst)
       in
       eval_case cases
   | Term.Handle (e, c) ->

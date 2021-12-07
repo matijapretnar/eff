@@ -194,7 +194,7 @@ plain_app_term:
       | Variant (lbl, None), [t] -> Variant (lbl, Some t)
       | Variant (lbl, _), _ -> Error.syntax ~loc:(t.at) "Label %s applied to too many argument" lbl
       | _, _ ->
-        let apply t1 t2 = {it= Apply(t1, t2); at= Location.union [t1.at; t2.at]} in
+        let apply t1 t2 = {it= Apply(t1, t2); at= Location.union t1.at t2.at} in
         (List.fold_left apply t ts).it
     }
   | t = plain_prefix_term
@@ -227,7 +227,7 @@ plain_simple_term:
     {
       let nil = {it= Variant (Type.nil_annot, None); at= Location.make $endpos $endpos} in
       let cons t ts =
-        let loc = Location.union [t.at; ts.at] in
+        let loc = Location.union t.at ts.at in
         let tuple = {it= Tuple [t; ts];at= loc} in
         {it= Variant (Type.cons_annot, Some tuple); at= loc}
       in
@@ -348,7 +348,7 @@ plain_simple_pattern:
     {
       let nil = {it= PVariant (Type.nil_annot, None);at= Location.make $endpos $endpos} in
       let cons t ts =
-        let loc = Location.union [t.at; ts.at] in
+        let loc = Location.union t.at ts.at in
         let tuple = {it= PTuple [t; ts]; at= loc} in
         {it= PVariant (Type.cons_annot, Some tuple); at= loc}
       in

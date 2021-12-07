@@ -12,5 +12,3 @@ module Symbols = Symbols
 type 'a located = { it : 'a; at : Location.t }
 
 type ('trm, 'ty) typed = { term : 'trm; ty : 'ty }
-
-let unlocated x = { it = x; at = Location.unknown }

@@ -11,14 +11,11 @@ type t
 val print : t -> Format.formatter -> unit
 (** Print a location. *)
 
-val unknown : t
-(** Unknown location. *)
-
 val make : Lexing.position -> Lexing.position -> t
 (** Make a location from two lexing positions. *)
 
-val union : t list -> t
-(** Computes the smallest location containing all known locations in the list. *)
+val union : t -> t -> t
+(** Computes the smallest location containing the two given locations. *)
 
 val of_lexeme : Lexing.lexbuf -> t
 (** Get the location of the current lexeme in a lexing buffer. *)
