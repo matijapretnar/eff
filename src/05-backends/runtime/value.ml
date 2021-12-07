@@ -44,7 +44,7 @@ let print_effect eff ppf = Format.fprintf ppf "%t" (Type.Effect.print eff)
 let rec print_value ?max_level v ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match to_list v with
-  | Some vs -> print "[%t]" (Print.sequence "; " print_value vs)
+  | Some vs -> print "[@[%t@]]" (Print.sequence "; " print_value vs)
   | None -> (
       match v with
       | Const c -> Const.print c ppf

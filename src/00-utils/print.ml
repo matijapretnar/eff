@@ -24,11 +24,18 @@ let print ?(at_level = min_int) ?(max_level = max_int) ppf =
   if at_level <= max_level then Format.fprintf ppf
   else fun fmt -> Format.fprintf ppf ("(" ^^ fmt ^^ ")")
 
-let rec sequence sep pp vs ppf =
-  match vs with
-  | [] -> ()
-  | [ v ] -> pp v ppf
-  | v :: vs -> Format.fprintf ppf "%t%s@,%t" (pp v) sep (sequence sep pp vs)
+let sequence sep pp vs ppf =
+  let i = String.length sep - 1 in
+  let space = sep.[i] = ' ' in
+  let sep = if space then String.sub sep 0 i else sep in
+  let rec aux vs ppf =
+    match vs with
+    | [] -> ()
+    | [ v ] -> pp v ppf
+    | v :: vs when space -> Format.fprintf ppf "%t%s@ %t" (pp v) sep (aux vs)
+    | v :: vs -> Format.fprintf ppf "%t%s@ %t" (pp v) sep (aux vs)
+  in
+  aux vs ppf
 
 let printer_sequence sep printers ppf =
   sequence sep (fun printer ppf -> printer ppf) printers ppf

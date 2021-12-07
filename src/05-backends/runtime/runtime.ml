@@ -18,7 +18,7 @@ module Backend : Language.Backend = struct
   (* Processing functions *)
   let process_computation state ((params : Type.Params.t), c, _) =
     let v = Eval.run state c in
-    Format.fprintf !Config.output_formatter "@[- : %t = %t@]@."
+    Format.fprintf !Config.output_formatter "- : @[%t@] = @[%t@]@."
       (Type.print_pretty params.skel_params (fst c.ty).ty)
       (V.print_value v);
     state
