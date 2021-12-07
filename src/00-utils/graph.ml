@@ -76,6 +76,10 @@ struct
         (vertices graph) (visited, components)
     in
     (* TODO: a bunch of asserts *)
+    List.iter (fun cmp -> assert (Vertex.Set.cardinal cmp >= 1)) components;
+    let all = List.fold_right Vertex.Set.union components Vertex.Set.empty in
+    assert (Vertex.Set.equal all (vertices graph));
+    (*  *)
     components
 
   let toposort graph =
