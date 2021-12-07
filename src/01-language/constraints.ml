@@ -169,6 +169,8 @@ let print_dot c ppf =
 
   Print.print ppf
     "digraph {\n\
+     labelloc=b\n\
+     rankdir=BT\n\
      //Type params\n\
     \  subgraph cluster_skeleton {\n\n\
     \  label=\"Type constraints\";\n\
