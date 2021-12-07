@@ -369,7 +369,13 @@ and apply_sub_exp sub expression =
 
 and apply_sub_exp' sub expression =
   match expression with
-  | Var v -> Var v
+  | Var v ->
+      Var
+        {
+          v with
+          instantiation =
+            Substitution.apply_substitutions_to_substitution sub v.instantiation;
+        }
   | Const c -> Const c
   | Tuple elist -> Tuple (List.map (fun x -> apply_sub_exp sub x) elist)
   | Variant (lbl, e1) -> Variant (lbl, Option.map (apply_sub_exp sub) e1)

@@ -224,31 +224,45 @@ let of_parameters (params : Type.Params.t) =
   (* Print.debug "SUBSTITUTION': %t" (print subst'); *)
   (params', subst')
 
+let apply_substitutions_to_substitution new_sub old_sub =
+  {
+    type_param_to_type_coercions =
+      Type.TyCoercionParam.Map.map (apply_sub_tycoer new_sub)
+        old_sub.type_param_to_type_coercions;
+    type_param_to_type_subs =
+      Type.TyParam.Map.map (apply_sub_ty new_sub)
+        old_sub.type_param_to_type_subs;
+    dirt_var_to_dirt_coercions =
+      Type.DirtCoercionParam.Map.map
+        (apply_sub_dirtcoer new_sub)
+        old_sub.dirt_var_to_dirt_coercions;
+    dirt_var_to_dirt_subs =
+      Type.DirtParam.Map.map (apply_sub_dirt new_sub)
+        old_sub.dirt_var_to_dirt_subs;
+    skel_param_to_skel_subs =
+      Type.SkelParam.Map.map (apply_sub_skel new_sub)
+        old_sub.skel_param_to_skel_subs;
+  }
+
 let merge new_sub old_sub =
+  let old_sub' = apply_substitutions_to_substitution new_sub old_sub in
   {
     type_param_to_type_coercions =
       Type.TyCoercionParam.Map.compatible_union
         new_sub.type_param_to_type_coercions
-        (Type.TyCoercionParam.Map.map (apply_sub_tycoer new_sub)
-           old_sub.type_param_to_type_coercions);
+        old_sub'.type_param_to_type_coercions;
     type_param_to_type_subs =
       Type.TyParam.Map.compatible_union new_sub.type_param_to_type_subs
-        (Type.TyParam.Map.map (apply_sub_ty new_sub)
-           old_sub.type_param_to_type_subs);
+        old_sub'.type_param_to_type_subs;
     dirt_var_to_dirt_coercions =
       Type.DirtCoercionParam.Map.compatible_union
-        new_sub.dirt_var_to_dirt_coercions
-        (Type.DirtCoercionParam.Map.map
-           (apply_sub_dirtcoer new_sub)
-           old_sub.dirt_var_to_dirt_coercions);
+        new_sub.dirt_var_to_dirt_coercions old_sub'.dirt_var_to_dirt_coercions;
     dirt_var_to_dirt_subs =
       Type.DirtParam.Map.compatible_union new_sub.dirt_var_to_dirt_subs
-        (Type.DirtParam.Map.map (apply_sub_dirt new_sub)
-           old_sub.dirt_var_to_dirt_subs);
+        old_sub'.dirt_var_to_dirt_subs;
     skel_param_to_skel_subs =
       Type.SkelParam.Map.compatible_union new_sub.skel_param_to_skel_subs
-        (Type.SkelParam.Map.map (apply_sub_skel new_sub)
-           old_sub.skel_param_to_skel_subs);
+        old_sub'.skel_param_to_skel_subs;
   }
 
 let add_type_coercion_e parameter t_coercion =
