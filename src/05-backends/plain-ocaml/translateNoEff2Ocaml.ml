@@ -344,7 +344,9 @@ let pp_tydef (name, (params, tydef)) ppf =
 
 let pp_cmd state cmd ppf =
   match cmd with
-  | Term t -> print ppf "%t@.;;" (pp_term state t) (* TODO check if ok *)
+  | Term ([], t) -> print ppf "%t@.;;" (pp_term state t)
+  | Term (ws, t) ->
+      print ppf "fun %t -> %t@.;;" (pp_coercion_vars ws) (pp_term state t)
   | DefEffect e -> pp_def_effect e ppf
   | TopLet defs ->
       print ppf "%t@.;; let %t = %t@.;;"

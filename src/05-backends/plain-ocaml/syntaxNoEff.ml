@@ -96,7 +96,7 @@ type n_tydef =
   | TyDefInline of n_type
 
 type cmd =
-  | Term of n_term
+  | Term of Type.TyCoercionParam.t list * n_term
   | TopLet of (n_pattern * Type.TyCoercionParam.t list * n_term) list
   | TopLetRec of n_top_rec_definitions
   | DefEffect of n_effect

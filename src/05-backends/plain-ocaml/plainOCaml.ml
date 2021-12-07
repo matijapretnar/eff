@@ -63,12 +63,17 @@ module Backend : Language.Backend = struct
     in
     defs'
 
-  let process_computation state (_, c, _) =
+  let process_computation state (_, c, cnstrs) =
     let c' =
       optimize_term state
       @@ TranslateExEff2NoEff.elab_computation translate_exeff_config c
     in
-    { state with prog = SyntaxNoEff.Term c' :: state.prog }
+    {
+      state with
+      prog =
+        SyntaxNoEff.Term (TranslateExEff2NoEff.elab_constraints cnstrs, c')
+        :: state.prog;
+    }
 
   let process_type_of state _ =
     (* Print.warning "[#typeof] commands are ignored when compiling to OCaml."; *)
@@ -87,9 +92,7 @@ module Backend : Language.Backend = struct
       List.map
         (fun (pat, _params, cnstrs, comp) ->
           ( TranslateExEff2NoEff.elab_pattern translate_exeff_config pat,
-            Type.TyConstraints.fold
-              (fun _ _ _ w lst -> w :: lst)
-              cnstrs.Type.Constraints.ty_constraints [],
+            TranslateExEff2NoEff.elab_constraints cnstrs,
             optimize_term state
             @@ TranslateExEff2NoEff.elab_computation translate_exeff_config comp
           ))
