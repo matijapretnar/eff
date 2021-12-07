@@ -1,9 +1,11 @@
 module Coercion = Coercion
 module Const = Const
 module Primitives = Primitives
+module Skeleton = Skeleton
 module Substitution = Substitution
 module Term = Term
 module Type = Type
+module TyName = TyName
 module UntypedSyntax = UntypedSyntax
 
 module type Backend = sig
@@ -32,8 +34,7 @@ module type Backend = sig
   val load_primitive_effect :
     state -> Term.effect -> Primitives.primitive_effect -> state
 
-  val process_tydef :
-    state -> (Type.TyName.t, Type.type_data) Utils.Assoc.t -> state
+  val process_tydef : state -> (TyName.t, Type.type_data) Utils.Assoc.t -> state
 
   val finalize : state -> unit
 end

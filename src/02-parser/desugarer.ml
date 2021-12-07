@@ -17,9 +17,9 @@ type state = {
   context : (string, Term.Variable.t) Assoc.t;
   effect_symbols : (string, Type.Effect.t) Assoc.t;
   field_symbols : (string, Type.Field.t) Assoc.t;
-  tyname_symbols : (string, Type.TyName.t) Assoc.t;
+  tyname_symbols : (string, TyName.t) Assoc.t;
   constructors : (string, Type.Label.t * constructor_kind) Assoc.t;
-  local_type_annotations : (string, Type.TyParam.t * Type.SkelParam.t) Assoc.t;
+  local_type_annotations : (string, Type.TyParam.t * Skeleton.Param.t) Assoc.t;
   inlined_types : (string, Type.ty) Assoc.t;
 }
 
@@ -79,7 +79,7 @@ let tyname_to_symbol state name =
   match Assoc.lookup name state.tyname_symbols with
   | Some sym -> (state, sym)
   | None ->
-      let sym = Type.TyName.fresh name in
+      let sym = TyName.fresh name in
       let tyname_symbols' = Assoc.update name sym state.tyname_symbols in
       ({ state with tyname_symbols = tyname_symbols' }, sym)
 
@@ -105,7 +105,7 @@ let desugar_type type_sbst state =
     | Sugared.TyParam t -> (
         match Assoc.lookup t type_sbst with
         | None -> Error.syntax ~loc "Unbound type parameter '%s" t
-        | Some (p, skel) -> (state, T.tyParam p (Type.SkelParam skel)))
+        | Some (p, skel) -> (state, T.tyParam p (Skeleton.Param skel)))
     | Sugared.TyArrow (t1, t2) ->
         let state', t1' = desugar_type state t1 in
         let state'', t2' = desugar_dirty_type state' t2 in
@@ -202,7 +202,7 @@ let desugar_tydef state params ty_name def =
     ty_sbst |> Assoc.values_of
     |> Type.Params.union_map (fun (p, skel) ->
            Type.Params.union
-             (Type.Params.ty_singleton p (Type.SkelParam skel))
+             (Type.Params.ty_singleton p (Skeleton.Param skel))
              (Type.Params.skel_singleton skel))
   in
   (state', { Type.params = params'; type_def = def' })

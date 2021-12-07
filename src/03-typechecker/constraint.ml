@@ -3,7 +3,7 @@ open Language
 
 (* A bag/list of constraints *)
 type t = {
-  skeleton_equalities : (Type.skeleton * Type.skeleton) list;
+  skeleton_equalities : (Skeleton.t * Skeleton.t) list;
   dirt_equalities : (Type.dirt * Type.dirt) list;
   dirt_inequalities : (Type.DirtCoercionParam.t * Type.ct_dirt) list;
   ty_equalities : (Type.ty * Type.ty) list;
@@ -47,8 +47,7 @@ let list_union conss = List.fold_left union empty conss
 
 let print c =
   let print_skeleton_equality (sk1, sk2) ppf =
-    Print.print ppf "%t = %t" (Type.print_skeleton sk1)
-      (Type.print_skeleton sk2)
+    Print.print ppf "%t = %t" (Skeleton.print sk1) (Skeleton.print sk2)
   and print_dirt_equality (drt1, drt2) ppf =
     Print.print ppf "%t = %t" (Type.print_dirt drt1) (Type.print_dirt drt2)
   and print_dirt_inequality (p, (ty1, ty2)) ppf =

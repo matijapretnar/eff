@@ -31,9 +31,9 @@ let identity_instantiation (params : Type.Params.t)
         |> List.map (fun d -> (d, Type.no_effect_dirt d))
         |> Type.DirtParam.Map.of_bindings;
       skel_param_to_skel_subs =
-        params.skel_params |> Type.SkelParam.Set.elements
-        |> List.map (fun s -> (s, Type.SkelParam s))
-        |> Type.SkelParam.Map.of_bindings;
+        params.skel_params |> Language.Skeleton.Param.Set.elements
+        |> List.map (fun s -> (s, Language.Skeleton.Param s))
+        |> Language.Skeleton.Param.Map.of_bindings;
     }
 
 module TypingEnv = struct
@@ -278,7 +278,7 @@ and infer_pattern' state pat =
         | None ->
             Error.typing ~loc:pat.at "Field %t does not belong to type %t"
               (Type.Field.print fld)
-              (Type.TyName.print ty_name)
+              (Language.TyName.print ty_name)
         | Some fld_ty ->
             ( (fld, p') :: flds',
               Term.Variable.Map.compatible_union vars vars',
@@ -287,7 +287,7 @@ and infer_pattern' state pat =
                 cnstrs )
       in
       let flds', vars, cnstrs' =
-        Type.TyName.Map.fold fold flds
+        Language.TyName.Map.fold fold flds
           ([], Term.Variable.Map.empty, Constraint.empty)
       in
       (Term.PRecord (Type.Field.Map.of_bindings flds'), out_ty, vars, cnstrs')
@@ -343,7 +343,7 @@ and tcRecord (state : state) (flds : Untyped.expression Type.Field.Map.t) :
     | None ->
         Error.typing ~loc:e.at "Field %t does not belong to type %t"
           (Type.Field.print fld)
-          (Type.TyName.print ty_name)
+          (Language.TyName.print ty_name)
     | Some fld_ty ->
         let e'', cons = Constraint.cast_expression e' fld_ty in
         ((fld, e'') :: flds', Constraint.list_union [ cons; cnstrs'; cnstrs ])

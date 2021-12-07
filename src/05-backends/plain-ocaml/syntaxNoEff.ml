@@ -12,7 +12,7 @@ type n_type =
   | NTyArrow of n_type * n_type
   | NTyHandler of n_type * n_type
   | NTyComp of n_type
-  | NTyApply of Type.TyName.t * n_type list
+  | NTyApply of Language.TyName.t * n_type list
   | NTyBasic of Const.ty
 
 and n_coerty = n_type * n_type
@@ -27,7 +27,7 @@ type n_coercion =
   | NCoerComp of n_coercion
   | NCoerReturn of n_coercion
   | NCoerUnsafe of n_coercion
-  | NCoerApply of Type.TyName.t * n_coercion list
+  | NCoerApply of Language.TyName.t * n_coercion list
   | NCoerTuple of n_coercion list
 
 type variable = Variable.t
@@ -100,7 +100,7 @@ type cmd =
   | TopLet of (n_pattern * Type.TyCoercionParam.t list * n_term) list
   | TopLetRec of n_top_rec_definitions
   | DefEffect of n_effect
-  | TyDef of (Type.TyName.t * (Type.TyParam.t list * n_tydef)) list
+  | TyDef of (Language.TyName.t * (Type.TyParam.t list * n_tydef)) list
 
 let rec subs_var_in_term par subs term =
   match term with
@@ -292,15 +292,15 @@ let rec print_type ?max_level ty ppf =
   | NTyArrow (t1, t2) -> print "%t -> %t" (print_type t1) (print_type t2)
   | NTyHandler (t1, t2) -> print "%t ==> %t" (print_type t1) (print_type t2)
   | NTyComp t -> print "Comp %t" (print_type t)
-  | NTyApply (t, []) -> print "%t" (Type.TyName.print t)
+  | NTyApply (t, []) -> print "%t" (Language.TyName.print t)
   | NTyApply (t, [ s ]) ->
       print ~at_level:1 "%t %t"
         (print_type ~max_level:1 s)
-        (Type.TyName.print t)
+        (Language.TyName.print t)
   | NTyApply (t, ts) ->
       print ~at_level:1 "(%t) %t"
         (Print.sequence ", " print_type ts)
-        (Type.TyName.print t)
+        (Language.TyName.print t)
   | NTyBasic t -> print "%t" (Const.print_ty t)
 
 and print_coerty ?max_level (t1, t2) ppf =

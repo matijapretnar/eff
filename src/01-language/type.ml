@@ -18,9 +18,6 @@ let cons = Label.fresh cons_annot
 module Field = Symbol.Make (Symbol.String)
 (** record fields *)
 
-module TyName = Symbol.Make (Symbol.String)
-(** type names *)
-
 let bool_tyname = TyName.fresh "bool"
 
 let int_tyname = TyName.fresh "int"
@@ -60,13 +57,6 @@ module DirtParam = Symbol.Make (Symbol.Parameter (struct
   let utf8_symbol = "δ"
 end))
 
-(** skeleton parameters *)
-module SkelParam = Symbol.Make (Symbol.Parameter (struct
-  let ascii_symbol = "skl"
-
-  let utf8_symbol = "ς"
-end))
-
 (** type coercion parameters *)
 module TyCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "tycoer"
@@ -83,36 +73,7 @@ end))
 
 type effect_set = Effect.Set.t
 
-type skeleton =
-  | SkelParam of SkelParam.t
-  | SkelBasic of Const.ty
-  | SkelArrow of skeleton * skeleton
-  | SkelApply of TyName.t * skeleton list
-  | SkelHandler of skeleton * skeleton
-  | SkelTuple of skeleton list
-
-let rec print_skeleton ?max_level sk ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match sk with
-  | SkelParam p -> SkelParam.print p ppf
-  | SkelBasic s -> print "%t" (Const.print_ty s)
-  | SkelArrow (sk1, sk2) ->
-      print "%t → %t" (print_skeleton sk1) (print_skeleton sk2)
-  | SkelApply (t, []) -> print "%t" (TyName.print t)
-  | SkelApply (t, [ s ]) ->
-      print ~at_level:1 "%t %t" (print_skeleton ~max_level:1 s) (TyName.print t)
-  | SkelApply (t, ts) ->
-      print ~at_level:1 "(%t) %t"
-        (Print.sequence ", " print_skeleton ts)
-        (TyName.print t)
-  | SkelTuple [] -> print "𝟙"
-  | SkelTuple sks ->
-      print ~at_level:2 "%t"
-        (Print.sequence "×" (print_skeleton ~max_level:1) sks)
-  | SkelHandler (sk1, sk2) ->
-      print "%t ⇛ %t" (print_skeleton sk1) (print_skeleton sk2)
-
-type ty = (ty', skeleton) typed
+type ty = (ty', Skeleton.t) typed
 
 and ty' =
   | TyParam of TyParam.t
@@ -140,7 +101,7 @@ let rec print_ty ?max_level ty ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match ty.term with
   | TyParam p ->
-      print ~at_level:4 "%t:%t" (TyParam.print p) (print_skeleton ty.ty)
+      print ~at_level:4 "%t:%t" (TyParam.print p) (Skeleton.print ty.ty)
   | Arrow (t1, (t2, drt)) when is_empty_dirt drt ->
       print ~at_level:3 "%t → %t" (print_ty ~max_level:2 t1)
         (print_ty ~max_level:3 t2)
@@ -197,28 +158,28 @@ let tyParam t skel = { term = TyParam t; ty = skel }
 let arrow (ty1, drty2) =
   {
     term = Arrow (ty1, drty2);
-    ty = SkelArrow (skeleton_of_ty ty1, skeleton_of_dirty drty2);
+    ty = Skeleton.Arrow (skeleton_of_ty ty1, skeleton_of_dirty drty2);
   }
 
 let apply (ty_name, ty_args) =
   {
     term = Apply { ty_name; ty_args };
-    ty = SkelApply (ty_name, List.map (fun ty -> skeleton_of_ty ty) ty_args);
+    ty = Skeleton.Apply (ty_name, List.map (fun ty -> skeleton_of_ty ty) ty_args);
   }
 
 let tuple tup =
   {
     term = Tuple tup;
-    ty = SkelTuple (List.map (fun ty -> skeleton_of_ty ty) tup);
+    ty = Skeleton.Tuple (List.map (fun ty -> skeleton_of_ty ty) tup);
   }
 
 let handler (drty1, drty2) =
   {
     term = Handler (drty1, drty2);
-    ty = SkelHandler (skeleton_of_dirty drty1, skeleton_of_dirty drty2);
+    ty = Skeleton.Handler (skeleton_of_dirty drty1, skeleton_of_dirty drty2);
   }
 
-let tyBasic pt = { term = TyBasic pt; ty = SkelBasic pt }
+let tyBasic pt = { term = TyBasic pt; ty = Skeleton.Basic pt }
 
 let unit_ty = tuple []
 
@@ -236,16 +197,16 @@ and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
 
 module Params = struct
   type t = {
-    ty_params : skeleton TyParam.Map.t;
+    ty_params : Skeleton.t TyParam.Map.t;
     dirt_params : DirtParam.Set.t;
-    skel_params : SkelParam.Set.t;
+    skel_params : Skeleton.Param.Set.t;
   }
 
   let empty =
     {
       ty_params = TyParam.Map.empty;
       dirt_params = DirtParam.Set.empty;
-      skel_params = SkelParam.Set.empty;
+      skel_params = Skeleton.Param.Set.empty;
     }
 
   let subset fp1 fp2 =
@@ -253,14 +214,15 @@ module Params = struct
       (fun p1 _ -> TyParam.Map.mem p1 fp2.ty_params)
       fp1.ty_params
     && DirtParam.Set.subset fp1.dirt_params fp2.dirt_params
-    && SkelParam.Set.subset fp1.skel_params fp2.skel_params
+    && Skeleton.Param.Set.subset fp1.skel_params fp2.skel_params
 
   let ty_singleton p skel =
     { empty with ty_params = TyParam.Map.singleton p skel }
 
   let dirt_singleton p = { empty with dirt_params = DirtParam.Set.singleton p }
 
-  let skel_singleton p = { empty with skel_params = SkelParam.Set.singleton p }
+  let skel_singleton p =
+    { empty with skel_params = Skeleton.Param.Set.singleton p }
 
   let union fp1 fp2 =
     {
@@ -274,7 +236,7 @@ module Params = struct
             Some skel1)
           fp1.ty_params fp2.ty_params;
       dirt_params = DirtParam.Set.union fp1.dirt_params fp2.dirt_params;
-      skel_params = SkelParam.Set.union fp1.skel_params fp2.skel_params;
+      skel_params = Skeleton.Param.Set.union fp1.skel_params fp2.skel_params;
     }
 
   let union_map free_params =
@@ -282,18 +244,18 @@ module Params = struct
 
   let is_empty fp =
     DirtParam.Set.is_empty fp.dirt_params
-    && SkelParam.Set.is_empty fp.skel_params
+    && Skeleton.Param.Set.is_empty fp.skel_params
 end
 
 let rec free_params_skeleton = function
-  | SkelParam p -> Params.skel_singleton p
-  | SkelBasic _ -> Params.empty
-  | SkelApply (_, sks) -> Params.union_map free_params_skeleton sks
-  | SkelArrow (sk1, sk2) ->
+  | Skeleton.Param p -> Params.skel_singleton p
+  | Skeleton.Basic _ -> Params.empty
+  | Skeleton.Apply (_, sks) -> Params.union_map free_params_skeleton sks
+  | Skeleton.Arrow (sk1, sk2) ->
       Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
-  | SkelHandler (sk1, sk2) ->
+  | Skeleton.Handler (sk1, sk2) ->
       Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
-  | SkelTuple sks -> Params.union_map free_params_skeleton sks
+  | Skeleton.Tuple sks -> Params.union_map free_params_skeleton sks
 
 let rec free_params_ty ty =
   Params.union (free_params_ty' ty.ty ty.term) (free_params_skeleton ty.ty)
@@ -396,37 +358,39 @@ end
 module TyConstraints = struct
   module TyParamGraph = Graph.Make (TyParam) (TyCoercionParam)
 
-  type t = TyParamGraph.t SkelParam.Map.t
+  type t = TyParamGraph.t Skeleton.Param.Map.t
 
-  let empty = SkelParam.Map.empty
+  let empty = Skeleton.Param.Map.empty
 
   (* Since we only add and never remove type constraints, the set of constraints
      is empty if and only iff there are no skeleton graphs in it *)
-  let is_empty = SkelParam.Map.is_empty
+  let is_empty = Skeleton.Param.Map.is_empty
 
   let get_ty_graph (ty_constraints : t) s =
-    SkelParam.Map.find_opt s ty_constraints
+    Skeleton.Param.Map.find_opt s ty_constraints
     |> Option.value ~default:TyParamGraph.empty
 
   let add_edge s t1 t2 w (ty_constraints : t) : t =
     let s_graph' =
       get_ty_graph ty_constraints s |> TyParamGraph.add_edge t1 t2 w
     in
-    SkelParam.Map.add s s_graph' ty_constraints
+    Skeleton.Param.Map.add s s_graph' ty_constraints
 
   let fold f (ty_constraints : t) acc =
-    SkelParam.Map.fold (fun s -> TyParamGraph.fold (f s)) ty_constraints acc
+    Skeleton.Param.Map.fold
+      (fun s -> TyParamGraph.fold (f s))
+      ty_constraints acc
 
   let fold_expanded f =
     fold (fun s t1 t2 w ->
-        let skel = SkelParam s in
+        let skel = Skeleton.Param s in
         let ty1 = tyParam t1 skel and ty2 = tyParam t2 skel in
         f s t1 t2 w ty1 ty2)
 
   let free_params (ty_constraints : t) =
     fold
       (fun s t1 t2 _w params ->
-        let skel = SkelParam s in
+        let skel = Skeleton.Param s in
         Params.union
           (Params.union (Params.skel_singleton s)
              (Params.union
@@ -498,10 +462,11 @@ module Constraints = struct
 
   let print_skeleton_graph (skel_param, graph) ppf : unit =
     TyConstraints.TyParamGraph.print_dot graph
-      (fun ppf -> Print.print ppf "cluster_%t" (SkelParam.print skel_param))
+      (fun ppf ->
+        Print.print ppf "cluster_%t" (Skeleton.Param.print skel_param))
       (fun ppf ->
         Print.print ppf "label=\"Skeleton param: %t\""
-          (SkelParam.print skel_param))
+          (Skeleton.Param.print skel_param))
       ppf
 
   let print_dirt_graph graph ppf : unit =
@@ -511,7 +476,7 @@ module Constraints = struct
       ppf
 
   let print_dot c ppf =
-    let skeleton_graphs = SkelParam.Map.bindings c.ty_constraints in
+    let skeleton_graphs = Skeleton.Param.Map.bindings c.ty_constraints in
 
     Print.print ppf
       "digraph {\n\
@@ -533,7 +498,7 @@ module Constraints = struct
         (print_dirt drt1) (print_dirt drt2)
     and print_ty_constraint s t1 t2 w ppf =
       Print.print ppf "%t: (%t ≤ %t) : %t" (TyCoercionParam.print w)
-        (TyParam.print t1) (TyParam.print t2) (SkelParam.print s)
+        (TyParam.print t1) (TyParam.print t2) (Skeleton.Param.print s)
     in
     []
     |> DirtConstraints.fold_expanded
@@ -555,25 +520,9 @@ let monotype ty = { params = Params.empty; constraints = Constraints.empty; ty }
 (* ************************************************************************* *)
 (*                       PREDICATES ON ty                             *)
 (* ************************************************************************* *)
-let rec equal_skeleton skel1 skel2 =
-  match (skel1, skel2) with
-  | SkelParam tv1, SkelParam tv2 -> tv1 = tv2
-  | SkelArrow (ttya1, dirtya1), SkelArrow (ttyb1, dirtyb1) ->
-      equal_skeleton ttya1 ttyb1 && equal_skeleton dirtya1 dirtyb1
-  | SkelTuple tys1, SkelTuple tys2 ->
-      List.length tys1 = List.length tys2
-      && List.for_all2 equal_skeleton tys1 tys2
-  | SkelApply (ty_name1, tys1), SkelApply (ty_name2, tys2) ->
-      ty_name1 = ty_name2
-      && List.length tys1 = List.length tys2
-      && List.for_all2 equal_skeleton tys1 tys2
-  | SkelHandler (dirtya1, dirtya2), SkelHandler (dirtyb1, dirtyb2) ->
-      equal_skeleton dirtya1 dirtyb1 && equal_skeleton dirtya2 dirtyb2
-  | SkelBasic ptya, SkelBasic ptyb -> ptya = ptyb
-  | _, _ -> false
 
 let rec equal_ty (ty1 : ty) (ty2 : ty) =
-  equal_skeleton ty1.ty ty2.ty && equal_ty' ty1.term ty2.term
+  Skeleton.equal ty1.ty ty2.ty && equal_ty' ty1.term ty2.term
 
 and equal_ty' ty1' ty2' =
   match (ty1', ty2') with
@@ -611,11 +560,11 @@ let add_effects effect_set drt =
   { drt with effect_set = Effect.Set.union drt.effect_set effect_set }
 
 let fresh_skel () =
-  let skel_var = SkelParam.fresh () in
-  SkelParam skel_var
+  let skel_var = Skeleton.Param.fresh () in
+  Skeleton.Param skel_var
 
 let fresh_ty_param () =
-  let ty_param = TyParam.fresh () and skel = SkelParam.fresh () in
+  let ty_param = TyParam.fresh () and skel = Skeleton.Param.fresh () in
   (ty_param, skel)
 
 let fresh_ty_with_skel skel =
@@ -633,24 +582,24 @@ let fresh_dirty_with_fresh_skel () = fresh_dirty_param_with_skel (fresh_skel ())
 let fresh_ty_with_skel skel =
   match skel with
   (* α : ς *)
-  | SkelParam _ -> assert false
+  | Skeleton.Param _ -> assert false
   (* α : int *)
-  | SkelBasic ps -> tyBasic ps
+  | Skeleton.Basic ps -> tyBasic ps
   (* α : τ₁ -> τ₂ *)
-  | SkelArrow (sk1, sk2) ->
+  | Skeleton.Arrow (sk1, sk2) ->
       let tvar1 = fresh_ty_with_skel sk1
       and dtvar2 = fresh_dirty_param_with_skel sk2 in
       arrow (tvar1, dtvar2)
   (* α : τ₁ x τ₂ ... *)
-  | SkelTuple sks ->
+  | Skeleton.Tuple sks ->
       let tvars = List.map fresh_ty_with_skel sks in
       tuple tvars
   (* α : ty_name (τ₁, τ₂, ...) *)
-  | SkelApply (ty_name, sks) ->
+  | Skeleton.Apply (ty_name, sks) ->
       let tvars = List.map fresh_ty_with_skel sks in
       apply (ty_name, tvars)
   (* α : τ₁ => τ₂ *)
-  | SkelHandler (sk1, sk2) ->
+  | Skeleton.Handler (sk1, sk2) ->
       let dtvar1 = fresh_dirty_param_with_skel sk1
       and dtvar2 = fresh_dirty_param_with_skel sk2 in
       handler (dtvar1, dtvar2)
@@ -658,7 +607,7 @@ let fresh_ty_with_skel skel =
 let rec print_pretty_skel ?max_level free params skel ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match skel with
-  | SkelParam s ->
+  | Skeleton.Param s ->
       let symb =
         match Assoc.lookup s !params with
         | Some symb -> symb
@@ -668,30 +617,31 @@ let rec print_pretty_skel ?max_level free params skel ppf =
             params := Assoc.update s symb !params;
             symb
       in
-      if SkelParam.Set.mem s free then print "'%c" symb else print "'_%c" symb
-  | SkelArrow (skel1, skel2) ->
+      if Skeleton.Param.Set.mem s free then print "'%c" symb
+      else print "'_%c" symb
+  | Skeleton.Arrow (skel1, skel2) ->
       print ~at_level:3 "%t -> %t"
         (print_pretty_skel ~max_level:2 free params skel1)
         (print_pretty_skel ~max_level:3 free params skel2)
-  | SkelApply (t, []) -> print "%t" (TyName.print t)
-  | SkelApply (t, [ s ]) ->
+  | Skeleton.Apply (t, []) -> print "%t" (TyName.print t)
+  | Skeleton.Apply (t, [ s ]) ->
       print ~at_level:1 "%t %t"
         (print_pretty_skel ~max_level:1 free params s)
         (TyName.print t)
-  | SkelApply (t, skels) ->
+  | Skeleton.Apply (t, skels) ->
       print ~at_level:1 "(%t) %t"
         (Print.sequence ", " (print_pretty_skel free params) skels)
         (TyName.print t)
-  | SkelTuple [] -> print "unit"
-  | SkelTuple skels ->
+  | Skeleton.Tuple [] -> print "unit"
+  | Skeleton.Tuple skels ->
       print ~at_level:2 "%t"
         (Print.sequence " * "
            (print_pretty_skel free ~max_level:1 params)
            skels)
-  | SkelHandler (skel1, skel2) ->
+  | Skeleton.Handler (skel1, skel2) ->
       print ~at_level:3 "%t => %t"
         (print_pretty_skel free ~max_level:2 params skel1)
         (print_pretty_skel free ~max_level:2 params skel2)
-  | SkelBasic p -> print "%t" (Const.print_ty p)
+  | Skeleton.Basic p -> print "%t" (Const.print_ty p)
 
 let print_pretty free = print_pretty_skel free (ref Assoc.empty)

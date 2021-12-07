@@ -10,7 +10,7 @@ type field = Type.Field.t
 
 (** Types used by MulticoreOcaml. *)
 type ty =
-  | TyApply of Type.TyName.t * ty list
+  | TyApply of TyName.t * ty list
   | TyParam of Type.TyParam.t
   | TyBasic of Const.ty
   | TyTuple of ty list

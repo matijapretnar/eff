@@ -45,54 +45,59 @@ let expand_row ~loc row ops =
 let skel_eq_step ~loc sub (paused : Type.Constraints.t) rest_queue sk1 sk2 =
   match (sk1, sk2) with
   (* ς = ς *)
-  | SkelParam sp1, SkelParam sp2 when sp1 = sp2 -> (sub, paused, rest_queue)
+  | Skeleton.Param sp1, Skeleton.Param sp2 when sp1 = sp2 ->
+      (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
-  | SkelParam sp1, sk2a
-    when not (SkelParam.Set.mem sp1 (free_params_skeleton sk2a).skel_params) ->
+  | Param sp1, sk2a
+    when not
+           (Skeleton.Param.Set.mem sp1 (free_params_skeleton sk2a).skel_params)
+    ->
       apply_substitution
         (Substitution.add_skel_param_substitution_e sp1 sk2a)
         sub paused rest_queue
-  | sk2a, SkelParam sp1
-    when not (SkelParam.Set.mem sp1 (free_params_skeleton sk2a).skel_params) ->
+  | sk2a, Param sp1
+    when not
+           (Skeleton.Param.Set.mem sp1 (free_params_skeleton sk2a).skel_params)
+    ->
       apply_substitution
         (Substitution.add_skel_param_substitution_e sp1 sk2a)
         sub paused rest_queue
       (* occurs-check failing *)
-  | SkelParam _, _ | _, SkelParam _ ->
-      let printer = Type.print_pretty SkelParam.Set.empty in
+  | Param _, _ | _, Param _ ->
+      let printer = Type.print_pretty Skeleton.Param.Set.empty in
       Error.typing ~loc "This expression has a forbidden cyclic type %t = %t."
         (printer sk1) (printer sk2)
       (* int = int *)
-  | SkelBasic ps1, SkelBasic ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
+  | Basic ps1, Basic ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
   (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
-  | SkelArrow (ska, skb), SkelArrow (skc, skd) ->
+  | Arrow (ska, skb), Arrow (skc, skd) ->
       ( sub,
         paused,
         rest_queue
         |> Constraint.add_skeleton_equality (ska, skc)
         |> Constraint.add_skeleton_equality (skb, skd) )
   (* τ₁₁ => τ₁₂ = τ₂₁ => τ₂₂ *)
-  | SkelHandler (ska, skb), SkelHandler (skc, skd) ->
+  | Handler (ska, skb), Handler (skc, skd) ->
       ( sub,
         paused,
         rest_queue
         |> Constraint.add_skeleton_equality (ska, skc)
         |> Constraint.add_skeleton_equality (skb, skd) )
-  | SkelApply (ty_name1, sks1), SkelApply (ty_name2, sks2)
+  | Apply (ty_name1, sks1), Apply (ty_name2, sks2)
     when ty_name1 = ty_name2 && List.length sks1 = List.length sks2 ->
       ( sub,
         paused,
         List.fold_right2
           (fun sk1 sk2 -> Constraint.add_skeleton_equality (sk1, sk2))
           sks1 sks2 rest_queue )
-  | SkelTuple sks1, SkelTuple sks2 when List.length sks1 = List.length sks2 ->
+  | Tuple sks1, Tuple sks2 when List.length sks1 = List.length sks2 ->
       ( sub,
         paused,
         List.fold_right2
           (fun sk1 sk2 -> Constraint.add_skeleton_equality (sk1, sk2))
           sks1 sks2 rest_queue )
   | _ ->
-      let printer = Type.print_pretty SkelParam.Set.empty in
+      let printer = Type.print_pretty Skeleton.Param.Set.empty in
       Error.typing ~loc
         "This expression has type %t but it should have type %t." (printer sk1)
         (printer sk2)
@@ -119,7 +124,7 @@ and ty_eq_step ~loc sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
       apply_substitution sub1 sub paused rest_queue
       (* occurs-check failing *)
   | TyParam _, _ | _, TyParam _ ->
-      let printer = Type.print_pretty SkelParam.Set.empty in
+      let printer = Type.print_pretty Skeleton.Param.Set.empty in
       Error.typing ~loc "This expression has a forbidden cyclic type %t = %t."
         (printer ty1.ty) (printer ty2.ty)
       (* int = int *)
@@ -156,7 +161,7 @@ and ty_eq_step ~loc sub (paused : Type.Constraints.t) rest_queue (ty1 : Type.ty)
           (fun ty1 ty2 -> Constraint.add_ty_equality (ty1, ty2))
           tys1 tys2 rest_queue )
   | _ ->
-      let printer = Type.print_pretty SkelParam.Set.empty in
+      let printer = Type.print_pretty Skeleton.Param.Set.empty in
       Error.typing ~loc
         "This expression has type %t but it should have type %t."
         (printer ty1.ty) (printer ty2.ty)
@@ -227,13 +232,13 @@ and ty_omega_step ~loc sub (paused : Type.Constraints.t) cons rest_queue omega =
         paused,
         Constraint.list_union [ dirty_cons1; dirty_cons2; rest_queue ] )
   (* ω : α <= A /  ω : A <= α *)
-  | ( { term = Type.TyParam t1; ty = SkelParam s1 },
-      { term = Type.TyParam t2; ty = SkelParam s2 } )
+  | ( { term = Type.TyParam t1; ty = Skeleton.Param s1 },
+      { term = Type.TyParam t2; ty = Skeleton.Param s2 } )
     when s1 = s2 ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
       (sub, Type.Constraints.add_ty_constraint s1 t1 t2 omega paused, rest_queue)
-  | { term = Type.TyParam _; ty = SkelParam _ as skel_tv }, a
-  | a, { term = Type.TyParam _; ty = SkelParam _ as skel_tv } ->
+  | { term = Type.TyParam _; ty = Skeleton.Param _ as skel_tv }, a
+  | a, { term = Type.TyParam _; ty = Skeleton.Param _ as skel_tv } ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
       let skel_a = Type.skeleton_of_ty a in
       ( sub,
@@ -249,7 +254,7 @@ and ty_omega_step ~loc sub (paused : Type.Constraints.t) cons rest_queue omega =
         sub paused
         (Constraint.union cons rest_queue)
   | ty1, ty2 ->
-      let printer = Type.print_pretty SkelParam.Set.empty in
+      let printer = Type.print_pretty Skeleton.Param.Set.empty in
       Error.typing ~loc
         "This expression has type %t but it should have type %t."
         (printer ty1.ty) (printer ty2.ty)

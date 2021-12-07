@@ -9,7 +9,7 @@ type t = {
   dirt_var_to_dirt_coercions :
     Coercion.dirt_coercion Type.DirtCoercionParam.Map.t;
   dirt_var_to_dirt_subs : Type.dirt Type.DirtParam.Map.t;
-  skel_param_to_skel_subs : Type.skeleton Type.SkelParam.Map.t;
+  skel_param_to_skel_subs : Skeleton.t Skeleton.Param.Map.t;
 }
 
 let empty =
@@ -18,7 +18,7 @@ let empty =
     type_param_to_type_subs = Type.TyParam.Map.empty;
     dirt_var_to_dirt_coercions = Type.DirtCoercionParam.Map.empty;
     dirt_var_to_dirt_subs = Type.DirtParam.Map.empty;
-    skel_param_to_skel_subs = Type.SkelParam.Map.empty;
+    skel_param_to_skel_subs = Skeleton.Param.Map.empty;
   }
 
 let is_empty sub =
@@ -26,7 +26,7 @@ let is_empty sub =
   && Type.TyParam.Map.is_empty sub.type_param_to_type_subs
   && Type.DirtCoercionParam.Map.is_empty sub.dirt_var_to_dirt_coercions
   && Type.DirtParam.Map.is_empty sub.dirt_var_to_dirt_subs
-  && Type.SkelParam.Map.is_empty sub.skel_param_to_skel_subs
+  && Skeleton.Param.Map.is_empty sub.skel_param_to_skel_subs
 
 (* Substitution application *)
 open Type
@@ -41,18 +41,17 @@ let apply_sub_dirt sub dirt =
 
 let rec apply_sub_skel sub skeleton =
   match skeleton with
-  | SkelParam p -> (
-      match Type.SkelParam.Map.find_opt p sub.skel_param_to_skel_subs with
+  | Skeleton.Param p -> (
+      match Skeleton.Param.Map.find_opt p sub.skel_param_to_skel_subs with
       | Some sk1 -> sk1
       | None -> skeleton)
-  | SkelBasic _ -> skeleton
-  | SkelArrow (sk1, sk2) ->
-      SkelArrow (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
-  | SkelHandler (sk1, sk2) ->
-      SkelHandler (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
+  | Basic _ -> skeleton
+  | Arrow (sk1, sk2) -> Arrow (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
+  | Handler (sk1, sk2) ->
+      Handler (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
   (* Really consider other cases *)
-  | SkelApply (t, l) -> SkelApply (t, List.map (apply_sub_skel sub) l)
-  | SkelTuple skels -> SkelTuple (List.map (apply_sub_skel sub) skels)
+  | Apply (t, l) -> Apply (t, List.map (apply_sub_skel sub) l)
+  | Tuple skels -> Tuple (List.map (apply_sub_skel sub) skels)
 
 let rec apply_sub_ty sub ty =
   let ty' = apply_sub_ty' sub ty in
@@ -157,7 +156,7 @@ let print_dirt_var_coercion p t ppf =
     (Coercion.print_dirt_coercion t)
 
 let print_skel_param_sub p t ppf =
-  printy ppf "%t ↦ %t" (Type.SkelParam.print p) (Type.print_skeleton t)
+  printy ppf "%t ↦ %t" (Skeleton.Param.print p) (Skeleton.print t)
 
 let print subs =
   [
@@ -169,7 +168,7 @@ let print subs =
     |> List.map (fun (x, y) -> print_dirt_var_sub x y);
     subs.dirt_var_to_dirt_coercions |> Type.DirtCoercionParam.Map.bindings
     |> List.map (fun (x, y) -> print_dirt_var_coercion x y);
-    subs.skel_param_to_skel_subs |> Type.SkelParam.Map.bindings
+    subs.skel_param_to_skel_subs |> Skeleton.Param.Map.bindings
     |> List.map (fun (x, y) -> print_skel_param_sub x y);
   ]
   |> List.concat
@@ -177,9 +176,9 @@ let print subs =
 
 let of_parameters (params : Type.Params.t) =
   let skel_params' =
-    Type.SkelParam.Set.elements params.skel_params
-    |> List.map (fun s -> (s, Type.SkelParam.refresh s))
-    |> Type.SkelParam.Map.of_bindings
+    Skeleton.Param.Set.elements params.skel_params
+    |> List.map (fun s -> (s, Skeleton.Param.refresh s))
+    |> Skeleton.Param.Map.of_bindings
   and dirt_params' =
     Type.DirtParam.Set.elements params.dirt_params
     |> List.map (fun d -> (d, Type.DirtParam.refresh d))
@@ -191,7 +190,7 @@ let of_parameters (params : Type.Params.t) =
       dirt_var_to_dirt_subs =
         Type.DirtParam.Map.map (fun d' -> Type.no_effect_dirt d') dirt_params';
       skel_param_to_skel_subs =
-        Type.SkelParam.Map.map (fun s' -> Type.SkelParam s') skel_params';
+        Skeleton.Param.Map.map (fun s' -> Skeleton.Param s') skel_params';
     }
   in
   (* Print.debug "SUBSTITUTION: %t" (print subst); *)
@@ -210,8 +209,8 @@ let of_parameters (params : Type.Params.t) =
         Type.DirtParam.Map.bindings dirt_params'
         |> List.map fst |> Type.DirtParam.Set.of_list;
       skel_params =
-        Type.SkelParam.Map.bindings skel_params'
-        |> List.map fst |> Type.SkelParam.Set.of_list;
+        Skeleton.Param.Map.bindings skel_params'
+        |> List.map fst |> Skeleton.Param.Set.of_list;
     }
   and subst' =
     {
@@ -240,7 +239,7 @@ let apply_substitutions_to_substitution new_sub old_sub =
       Type.DirtParam.Map.map (apply_sub_dirt new_sub)
         old_sub.dirt_var_to_dirt_subs;
     skel_param_to_skel_subs =
-      Type.SkelParam.Map.map (apply_sub_skel new_sub)
+      Skeleton.Param.Map.map (apply_sub_skel new_sub)
         old_sub.skel_param_to_skel_subs;
   }
 
@@ -261,7 +260,7 @@ let merge new_sub old_sub =
       Type.DirtParam.Map.compatible_union new_sub.dirt_var_to_dirt_subs
         old_sub'.dirt_var_to_dirt_subs;
     skel_param_to_skel_subs =
-      Type.SkelParam.Map.compatible_union new_sub.skel_param_to_skel_subs
+      Skeleton.Param.Map.compatible_union new_sub.skel_param_to_skel_subs
         old_sub'.skel_param_to_skel_subs;
   }
 
@@ -315,7 +314,7 @@ let empty_dirt_substitution empty_dirt_params =
 let add_skel_param_substitution_e param skel =
   {
     empty with
-    skel_param_to_skel_subs = Type.SkelParam.Map.singleton param skel;
+    skel_param_to_skel_subs = Skeleton.Param.Map.singleton param skel;
   }
 
 let add_skel_param_substitution param skel sub =

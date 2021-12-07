@@ -2,7 +2,7 @@ open Utils
 open Language
 open Type
 
-type state = (Type.TyName.t, type_data) Assoc.t
+type state = (TyName.t, type_data) Assoc.t
 
 let initial_state =
   Assoc.of_list
@@ -15,7 +15,7 @@ let initial_state =
       (Type.float_tyname, { params = Params.empty; type_def = Inline float_ty });
       ( Type.list_tyname,
         let a, skel = Type.fresh_ty_param () in
-        let a_ty = Type.tyParam a (Type.SkelParam skel) in
+        let a_ty = Type.tyParam a (Skeleton.Param skel) in
         let list_nil = (Type.nil, None) in
         let list_cons =
           (Type.cons, Some (tuple [ a_ty; apply (Type.list_tyname, [ a_ty ]) ]))
@@ -24,8 +24,8 @@ let initial_state =
           params =
             {
               Params.empty with
-              ty_params = TyParam.Map.singleton a (Type.SkelParam skel);
-              skel_params = SkelParam.Set.singleton skel;
+              ty_params = TyParam.Map.singleton a (Skeleton.Param skel);
+              skel_params = Skeleton.Param.Set.singleton skel;
             };
           type_def = Sum (Type.Field.Map.of_bindings [ list_nil; list_cons ]);
         } );
@@ -43,7 +43,7 @@ let initial_state =
 
 let lookup_tydef ~loc ty_name st =
   match Assoc.lookup ty_name st with
-  | None -> Error.typing ~loc "Unknown type %t" (Type.TyName.print ty_name)
+  | None -> Error.typing ~loc "Unknown type %t" (TyName.print ty_name)
   | Some tdata -> tdata
 
 let rec find_some f = function
@@ -120,7 +120,7 @@ let transparent ~loc ty_name st =
   let { params; type_def } = lookup_tydef ~loc ty_name st in
   if List.length params <> List.length lst then
     Error.typing ~loc "Type constructors %t should be applied to %d arguments"
-      (Type.TyName.print ty_name)
+      (TyName.print ty_name)
       (List.length params)
   else
     let combined = Assoc.of_list (List.combine params lst) in
@@ -136,7 +136,7 @@ let transparent ~loc ty_name st =
         let n = List.length params in
         if List.length tys <> n then
           Error.typing ~loc "The type constructor %t expects %d arguments"
-            (Type.TyName.print ty_name)
+            (TyName.print ty_name)
             n
     | Arrow (ty1, ty2) ->
         check ty1;
@@ -166,7 +166,7 @@ let transparent ~loc ty_name st =
     | Apply (t, lst) ->
         if List.mem t forbidden then
           Error.typing ~loc "Type definition %t is cyclic."
-            (Type.TyName.print t)
+            (TyName.print t)
         else check_tydef (t :: forbidden) (ty_apply ~loc t lst st)
     | Arrow (ty1, ty2) ->
         check forbidden ty1;
@@ -194,7 +194,7 @@ let check_shadowing ~loc st = function
         match find_field f st with
         | Some (u, _, _) ->
             Error.typing ~loc "Record field label %t is already used in type %t"
-              (Type.Field.print f) (Type.TyName.print u)
+              (Type.Field.print f) (TyName.print u)
         | None -> ()
       in
       Type.Field.Map.iter shadow_check_fld lst
@@ -203,7 +203,7 @@ let check_shadowing ~loc st = function
         match find_variant lbl st with
         | Some (u, _, _, _) ->
             Error.typing ~loc "Constructor %t is already used in type %t"
-              (Type.Label.print lbl) (Type.TyName.print u)
+              (Type.Label.print lbl) (TyName.print u)
         | None -> ()
       in
       Type.Field.Map.iter shadow_check_sum lst
@@ -216,8 +216,7 @@ let extend_type_definitions ~loc tydefs st =
   let extend_tydef name { params; type_def } st' =
     check_shadowing ~loc st' type_def;
     match Assoc.lookup name st' with
-    | Some _ ->
-        Error.typing ~loc "Type %t already defined." (Type.TyName.print name)
+    | Some _ -> Error.typing ~loc "Type %t already defined." (TyName.print name)
     | None -> Assoc.update name { params; type_def } st'
   in
   try

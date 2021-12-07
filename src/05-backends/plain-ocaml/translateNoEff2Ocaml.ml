@@ -34,7 +34,7 @@ let pp_tuple pp lst ppf =
 
 let pp_label label ppf = Type.Label.print label ppf
 
-let pp_tyname ty_name ppf = Type.TyName.print ty_name ppf
+let pp_tyname ty_name ppf = Language.TyName.print ty_name ppf
 
 let pp_typaram ty_param ppf =
   print ppf "'ty%d" (Type.TyParam.fold (fun _ n -> n) ty_param)
@@ -158,7 +158,7 @@ let rec pp_coercion ?max_level coer ppf =
       print ~at_level:1 "coer_tuple_%d %t" (List.length cs)
         (pp_tuple pp_coercion cs)
   | NCoerApply (t, cs) ->
-      print ~at_level:1 "coer_%t %t" (Type.TyName.print t)
+      print ~at_level:1 "coer_%t %t" (Language.TyName.print t)
         (Print.sequence " " (pp_coercion ~max_level:0) cs)
 
 let pp_lets keyword pp_let_def lst ppf =
@@ -336,11 +336,12 @@ let pp_tydef (name, (params, tydef)) ppf =
     | TyDefInline ty -> print ppf "%t" (pp_type ty)
   in
   match params with
-  | [] -> print ppf "@[%t = %t@]@." (Type.TyName.print name) (pp_def tydef)
+  | [] -> print ppf "@[%t = %t@]@." (Language.TyName.print name) (pp_def tydef)
   | _lst ->
       print ppf "@[(%t) %t = %t@]@."
         (pp_sequence ", " pp_typaram params)
-        (Type.TyName.print name) (pp_def tydef)
+        (Language.TyName.print name)
+        (pp_def tydef)
 
 let pp_cmd state cmd ppf =
   match cmd with
