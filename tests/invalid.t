@@ -33,7 +33,7 @@
   ======================================================================
   invalid/invalid_match_type.eff
   ----------------------------------------------------------------------
-  Typing error (file "invalid/invalid_match_type.eff", line 5, char 7):
+  Typing error (file "invalid/invalid_match_type.eff", line 4, char 1):
   This expression has type a list but it should have type b.
   ======================================================================
   invalid/less_than_complex.eff
@@ -67,14 +67,14 @@
   ======================================================================
   invalid/occurs_check.eff
   ----------------------------------------------------------------------
-  Typing error (file "invalid/occurs_check.eff", line 1, char 15):
+  Typing error (file "invalid/occurs_check.eff", line 1, char 1):
   This expression has a forbidden cyclic type '_a = '_b -> '_a.
   ======================================================================
   invalid/polymorphism_id_id.eff
   ----------------------------------------------------------------------
   val u : 'a -> 'a = <fun>
   val v : '_a -> '_a = <fun>
-  Typing error (file "invalid/polymorphism_id_id.eff", line 3, char 8):
+  Typing error (file "invalid/polymorphism_id_id.eff", line 3, char 1):
   This expression has type string but it should have type int.
   ======================================================================
   invalid/shadow_eff.eff
