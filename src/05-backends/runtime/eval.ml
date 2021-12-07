@@ -88,9 +88,9 @@ let rec ceval state c =
       V.Call (eff, e', eval_closure state a.term)
   | Term.Bind (c1, { term = p, c2; _ }) -> eval_let state [ (p, c1) ] c2
   | Term.CastComp (c, _) -> ceval state c
-  | Term.Check c ->
+  | Term.Check (loc, c) ->
       let r = ceval state c in
-      Print.check "%t" (V.print_result r);
+      Print.check ~loc "%t" (V.print_result r);
       V.unit_result
 
 and eval_let state lst c =

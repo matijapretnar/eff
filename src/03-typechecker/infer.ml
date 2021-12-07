@@ -529,7 +529,7 @@ and tcExpr state (e : Untyped.expression) : tcExprOutput =
 (* ************************************************************************* *)
 
 (* Dispatch: Type inference for a plan computation *)
-and tcComp' state : Untyped.plain_computation -> tcCompOutput' = function
+and tcComp' state loc : Untyped.plain_computation -> tcCompOutput' = function
   | Value exp -> tcValue state exp
   (* Nest a list of let-bindings *)
   | Let ([], c2) ->
@@ -538,21 +538,21 @@ and tcComp' state : Untyped.plain_computation -> tcCompOutput' = function
   | Let ([ (pat, c1) ], c2) -> tcLet state pat c1 c2
   | Let ((pat, c1) :: rest, c2) ->
       let subCmp = { it = Untyped.Let (rest, c2); at = c2.at } in
-      tcComp' state (Untyped.Let ([ (pat, c1) ], subCmp))
+      tcComp' state loc (Untyped.Let ([ (pat, c1) ], subCmp))
   | LetRec (defs, c2) -> tcLetRecNoGen state defs c2
   (* Pattern Matching: Special Case 2: Variable-binding *)
   | Match (scr, [ (p, c) ]) when isLocatedVarPat p ->
-      tcComp' state
+      tcComp' state loc
         (Untyped.Let ([ (p, { it = Untyped.Value scr; at = p.at }) ], c))
   (* Pattern Matching: General Case: Monomorphic patterns *)
   | Match (scr, cases) -> tcMatch state scr cases
   | Apply (val1, val2) -> tcApply state val1 val2
   | Handle (hand, cmp) -> tcHandle state hand cmp
-  | Check cmp -> tcCheck state cmp
+  | Check cmp -> tcCheck state loc cmp
 
 (* Type inference for a located computation *)
 and tcComp state (c : Untyped.computation) : tcCompOutput =
-  let (trm, ty), cnstrs = tcComp' state c.it in
+  let (trm, ty), cnstrs = tcComp' state c.at c.it in
   (* Print.debug "%t -> %t : %t / %t"
      (Untyped.print_computation c)
      (Term.print_computation' trm)
@@ -769,9 +769,9 @@ and tcHandle state (hand : Untyped.expression) (cmp : Untyped.computation) :
   ((outExpr, dirty2), outCs)
 
 (* Typecheck a "Check" expression (GEORGE does not know what this means yet *)
-and tcCheck (state : state) (cmp : Untyped.computation) : tcCompOutput' =
+and tcCheck (state : state) loc (cmp : Untyped.computation) : tcCompOutput' =
   let cmp', cnstrs = tcComp state cmp in
-  ((Term.Check cmp', Type.pure_ty Type.unit_ty), cnstrs)
+  ((Term.Check (loc, cmp'), Type.pure_ty Type.unit_ty), cnstrs)
 
 (* GEORGE: Planned TODO for the future I guess?? *)
 

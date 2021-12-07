@@ -68,7 +68,7 @@ and computation' =
   | Call of effect * expression * abstraction
   | Bind of computation * abstraction
   | CastComp of computation * Coercion.dirty_coercion
-  | Check of computation
+  | Check of Location.t * computation
 
 and handler_clauses = (handler_clauses', Type.dirty * Type.dirty) typed
 (** Handler definitions *)
@@ -217,7 +217,8 @@ let castComp (cmp, coer) =
   assert (Type.equal_dirty drty1 drty1');
   { term = CastComp (cmp, coer); ty = drty2 }
 
-let check cmp = { term = Check cmp; ty = Type.pure_ty Type.unit_ty }
+let check (loc, cmp) =
+  { term = Check (loc, cmp); ty = Type.pure_ty Type.unit_ty }
 
 let abstraction (p, c) : abstraction = { term = (p, c); ty = (p.ty, c.ty) }
 
@@ -316,7 +317,8 @@ and print_computation' ?max_level c ppf =
   | LetVal (e1, { term = p, c1; _ }) ->
       print ~at_level:3 "let %t = %t in %t" (print_pattern p)
         (print_expression e1) (print_computation c1)
-  | Check c -> print ~at_level:1 "check %t" (print_computation ~max_level:0 c)
+  | Check (_loc, c) ->
+      print ~at_level:1 "check %t" (print_computation ~max_level:0 c)
 
 and print_effect_clause (eff, a2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
@@ -359,7 +361,7 @@ and apply_sub_comp' sub computation =
   | Bind (c1, a1) -> Bind (apply_sub_comp sub c1, apply_sub_abs sub a1)
   | CastComp (c1, dc1) ->
       CastComp (apply_sub_comp sub c1, Substitution.apply_sub_dirtycoer sub dc1)
-  | Check c -> Check (apply_sub_comp sub c)
+  | Check (loc, c) -> Check (loc, apply_sub_comp sub c)
 
 and apply_sub_exp sub expression =
   {
@@ -534,7 +536,7 @@ and refresh_computation' sbst = function
   | CastComp (c, dtyco) -> CastComp (refresh_computation sbst c, dtyco)
   | LetVal (exp, abs) ->
       LetVal (refresh_expression sbst exp, refresh_abstraction sbst abs)
-  | Check c -> Check (refresh_computation sbst c)
+  | Check (loc, c) -> Check (loc, refresh_computation sbst c)
 
 and refresh_handler sbst { term = h; ty } =
   {
@@ -590,7 +592,7 @@ and subst_comp' sbst = function
   | Call (eff, e, a) -> Call (eff, subst_expr sbst e, subst_abs sbst a)
   | Value e -> Value (subst_expr sbst e)
   | CastComp (c, dtyco) -> CastComp (subst_comp sbst c, dtyco)
-  | Check c -> Check (subst_comp sbst c)
+  | Check (loc, c) -> Check (loc, subst_comp sbst c)
 
 and substitute_effect_clauses sbst effect_clauses =
   {
@@ -692,7 +694,7 @@ let rec free_vars_comp c =
   | Call (_, e1, a1) -> free_vars_expr e1 @@@ free_vars_abs a1
   | Bind (c1, a1) -> free_vars_comp c1 @@@ free_vars_abs a1
   | CastComp (c1, _dtyco) -> free_vars_comp c1
-  | Check c -> free_vars_comp c
+  | Check (_, c) -> free_vars_comp c
 
 and free_vars_expr e =
   match e.term with
@@ -776,7 +778,7 @@ and free_params_computation' c =
       Type.Params.union
         (free_params_computation c)
         (Coercion.free_params_dirty_coercion dc)
-  | Check c -> free_params_computation c
+  | Check (_, c) -> free_params_computation c
 
 and free_params_abstraction abs =
   Type.Params.union

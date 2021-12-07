@@ -77,7 +77,7 @@ and of_computation cmp =
       let p, c = of_abstraction a in
       Let ([ (p, Apply (Effect eff, of_expression e)) ], c)
   | Term.CastComp (c, _) -> of_computation c
-  | Term.Check c -> Check (of_computation c)
+  | Term.Check (_, c) -> Check (of_computation c)
 
 and of_pattern pat =
   match pat.term with
