@@ -403,5 +403,12 @@ let solve ~loc constraints =
 
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
-  let subs', constraints' = Constraints.garbage_collect constraints in
+  let constraints' =
+    Constraints.garbage_collect constraints
+    |> List.fold
+         (fun (constraints : Constraint.t) (t1, t2) ->
+           Constraint.add_ty_equality (t1, t2) constraints)
+         Constraint.empty
+  in
+  let subs', constraints' = unify ~loc (sub, constraints, constraints') in
   (Substitution.merge subs' sub, constraints')
