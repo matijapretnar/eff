@@ -15,7 +15,7 @@ let failwith msg = absurd (perform (Failure msg)) ;;
 
 effect AssertionFault : empty
 
-let assert b = if b then () else absurd (perform AssertionFault) ;;
+let assert_ b = if b then () else absurd (perform AssertionFault) ;;
 
 let (mod) m n = match n with
   | 0 -> absurd (perform DivisionByZero)
