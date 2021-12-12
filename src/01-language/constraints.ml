@@ -90,45 +90,6 @@ module TyConstraints = struct
                 (Params.ty_singleton t2 skel)))
           params)
       ty_constraints Params.empty
-
-  let garbage_collect (constraints : t) =
-    (* Skeleton component *)
-    let garbage_collect_skeleton_component skel (graph : TyParamGraph.t)
-        (new_constr, cmps) :
-        (Type.ty * Type.ty) list list
-        * (('a * 'b list) * (TyParam.t * TyParam.Set.t) list) list =
-      let pack ty_param =
-        { term = TyParam ty_param; ty = Skeleton.Param skel }
-      in
-      let components = TyParamGraph.scc graph in
-      (* For each component: pick one and update substitutions  *)
-      let new_constr = new_constr in
-      let new_constr', new_components =
-        List.fold
-          (fun (new_constr, cmps) component ->
-            match TyParam.Set.elements component with
-            | [] -> assert false
-            (* Select the first one as representative *)
-            | top :: rest ->
-                let new_constr' =
-                  List.fold
-                    (fun new_constr param ->
-                      (pack top, pack param) :: new_constr)
-                    [] rest
-                in
-                (* find inner loops, there must be a more optimal way to do this, maybe implement tarjan to get factor graph  *)
-                (new_constr' :: new_constr, (top, component) :: cmps))
-          (new_constr, []) components
-      in
-      (new_constr', ((skel, []), new_components) :: cmps)
-    in
-
-    let constraints, components =
-      Skeleton.Param.Map.fold garbage_collect_skeleton_component constraints
-        ([], [])
-    in
-
-    (List.concat constraints, components)
 end
 
 type t = {
@@ -165,12 +126,6 @@ let free_params constraints =
     DirtConstraints.free_params constraints.dirt_constraints
   in
   Params.union free_params_ty free_params_dirt
-
-let garbage_collect constraints =
-  let new_constraints, _ =
-    TyConstraints.garbage_collect constraints.ty_constraints
-  in
-  new_constraints
 
 let print_ty_param_vertex ty_param ppf : unit =
   let vertex = TyParam.print ty_param in

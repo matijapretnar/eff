@@ -395,6 +395,37 @@ let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
   } ->
       (sub, paused)
 
+let garbage_collect { Language.Constraints.ty_constraints; _ } =
+  let open Language.Constraints in
+  (* Remove type cycles *)
+  let garbage_collect_skeleton_component skel graph new_constr =
+    let pack ty_param = { term = TyParam ty_param; ty = Skeleton.Param skel } in
+    let components = TyConstraints.TyParamGraph.scc graph in
+    (* For each component: pick one and add equal consstraint  *)
+    let new_constr' =
+      List.fold
+        (fun new_constr component ->
+          match TyParam.Set.elements component with
+          | [] -> assert false
+          (* Select the first one as representative *)
+          | top :: rest ->
+              let new_constr' =
+                List.fold
+                  (fun new_constr param ->
+                    Constraint.add_ty_equality (pack top, pack param) new_constr)
+                  new_constr rest
+              in
+              new_constr')
+        new_constr components
+    in
+    new_constr'
+  in
+  let ty_constraints =
+    Skeleton.Param.Map.fold garbage_collect_skeleton_component ty_constraints
+      Constraint.empty
+  in
+  ty_constraints
+
 let solve ~loc constraints =
   (* Print.debug "constraints: %t" (Constraint.print_constraints constraints); *)
   let sub, constraints =
@@ -403,12 +434,6 @@ let solve ~loc constraints =
 
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
-  let constraints' =
-    Constraints.garbage_collect constraints
-    |> List.fold
-         (fun (constraints : Constraint.t) (t1, t2) ->
-           Constraint.add_ty_equality (t1, t2) constraints)
-         Constraint.empty
-  in
+  let constraints' = garbage_collect constraints in
   let subs', constraints' = unify ~loc (sub, constraints, constraints') in
   (Substitution.merge subs' sub, constraints')
