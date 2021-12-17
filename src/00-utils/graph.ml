@@ -5,7 +5,10 @@ module MakeEdges (Vertex : Symbol.S) = struct
 
   let get_edge t edges = Vertex.Map.find_opt t edges
 
-  let add_edge t w edges = Vertex.Map.add t w edges
+  let add_edge t w edges =
+    Vertex.Map.update t
+      (function None -> Some w | Some _ -> assert false)
+      edges
 
   let fold f edges acc = Vertex.Map.fold f edges acc
 end
