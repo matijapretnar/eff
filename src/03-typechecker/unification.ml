@@ -232,11 +232,25 @@ and ty_omega_step ~loc sub (paused : Constraints.t) cons rest_queue omega =
         paused,
         Constraint.list_union [ dirty_cons1; dirty_cons2; rest_queue ] )
   (* ω : α <= A /  ω : A <= α *)
-  | ( { term = Type.TyParam t1; ty = Skeleton.Param s1 },
-      { term = Type.TyParam t2; ty = Skeleton.Param s2 } )
-    when s1 = s2 ->
+  | ( ({ term = Type.TyParam t1; ty = Skeleton.Param s1 } as ty1),
+      ({ term = Type.TyParam t2; ty = Skeleton.Param s2 } as ty2) )
+    when s1 = s2 -> (
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
-      (sub, Constraints.add_ty_constraint s1 t1 t2 omega paused, rest_queue)
+      let ty_graph =
+        Constraints.TyConstraints.get_ty_graph paused.ty_constraints s1
+      in
+      let ty_edges =
+        Constraints.TyConstraints.TyParamGraph.get_edges t1 ty_graph
+      in
+      match TyParam.Map.find_opt t2 ty_edges with
+      | None ->
+          (sub, Constraints.add_ty_constraint s1 t1 t2 omega paused, rest_queue)
+      | Some w ->
+          ( Substitution.add_type_coercion omega
+              (Coercion.tyCoercionVar w (ty1, ty2))
+              sub,
+            paused,
+            rest_queue ))
   | { term = Type.TyParam _; ty = Skeleton.Param _ as skel_tv }, a
   | a, { term = Type.TyParam _; ty = Skeleton.Param _ as skel_tv } ->
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
