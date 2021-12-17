@@ -175,6 +175,12 @@ module Params = struct
       skel_params = Skeleton.Param.Set.empty;
     }
 
+  let print fp ppf =
+    Format.fprintf ppf "{ %t, %t, %t }"
+      (Skeleton.Param.Set.print fp.skel_params)
+      (Dirt.Param.Set.print fp.dirt_params)
+      (TyParam.Map.print Skeleton.print fp.ty_params)
+
   let subset fp1 fp2 =
     TyParam.Map.for_all
       (fun p1 _ -> TyParam.Map.mem p1 fp2.ty_params)
