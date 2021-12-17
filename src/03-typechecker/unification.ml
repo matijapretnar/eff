@@ -17,7 +17,7 @@ let apply_substitution new_sub sub (paused : Constraints.t) queue =
         Substitution.apply_substitutions_to_dirt new_sub drt2 )
     in
     if Type.equal_dirt drt1 drt1' && Type.equal_dirt drt2 drt2' then
-      (Constraints.add_dirt_constraint paused d1 d2 w effs, queue)
+      (Constraints.add_dirt_constraint d1 d2 w effs paused, queue)
     else (paused, Constraint.add_dirt_inequality (w, (drt1', drt2')) queue)
   in
   let sub' = Substitution.merge new_sub sub in
@@ -236,13 +236,13 @@ and ty_omega_step ~loc sub (paused : Constraints.t) cons rest_queue omega =
       ({ term = Type.TyParam t2; ty = Skeleton.Param s2 } as ty2) )
     when s1 = s2 -> (
       (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
-      let ty_graph =
-        Constraints.TyConstraints.get_ty_graph paused.ty_constraints s1
+      let existing =
+        paused.ty_constraints
+        |> Constraints.TyConstraints.get_ty_graph s1
+        |> Constraints.TyConstraints.TyParamGraph.get_edges t1
+        |> TyParam.Map.find_opt t2
       in
-      let ty_edges =
-        Constraints.TyConstraints.TyParamGraph.get_edges t1 ty_graph
-      in
-      match TyParam.Map.find_opt t2 ty_edges with
+      match existing with
       | None ->
           (sub, Constraints.add_ty_constraint s1 t1 t2 omega paused, rest_queue)
       | Some w ->
@@ -279,7 +279,7 @@ and dirt_omega_step sub resolved unresolved w dcons =
   | ( { Dirt.effect_set = ops1; row = Dirt.Row.Param d1 },
       { Dirt.effect_set = ops2; row = Dirt.Row.Param d2 } )
     when Effect.Set.is_empty ops1 ->
-      (sub, Constraints.add_dirt_constraint resolved d1 d2 w ops2, unresolved)
+      (sub, Constraints.add_dirt_constraint d1 d2 w ops2 resolved, unresolved)
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
       { effect_set = ops2; row = Dirt.Row.Param d2 } ) ->
@@ -376,9 +376,9 @@ and dirt_eq_step ~loc sub paused rest_queue { Dirt.effect_set = o1; row = row1 }
   apply_substitution sub' sub paused rest_queue
 
 let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
-  (* Print.debug "SUB: %t" (Substitution.print sub); *)
-  (* Print.debug "PAUSED: %t" (Constraints.print paused); *)
-  (* Print.debug "QUEUE: %t" (Constraint.print queue); *)
+  Print.debug "SUB: %t" (Substitution.print sub);
+  Print.debug "PAUSED: %t" (Constraints.print paused);
+  Print.debug "QUEUE: %t" (Constraint.print queue);
   match queue with
   | { skeleton_equalities = (sk1, sk2) :: skeleton_equalities; _ } ->
       skel_eq_step ~loc sub paused { queue with skeleton_equalities } sk1 sk2

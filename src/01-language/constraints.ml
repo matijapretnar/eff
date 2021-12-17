@@ -58,13 +58,13 @@ module TyConstraints = struct
      is empty if and only iff there are no skeleton graphs in it *)
   let is_empty = Skeleton.Param.Map.is_empty
 
-  let get_ty_graph (ty_constraints : t) s =
+  let get_ty_graph s (ty_constraints : t) =
     Skeleton.Param.Map.find_opt s ty_constraints
     |> Option.value ~default:TyParamGraph.empty
 
   let add_edge s t1 t2 w (ty_constraints : t) : t =
     let s_graph' =
-      get_ty_graph ty_constraints s |> TyParamGraph.add_edge t1 t2 w
+      ty_constraints |> get_ty_graph s |> TyParamGraph.add_edge t1 t2 w
     in
     Skeleton.Param.Map.add s s_graph' ty_constraints
 
@@ -113,7 +113,7 @@ let add_ty_constraint s t1 t2 w constraints =
     ty_constraints = TyConstraints.add_edge s t1 t2 w constraints.ty_constraints;
   }
 
-let add_dirt_constraint constraints d1 d2 w effs =
+let add_dirt_constraint d1 d2 w effs constraints =
   {
     constraints with
     dirt_constraints =
