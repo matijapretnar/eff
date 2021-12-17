@@ -14,13 +14,13 @@ let test_equal_float = (1.0 = 1.0);;
 
 (* More comprehensive checking of = can be found in test_equality.eff *)
 
-assert ("a" = "a");;
+assert_ ("a" = "a");;
 
-assert (1.0 /. 0.0 = infinity);;
+assert_ (1.0 /. 0.0 = infinity);;
 
-assert (-. 1.0 /. 0.0 = neg_infinity);;
+assert_ (-. 1.0 /. 0.0 = neg_infinity);;
 
-assert (0.0 /. 0.0 = nan);;
+assert_ (0.0 /. 0.0 = nan);;
 
 let tilda_minus = (~-1);;
 
