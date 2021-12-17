@@ -276,10 +276,24 @@ and ty_omega_step ~loc sub (paused : Constraints.t) cons rest_queue omega =
 and dirt_omega_step sub resolved unresolved w dcons =
   match dcons with
   (* ω : δ₁ <= O₂ ∪ δ₂ *)
-  | ( { Dirt.effect_set = ops1; row = Dirt.Row.Param d1 },
-      { Dirt.effect_set = ops2; row = Dirt.Row.Param d2 } )
-    when Effect.Set.is_empty ops1 ->
-      (sub, Constraints.add_dirt_constraint d1 d2 w ops2 resolved, unresolved)
+  | ( ({ Dirt.effect_set = ops1; row = Dirt.Row.Param d1 } as ty1),
+      ({ Dirt.effect_set = ops2; row = Dirt.Row.Param d2 } as ty2) )
+    when Effect.Set.is_empty ops1 -> (
+      let dirt_edges =
+        Constraints.DirtConstraints.DirtParamGraph.get_edges d1
+          resolved.Constraints.dirt_constraints
+      in
+      match Dirt.Param.Map.find_opt d2 dirt_edges with
+      | None ->
+          ( sub,
+            Constraints.add_dirt_constraint d1 d2 w ops2 resolved,
+            unresolved )
+      | Some (d, _) ->
+          ( Substitution.add_dirt_var_coercion w
+              { term = Coercion.DirtCoercionVar d; ty = (ty1, ty2) }
+              sub,
+            resolved,
+            unresolved ))
   (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
   | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
       { effect_set = ops2; row = Dirt.Row.Param d2 } ) ->
