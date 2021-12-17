@@ -156,7 +156,7 @@ and reduce_ty_coercion' state n_coer =
       NCoerRefl
   | NCoerComp NCoerRefl when state.optimization_config.eliminate_coercions ->
       NCoerRefl
-  | NoEff.NCoerTuple coers
+  | (NoEff.NCoerTuple coers | NoEff.NCoerApply (_, coers))
     when List.for_all (fun coer -> coer = NoEff.NCoerRefl) coers
          && state.optimization_config.eliminate_coercions ->
       NCoerRefl
