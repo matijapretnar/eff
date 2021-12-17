@@ -21,32 +21,34 @@ effect Decide : unit -> bool
 * Handlers
 ********************************)
 
+let fail () = match (perform (Fail ())) with;;
+
 let parse = handler
-    | val y -> (fun s ->
+    | y -> (fun s ->
         begin match s with
         | [] -> y
-        | _ -> (absurd (#Fail ()))
+        | _ -> fail ()
         end
     )
-    | #Symbol c k ->
+    | effect (Symbol c) k ->
         fun s ->
         (begin match s with
-            | [] -> (absurd (#Fail ()))
-            | (x :: xs) -> if (c = x) then k x xs else (absurd (#Fail ()))
+            | [] -> fail ()
+            | (x :: xs) -> if (c = x) then k x xs else fail ()
         end
         )
 ;;
 
 let allsols = handler
-  | val x -> [x]
-  | #Decide _ k -> k true @ k false
-  | #Fail _ _ -> []
+  | x -> [x]
+  |  effect (Decide _) k -> k true @ k false
+  |  effect (Fail _) _ -> []
 ;;
 
 let backtrack = handler
-    | #Decide _ k ->
+    |  effect (Decide _) k ->
         handle k true with
-            | #Fail _ _ -> k false
+            |  effect (Fail _) _ -> k false
 ;;
 (********************************
 * Parser :: string list to int
@@ -69,6 +71,7 @@ let rec parseNum (l, v) =
         | "7" -> parseNum (xs, (createNumber (v, 7)))
         | "8" -> parseNum (xs, (createNumber (v, 8)))
         | "9" -> parseNum (xs, (createNumber (v, 9)))
+        | _ -> fail ()
         end
     end
 ;;
@@ -84,14 +87,14 @@ let digit () =
         let nums = ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] in
         let rec checkNums n =
             begin match n with
-            | [] -> (absurd (#Fail ()))
+            | [] -> fail ()
             | (x :: xs) ->
-                if (#Decide ()) then (#Symbol x) else (checkNums xs)
+                if (perform (Decide ())) then (perform (Symbol x)) else (checkNums xs)
             end in
         checkNums nums
 ;;
 
-let rec many m = if (#Decide ()) then (m ()) else ([]);;
+let rec many m = if (perform (Decide ())) then (m ()) else ([]);;
 
 let rec many1 () =
     let x = digit () in
@@ -102,28 +105,28 @@ let rec many1 () =
 let rec expr () =
     let rec term () =
         let rec factor () =
-            if (#Decide ()) then (
+            if (perform (Decide ())) then (
                 let i = many1 () in
                 (toNum i)
             ) else (
-                let p = #Symbol "(" in
+                let p = perform (Symbol "(") in
                 let j = expr () in
-                let p = #Symbol ")" in
+                let p = perform (Symbol ")") in
                 j
             )
         in
-        if (#Decide ()) then (
+        if (perform (Decide ())) then (
             let i = factor () in
-            let p = #Symbol "*" in
+            let p = perform (Symbol "*") in
             let j = term () in
             i * j
         ) else (
             factor ()
         )
     in
-    if (#Decide ()) then (
+    if (perform (Decide ())) then (
         let i = term () in
-        let p = #Symbol "+" in
+        let p = perform (Symbol "+") in
         let j = expr () in
         i + j
     ) else (
