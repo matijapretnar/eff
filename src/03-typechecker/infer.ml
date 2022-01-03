@@ -76,7 +76,12 @@ module TypingEnv = struct
         in
         let x = Term.poly_var x subst ty_scheme.ty in
         (x, cnstrs)
-    | None -> assert false
+    | None ->
+        Error.runtime "%t NOT IN %t"
+          (Term.Variable.print ~safe:true x)
+          (Print.sequence ","
+             (Term.Variable.print ~safe:true)
+             (Assoc.keys_of ctx))
 
   let update ctx x sch = Assoc.update x sch ctx
 end

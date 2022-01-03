@@ -13,13 +13,13 @@
   ======================================================================
   invalid/duplicate_let.eff
   ----------------------------------------------------------------------
-  Syntax error (file "invalid/duplicate_let.eff", line 1, char 5):
-  Several definitions of x
+  Syntax error (file "invalid/duplicate_let.eff", line 1, char 1):
+  Variable x defined multiple times.
   ======================================================================
   invalid/duplicate_let_toplevel.eff
   ----------------------------------------------------------------------
-  Syntax error (file "invalid/duplicate_let_toplevel.eff", line 1, char 5):
-  Several definitions of x
+  Syntax error (file "invalid/duplicate_let_toplevel.eff", line 1, char 1):
+  Variable x defined multiple times.
   ======================================================================
   invalid/duplicate_operation_tydef_effect.eff
   ----------------------------------------------------------------------
@@ -28,8 +28,8 @@
   ======================================================================
   invalid/duplicate_variant_tydef_sum.eff
   ----------------------------------------------------------------------
-  Typing error (file "invalid/duplicate_variant_tydef_sum.eff", line 2, char 1):
-  Constructors of a sum type must be distinct
+  Syntax error (file "invalid/duplicate_variant_tydef_sum.eff", line 2, char 1):
+  Constructor Horn defined multiple times.
   ======================================================================
   invalid/invalid_match_type.eff
   ----------------------------------------------------------------------
@@ -57,8 +57,8 @@
   ======================================================================
   invalid/non_linear_pattern.eff
   ----------------------------------------------------------------------
-  Syntax error (file "invalid/non_linear_pattern.eff", line 2, char 5):
-  Variable a occurs more than once in a pattern
+  Syntax error (file "invalid/non_linear_pattern.eff", line 2, char 8):
+  Variable a defined multiple times.
   ======================================================================
   invalid/non_linear_record.eff
   ----------------------------------------------------------------------
@@ -88,8 +88,8 @@
   ======================================================================
   invalid/shadow_label.eff
   ----------------------------------------------------------------------
-  Typing error (file "invalid/shadow_label.eff", line 2, char 1):
-  Constructor Horn is already used in type cow
+  Syntax error (file "invalid/shadow_label.eff", line 2, char 1):
+  Constructor Horn defined multiple times.
   ======================================================================
   invalid/shadow_type.eff
   ----------------------------------------------------------------------

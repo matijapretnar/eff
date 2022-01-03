@@ -142,7 +142,7 @@ module Make (Backend : Language.Backend.S) = struct
     | Commands.Use filename -> execute_file filename state
     | Commands.TopLet defs ->
         let desugarer_state', defs' =
-          Desugarer.desugar_top_let state.desugarer_state defs
+          Desugarer.desugar_top_let ~loc state.desugarer_state defs
         in
         let type_system_state', defs'' =
           TypeSystem.process_top_let ~loc state.type_system_state defs'
@@ -181,7 +181,7 @@ module Make (Backend : Language.Backend.S) = struct
         }
     | Commands.Tydef tydefs ->
         let desugarer_state', tydefs' =
-          Desugarer.desugar_tydefs state.desugarer_state tydefs
+          Desugarer.desugar_tydefs ~loc state.desugarer_state tydefs
         in
         let type_system_state' =
           TypeSystem.add_type_definitions ~loc state.type_system_state
