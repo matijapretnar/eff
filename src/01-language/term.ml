@@ -53,6 +53,10 @@ and expression' =
   | Variant of Type.Label.t * expression option
   | Lambda of abstraction
   | Handler of handler_clauses
+  | HandlerWithFinally of {
+      handler_clauses : handler_clauses;
+      finally_clause : abstraction;
+    }
   | CastExp of expression * Coercion.ty_coercion
 
 and computation = (computation', Type.dirty) typed
@@ -153,6 +157,16 @@ let handler_with_smaller_input_dirt hnd dcoer =
 let handler h =
   let drty1, drty2 = h.ty in
   { term = Handler h; ty = Type.handler (drty1, drty2) }
+
+let handlerWithFinally handler_clauses finally_clause =
+  let drty1, (ty2, drt2) = handler_clauses.ty
+  and ty2', (ty3, drt2') = finally_clause.ty in
+  assert (Type.equal_ty ty2 ty2');
+  assert (Type.equal_dirt drt2 drt2');
+  {
+    term = HandlerWithFinally { handler_clauses; finally_clause };
+    ty = Type.handler (drty1, (ty3, drt2'));
+  }
 
 let castExp (exp, coer) =
   let ty1 = exp.ty and ty1', ty2 = coer.ty in
@@ -272,6 +286,12 @@ and print_expression' ?max_level e ppf =
         (print_abstraction h.term.value_clause)
         (Print.sequence ";" print_effect_clause
            (Assoc.to_list h.term.effect_clauses.effect_part))
+  | HandlerWithFinally h ->
+      print "{ret %t; %t; finally %t}"
+        (print_abstraction h.handler_clauses.term.value_clause)
+        (Print.sequence ";" print_effect_clause
+           (Assoc.to_list h.handler_clauses.term.effect_clauses.effect_part))
+        (print_abstraction h.finally_clause)
   | CastExp (e1, tc) ->
       print ~at_level:2 "%t ▷ %t"
         (print_expression ~max_level:0 e1)
@@ -383,6 +403,12 @@ and apply_sub_exp' sub expression =
   | Variant (lbl, e1) -> Variant (lbl, Option.map (apply_sub_exp sub) e1)
   | Lambda abs -> Lambda (apply_sub_abs sub abs)
   | Handler h -> Handler (apply_sub_handler sub h)
+  | HandlerWithFinally h ->
+      HandlerWithFinally
+        {
+          handler_clauses = apply_sub_handler sub h.handler_clauses;
+          finally_clause = apply_sub_abs sub h.finally_clause;
+        }
   | CastExp (e1, tc1) ->
       CastExp (apply_sub_exp sub e1, Substitution.apply_sub_tycoer sub tc1)
   | Record flds -> Record (Type.Field.Map.map (apply_sub_exp sub) flds)
@@ -495,6 +521,12 @@ and refresh_expression' sbst = function
       | None -> e)
   | Lambda abs -> Lambda (refresh_abstraction sbst abs)
   | Handler h -> Handler (refresh_handler sbst h)
+  | HandlerWithFinally h ->
+      HandlerWithFinally
+        {
+          handler_clauses = refresh_handler sbst h.handler_clauses;
+          finally_clause = refresh_abstraction sbst h.finally_clause;
+        }
   | Tuple es -> Tuple (List.map (refresh_expression sbst) es)
   | Record flds -> Record (Type.Field.Map.map (refresh_expression sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, Option.map (refresh_expression sbst) e)
@@ -571,6 +603,12 @@ and subst_expr' sbst = function
       match Assoc.lookup x.variable sbst with Some e' -> e'.term | None -> e)
   | Lambda abs -> Lambda (subst_abs sbst abs)
   | Handler h -> Handler (subst_handler sbst h)
+  | HandlerWithFinally h ->
+      HandlerWithFinally
+        {
+          handler_clauses = subst_handler sbst h.handler_clauses;
+          finally_clause = subst_abs sbst h.finally_clause;
+        }
   | Tuple es -> Tuple (List.map (subst_expr sbst) es)
   | Record flds -> Record (Type.Field.Map.map (subst_expr sbst) flds)
   | Variant (lbl, e) -> Variant (lbl, Option.map (subst_expr sbst) e)
@@ -702,6 +740,8 @@ and free_vars_expr e =
   | Tuple es -> concat_vars (List.map free_vars_expr es)
   | Lambda a -> free_vars_abs a
   | Handler h -> free_vars_handler h
+  | HandlerWithFinally h ->
+      free_vars_handler h.handler_clauses @@@ free_vars_abs h.finally_clause
   | Record flds ->
       Type.Field.Map.values flds |> List.map free_vars_expr |> concat_vars
   | Variant (_, e) -> Option.default_map Variable.Map.empty free_vars_expr e
@@ -744,7 +784,11 @@ and free_params_expression' e =
   | Variant (_, e) ->
       Option.default_map Type.Params.empty free_params_expression e
   | Lambda abs -> free_params_abstraction abs
-  | Handler h -> free_params_abstraction h.term.value_clause
+  | Handler h -> free_params_handler_clauses h
+  | HandlerWithFinally h ->
+      Type.Params.union
+        (free_params_handler_clauses h.handler_clauses)
+        (free_params_abstraction h.finally_clause)
   | CastExp (e, tc) ->
       Type.Params.union (free_params_expression e)
         (Coercion.free_params_ty_coercion tc)
@@ -780,12 +824,25 @@ and free_params_computation' c =
         (Coercion.free_params_dirty_coercion dc)
   | Check (_, c) -> free_params_computation c
 
+and free_params_handler_clauses h =
+  Type.Params.union
+    (free_params_abstraction h.term.value_clause)
+    (h.term.effect_clauses.effect_part |> Assoc.values_of
+    |> Type.Params.union_map free_params_abstraction2)
+
 and free_params_abstraction abs =
   Type.Params.union
     (Type.free_params_abstraction_ty abs.ty)
     (free_params_abstraction' abs.term)
 
 and free_params_abstraction' (_, c) = free_params_computation c
+
+and free_params_abstraction2 abs2 =
+  Type.Params.union
+    (Type.free_params_abstraction2_ty abs2.ty)
+    (free_params_abstraction2' abs2.term)
+
+and free_params_abstraction2' (_, _, c) = free_params_computation c
 
 and free_params_definitions defs =
   Type.Params.union_map

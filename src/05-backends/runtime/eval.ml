@@ -127,7 +127,12 @@ and veval state e =
   | Term.Record es -> V.Record (Type.Field.Map.map (fun e -> veval state e) es)
   | Term.Variant (lbl, e) -> V.Variant (lbl, Option.map (veval state) e)
   | Term.Lambda a -> V.Closure (eval_closure state a.term)
-  | Term.Handler h -> V.Handler (eval_handler state h)
+  | Term.Handler h ->
+      let fin v = V.Value v in
+      V.Handler (eval_handler state h fin)
+  | Term.HandlerWithFinally h ->
+      let fin = eval_closure state h.finally_clause.term in
+      V.Handler (eval_handler state h.handler_clauses fin)
   | Term.CastExp (e, _coercion) -> veval state e
 
 and eval_handler state
@@ -138,7 +143,7 @@ and eval_handler state
           Term.value_clause = value;
         };
       _;
-    } =
+    } (fin : V.closure) =
   let eval_op ((eff, _), a2) =
     let p, kvar, c = a2.term in
     let f u k = eval_closure (extend kvar (V.Closure k) state) (p, c) u in
@@ -153,8 +158,7 @@ and eval_handler state
         | Some f -> f v k'
         | None -> V.Call (eff, v, k'))
   in
-  (* fun r -> sequence (eval_closure state fin) (h r) *)
-  h
+  fun r -> sequence fin (h r)
 
 and eval_closure state a v =
   let p, c = a in

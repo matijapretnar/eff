@@ -35,22 +35,30 @@ and of_expression exp =
               Function (List.map converter abs_lst)
           | _ -> Lambda (of_abstraction abs))
       | _ -> Lambda (of_abstraction abs))
-  | Term.Handler
-      { term = { value_clause; effect_clauses = { effect_part; _ } }; _ } ->
-      (* Non-trivial case *)
-      let effect_clauses' =
-        List.map
-          (fun ((eff, _), abs) -> EffectClause (eff, of_abstraction2 abs))
-          (Assoc.to_list effect_part)
-      in
-      let value_clause' = ValueClause (of_abstraction value_clause) in
-      let ghost_bind = Term.Variable.fresh "$c_thunk" in
-      let match_handler =
-        Match
-          (Apply (Var ghost_bind, Tuple []), value_clause' :: effect_clauses')
-      in
-      Lambda (PVar ghost_bind, match_handler)
+  | Term.Handler h -> of_handler h None
+  | Term.HandlerWithFinally h ->
+      of_handler h.handler_clauses (Some h.finally_clause)
   | Term.CastExp (exp, _) -> of_expression exp
+
+and of_handler
+    ({ term = { value_clause; effect_clauses = { effect_part; _ } }; _ } :
+      Term.handler_clauses) finally_clause =
+  (* Non-trivial case *)
+  let effect_clauses' =
+    List.map
+      (fun ((eff, _), abs) -> EffectClause (eff, of_abstraction2 abs))
+      (Assoc.to_list effect_part)
+  in
+  let value_clause' = ValueClause (of_abstraction value_clause) in
+  let ghost_bind = Term.Variable.fresh "$c_thunk" in
+  let match_handler =
+    Match (Apply (Var ghost_bind, Tuple []), value_clause' :: effect_clauses')
+  in
+  match finally_clause with
+  | None -> Lambda (PVar ghost_bind, match_handler)
+  | Some fin ->
+      let p_fin, c_fin = of_abstraction fin in
+      Lambda (PVar ghost_bind, Let ([ (p_fin, match_handler) ], c_fin))
 
 and of_computation cmp =
   match cmp.term with

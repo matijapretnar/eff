@@ -248,6 +248,11 @@ and free_params_dirty (ty, dirt) =
 and free_params_abstraction_ty (ty_in, drty_out) =
   Params.union (free_params_ty ty_in) (free_params_dirty drty_out)
 
+and free_params_abstraction2_ty (ty_in1, ty_in2, drty_out) =
+  Params.union
+    (Params.union (free_params_ty ty_in1) (free_params_ty ty_in2))
+    (free_params_dirty drty_out)
+
 and free_params_ct_ty (vty1, vty2) =
   Params.union (free_params_ty vty1) (free_params_ty vty2)
 

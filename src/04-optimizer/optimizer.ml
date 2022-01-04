@@ -148,6 +148,10 @@ and optimize_expression' state exp =
       Term.variant (lbl, Option.map (optimize_expression state) arg) exp.ty
   | Term.Lambda abs -> Term.lambda (optimize_abstraction state abs)
   | Term.Handler hnd -> Term.handler (optimize_handler state hnd)
+  | Term.HandlerWithFinally hnd ->
+      Term.handlerWithFinally
+        (optimize_handler state hnd.handler_clauses)
+        (optimize_abstraction state hnd.finally_clause)
   | Term.CastExp (exp, coer) ->
       Term.castExp (optimize_expression state exp, coer)
 

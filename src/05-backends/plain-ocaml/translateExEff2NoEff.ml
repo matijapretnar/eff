@@ -324,6 +324,7 @@ and elab_expression' state exp =
                 Assoc.map_of_list elab_effect_clause
                   (Assoc.to_list h.term.effect_clauses.effect_part);
             }
+  | ExEff.HandlerWithFinally _ -> failwith __LOC__
   | ExEff.CastExp (value, coer) ->
       let elab1 = elab_expression state value in
       let elab2 = elab_ty_coercion state coer in
