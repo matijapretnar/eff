@@ -15,6 +15,7 @@ val desugar_computation :
   state -> SugaredSyntax.term -> state * UntypedSyntax.computation
 
 val desugar_def_effect :
+  loc:Location.t ->
   state ->
   SugaredSyntax.effect * (SugaredSyntax.ty * SugaredSyntax.ty) ->
   state * (Effect.t * (Type.ty * Type.ty))

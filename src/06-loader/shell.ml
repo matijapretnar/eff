@@ -122,7 +122,7 @@ module Make (Backend : Language.Backend.S) = struct
         state
     | Commands.DefEffect effect_def ->
         let desugarer_state', (eff, (ty1, ty2)) =
-          Desugarer.desugar_def_effect state.desugarer_state effect_def
+          Desugarer.desugar_def_effect ~loc state.desugarer_state effect_def
         in
         let type_system_state', (ty1', ty2') =
           TypeSystem.process_def_effect eff (ty1, ty2) state.type_system_state

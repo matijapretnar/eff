@@ -79,7 +79,8 @@
   ======================================================================
   invalid/shadow_eff.eff
   ----------------------------------------------------------------------
-  Typing error: Effect A already defined.
+  Syntax error (file "invalid/shadow_eff.eff", line 3, char 1):
+  Effect A defined multiple times.
   ======================================================================
   invalid/shadow_field.eff
   ----------------------------------------------------------------------

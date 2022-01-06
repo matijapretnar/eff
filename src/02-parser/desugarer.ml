@@ -73,13 +73,10 @@ let add_unique_variables ~loc vars context =
 
 let add_loc t loc = { it = t; at = loc }
 
-let effect_to_symbol state name =
+let effect_to_symbol ~loc state name =
   match StringMap.find_opt name state.effect_symbols with
   | Some sym -> (state, sym)
-  | None ->
-      let sym = Effect.fresh name in
-      let effect_symbols' = StringMap.add name sym state.effect_symbols in
-      ({ state with effect_symbols = effect_symbols' }, sym)
+  | None -> Error.syntax ~loc "Unknown effect %s" name
 
 let field_to_symbol state name =
   match StringMap.find_opt name state.field_symbols with
@@ -530,7 +527,7 @@ and desugar_handler loc state
   in
   let construct_eff_clause state (eff, eff_cs_lst) =
     (* transform string name to Effect.t *)
-    let state', eff' = effect_to_symbol state eff in
+    let state', eff' = effect_to_symbol ~loc state eff in
     match eff_cs_lst with
     | [] -> assert false
     | [ a2 ] ->
@@ -672,8 +669,14 @@ let load_primitive_effect state eff prim =
         eff state.effect_symbols;
   }
 
-let desugar_def_effect state (eff, (ty1, ty2)) =
-  let state', eff' = effect_to_symbol state eff in
+let desugar_def_effect ~loc state (eff, (ty1, ty2)) =
+  let eff' = Effect.fresh eff in
+  let state' =
+    {
+      state with
+      effect_symbols = add_unique ~loc "Effect" eff eff' state.effect_symbols;
+    }
+  in
   let state'', ty1' = desugar_type StringMap.empty state' ty1 in
   let state''', ty2' = desugar_type StringMap.empty state'' ty2 in
   (state''', (eff', (ty1', ty2')))
