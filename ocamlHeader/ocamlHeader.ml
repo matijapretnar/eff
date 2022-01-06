@@ -23,14 +23,15 @@ let rec ( >>= ) (c : 'a computation) (f : 'a -> 'b computation) =
   | Value x -> f x
   | Call (eff, arg, k) -> Call (eff, arg, fun y -> k y >>= f)
 
-let handler (h : ('a, 'b) handler_clauses) : 'a computation -> 'b =
+let handler (h : ('a, 'b computation) handler_clauses)
+    (finally_clause : 'b -> 'c) : 'a computation -> 'c =
   let rec handler = function
     | Value x -> h.value_clause x
     | Call (eff, arg, k) ->
         let clause = h.effect_clauses eff in
         clause arg (fun y -> handler (k y))
   in
-  handler
+  fun comp -> handler comp >>= finally_clause
 
 let rec lift (f : 'a -> 'b) : 'a computation -> 'b computation = function
   | Value x -> Value (f x)

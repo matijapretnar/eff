@@ -76,6 +76,7 @@ type n_term =
 and n_handler = {
   effect_clauses : (n_effect, n_abstraction_2_args) Assoc.t;
   return_clause : n_abstraction_with_param_ty;
+  finally_clause : n_abstraction_with_param_ty;
 }
 
 and n_abstraction = n_pattern * n_term
@@ -220,10 +221,11 @@ and substitute_abstraction_with_ty sbst (p, ty, c) =
 
 and substitute_abstraction2 sbst (p1, p2, c) = (p1, p2, (substitute_term sbst) c)
 
-and substitue_handler sbst { effect_clauses; return_clause } =
+and substitue_handler sbst { effect_clauses; return_clause; finally_clause } =
   {
     return_clause = substitute_abstraction_with_ty sbst return_clause;
     effect_clauses = Assoc.map (substitute_abstraction2 sbst) effect_clauses;
+    finally_clause = substitute_abstraction_with_ty sbst finally_clause;
   }
 
 let beta_reduce (pat, trm2) trm1 =

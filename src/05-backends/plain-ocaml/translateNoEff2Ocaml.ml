@@ -215,12 +215,13 @@ let rec pp_term ?max_level state noEff_term ppf =
         (pp_coercion ~max_level:1 c)
         (pp_term state ~max_level:0 t)
   | NReturn t -> print ~at_level:1 "Value %t" (pp_term state ~max_level:0 t)
-  | NHandler { effect_clauses = eff_cls; return_clause = val_cl } ->
+  | NHandler { effect_clauses; return_clause; finally_clause } ->
       print ~at_level:2
         "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_clauses = \
-         %t;@] }"
-        (pp_abs_with_ty state val_cl)
-        (pp_effect_cls state eff_cls)
+         %t;@]} (@[<hov>(fun %t)@])"
+        (pp_abs_with_ty state return_clause)
+        (pp_effect_cls state effect_clauses)
+        (pp_abs_with_ty state finally_clause)
   | NLet (t1, (pat, t2)) ->
       print ~at_level:2 "@[<hv>@[<hv>let %t = %t in@] @,%t@]"
         (pp_pattern state pat) (pp_term state t1) (pp_term state t2)

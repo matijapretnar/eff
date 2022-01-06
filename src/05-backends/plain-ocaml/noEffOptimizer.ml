@@ -204,6 +204,7 @@ and optimize_handler state (hnd : NoEff.n_handler) =
   {
     return_clause = optimize_abstraction_with_ty state hnd.return_clause;
     effect_clauses = Assoc.map (n_abstraction_2_args state) hnd.effect_clauses;
+    finally_clause = optimize_abstraction_with_ty state hnd.finally_clause;
   }
 
 and optimize_rec_definitions state defs =

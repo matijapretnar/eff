@@ -273,58 +273,15 @@ and elab_expression' state exp =
   | ExEff.Tuple vs -> NoEff.NTuple (List.map (elab_expression state) vs)
   | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty state abs)
   | ExEff.Handler h ->
-      let elabvc = elab_abstraction_with_param_ty state h.term.value_clause in
-      let (_, drt_in), _ = h.ty in
-      if Dirt.is_empty drt_in (* Handler - Case 1 *) then NoEff.NFun elabvc
-      else
-        let _, (_ty, dirt) = h.term.value_clause.ty in
-        if Dirt.is_empty dirt (* Handler - Case 2 *) then
-          let subst_cont_effect ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
-              =
-            let elab1 = elab_ty ty1 in
-            let elab2 = elab_ty ty2 in
-            let elabcomp = elab_computation state comp in
-            match p2.term with
-            | PVar x ->
-                ( (eff, (elab1, elab2)),
-                  ( elab_pattern state p1,
-                    elab_pattern state p2,
-                    NReturn
-                      (subs_var_in_term x
-                         (NCast
-                            ( NVar { variable = x; coercions = [] },
-                              NoEff.NCoerArrow
-                                ( NoEff.NCoerRefl,
-                                  NoEff.NCoerUnsafe NoEff.NCoerRefl ) ))
-                         elabcomp) ) )
-            | _ -> failwith __LOC__
-          in
-          let p, ty, c = elabvc in
-          NoEff.NHandler
-            {
-              return_clause = (p, ty, NoEff.NReturn c);
-              effect_clauses =
-                Assoc.map_of_list subst_cont_effect
-                  (Assoc.to_list h.term.effect_clauses.effect_part);
-            } (* Handler - Case 3 *)
-        else
-          let elab_effect_clause ((eff, (ty1, ty2)), { term = p1, p2, comp; _ })
-              =
-            let elab1 = elab_ty ty1 in
-            let elab2 = elab_ty ty2 in
-            let elabcomp = elab_computation state comp in
-            ( (eff, (elab1, elab2)),
-              (elab_pattern state p1, elab_pattern state p2, elabcomp) )
-          in
-          let p, ty, c = elabvc in
-          NoEff.NHandler
-            {
-              return_clause = (p, ty, c);
-              effect_clauses =
-                Assoc.map_of_list elab_effect_clause
-                  (Assoc.to_list h.term.effect_clauses.effect_part);
-            }
-  | ExEff.HandlerWithFinally _ -> failwith __LOC__
+      let _, (ty, _) = h.ty in
+      let x = Variable.fresh "$finally" in
+      let finally_clause =
+        (NoEff.PNVar x, elab_ty ty, NoEff.NVar { variable = x; coercions = [] })
+      in
+      elab_handler state h finally_clause
+  | ExEff.HandlerWithFinally h ->
+      elab_handler state h.handler_clauses
+        (elab_abstraction_with_param_ty state h.finally_clause)
   | ExEff.CastExp (value, coer) ->
       let elab1 = elab_expression state value in
       let elab2 = elab_ty_coercion state coer in
@@ -334,6 +291,61 @@ and elab_expression' state exp =
       let elab_e = elab_expression state exp in
       NoEff.NVariant (lbl, Some elab_e)
   | ExEff.Record _ass -> failwith __LOC__
+
+and elab_handler state h elabfc =
+  let elabvc = elab_abstraction_with_param_ty state h.term.value_clause in
+  let (_, drt_in), _ = h.ty in
+  if Dirt.is_empty drt_in (* Handler - Case 1 *) then
+    let p_vc, p_vc_ty, c_vc = elabvc in
+    let p_fc, _, c_fc = elabfc in
+    NoEff.NFun (p_vc, p_vc_ty, NoEff.NLet (c_vc, (p_fc, c_fc)))
+  else
+    let _, (_ty, dirt) = h.term.value_clause.ty in
+    if Dirt.is_empty dirt (* Handler - Case 2 *) then
+      let subst_cont_effect ((eff, (ty1, ty2)), { term = p1, p2, comp; _ }) =
+        let elab1 = elab_ty ty1 in
+        let elab2 = elab_ty ty2 in
+        let elabcomp = elab_computation state comp in
+        match p2.term with
+        | PVar x ->
+            ( (eff, (elab1, elab2)),
+              ( elab_pattern state p1,
+                elab_pattern state p2,
+                NReturn
+                  (subs_var_in_term x
+                     (NCast
+                        ( NVar { variable = x; coercions = [] },
+                          NoEff.NCoerArrow
+                            (NoEff.NCoerRefl, NoEff.NCoerUnsafe NoEff.NCoerRefl)
+                        ))
+                     elabcomp) ) )
+        | _ -> failwith __LOC__
+      in
+      let p, ty, c = elabvc in
+      NoEff.NHandler
+        {
+          return_clause = (p, ty, NoEff.NReturn c);
+          effect_clauses =
+            Assoc.map_of_list subst_cont_effect
+              (Assoc.to_list h.term.effect_clauses.effect_part);
+          finally_clause = elabfc;
+        } (* Handler - Case 3 *)
+    else
+      let elab_effect_clause ((eff, (ty1, ty2)), { term = p1, p2, comp; _ }) =
+        let elab1 = elab_ty ty1 in
+        let elab2 = elab_ty ty2 in
+        let elabcomp = elab_computation state comp in
+        ( (eff, (elab1, elab2)),
+          (elab_pattern state p1, elab_pattern state p2, elabcomp) )
+      in
+      NoEff.NHandler
+        {
+          return_clause = elabvc;
+          effect_clauses =
+            Assoc.map_of_list elab_effect_clause
+              (Assoc.to_list h.term.effect_clauses.effect_part);
+          finally_clause = elabfc;
+        }
 
 and elab_abstraction state { term = p, c; _ } =
   let elab2 = elab_computation state c in
