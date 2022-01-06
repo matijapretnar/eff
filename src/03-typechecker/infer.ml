@@ -461,51 +461,89 @@ and tcOpCase state
   (outExpr, outCs)
 
 (* Handlers *)
-and tcHandler state (h : Untyped.handler) : tcExprOutput' =
+and tcHandler state { Untyped.value_clause; effect_clauses; finally_clause } :
+    tcExprOutput' =
   (* 1: Generate fresh variables for the input and output types *)
-  let deltaIn = Dirt.fresh () in
-  let ((_, deltaOut) as dirtyOut) = Type.fresh_dirty_with_fresh_skel () in
+  let dirt_row_param = Dirt.Param.fresh ()
+  and ty_mid = Type.fresh_ty_with_fresh_skel ()
+  and ty_out = Type.fresh_ty_with_fresh_skel () in
+
+  let drt_out = Dirt.fresh () in
 
   (* 2: Process the return and the operation clauses *)
-  let trgRet, cs1 = tcAbstraction state h.value_clause in
-  let trgCls, cs2 = tcOpCases state h.effect_clauses dirtyOut in
-
-  (* 3: Create the omega7 coercion (cast the whole handler) *)
-  let ty_ret_in, _ = trgRet.ty in
-  let omega7, omegaCt7 =
-    let allOps =
-      trgCls |> Assoc.to_list
-      |> List.map (fun ((eff, _), _) -> eff)
-      |> Effect.Set.of_list
-    in
-
-    (* GEORGE: This should be done in a cleaner way but let's leave it for later *)
-    let deltaOutVar =
-      match deltaOut.row with
-      | Dirt.Row.Param deltaOutVar -> deltaOutVar
-      | Dirt.Row.Empty -> assert false
-    in
-
-    Constraint.fresh_dirt_coer
-      (deltaIn, Dirt.{ effect_set = allOps; row = Dirt.Row.Param deltaOutVar })
+  let value_clause', value_clause_cnstrs = tcAbstraction state value_clause
+  and effect_clauses', effect_clauses_cnstrs =
+    tcOpCases state effect_clauses (ty_mid, drt_out)
+  and finally_clause', finally_clause_cnstrs =
+    tcAbstraction state finally_clause
   in
 
-  let handlerCo =
-    Coercion.handlerCoercion
-      ( Coercion.bangCoercion (Coercion.reflTy ty_ret_in, omega7),
-        Coercion.reflDirty dirtyOut )
+  let drt_in =
+    Dirt.
+      {
+        effect_set = Term.handled_effects effect_clauses';
+        row = Dirt.Row.Param dirt_row_param;
+      }
   in
-  let handTy, _ = handlerCo.ty in
-  match handTy.term with
-  | Type.Handler ((_, drt_in), _) ->
-      let trgRet', cnstr_ret = Constraint.cast_abstraction trgRet dirtyOut in
-      let handler = Term.Handler (Term.handler_clauses trgRet' trgCls drt_in) in
-      let outExpr = Term.CastExp ({ term = handler; ty = handTy }, handlerCo) in
-      let outType = Type.handler ((ty_ret_in, deltaIn), dirtyOut) in
-      let outCs = Constraint.list_union [ omegaCt7; cnstr_ret; cs1; cs2 ] in
-      (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)
-      ((outExpr, outType), outCs)
-  | _ -> assert false
+
+  let value_clause'', value_clause_cast_cnstrs =
+    Constraint.cast_abstraction value_clause' (ty_mid, drt_out)
+  and finally_clause'', finally_clause_cast_cnstrs =
+    Constraint.full_cast_abstraction finally_clause' ty_mid (ty_out, drt_out)
+  in
+
+  let handler =
+    Term.handlerWithFinally
+      (Term.handler_clauses value_clause'' effect_clauses' drt_in)
+      finally_clause''
+  in
+  ( (handler.term, handler.ty),
+    Constraint.list_union
+      [
+        value_clause_cnstrs;
+        effect_clauses_cnstrs;
+        finally_clause_cnstrs;
+        value_clause_cast_cnstrs;
+        finally_clause_cast_cnstrs;
+      ] )
+
+(* 3: Create the omega7 coercion (cast the whole handler)
+     let ty_ret_in, _ = trgRet.ty in
+     let omega7, omegaCt7 =
+       let allOps =
+         trgCls |> Assoc.to_list
+         |> List.map (fun ((eff, _), _) -> eff)
+         |> Effect.Set.of_list
+       in
+
+       (* GEORGE: This should be done in a cleaner way but let's leave it for later *)
+       let deltaOutVar =
+         match deltaOut.row with
+         | Dirt.Row.Param deltaOutVar -> deltaOutVar
+         | Dirt.Row.Empty -> assert false
+       in
+   Din <= Ops U dOutVar
+       Constraint.fresh_dirt_coer
+         (deltaIn, Dirt.{ effect_set = allOps; row = Dirt.Row.Param deltaOutVar })
+     in
+
+     let handlerCo =
+       Coercion.handlerCoercion
+         ( Coercion.bangCoercion (Coercion.reflTy ty_ret_in, omega7),
+           Coercion.reflDirty dirtyOut )
+     in
+     let handTy, _ = handlerCo.ty in
+     match handTy.term with
+     | Type.Handler ((_, drt_in), (ty_out, _)) ->
+         let handler = Term.Handler (Term.handler_clauses trgRet' trgCls drt_in) in
+         let outExpr = Term.CastExp ({ term = handler; ty = handTy }, handlerCo) in
+         let outType = Type.handler ((ty_ret_in, deltaIn), dirtyOut) in
+         let outCs =
+
+         in
+         (* 7, ain : skelin, aout : skelout && 1, 2, 6 && 3i, 4i, 5i *)
+         ((outExpr, outType), outCs)
+     | _ -> assert false *)
 
 (* Dispatch: Type inference for a plain value (expression) *)
 and tcExpr' state : Untyped.plain_expression -> tcExprOutput' = function

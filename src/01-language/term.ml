@@ -126,11 +126,14 @@ let variant (lbl, e) ty = { term = Variant (lbl, e); ty }
 
 let lambda abs = { term = Lambda abs; ty = Type.arrow abs.ty }
 
+let handled_effects effect_part =
+  effect_part |> Assoc.keys_of
+  |> List.map (fun (eff, _) -> eff)
+  |> Effect.Set.of_list
+
 let handler_clauses (value_clause : abstraction) effect_part drt_in =
-  (* TODO: Check that input dirt is either handled or covered in output dirt *)
   let fingerprint = EffectFingerprint.fresh () in
-  let ty_in, drty_out = value_clause.ty in
-  let ty = ((ty_in, drt_in), drty_out) in
+  let ty_in, ((_, drt_out) as drty_out) = value_clause.ty in
   let check_effect_clause ((_eff, (ty1, ty2)), abs) =
     let pty1, pty2, drty = abs.ty in
     assert (Type.equal_ty ty1 pty1);
@@ -138,9 +141,14 @@ let handler_clauses (value_clause : abstraction) effect_part drt_in =
     assert (Type.equal_dirty drty_out drty)
   in
   Assoc.iter check_effect_clause effect_part;
+  assert (
+    Effect.Set.equal drt_in.Dirt.effect_set
+      (Effect.Set.union drt_out.Dirt.effect_set (handled_effects effect_part)));
+  let ty = ((ty_in, drt_in), drty_out) in
   { term = { value_clause; effect_clauses = { fingerprint; effect_part } }; ty }
 
 let handler_with_new_value_clause hnd value_clause =
+  (* TODO: verify the same as above *)
   let ty_in, drty_out = value_clause.ty in
   let (_, drt_in), _ = hnd.ty in
   {
@@ -149,6 +157,7 @@ let handler_with_new_value_clause hnd value_clause =
   }
 
 let handler_with_smaller_input_dirt hnd dcoer =
+  (* TODO: verify the same as above *)
   let (ty_in, drt_in), drty_out = hnd.ty in
   let drt, drt_in' = dcoer.ty in
   assert (Type.equal_dirt drt_in drt_in');
@@ -159,13 +168,13 @@ let handler h =
   { term = Handler h; ty = Type.handler (drty1, drty2) }
 
 let handlerWithFinally handler_clauses finally_clause =
-  let drty1, (ty2, drt2) = handler_clauses.ty
-  and ty2', (ty3, drt2') = finally_clause.ty in
-  assert (Type.equal_ty ty2 ty2');
-  assert (Type.equal_dirt drt2 drt2');
+  let drty_in, (ty_cont, drt_cont) = handler_clauses.ty
+  and ty_cont', ((_, drt_out) as drty_out) = finally_clause.ty in
+  assert (Type.equal_ty ty_cont ty_cont');
+  assert (Type.equal_dirt drt_cont drt_out);
   {
     term = HandlerWithFinally { handler_clauses; finally_clause };
-    ty = Type.handler (drty1, (ty3, drt2'));
+    ty = Type.handler (drty_in, drty_out);
   }
 
 let castExp (exp, coer) =
