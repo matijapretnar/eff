@@ -94,12 +94,12 @@
   ======================================================================
   invalid/shadow_type.eff
   ----------------------------------------------------------------------
-  Typing error (file "invalid/shadow_type.eff", line 3, char 1):
-  Type cow already defined.
+  Syntax error (file "invalid/shadow_type.eff", line 3, char 1):
+  Type cow defined multiple times.
   ======================================================================
   invalid/use_undefined_type.eff
   ----------------------------------------------------------------------
-  Typing error (file "invalid/use_undefined_type.eff", line 1, char 1):
+  Syntax error (file "invalid/use_undefined_type.eff", line 1, char 17):
   Unknown type bar
   [1]
 -------------------------------------------------------------------------------

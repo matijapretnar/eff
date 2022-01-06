@@ -26,7 +26,7 @@ type state = {
   context : Term.Variable.t StringMap.t;
   effect_symbols : Effect.t StringMap.t;
   field_symbols : Type.Field.t StringMap.t;
-  tyname_symbols : TyName.t StringMap.t;
+  tyname_symbols : (TyName.t * int) StringMap.t;
   constructors : (Type.Label.t * constructor_kind) StringMap.t;
   local_type_annotations : Type.ty StringMap.t;
   inlined_types : Type.ty StringMap.t;
@@ -39,13 +39,13 @@ let initial_state =
     |> StringMap.add Type.nil_annot (Type.nil, Variant false)
   and tyname_symbols =
     StringMap.empty
-    |> StringMap.add "bool" Type.bool_tyname
-    |> StringMap.add "int" Type.int_tyname
-    |> StringMap.add "unit" Type.unit_tyname
-    |> StringMap.add "string" Type.string_tyname
-    |> StringMap.add "float" Type.float_tyname
-    |> StringMap.add "list" Type.list_tyname
-    |> StringMap.add "empty" Type.empty_tyname
+    |> StringMap.add "bool" (Type.bool_tyname, 0)
+    |> StringMap.add "int" (Type.int_tyname, 0)
+    |> StringMap.add "unit" (Type.unit_tyname, 0)
+    |> StringMap.add "string" (Type.string_tyname, 0)
+    |> StringMap.add "float" (Type.float_tyname, 0)
+    |> StringMap.add "list" (Type.list_tyname, 1)
+    |> StringMap.add "empty" (Type.empty_tyname, 0)
   and inlined_types =
     StringMap.empty
     |> StringMap.add "bool" Type.bool_ty
@@ -86,13 +86,10 @@ let field_to_symbol state name =
       let field_symbols' = StringMap.add name sym state.field_symbols in
       ({ state with field_symbols = field_symbols' }, sym)
 
-let tyname_to_symbol state name =
+let tyname_to_symbol ~loc state name =
   match StringMap.find_opt name state.tyname_symbols with
-  | Some sym -> (state, sym)
-  | None ->
-      let sym = TyName.fresh name in
-      let tyname_symbols' = StringMap.add name sym state.tyname_symbols in
-      ({ state with tyname_symbols = tyname_symbols' }, sym)
+  | Some sym -> sym
+  | None -> Error.syntax ~loc "Unknown type %s" name
 
 (* ***** Desugaring of types. ***** *)
 (* Desugar a type, where only the given type, dirt and region parameters may appear.
@@ -110,9 +107,13 @@ let desugar_type type_sbst state =
         match StringMap.find_opt t state.inlined_types with
         | Some ty -> (state, ty)
         | None ->
-            let state', t' = tyname_to_symbol state t in
-            let state'', tys' = List.fold_map desugar_type state' tys in
-            (state'', T.apply (t', tys')))
+            let t', n = tyname_to_symbol ~loc state t in
+            if List.length tys <> n then
+              Error.syntax ~loc "Type %t expects %d arguments" (TyName.print t')
+                n
+            else
+              let state', tys' = List.fold_map desugar_type state tys in
+              (state', T.apply (t', tys')))
     | Sugared.TyParam t -> (
         match StringMap.find_opt t type_sbst with
         | None -> Error.syntax ~loc "Unbound type parameter '%s" t
@@ -208,14 +209,25 @@ let desugar_tydef ~loc state params ty_name def =
 
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let desugar_tydefs ~loc state sugared_defs =
+  let add_ty_names tyname_symbols (name, (params, _)) =
+    let sym = TyName.fresh name in
+    add_unique ~loc "Type" name (sym, List.length params) tyname_symbols
+  in
+  let state' =
+    {
+      state with
+      tyname_symbols =
+        Assoc.fold_left add_ty_names state.tyname_symbols sugared_defs;
+    }
+  in
   let desugar_fold st (name, (params, def)) =
     (* First desugar the type names *)
-    let st', sym = tyname_to_symbol st name in
+    let sym, _ = StringMap.find name st.tyname_symbols in
     (* Then the types themselves *)
-    let st'', tydef = desugar_tydef ~loc st' params name def in
-    (st'', (sym, tydef))
+    let st', tydef = desugar_tydef ~loc st params name def in
+    (st', (sym, tydef))
   in
-  Assoc.kfold_map desugar_fold state sugared_defs
+  Assoc.kfold_map desugar_fold state' sugared_defs
 
 (* ***** Desugaring of expressions and computations. ***** *)
 
