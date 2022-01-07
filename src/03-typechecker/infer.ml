@@ -443,35 +443,29 @@ and infer_computation' ~loc state = function
 
 (* Typecheck a (potentially) recursive let *)
 and infer_rec_definitions state defs =
-  (* 1: Generate fresh variables for everything *)
-  let defs' =
+  let defs_with_fresh_types =
     List.map
       (fun (x, abs) ->
-        let alpha = Type.fresh_ty_with_fresh_skel () in
-        let betadelta = Type.fresh_dirty_with_fresh_skel () in
-        (x, abs, alpha, betadelta, Constraint.empty))
+        let ty_in = Type.fresh_ty_with_fresh_skel () in
+        let ty_out = Type.fresh_dirty_with_fresh_skel () in
+        (x, abs, ty_in, ty_out))
       defs
   in
-  let state' =
+  let state_extended_with_all_defs =
     List.fold_left
-      (fun state (x, _, alpha, betadelta, _) ->
-        extend_var x (Type.arrow (alpha, betadelta)) state)
-      state defs'
+      (fun state (x, _, ty_in, ty_out) ->
+        extend_var x (Type.arrow (ty_in, ty_out)) state)
+      state defs_with_fresh_types
   in
   let defs'', cnstrs =
-    List.fold_right
-      (fun (x, abs, alpha, betadelta, cs3) (defs, cnstrs) ->
-        let p, c = abs in
-        Exhaust.is_irrefutable state.type_definitions p;
-        Exhaust.check_computation state.type_definitions c;
-        let abs', cs1 = infer_abstraction state' abs in
-        let abs'', cs2 =
-          Constraint.full_cast_abstraction abs' alpha betadelta
-        in
-        ((x, abs'') :: defs, Constraint.list_union [ cs1; cs2; cs3; cnstrs ]))
-      defs' ([], Constraint.empty)
+    infer_many
+      (fun (x, abs, ty_in, ty_out) ->
+        let abs', cs1 = infer_abstraction state_extended_with_all_defs abs in
+        let abs'', cs2 = Constraint.full_cast_abstraction abs' ty_in ty_out in
+        ((x, abs''), Constraint.list_union [ cs1; cs2 ]))
+      defs_with_fresh_types
   in
-  (Assoc.of_list defs'', cnstrs)
+  (Assoc.of_list defs'', Constraint.list_union cnstrs)
 
 and infer_abstraction state (pat, cmp) : Term.abstraction * Constraint.t =
   let trgPat, vars, cs1 = infer_pattern state pat in
@@ -546,6 +540,11 @@ let process_top_let ~loc state defs =
   List.fold_right fold defs (state, [])
 
 let process_top_let_rec ~loc state un_defs =
+  Assoc.iter
+    (fun (_, (p, c)) ->
+      Exhaust.is_irrefutable state.type_definitions p;
+      Exhaust.check_computation state.type_definitions c)
+    un_defs;
   let defs', cnstrs = infer_rec_definitions state (Assoc.to_list un_defs) in
   let sub, constraints = Unification.solve ~loc cnstrs in
   let defs = Assoc.map (Term.apply_substitutions_to_abstraction sub) defs' in

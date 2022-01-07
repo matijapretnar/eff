@@ -2135,7 +2135,7 @@
                               (coer_computation _tycoer (_fail ())))
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
-      (fun (_x : string list -> 'ty76 computation) ->
+      (fun (_x : string list -> 'ty73 computation) ->
         coer_return
           (coer_arrow coer_refl_ty (coer_computation _tycoer))
           (coer_arrow coer_refl_ty (coer_computation _tycoer) _x))
@@ -2164,7 +2164,7 @@
             | Fail -> fun (_ : unit) _l -> coer_return (coer_list _tycoer) []
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
-      (fun (_x : 'ty126 list) ->
+      (fun (_x : 'ty130 list) ->
         coer_return (coer_list _tycoer) (coer_list _tycoer _x))
   
   let allsols = _allsols
