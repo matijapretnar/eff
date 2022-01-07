@@ -297,9 +297,10 @@ and pp_top_let_rec state lst ppf =
   pp_lets "let rec" pp_top_let_rec_def lst ppf
 
 and pp_effect_cls state eff_cls ppf =
-  let pp_effect_abs2 (eff, (pat1, pat2, t)) ppf =
-    print ppf "@[<hv 2>| %t -> fun %t %t -> %t @]" (pp_effect eff)
-      (pp_pattern state pat1) (pp_pattern state pat2) (pp_term state t)
+  let pp_effect_abs2 (((_, (ty1, _)) as eff), (pat1, pat2, t)) ppf =
+    print ppf "@[<hv 2>| %t -> fun (%t : %t) %t -> %t @]" (pp_effect eff)
+      (pp_pattern state pat1) (pp_type ty1) (pp_pattern state pat2)
+      (pp_term state t)
   in
   print ppf
     "@[<h>(fun (type a) (type b) (eff : (a, b) eff_internal_effect) : (a -> (b \
