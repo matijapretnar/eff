@@ -713,29 +713,6 @@ and tcLetRecNoGen state defs (c2 : Untyped.computation) : tcCompOutput' =
 (* Typecheck a case expression *)
 and tcMatch state (scr : Untyped.expression) (alts : Untyped.abstraction list) :
     tcCompOutput' =
-  if List.length alts > 0 then tcNonEmptyMatch state scr alts
-  else tcEmptyMatch state scr
-
-and infer_cases state drty (cases : Untyped.abstraction list) =
-  let ty = Type.fresh_ty_with_fresh_skel () in
-  let infer_case state case (cases', cnstrs) =
-    let case', cnstrs' = infer_abstraction state case in
-    let ty_in, _ = case'.ty
-    and case'', cnstrs'' = Constraint.cast_abstraction case' drty in
-    ( case'' :: cases',
-      Constraint.add_ty_equality (ty, ty_in)
-        (Constraint.list_union [ cnstrs''; cnstrs'; cnstrs ]) )
-  in
-  let cases', cnstrs =
-    List.fold_right (infer_case state) cases ([], Constraint.empty)
-  in
-  (cases', ty, cnstrs)
-
-(* Typecheck a non-empty case expression *)
-and tcNonEmptyMatch state (scr : Untyped.expression) alts : tcCompOutput' =
-  (* 0: Make sure that we have at least one alternative *)
-  assert (List.length alts > 0);
-
   (* 1: Generate fresh variables for the result *)
   let dirtyOut = Type.fresh_dirty_with_fresh_skel () in
 
@@ -754,18 +731,20 @@ and tcNonEmptyMatch state (scr : Untyped.expression) alts : tcCompOutput' =
   let outCs = Constraint.list_union [ omegaCtScr; cs1; cs2 ] in
   ((outExpr, dirtyOut), outCs)
 
-(* Typecheck an empty case expression *)
-and tcEmptyMatch state (scr : Untyped.expression) : tcCompOutput' =
-  (* 1: Generate fresh variables for the result *)
-  let dirtyOut = Type.fresh_dirty_with_fresh_skel () in
-
-  (* 2: Typecheck the scrutinee *)
-  let trgScr, cs1 = tcExpr state scr in
-
-  (* 3: Combine the results *)
-  let outExpr = Term.Match (trgScr, []) in
-  let outCs = cs1 in
-  ((outExpr, dirtyOut), outCs)
+and infer_cases state drty (cases : Untyped.abstraction list) =
+  let ty = Type.fresh_ty_with_fresh_skel () in
+  let infer_case state case (cases', cnstrs) =
+    let case', cnstrs' = infer_abstraction state case in
+    let ty_in, _ = case'.ty
+    and case'', cnstrs'' = Constraint.cast_abstraction case' drty in
+    ( case'' :: cases',
+      Constraint.add_ty_equality (ty, ty_in)
+        (Constraint.list_union [ cnstrs''; cnstrs'; cnstrs ]) )
+  in
+  let cases', cnstrs =
+    List.fold_right (infer_case state) cases ([], Constraint.empty)
+  in
+  (cases', ty, cnstrs)
 
 (* Typecheck a function application *)
 and tcApply state (val1 : Untyped.expression) (val2 : Untyped.expression) :
