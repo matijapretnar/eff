@@ -84,13 +84,12 @@ let initial_state : state =
   }
 
 (* Typecheck a list of things *)
-let rec infer_many infer (xss : 'a list) =
-  match xss with
-  | [] -> ([], [])
-  | x :: xs ->
-      let y, cs1 = infer x in
-      let ys, cs2 = infer_many infer xs in
-      (y :: ys, cs1 :: cs2)
+let infer_many infer xs =
+  List.fold_right
+    (fun x (xs', css) ->
+      let x', cs = infer x in
+      (x' :: xs', cs :: css))
+    xs ([], [])
 
 (* ************************************************************************* *)
 (*                            PATTERN TYPING                                 *)
