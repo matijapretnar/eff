@@ -364,8 +364,8 @@ and infer_computation state cmp =
 (* Dispatch: Type inference for a plan computation *)
 and infer_computation' ~loc state = function
   | Untyped.Value exp ->
-      let outExpr, outCs = infer_expression state exp in
-      (Term.value outExpr, [ outCs ])
+      let exp', outCs = infer_expression state exp in
+      (Term.value exp', [ outCs ])
   (* Nest a list of let-bindings *)
   | Let ([], c2) ->
       let c, cnstrs = infer_computation state c2 in
@@ -388,37 +388,23 @@ and infer_computation' ~loc state = function
           (fun state (x, abs) -> extend_var x (Type.arrow abs.ty) state)
           state (Assoc.to_list defs')
       in
-      (* 3: Typecheck c2 *)
       let trgC2, cs2 = infer_computation state' c2 in
-
-      (* 5: Combine the results *)
-      let outExpr = Term.letRec (defs', trgC2) in
-
-      (outExpr, [ cs1; cs2 ])
-  | Match (scr, alts) ->
-      (* 1: Generate fresh variables for the result *)
-      let dirtyOut = Type.fresh_dirty_with_fresh_skel () in
-
-      let patTy = Type.fresh_ty_with_fresh_skel () in
+      (Term.letRec (defs', trgC2), [ cs1; cs2 ])
+  | Match (exp, cases) ->
+      let ty_in = Type.fresh_ty_with_fresh_skel ()
+      and dirty_out = Type.fresh_dirty_with_fresh_skel () in
       let infer_case case =
-        let case', cnstrs' = infer_abstraction state case in
-        let ty_in, _ = case'.ty
-        and case'', cnstrs'' = Constraint.cast_abstraction case' dirtyOut in
+        let case', cnstrs = infer_abstraction state case in
+        let ty_in', _ = case'.ty
+        and case'', cnstrs' = Constraint.cast_abstraction case' dirty_out in
         ( case'',
-          Constraint.add_ty_equality (patTy, ty_in)
-            (Constraint.list_union [ cnstrs''; cnstrs' ]) )
+          Constraint.add_ty_equality (ty_in, ty_in')
+            (Constraint.list_union [ cnstrs; cnstrs' ]) )
       in
-      (* 2: Infer a type for the patterns *)
-      let cases, cs2 = infer_many infer_case alts in
-
-      (* 4: Typecheck the scrutinee and the alternatives *)
-      let trgScr, cs1 = infer_expression state scr in
-
-      (* 5: Generate the coercion for casting the scrutinee *)
-      (* NOTE: The others should be already included in 'altRes' *)
-      let matchExp, omegaCtScr = Constraint.cast_expression trgScr patTy in
-
-      (Term.match_ (matchExp, cases) dirtyOut, [ omegaCtScr; cs1 ] @ cs2)
+      let cases', cs_cases = infer_many infer_case cases in
+      let exp', cs_exp = infer_expression state exp in
+      let exp'', cs_cast = Constraint.cast_expression exp' ty_in in
+      (Term.match_ (exp'', cases') dirty_out, [ cs_cast; cs_exp ] @ cs_cases)
   | Apply (expr1, expr2) ->
       let expr1', cs1 = infer_expression state expr1 in
       let expr2', cs2 = infer_expression state expr2 in
@@ -426,8 +412,7 @@ and infer_computation' ~loc state = function
       let castexpr1, omegaCt =
         Constraint.cast_expression expr1' (Type.arrow (expr2'.ty, outType))
       in
-      let outExpr = Term.apply (castexpr1, expr2') in
-      (outExpr, [ omegaCt; cs1; cs2 ])
+      (Term.apply (castexpr1, expr2'), [ omegaCt; cs1; cs2 ])
   | Handle (hand, cmp) ->
       let hand', cs1 = infer_expression state hand in
       let cmp', cs2 = infer_computation state cmp in
@@ -435,8 +420,7 @@ and infer_computation' ~loc state = function
       let castHand, omegaCt1 =
         Constraint.cast_expression hand' (Type.handler (cmp'.ty, out_ty))
       in
-      let outExpr = Term.handle (castHand, cmp') in
-      (outExpr, [ omegaCt1; cs1; cs2 ])
+      (Term.handle (castHand, cmp'), [ omegaCt1; cs1; cs2 ])
   | Check cmp ->
       let cmp', cnstrs = infer_computation state cmp in
       (Term.check (loc, cmp'), [ cnstrs ])
