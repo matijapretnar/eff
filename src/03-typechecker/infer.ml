@@ -64,7 +64,7 @@ let fresh_instantiation (params : Type.Params.t) (constraints : Constraints.t) =
 
 type state = {
   variables : TyScheme.t Term.Variable.Map.t;
-  effects : (Type.ty * Type.ty) Effect.Map.t;
+  effects : Term.effect Effect.Map.t;
   type_definitions : TypeDefinitionContext.state;
 }
 
@@ -224,8 +224,9 @@ and infer_expression' state = function
       let abs', cnstrs = infer_abstraction state abs in
       (Term.lambda abs', [ cnstrs ])
   | Untyped.Effect eff ->
-      let in_ty, out_ty = Effect.Map.find eff state.effects
-      and s = Effect.Set.singleton eff in
+      let eff' = Effect.Map.find eff state.effects in
+      let in_ty, out_ty = eff'.ty in
+      let s = Effect.Set.singleton eff in
       let out_drty = (out_ty, Dirt.closed s) in
       let x_pat, x_var = Term.fresh_variable "x" in_ty
       and y_pat, y_var = Term.fresh_variable "y" out_ty in
@@ -235,10 +236,7 @@ and infer_expression' state = function
       let outVal =
         Term.lambda
           (Term.abstraction
-             ( x_pat,
-               Term.call
-                 ((eff, (in_ty, out_ty)), x_var, Term.abstraction (y_pat, ret))
-             ))
+             (x_pat, Term.call (eff', x_var, Term.abstraction (y_pat, ret))))
       in
       (outVal, [ cnstrs ])
   | Untyped.Handler hand -> infer_handler state hand
@@ -249,7 +247,8 @@ and infer_effect_clause state (dirtyOut : Type.dirty)
       (* Op clause *)
       (* Expected output type *) =
   (* 1: Lookup the type of Opi *)
-  let tyAi, tyBi = Effect.Map.find eff state.effects in
+  let eff' = Effect.Map.find eff state.effects in
+  let tyAi, tyBi = eff'.ty in
 
   (* 2: Generate fresh variables for the type of the codomain of the continuation *)
   let dirtyi = Type.fresh_dirty_with_fresh_skel () in
@@ -292,8 +291,7 @@ and infer_effect_clause state (dirtyOut : Type.dirty)
   let castExp, omegaCt5i = Constraint.cast_expression l_var rightty in
   let lsub = Term.subst_comp (Assoc.of_list [ (k, castExp) ]) in
   let outExpr =
-    ( ((eff, (tyAi, tyBi)) : Term.effect) (* Opi *),
-      Term.abstraction2 (xop, l_pat, Term.castComp (lsub trgCop, omega34i)) )
+    (eff', Term.abstraction2 (xop, l_pat, Term.castComp (lsub trgCop, omega34i)))
   in
 
   (* 7: Combine the results *)
@@ -471,10 +469,6 @@ and infer_abstraction2 state (pat1, pat2, cmp) :
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
-let process_def_effect eff (ty1, ty2) state =
-  ( { state with effects = Effect.Map.add eff (ty1, ty2) state.effects },
-    (ty1, ty2) )
-
 let process_computation state comp =
   let comp', cnstrs = infer_computation state comp in
   let sub, residuals = Unification.solve ~loc:comp.at cnstrs in
@@ -569,10 +563,14 @@ let add_type_definitions state type_definitions =
         state.type_definitions;
   }
 
+let process_def_effect eff eff_sig state =
+  let eff' = { term = eff; ty = eff_sig } in
+  ({ state with effects = Effect.Map.add eff eff' state.effects }, eff')
+
 let load_primitive_effect state eff prim =
-  let ty1, ty2 = TypeCheckerPrimitives.primitive_effect_signature prim in
-  ( { state with effects = Effect.Map.add eff (ty1, ty2) state.effects },
-    (ty1, ty2) )
+  process_def_effect eff
+    (TypeCheckerPrimitives.primitive_effect_signature prim)
+    state
 
 let load_primitive_value state x prim =
   let ty = TypeCheckerPrimitives.primitive_value_type_scheme prim in

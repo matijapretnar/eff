@@ -28,19 +28,19 @@ module Make (Backend : Language.Backend.S) = struct
   }
 
   let add_primitive_effect state prim =
-    let x =
+    let eff =
       Language.Term.Variable.fresh (Primitives.primitive_effect_name prim)
     in
-    let type_system_state', (ty1, ty2) =
-      TypeSystem.load_primitive_effect state.type_system_state x prim
+    let type_system_state', eff' =
+      TypeSystem.load_primitive_effect state.type_system_state eff prim
     in
     {
       state with
       desugarer_state =
-        Desugarer.load_primitive_effect state.desugarer_state x prim;
+        Desugarer.load_primitive_effect state.desugarer_state eff prim;
       type_system_state = type_system_state';
       backend_state =
-        Backend.load_primitive_effect state.backend_state (x, (ty1, ty2)) prim;
+        Backend.load_primitive_effect state.backend_state eff' prim;
     }
 
   let add_primitive_value state prim =
@@ -124,11 +124,11 @@ module Make (Backend : Language.Backend.S) = struct
         let desugarer_state', (eff, (ty1, ty2)) =
           Desugarer.desugar_def_effect ~loc state.desugarer_state effect_def
         in
-        let type_system_state', (ty1', ty2') =
+        let type_system_state', eff' =
           TypeSystem.process_def_effect eff (ty1, ty2) state.type_system_state
         in
         let backend_state' =
-          Backend.process_def_effect state.backend_state (eff, (ty1', ty2'))
+          Backend.process_def_effect state.backend_state eff'
         in
         {
           state with

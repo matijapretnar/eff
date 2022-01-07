@@ -2072,7 +2072,7 @@
   
   let rec _op (* @ *) _tycoer _tycoer _x =
     Value
-      (fun (_ys : 'ty30 list) ->
+      (fun (_ys : 'ty31 list) ->
         match _x with
         | [] -> coer_return (coer_list _tycoer) _ys
         | _x :: _xs ->
@@ -2135,7 +2135,7 @@
                               (coer_computation _tycoer (_fail ())))
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
-      (fun (_x : string list -> 'ty73 computation) ->
+      (fun (_x : string list -> 'ty74 computation) ->
         coer_return
           (coer_arrow coer_refl_ty (coer_computation _tycoer))
           (coer_arrow coer_refl_ty (coer_computation _tycoer) _x))

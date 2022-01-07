@@ -26,14 +26,14 @@ module Backend : Language.Backend.S = struct
   let load_primitive_value state x prim =
     update state (RawSource (x, Primitives.primitive_source prim))
 
-  let load_primitive_effect state (eff, _) prim =
+  let load_primitive_effect state eff prim =
     let x, k, c = Primitives.top_level_handler_source prim in
-    let ty1, ty2 = Typechecker.Primitives.primitive_effect_signature prim in
+    let ty1, ty2 = eff.ty in
     let ty1', ty2' = (Translate.of_type ty1, Translate.of_type ty2) in
     {
       state with
       primitive_effects =
-        (eff, (ty1', ty2'), (x, k, c)) :: state.primitive_effects;
+        (eff.term, (ty1', ty2'), (x, k, c)) :: state.primitive_effects;
     }
 
   let process_computation state (_, c, _) =
@@ -45,10 +45,11 @@ module Backend : Language.Backend.S = struct
       "[#typeof] commands are ignored when compiling to Multicore OCaml.";
     state
 
-  let process_def_effect state (eff, (ty1, ty2)) =
+  let process_def_effect state eff =
+    let ty1, ty2 = eff.ty in
     let ty1' = Translate.of_type ty1 in
     let ty2' = Translate.of_type ty2 in
-    update state (DefEffect (eff, (ty1', ty2')))
+    update state (DefEffect (eff.term, (ty1', ty2')))
 
   let process_top_let state defs =
     let converter (p, _, _, c) =

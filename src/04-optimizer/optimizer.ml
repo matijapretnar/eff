@@ -106,7 +106,7 @@ let recast_computation hnd comp =
       let handled_effs =
         Effect.Set.of_list
           (List.map
-             (fun ((eff, _), _) -> eff)
+             (fun (eff, _) -> eff.term)
              (Assoc.to_list hnd.term.Term.effect_clauses.effect_part))
       in
       if Effect.Set.disjoint effs handled_effs then
