@@ -650,15 +650,12 @@ let desugar_top_let ~loc state defs =
   (add_variables new_vars state, defs')
 
 let desugar_top_let_rec state defs =
-  let aux_desugar (x, t) (fold_state, ns) =
+  let aux_desugar (x, t) (vars, ns) =
     let n = fresh_var (Some x) in
-    ( {
-        state with
-        context = add_unique ~loc:t.at "Variable" x n fold_state.context;
-      },
-      n :: ns )
+    (add_unique ~loc:t.at "Variable" x n vars, n :: ns)
   in
-  let state', ns = List.fold_right aux_desugar defs (state, []) in
+  let vars, ns = List.fold_right aux_desugar defs (StringMap.empty, []) in
+  let state' = add_variables vars state in
   let desugar_defs (p, (_, c)) defs =
     let _, c = desugar_let_rec state' c in
     (p, c) :: defs
