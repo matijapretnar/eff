@@ -83,8 +83,7 @@ let skel_eq_step ~loc sub (paused : Constraints.t) rest_queue sk1 sk2 =
         rest_queue
         |> Constraint.add_skeleton_equality (ska, skc)
         |> Constraint.add_skeleton_equality (skb, skd) )
-  | Apply (ty_name1, sks1), Apply (ty_name2, sks2)
-    when ty_name1 = ty_name2 && List.length sks1 = List.length sks2 ->
+  | Apply (ty_name1, sks1), Apply (ty_name2, sks2) when ty_name1 = ty_name2 ->
       ( sub,
         paused,
         List.fold_right2
@@ -102,31 +101,19 @@ let skel_eq_step ~loc sub (paused : Constraints.t) rest_queue sk1 sk2 =
         "This expression has type %t but it should have type %t." (printer sk1)
         (printer sk2)
 
-and ty_eq_step ~loc sub (paused : Constraints.t) rest_queue (ty1 : Type.ty)
+and ty_eq_step sub (paused : Constraints.t) rest_queue (ty1 : Type.ty)
     (ty2 : Type.ty) =
   match (ty1.term, ty2.term) with
-  | _, _ when ty1.ty <> ty2.ty ->
-      ( sub,
-        paused,
-        rest_queue
-        |> Constraint.add_ty_equality (ty1, ty2)
-        |> Constraint.add_skeleton_equality (ty1.ty, ty2.ty) )
   (* ς = ς *)
   | TyParam p1, TyParam p2 when p1 = p2 -> (sub, paused, rest_queue)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
-  | TyParam p1, _ when not (TyParam.Map.mem p1 (free_params_ty ty2).ty_params)
-    ->
+  (* There is no need for occurs-check because skeletons of both sides are equal *)
+  | TyParam p1, _ ->
       let sub1 = Substitution.add_type_substitution_e p1 ty2 in
       apply_substitution sub1 sub paused rest_queue
-  | _, TyParam p2 when not (TyParam.Map.mem p2 (free_params_ty ty1).ty_params)
-    ->
+  | _, TyParam p2 ->
       let sub1 = Substitution.add_type_substitution_e p2 ty1 in
       apply_substitution sub1 sub paused rest_queue
-      (* occurs-check failing *)
-  | TyParam _, _ | _, TyParam _ ->
-      let printer = Type.print_pretty Skeleton.Param.Set.empty in
-      Error.typing ~loc "This expression has a forbidden cyclic type %t = %t."
-        (printer ty1.ty) (printer ty2.ty)
       (* int = int *)
   | TyBasic ps1, TyBasic ps2 when ps1 = ps2 -> (sub, paused, rest_queue)
   (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
@@ -148,26 +135,21 @@ and ty_eq_step ~loc sub (paused : Constraints.t) rest_queue (ty1 : Type.ty)
         |> Constraint.add_dirt_equality (drtb, drtd) )
   | ( Apply { ty_name = ty_name1; ty_args = tys1 },
       Apply { ty_name = ty_name2; ty_args = tys2 } )
-    when ty_name1 = ty_name2 && List.length tys1 = List.length tys2 ->
+    when ty_name1 = ty_name2 ->
       ( sub,
         paused,
         List.fold_right2
           (fun ty1 ty2 -> Constraint.add_ty_equality (ty1, ty2))
           tys1 tys2 rest_queue )
-  | Tuple tys1, Tuple tys2 when List.length tys1 = List.length tys2 ->
+  | Tuple tys1, Tuple tys2 ->
       ( sub,
         paused,
         List.fold_right2
           (fun ty1 ty2 -> Constraint.add_ty_equality (ty1, ty2))
           tys1 tys2 rest_queue )
-  | _ ->
-      let printer = Type.print_pretty Skeleton.Param.Set.empty in
-      Error.typing ~loc
-        "This expression has type %t but it should have type %t."
-        (printer ty1.ty) (printer ty2.ty)
+  | _ -> assert false
 
-and ty_omega_step ~loc sub (paused : Constraints.t) cons rest_queue omega =
-  function
+and ty_omega_step sub (paused : Constraints.t) cons rest_queue omega = function
   (* ω : A <= A *)
   | ty1, ty2 when Type.equal_ty ty1 ty2 ->
       let k = omega in
@@ -188,8 +170,7 @@ and ty_omega_step ~loc sub (paused : Constraints.t) cons rest_queue omega =
         paused,
         Constraint.list_union [ ty_cons; rest_queue; dirty_cnstrs ] )
   (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
-  | { term = Type.Tuple tys; _ }, { term = Type.Tuple tys'; _ }
-    when List.length tys = List.length tys' ->
+  | { term = Type.Tuple tys; _ }, { term = Type.Tuple tys'; _ } ->
       let coercions, conss =
         List.fold_right2
           (fun ty ty' (coercions, conss) ->
@@ -206,7 +187,7 @@ and ty_omega_step ~loc sub (paused : Constraints.t) cons rest_queue omega =
   (* we assume that all type parameters are positive *)
   | ( { term = Type.Apply { ty_name = ty_name1; ty_args = tys1 }; _ },
       { term = Type.Apply { ty_name = ty_name2; ty_args = tys2 }; _ } )
-    when ty_name1 = ty_name2 && List.length tys1 = List.length tys2 ->
+    when ty_name1 = ty_name2 ->
       let coercions, conss =
         List.fold_right2
           (fun ty ty' (coercions, conss) ->
@@ -251,15 +232,6 @@ and ty_omega_step ~loc sub (paused : Constraints.t) cons rest_queue omega =
               sub,
             paused,
             rest_queue ))
-  | { term = Type.TyParam _; ty = Skeleton.Param _ as skel_tv }, a
-  | a, { term = Type.TyParam _; ty = Skeleton.Param _ as skel_tv } ->
-      (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
-      let skel_a = Type.skeleton_of_ty a in
-      ( sub,
-        paused,
-        rest_queue
-        |> Constraint.add_skeleton_equality (skel_tv, skel_a)
-        |> Constraint.union cons )
   | { term = Type.TyParam tv; ty = skel }, _
   | _, { term = Type.TyParam tv; ty = skel } ->
       let ty = fresh_ty_with_skel skel in
@@ -267,13 +239,9 @@ and ty_omega_step ~loc sub (paused : Constraints.t) cons rest_queue omega =
         (Substitution.add_type_substitution_e tv ty)
         sub paused
         (Constraint.union cons rest_queue)
-  | ty1, ty2 ->
-      let printer = Type.print_pretty Skeleton.Param.Set.empty in
-      Error.typing ~loc
-        "This expression has type %t but it should have type %t."
-        (printer ty1.ty) (printer ty2.ty)
+  | _ -> assert false
 
-and dirt_omega_step sub resolved unresolved w dcons =
+and dirt_omega_step ~loc sub resolved unresolved w dcons =
   match dcons with
   (* ω : δ₁ <= O₂ ∪ δ₂ *)
   | ( ({ Dirt.effect_set = ops1; row = Dirt.Row.Param d1 } as ty1),
@@ -331,7 +299,9 @@ and dirt_omega_step sub resolved unresolved w dcons =
   (* ω : O₁ <= O₂ *)
   | ( { effect_set = ops1; row = Dirt.Row.Empty },
       { effect_set = ops2; row = Dirt.Row.Empty } ) ->
-      assert (Effect.Set.subset ops1 ops2);
+      if not (Effect.Set.subset ops1 ops2) then
+        Error.typing ~loc "Effects %t are not a subset of %t"
+          (Effect.Set.print ops1) (Effect.Set.print ops2);
       let sub' =
         Substitution.add_dirt_var_coercion w
           (Coercion.unionDirt
@@ -401,18 +371,23 @@ let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
       dirt_eq_step ~loc sub paused { queue with dirt_equalities } drt1 drt2
       |> unify ~loc
   | { dirt_inequalities = (omega, dcons) :: dirt_inequalities; _ } ->
-      dirt_omega_step sub paused { queue with dirt_inequalities } omega dcons
+      dirt_omega_step ~loc sub paused
+        { queue with dirt_inequalities }
+        omega dcons
       |> unify ~loc
+  | { ty_equalities = (ty1, ty2) :: _; _ }
+    when not (Skeleton.equal ty1.ty ty2.ty) ->
+      skel_eq_step ~loc sub paused queue ty1.ty ty2.ty |> unify ~loc
   | { ty_equalities = (ty1, ty2) :: ty_equalities; _ } ->
-      ty_eq_step ~loc sub paused { queue with ty_equalities } ty1 ty2
-      |> unify ~loc
+      ty_eq_step sub paused { queue with ty_equalities } ty1 ty2 |> unify ~loc
+  | { ty_inequalities = (_, (ty1, ty2)) :: _; _ }
+    when not (Skeleton.equal ty1.ty ty2.ty) ->
+      skel_eq_step ~loc sub paused queue ty1.ty ty2.ty |> unify ~loc
   | { ty_inequalities = (omega, tycons) :: ty_inequalities; _ } ->
       let cons =
         Constraint.add_ty_inequality (omega, tycons) Constraint.empty
       in
-      ty_omega_step ~loc sub paused cons
-        { queue with ty_inequalities }
-        omega tycons
+      ty_omega_step sub paused cons { queue with ty_inequalities } omega tycons
       |> unify ~loc
   | {
    skeleton_equalities = [];
