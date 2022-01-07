@@ -52,8 +52,8 @@
   ======================================================================
   invalid/malformed_type_application.eff
   ----------------------------------------------------------------------
-  Typing error (file "invalid/malformed_type_application.eff", line 3, char 1):
-  The type constructor foo expects 1 arguments
+  Syntax error (file "invalid/malformed_type_application.eff", line 3, char 12):
+  Type foo expects 1 arguments
   ======================================================================
   invalid/non_linear_pattern.eff
   ----------------------------------------------------------------------

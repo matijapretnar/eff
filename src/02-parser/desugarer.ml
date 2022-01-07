@@ -104,16 +104,14 @@ let desugar_type type_sbst state =
   let rec desugar_type state { it = t; at = loc } =
     match t with
     | Sugared.TyApply (t, tys) -> (
+        let t', n = tyname_to_symbol ~loc state t in
+        if List.length tys <> n then
+          Error.syntax ~loc "Type %t expects %d arguments" (TyName.print t') n;
         match StringMap.find_opt t state.inlined_types with
         | Some ty -> (state, ty)
         | None ->
-            let t', n = tyname_to_symbol ~loc state t in
-            if List.length tys <> n then
-              Error.syntax ~loc "Type %t expects %d arguments" (TyName.print t')
-                n
-            else
-              let state', tys' = List.fold_map desugar_type state tys in
-              (state', T.apply (t', tys')))
+            let state', tys' = List.fold_map desugar_type state tys in
+            (state', T.apply (t', tys')))
     | Sugared.TyParam t -> (
         match StringMap.find_opt t type_sbst with
         | None -> Error.syntax ~loc "Unbound type parameter '%s" t
