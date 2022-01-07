@@ -96,24 +96,21 @@ let rec infer_many infer (xss : 'a list) =
 (* ************************************************************************* *)
 
 let rec infer_pattern state pat =
-  let pat', ty, vars, cnstrs = infer_pattern' ~loc:pat.at state pat.it in
-  ({ term = pat'; ty }, vars, cnstrs)
+  let pat', vars, cnstrs = infer_pattern' ~loc:pat.at state pat.it in
+  (pat', vars, cnstrs)
 
 and infer_pattern' ~loc state = function
   | Untyped.PVar x ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
-      (Term.PVar x, alpha, Term.Variable.Map.singleton x alpha, Constraint.empty)
+      (Term.pVar x alpha, Term.Variable.Map.singleton x alpha, Constraint.empty)
   | Untyped.PAnnotated (p, ty) ->
       let p', vars, cnstrs = infer_pattern state p in
-      (p'.term, ty, vars, Constraint.add_ty_equality (ty, p'.ty) cnstrs)
+      ({ p' with ty }, vars, Constraint.add_ty_equality (ty, p'.ty) cnstrs)
   | Untyped.PNonbinding ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
-      (Term.PNonbinding, alpha, Term.Variable.Map.empty, Constraint.empty)
+      (Term.pNonbinding alpha, Term.Variable.Map.empty, Constraint.empty)
   | Untyped.PConst c ->
-      ( Term.PConst c,
-        Type.type_const c,
-        Term.Variable.Map.empty,
-        Constraint.empty )
+      (Term.pConst c, Term.Variable.Map.empty, Constraint.empty)
   | Untyped.PTuple ps ->
       let fold p (ps', vars, cnstrs) =
         let p', vars', cnstrs' = infer_pattern state p in
@@ -125,26 +122,24 @@ and infer_pattern' ~loc state = function
         List.fold_right fold ps ([], Term.Variable.Map.empty, Constraint.empty)
       in
       let p = Term.pTuple ps' in
-      (p.term, p.ty, vars, cnstrs)
+      (p, vars, cnstrs)
   | Untyped.PVariant (lbl, p) -> (
       match
         (p, TypeDefinitionContext.infer_variant lbl state.type_definitions)
       with
       | None, (None, out_ty) ->
-          ( Term.PVariant (lbl, None),
-            out_ty,
+          ( Term.pVariant (lbl, None) out_ty,
             Term.Variable.Map.empty,
             Constraint.empty )
       | Some p, (Some in_ty, out_ty) ->
           let p', vars, cnstrs = infer_pattern state p in
-          ( Term.PVariant (lbl, Some p'),
-            out_ty,
+          ( Term.pVariant (lbl, Some p') out_ty,
             vars,
             Constraint.add_ty_equality (in_ty, p'.ty) cnstrs )
       | _ -> assert false)
   | Untyped.PAs (p, x) ->
       let p', vars, cnstrs = infer_pattern state p in
-      (Term.PAs (p', x), p'.ty, Term.Variable.Map.add x p'.ty vars, cnstrs)
+      (Term.pAs (p', x), Term.Variable.Map.add x p'.ty vars, cnstrs)
   | Untyped.PRecord flds ->
       let hd_fld, _ = List.hd (Type.Field.Map.bindings flds) in
       let out_ty, (ty_name, fld_tys) =
@@ -168,7 +163,7 @@ and infer_pattern' ~loc state = function
         Language.TyName.Map.fold fold flds
           ([], Term.Variable.Map.empty, Constraint.empty)
       in
-      (Term.PRecord (Type.Field.Map.of_bindings flds'), out_ty, vars, cnstrs')
+      (Term.pRecord out_ty (Type.Field.Map.of_bindings flds'), vars, cnstrs')
 
 let extend_state vars state =
   Term.Variable.Map.fold (fun x ty state -> extend_var state x ty) vars state

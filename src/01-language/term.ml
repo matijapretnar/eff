@@ -27,8 +27,20 @@ and pattern' =
 
 let pVar p ty = { term = PVar p; ty }
 
+let pAs (p, x) = { term = PAs (p, x); ty = p.ty }
+
+let pNonbinding ty = { term = PNonbinding; ty }
+
+let pConst c = { term = PConst c; ty = Type.type_const c }
+
 let pTuple ps =
   { term = PTuple ps; ty = Type.tuple (List.map (fun x -> x.ty) ps) }
+
+let pVariant (lbl, pat) ty = { term = PVariant (lbl, pat); ty }
+
+let pRecord ty flds =
+  (* Ideally, we could reconstruct ty from the field names *)
+  { term = PRecord flds; ty }
 
 let rec pattern_vars pat =
   match pat.term with
