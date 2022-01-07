@@ -85,11 +85,11 @@ let initial_state : state =
 (* Typecheck a list of things *)
 let rec infer_many infer (xss : 'a list) =
   match xss with
-  | [] -> ([], Constraint.empty)
+  | [] -> ([], [])
   | x :: xs ->
       let y, cs1 = infer x in
       let ys, cs2 = infer_many infer xs in
-      (y :: ys, Constraint.union cs1 cs2)
+      (y :: ys, cs1 :: cs2)
 
 (* ************************************************************************* *)
 (*                            PATTERN TYPING                                 *)
@@ -178,7 +178,7 @@ let rec infer_expression state exp =
      (Untyped.print_expression exp)
      (Term.print_expression exp')
      (Type.print_ty exp'.ty) (Constraint.print cnstrs); *)
-  (exp', cnstrs)
+  (exp', Constraint.list_union cnstrs)
 
 and infer_expression' state = function
   | Untyped.Var x ->
@@ -186,12 +186,12 @@ and infer_expression' state = function
       let subst, cnstrs =
         fresh_instantiation ty_scheme.TyScheme.params ty_scheme.constraints
       in
-      (Term.poly_var x subst ty_scheme.ty, cnstrs)
-  | Untyped.Const c -> (Term.const c, Constraint.empty)
+      (Term.poly_var x subst ty_scheme.ty, [ cnstrs ])
+  | Untyped.Const c -> (Term.const c, [])
   | Untyped.Annotated (e, ty) ->
       let e', cnstrs = infer_expression state e in
       let e'', castCt = Constraint.cast_expression e' ty in
-      (e'', Constraint.union castCt cnstrs)
+      (e'', [ castCt; cnstrs ])
   | Untyped.Tuple es ->
       let es, cs = infer_many (infer_expression state) es in
       (Term.tuple es, cs)
@@ -209,27 +209,23 @@ and infer_expression' state = function
               (Language.TyName.print ty_name)
         | Some fld_ty ->
             let e'', cons = Constraint.cast_expression e' fld_ty in
-            ( (fld, e'') :: flds',
-              Constraint.list_union [ cons; cnstrs'; cnstrs ] )
+            ((fld, e'') :: flds', cons :: cnstrs' :: cnstrs)
       in
-      let flds', cnstrs' =
-        Type.Field.Map.fold fold flds ([], Constraint.empty)
-      in
+      let flds', cnstrs' = Type.Field.Map.fold fold flds ([], []) in
       (Term.record out_ty (Type.Field.Map.of_bindings flds'), cnstrs')
   | Untyped.Variant (lbl, mbe) -> (
       match
         (TypeDefinitionContext.infer_variant lbl state.type_definitions, mbe)
       with
-      | (None, ty_out), None ->
-          (Term.variant (lbl, None) ty_out, Constraint.empty)
+      | (None, ty_out), None -> (Term.variant (lbl, None) ty_out, [])
       | (Some ty_in, ty_out), Some e ->
           let e', cs1 = infer_expression state e in
           let castExp, castCt = Constraint.cast_expression e' ty_in in
-          (Term.variant (lbl, Some castExp) ty_out, Constraint.union castCt cs1)
+          (Term.variant (lbl, Some castExp) ty_out, [ castCt; cs1 ])
       | _, _ -> assert false)
   | Untyped.Lambda abs ->
       let abs', cnstrs = infer_abstraction state abs in
-      (Term.lambda abs', cnstrs)
+      (Term.lambda abs', [ cnstrs ])
   | Untyped.Effect eff ->
       let in_ty, out_ty = Effect.Map.find eff state.effects
       and s = Effect.Set.singleton eff in
@@ -247,7 +243,7 @@ and infer_expression' state = function
                  ((eff, (in_ty, out_ty)), x_var, Term.abstraction (y_pat, ret))
              ))
       in
-      (outVal, cnstrs)
+      (outVal, [ cnstrs ])
   | Untyped.Handler hand -> infer_handler state hand
 
 (* Handlers(Op Case) *)
@@ -349,14 +345,13 @@ and infer_handler state { Untyped.value_clause; effect_clauses; finally_clause }
       finally_clause''
   in
   ( handler,
-    Constraint.list_union
-      [
-        value_clause_cnstrs;
-        effect_clauses_cnstrs;
-        finally_clause_cnstrs;
-        value_clause_cast_cnstrs;
-        finally_clause_cast_cnstrs;
-      ] )
+    [
+      value_clause_cnstrs;
+      finally_clause_cnstrs;
+      value_clause_cast_cnstrs;
+      finally_clause_cast_cnstrs;
+    ]
+    @ effect_clauses_cnstrs )
 
 (* ************************************************************************* *)
 (*                          COMPUTATION TYPING                               *)
@@ -367,17 +362,17 @@ and infer_computation state cmp =
      (Untyped.print_computation c)
      (Term.print_computation cmp')
      (Type.print_dirty cmp'.ty) (Constraint.print cnstrs); *)
-  (cmp', cnstrs)
+  (cmp', Constraint.list_union cnstrs)
 
 (* Dispatch: Type inference for a plan computation *)
 and infer_computation' ~loc state = function
   | Untyped.Value exp ->
       let outExpr, outCs = infer_expression state exp in
-      (Term.value outExpr, outCs)
+      (Term.value outExpr, [ outCs ])
   (* Nest a list of let-bindings *)
   | Let ([], c2) ->
       let c, cnstrs = infer_computation state c2 in
-      (c, cnstrs)
+      (c, [ cnstrs ])
   | Let ([ (pdef, c1) ], c2) ->
       let trgC1, cs1 = infer_computation state c1 in
       let trgC2, cs2 = infer_abstraction state (pdef, c2) in
@@ -385,8 +380,7 @@ and infer_computation' ~loc state = function
       let delta = Dirt.fresh () in
       let cresC1, omegaCt1 = Constraint.cast_computation trgC1 (ty1', delta) in
       let cresC2, omegaCt2 = Constraint.cast_abstraction trgC2 (ty2, delta) in
-      let outCs = Constraint.list_union [ omegaCt1; omegaCt2; cs1; cs2 ] in
-      (Term.bind (cresC1, cresC2), outCs)
+      (Term.bind (cresC1, cresC2), [ omegaCt1; omegaCt2; cs1; cs2 ])
   | Let ((pat, c1) :: rest, c2) ->
       let subCmp = { it = Untyped.Let (rest, c2); at = c2.at } in
       infer_computation' ~loc state (Untyped.Let ([ (pat, c1) ], subCmp))
@@ -403,8 +397,7 @@ and infer_computation' ~loc state = function
       (* 5: Combine the results *)
       let outExpr = Term.letRec (defs', trgC2) in
 
-      let outCs = Constraint.union cs1 cs2 in
-      (outExpr, outCs)
+      (outExpr, [ cs1; cs2 ])
   | Match (scr, alts) ->
       (* 1: Generate fresh variables for the result *)
       let dirtyOut = Type.fresh_dirty_with_fresh_skel () in
@@ -428,10 +421,7 @@ and infer_computation' ~loc state = function
       (* NOTE: The others should be already included in 'altRes' *)
       let matchExp, omegaCtScr = Constraint.cast_expression trgScr patTy in
 
-      (* 6: Combine the results *)
-      let outExpr = Term.match_ (matchExp, cases) dirtyOut in
-      let outCs = Constraint.list_union [ omegaCtScr; cs1; cs2 ] in
-      (outExpr, outCs)
+      (Term.match_ (matchExp, cases) dirtyOut, [ omegaCtScr; cs1 ] @ cs2)
   | Apply (expr1, expr2) ->
       let expr1', cs1 = infer_expression state expr1 in
       let expr2', cs2 = infer_expression state expr2 in
@@ -440,8 +430,7 @@ and infer_computation' ~loc state = function
         Constraint.cast_expression expr1' (Type.arrow (expr2'.ty, outType))
       in
       let outExpr = Term.apply (castexpr1, expr2') in
-      let outCs = Constraint.list_union [ omegaCt; cs1; cs2 ] in
-      (outExpr, outCs)
+      (outExpr, [ omegaCt; cs1; cs2 ])
   | Handle (hand, cmp) ->
       let hand', cs1 = infer_expression state hand in
       let cmp', cs2 = infer_computation state cmp in
@@ -450,11 +439,10 @@ and infer_computation' ~loc state = function
         Constraint.cast_expression hand' (Type.handler (cmp'.ty, out_ty))
       in
       let outExpr = Term.handle (castHand, cmp') in
-      let outCs = Constraint.list_union [ omegaCt1; cs1; cs2 ] in
-      (outExpr, outCs)
+      (outExpr, [ omegaCt1; cs1; cs2 ])
   | Check cmp ->
       let cmp', cnstrs = infer_computation state cmp in
-      (Term.check (loc, cmp'), cnstrs)
+      (Term.check (loc, cmp'), [ cnstrs ])
 
 (* Typecheck a (potentially) recursive let *)
 and infer_rec_definitions state defs =
