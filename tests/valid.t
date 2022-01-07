@@ -103,7 +103,7 @@
   ======================================================================
   valid/state.eff
   ----------------------------------------------------------------------
-  val state : 'a -> 'b => int -> 'b = <fun>
+  val state : 'a -> 'b => (int -> 'b) = <fun>
   val better_state : int -> 'a => 'a = <fun>
   val transaction : 'a => 'a = <handler>
   Check (file "valid/state.eff", line 25, char 28):

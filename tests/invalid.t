@@ -68,14 +68,14 @@
   invalid/occurs_check.eff
   ----------------------------------------------------------------------
   Typing error (file "invalid/occurs_check.eff", line 1, char 1):
-  This expression has a forbidden cyclic type '_a = '_b -> '_a.
+  This expression has a forbidden cyclic type '_a -> '_b = '_b.
   ======================================================================
   invalid/polymorphism_id_id.eff
   ----------------------------------------------------------------------
   val u : 'a -> 'a = <fun>
   val v : '_a -> '_a = <fun>
   Typing error (file "invalid/polymorphism_id_id.eff", line 3, char 1):
-  This expression has type string but it should have type int.
+  This expression has type int but it should have type string.
   ======================================================================
   invalid/shadow_eff.eff
   ----------------------------------------------------------------------
