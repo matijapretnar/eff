@@ -1,0 +1,5 @@
+type integer = int ;;
+
+effect Op : integer ;;
+
+let f y = let z = perform Op in z + y in f

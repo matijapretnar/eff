@@ -15,11 +15,13 @@ val desugar_computation :
   state -> SugaredSyntax.term -> state * UntypedSyntax.computation
 
 val desugar_def_effect :
+  loc:Location.t ->
   state ->
   SugaredSyntax.effect * (SugaredSyntax.ty * SugaredSyntax.ty) ->
-  state * (CoreTypes.Effect.t * (Type.ty * Type.ty))
+  state * (Effect.t * (Type.ty * Type.ty))
 
 val desugar_top_let :
+  loc:Location.t ->
   state ->
   (SugaredSyntax.pattern * SugaredSyntax.term) list ->
   state * (UntypedSyntax.pattern * UntypedSyntax.computation) list
@@ -27,9 +29,10 @@ val desugar_top_let :
 val desugar_top_let_rec :
   state ->
   (SugaredSyntax.variable * SugaredSyntax.term) list ->
-  state * (CoreTypes.Variable.t * UntypedSyntax.abstraction) list
+  state * (Term.Variable.t * UntypedSyntax.abstraction) list
 
 val desugar_tydefs :
+  loc:Utils.Location.t ->
   state ->
   (string, SugaredSyntax.typaram list * SugaredSyntax.tydef) Assoc.t ->
-  state * (CoreTypes.TyName.t, CoreTypes.TyParam.t list * Type.tydef) Assoc.t
+  state * (TyName.t, Type.type_data) Assoc.t

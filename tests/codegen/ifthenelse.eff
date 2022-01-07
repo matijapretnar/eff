@@ -1,0 +1,7 @@
+let rec _loop n =
+    if n = 0 then
+        0
+    else
+        _loop (n - 1)
+in ()
+

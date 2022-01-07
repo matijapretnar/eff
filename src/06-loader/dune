@@ -1,0 +1,11 @@
+(library
+ (name loader)
+ (libraries language typechecker optimizer parser))
+
+(rule
+ (with-stdout-to
+  stdlib_eff.ml
+  (progn
+   (echo "let source = {|")
+   (cat stdlib.eff)
+   (echo "|}"))))

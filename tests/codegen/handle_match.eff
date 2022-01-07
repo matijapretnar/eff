@@ -1,0 +1,24 @@
+type int_list = Nil | Cons of int * int_list
+
+;;
+let f y = 
+handle
+    match y with
+    | Nil -> 1
+    | Cons (x, Nil) -> x
+    | Cons (_, Cons (y, Nil)) -> y
+    | Cons (x, _) -> x
+with
+| x -> x + 10
+;;
+
+
+handle
+    match Cons (4, Cons (5, Cons (6, Nil))) with
+    | Nil -> 1
+    | Cons (x, Nil) -> x
+    | Cons (_, Cons (y, Nil)) -> y
+    | Cons (x, _) -> x
+with
+| x -> x + 10
+;;

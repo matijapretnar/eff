@@ -4,13 +4,12 @@ type ('key, 'v) t
 val empty : ('k, 'v) t
 (** The empty association list. *)
 
+val is_empty : ('k, 'v) t -> bool
+(** Is the association list empty? *)
+
 val lookup : 'k -> ('k, 'v) t -> 'v option
 (** [lookup k assoc] returns the most recent value associated with [k] in
     [assoc] if it exists. *)
-
-val find_if : ('k * 'v -> bool) -> ('k, 'v) t -> ('k * 'v) option
-(** [find_if p assoc] returns the first [(k, v)] for which [p] returns [true]
-    if it exists. *)
 
 val pop : ('k, 'v) t -> (('k * 'v) * ('k, 'v) t) option
 (** [pop assoc] returns the first element and the rest of [assoc]. *)

@@ -1,0 +1,79 @@
+let f39 = fun x -> x in 
+
+let f38 = fun x -> (f39 x) in 
+
+let f37 = fun x -> (f38 x) in 
+
+let f36 = fun x -> (f37 x) in 
+
+let f35 = fun x -> (f36 x) in
+
+let f34 = fun x -> (f35 x) in 
+
+let f33 = fun x -> (f34 x) in 
+
+let f32 = fun x -> (f33 x) in 
+
+let f31 = fun x -> (f32 x) in 
+
+let f30 = fun x -> (f31 x) in
+
+let f29 = fun x -> (f30 x) in 
+
+let f28 = fun x -> (f29 x) in 
+
+let f27 = fun x -> (f28 x) in 
+
+let f26 = fun x -> (f27 x) in 
+
+let f25 = fun x -> (f26 x) in
+
+let f24 = fun x -> (f25 x) in 
+
+let f23 = fun x -> (f24 x) in 
+
+let f22 = fun x -> (f23 x) in 
+
+let f21 = fun x -> (f22 x) in 
+
+let f20 = fun x -> (f21 x) in
+
+let f19 = fun x -> (f20 x) in 
+
+let f18 = fun x -> (f19 x) in 
+
+let f17 = fun x -> (f18 x) in 
+
+let f16 = fun x -> (f17 x) in 
+
+let f15 = fun x -> (f16 x) in
+
+let f14 = fun x -> (f15 x) in 
+
+let f13 = fun x -> (f14 x) in 
+
+let f12 = fun x -> (f13 x) in 
+
+let f11 = fun x -> (f12 x) in 
+
+let f10 = fun x -> (f11 x) in
+
+let f9 = fun x -> (f10 x) in 
+
+let f8 = fun x -> (f9 x) in 
+
+let f7 = fun x -> (f8 x) in 
+
+let f6 = fun x -> (f7 x) in 
+
+let f5 = fun x -> (f6 x) in
+
+let f4 = fun x -> (f5 x) in 
+
+let f3 = fun x -> (f4 x) in 
+
+let f2 = fun x -> (f3 x) in 
+
+let f1 = fun x -> (f2 x) in 
+
+(f1 3)

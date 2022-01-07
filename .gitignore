@@ -16,8 +16,5 @@ docs/try/jseff.bc.js
 # Dune takes care of merlin
 .merlin
 
-# Compiler generated code - once compiler is fixed, this should be cleaned up
-_tmp
-_tmp_no_opt
-tests/code-generation/pure/*.ml
-tests/code-generation/pure/*.eff
+misc/code-generation-benchmarks/generate-graphs/tables/*.table
+graphs.exe

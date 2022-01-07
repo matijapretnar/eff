@@ -1,0 +1,17 @@
+effect Ping: unit -> unit
+
+let test_simple x = 
+  let h1 = handler
+    | effect (Ping ()) k -> k ()
+  in
+  with h1 handle (
+    (perform (Ping ()), 1)
+  )
+
+let test_simple2 () = 
+  let h3 = handler
+    | effect (Ping ()) k -> k ()
+  in
+  with h3 handle (
+    perform (Ping ())
+  ) 

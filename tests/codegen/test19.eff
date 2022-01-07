@@ -1,0 +1,13 @@
+type nat = Zero | Succ of nat
+
+;;
+
+let swap (w, k, num) = function
+| (Zero, Zero, 0) -> (w, k, Zero, 0, 0)
+| (Zero, z, n) -> (Zero, z, Zero, num, n)
+| (x, Zero, n) -> (Zero, w, x, 1, n)
+| (_, _, _) -> (Zero, Zero, Zero, 0, 0)
+
+in
+
+swap

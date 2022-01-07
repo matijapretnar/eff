@@ -1,43 +1,24 @@
 open Utils
 open Language
-open Type
 
-type state = (CoreTypes.TyName.t, type_data) Assoc.t
+type state = (TyName.t, Type.type_data) Assoc.t
 
 val initial_state : state
 
-val extend_type_definitions :
-  loc:Location.t ->
-  (CoreTypes.TyName.t, CoreTypes.TyParam.t list * tydef) Assoc.t ->
-  state ->
-  state
+val extend_type_definitions : Type.type_data Type.Field.Map.t -> state -> state
 
-val transparent : loc:Location.t -> CoreTypes.TyName.t -> state -> bool
-
-val ty_apply :
-  loc:Location.t -> CoreTypes.TyName.t -> Type.ty list -> state -> tydef
-
-val infer_variant :
-  CoreTypes.Label.t -> state -> (Type.ty * Type.ty option) option
+val infer_variant : Type.Label.t -> state -> Type.ty option * Type.ty
 
 val infer_field :
-  CoreTypes.Label.t ->
-  state ->
-  (Type.ty * (CoreTypes.TyName.t * (CoreTypes.Field.t, Type.ty) Assoc.t)) option
+  Type.Label.t -> state -> Type.ty * (TyName.t * Type.ty Type.Field.Map.t)
 
 val find_field :
-  CoreTypes.Field.t ->
+  Type.Field.t ->
   state ->
-  (CoreTypes.TyName.t
-  * CoreTypes.TyParam.t list
-  * (CoreTypes.Field.t, Type.ty) Assoc.t)
-  option
+  (TyName.t * Type.Params.t * Type.ty Type.Field.Map.t) option
 
 val find_variant :
-  CoreTypes.Label.t ->
+  Type.Label.t ->
   state ->
-  (CoreTypes.TyName.t
-  * CoreTypes.TyParam.t list
-  * (CoreTypes.Label.t, Type.ty option) Assoc.t
-  * Type.ty option)
+  (TyName.t * Type.Params.t * Type.ty option Type.Field.Map.t * Type.ty option)
   option

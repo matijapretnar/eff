@@ -20,6 +20,9 @@ jobs:
       - name: Test
         run: opam exec -- make test
       
+      - name: Delete problematic files
+        run: rm -rf misc tests
+      
       - name: Build
         run: opam exec -- make release
 

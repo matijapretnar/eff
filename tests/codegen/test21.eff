@@ -1,0 +1,11 @@
+let z =
+    match [1] with
+    | ([] : int list) -> 2
+    | x :: _ -> x
+in
+let w =
+    match [true] with
+    | ([] : bool list) -> true
+    | x :: _ -> x
+in
+(z, w)

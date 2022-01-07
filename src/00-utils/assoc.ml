@@ -3,14 +3,12 @@ type ('key, 'value) t = ('key * 'value) list
 
 let empty = []
 
+let is_empty = function [] -> true | _ :: _ -> false
+
 (* Finding elements. *)
 let rec lookup x = function
   | [] -> None
   | (k, v) :: tl -> if x = k then Some v else lookup x tl
-
-let rec find_if p = function
-  | [] -> None
-  | hd :: tl -> if p hd then Some hd else find_if p tl
 
 let pop = function [] -> None | hd :: tl -> Some (hd, tl)
 

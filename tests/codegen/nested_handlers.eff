@@ -1,0 +1,26 @@
+effect Get: unit -> int
+effect Fail: unit -> unit
+effect Decide: unit -> bool
+
+let test_nested m = 
+  let rec simple () = 
+    perform (Get ())  
+  in
+  let h = handler 
+  | x -> x
+  in
+  let d = handler
+  | effect (Get ()) k -> k m 
+  in
+  ((with d handle ((with h handle simple ()))))
+
+let test_nested m = 
+  let rec go n = 
+    if n = 0 then (perform (Fail ()))
+    else (if (perform (Decide ())) then go (n-1) else go (n-2))
+  in
+  handle (go m) with
+    | effect (Decide ()) k -> (
+      handle k true with 
+        | effect (Fail ()) _k -> k false
+    ) 

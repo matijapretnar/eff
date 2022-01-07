@@ -1,0 +1,29 @@
+effect WriteInt : int -> unit;;
+
+(* THIS ONE TERMINATES JUST FINE: *)
+
+with
+  (handler
+    | effect (WriteInt n) k -> n + k ()
+    | y -> 0
+  )
+handle
+  let rec f x = perform (WriteInt x)
+              ; if x = 0
+                  then ()
+                  else f (x - 1)
+  in f 10
+
+(* THIS VERSION DOES NOT TERMINATE AND IT MAKES NO SENSE
+with
+  (handler
+    | effect (WriteInt n) k -> n + k ()
+    | y -> 0
+  )
+handle
+  let rec f x = if x = 0
+                  then ()
+                  else perform (WriteInt x); f (x - 1)
+  in f 0
+*)
+

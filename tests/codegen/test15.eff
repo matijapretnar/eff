@@ -1,0 +1,16 @@
+type foo = A | B of bar
+and bar = {
+    x : foo
+} ;;
+
+effect Op1 : int -> bar ;;
+effect Op2 : bar -> foo ;;
+effect Op3 : foo -> int ;;
+
+let f a =
+    let x = perform (Op1 10) in
+    let y = perform (Op2 x) in
+    let z = perform (Op3 y) in
+    a + z
+in
+f

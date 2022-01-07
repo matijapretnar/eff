@@ -1,0 +1,21 @@
+effect Decide : unit -> bool
+
+type int_list = Nil | Cons of int * int_list
+
+
+;;
+
+let rec (@) xs ys =
+  match xs with
+  | Nil -> ys
+  | Cons (x, xs) -> Cons (x, (xs @ ys))
+in
+
+let choose_all = handler
+  | effect (Decide ()) k -> k true @ k false
+  | x -> Cons (x, Nil)
+in
+
+let decide_func1 x y =
+    (if perform (Decide ()) then x else y) in
+with choose_all handle (decide_func1 10 20 )

@@ -9,6 +9,15 @@ let file_queue = ref []
 
 let enqueue_file filename = file_queue := filename :: !file_queue
 
+let optimizator_bitmask_config : int Config.optimizator_base_config =
+  {
+    specialize_functions = 0;
+    eliminate_coercions = 1;
+    push_coercions = 2;
+    handler_reductions = 3;
+    purity_aware_translation = 4;
+  }
+
 (* Command-line options *)
 let options =
   Arg.align
@@ -23,10 +32,53 @@ let options =
       ( "--no-wrapper",
         Arg.Unit (fun () -> Config.wrapper := None),
         " Do not use a command-line wrapper" );
+      ( "--no-header",
+        Arg.Clear Config.include_header_open,
+        " Do not include open OcamlHeader in generated files" );
       ( "--compile-multicore-ocaml",
         Arg.Unit (fun () -> Config.backend := Multicore),
         " Compile the Eff code into a Multicore OCaml (sent to standard output)"
       );
+      ( "--compile-plain-ocaml",
+        Arg.Unit (fun () -> Config.backend := Ocaml),
+        " Compile the Eff code into plain OCaml (sent to standard output)" );
+      ("--profile", Arg.Set Config.profiling, " Print out profiling information");
+      ( "--no-opts",
+        Arg.Clear Config.enable_optimization,
+        " Disable optimizations" );
+      ( "--optimizations",
+        Arg.Int
+          (fun bitmask ->
+            let {
+              Config.specialize_functions;
+              eliminate_coercions;
+              push_coercions;
+              handler_reductions;
+              purity_aware_translation;
+            } =
+              optimizator_bitmask_config
+            in
+            let specialize_functions =
+              Int.logor bitmask specialize_functions = 1
+            in
+            let eliminate_coercions =
+              Int.logor bitmask eliminate_coercions = 1
+            in
+            let push_coercions = Int.logor bitmask push_coercions = 1 in
+            let handler_reductions = Int.logor bitmask handler_reductions = 1 in
+            let purity_aware_translation =
+              Int.logor bitmask purity_aware_translation = 1
+            in
+            Config.optimizator_config :=
+              {
+                specialize_functions;
+                eliminate_coercions;
+                push_coercions;
+                handler_reductions;
+                purity_aware_translation;
+              };
+            ()),
+        " Enable/disable specific optimizations" );
       ("--ascii", Arg.Set Config.ascii, " Use ASCII output");
       ( "-v",
         Arg.Unit
@@ -38,6 +90,9 @@ let options =
         Arg.String (fun str -> enqueue_file (Load str)),
         "<file> Load <file> into the initial environment" );
       ("-V", Arg.Set_int Config.verbosity, "<n> Set printing verbosity to <n>");
+      ( "-g",
+        Arg.Set Config.print_graph,
+        "<n> Enable constraint graph printing <n>" );
     ]
 
 (* Treat anonymous arguments as files to be run. *)
@@ -102,7 +157,6 @@ let toplevel execute_source state =
   Format.fprintf !Config.output_formatter
     "[Type %s to exit or #help;; for help.]@." eof;
   let state = ref state in
-  Sys.catch_break true;
   try
     while true do
       let source = read_toplevel () in
@@ -117,6 +171,8 @@ let toplevel execute_source state =
 let main =
   (* Parse the arguments. *)
   Arg.parse options anonymous usage;
+  Printexc.record_backtrace true;
+  Sys.catch_break true;
   (* Attemp to wrap yourself with a line-editing wrapper. *)
   (if !Config.interactive_shell then
    match !Config.wrapper with
@@ -129,10 +185,11 @@ let main =
   (* Files were listed in the wrong order, so we reverse them *)
   file_queue := List.rev !file_queue;
   try
-    let (module Backend : Language.BackendSignature.T) =
+    let (module Backend : Language.Backend.S) =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
-      | Config.Multicore -> (module Multicore.Backend)
+      | Config.Multicore -> (module MulticoreOCaml.Backend)
+      | Config.Ocaml -> (module PlainOCaml.Backend)
     in
     let (module Shell) =
       (module Loader.Shell.Make (Backend) : Loader.Shell.Shell)
@@ -148,8 +205,8 @@ let main =
       if !Config.use_stdlib then
         let stdlib =
           match !Config.backend with
-          | Config.Runtime -> Loader.Stdlib_eff.source
-          | Config.Multicore -> Multicore.stdlib
+          | Config.Runtime | Config.Ocaml -> Loader.Stdlib_eff.source
+          | Config.Multicore -> MulticoreOCaml.stdlib
         in
         Shell.load_source stdlib state
       else state

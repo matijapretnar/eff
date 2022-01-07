@@ -1,0 +1,68 @@
+effect Fetch : unit -> int;;
+
+type int_list = Nil | Cons of int * int_list
+;;
+let test n = 
+	let rec range n =
+		match n with
+		| 0 -> Nil
+		| _ ->
+			Cons (perform (Fetch ()), range (n - 1))
+	in			
+	handle ( range n ) with
+	| x -> x
+	| effect (Fetch _) k -> k 42
+
+
+	effect GeneratorPut: int -> unit
+	effect GeneratorGet: unit -> int 
+	effect GeneratorProduce: int -> int
+	;;
+	let testGenerator m = 
+		let n = 42 in
+		let rec sum i = 
+			if i = 0 then perform (GeneratorGet ())
+			else 
+				(perform (GeneratorPut ( (perform (GeneratorGet ())) + (perform (GeneratorProduce i))));
+				sum (i-1))
+		in 
+		let monad_state = handler 
+			| effect (GeneratorGet ()) k -> (
+				fun s -> (k s) s
+			)
+			| effect (GeneratorPut s) k -> (
+				fun _ -> (k ()) s
+			)
+			| y -> (fun _ -> y)
+		in
+		let produce_handler = handler 
+			| effect (GeneratorProduce i) k -> (k (i mod n))
+		in
+		(with monad_state handle (
+			with produce_handler handle (sum m) 
+		)) m
+		
+
+
+(* effect Get: unit -> int_list
+effect Put: int_list -> unit
+
+;;
+let test n = 
+	let rec range n =
+		match n with
+		| 0 -> perform (Put Nil)
+		| _ ->
+			(let q = (perform (Fetch ())) in
+			range (n-1);
+			perform ( Put (Cons(q,  perform (Get ()) ))
+			))
+	in			
+	(handle (handle ( range n ) with
+	| x -> x
+	| effect (Fetch _) k -> k 42
+	) with 
+	| y -> (fun _ -> y)
+	| effect (Get ()) k -> (fun s -> k s s)
+	| effect (Put s') k -> (fun _ -> k () s')
+	) Nil *)

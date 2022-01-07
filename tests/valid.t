@@ -6,6 +6,23 @@
   >   ../eff.exe $f
   > done
   ======================================================================
+  valid/choice.eff
+  ----------------------------------------------------------------------
+  - : int = 10
+  val choose_all : 'a => 'a list = <handler>
+  - : int list = [10; 5; 20; 15]
+  val choose_all2 : 'a => 'a list = <handler>
+  - : int list list = [[10; 5]; [20; 15]]
+  - : int list list = [[10; 20]; [5; 15]]
+  - : int list list = [[10; 20]; [10; 15]; [5; 20]; [5; 15]]
+  val choose_int : int -> int -> int = <fun>
+  val sqrt : int -> int option = <fun>
+  val pythagorean : int -> int -> int * int * int = <fun>
+  val backtrack : 'a => 'a = <handler>
+  val choose_all : 'a => 'a list = <handler>
+  - : (int * int * int) list = [(5, 12, 13); (6, 8, 10); (8, 15, 17);
+                                (9, 12, 15)]
+  ======================================================================
   valid/lexer.eff
   ----------------------------------------------------------------------
   - : int = 10
@@ -63,8 +80,6 @@
   ======================================================================
   valid/polymorphism.eff
   ----------------------------------------------------------------------
-  val a : int * string = (5, "foo")
-  - : int * string = (5, "foo")
   val g : 'a -> 'b -> 'a = <fun>
   - : int * string = (4, "foo")
   val u : 'a list = []
@@ -86,7 +101,7 @@
   ======================================================================
   valid/state.eff
   ----------------------------------------------------------------------
-  val state : 'a -> 'b => int -> 'b = <fun>
+  val state : 'a -> 'b => (int -> 'b) = <fun>
   val better_state : int -> 'a => 'a = <fun>
   val transaction : 'a => 'a = <handler>
   Check (file "valid/state.eff", line 25, char 28):

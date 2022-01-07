@@ -19,11 +19,13 @@ end
 module Parameter (Param : PARAMETER) : Annotation with type t = unit = struct
   type t = unit
 
-  let print _ _ n ppf =
-    let symbol =
-      if !Config.ascii then Param.ascii_symbol else Param.utf8_symbol
-    in
-    Print.print ppf "%s%s" symbol (Symbols.subscript (Some (n + 1)))
+  let print safe _ n ppf =
+    if safe then Format.fprintf ppf "_%s_%d" Param.ascii_symbol n
+    else
+      let symbol =
+        if !Config.ascii then Param.ascii_symbol else Param.utf8_symbol
+      in
+      Print.print ppf "%s%s" symbol (Symbols.subscript (Some (n + 1)))
 end
 
 module String : Annotation with type t = string = struct
@@ -60,6 +62,27 @@ module type S = sig
   val print : ?safe:bool -> t -> Format.formatter -> unit
 
   val fold : (annot -> int -> 'a) -> t -> 'a
+
+  module Set : sig
+    include Set.S with type elt = t
+
+    val print : t -> Format.formatter -> unit
+  end
+
+  module Map : sig
+    include Map.S with type key = t
+
+    val of_bindings : (key * 'a) list -> 'a t
+
+    val compatible_union : 'a t -> 'a t -> 'a t
+
+    val keys : 'a t -> key list
+
+    val values : 'a t -> 'a list
+
+    val print :
+      ('a -> Format.formatter -> unit) -> 'a t -> Format.formatter -> unit
+  end
 end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t = struct
@@ -84,4 +107,39 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
   let print ?(safe = false) (n, ann) ppf = Annot.print safe ann n ppf
 
   let fold f (n, ann) = f ann n
+
+  module Ord = struct
+    type t = int * annot
+
+    let compare = compare
+  end
+
+  module Set = struct
+    include Set.Make (Ord)
+
+    let print set = Print.sequence "," print (elements set)
+  end
+
+  module Map = struct
+    include Map.Make (Ord)
+
+    let of_bindings list =
+      List.fold_left (fun map (key, v) -> add key v map) empty list
+
+    let compatible_union m1 m2 =
+      union
+        (fun _ v1 v2 ->
+          assert (v1 = v2);
+          Some v1)
+        m1 m2
+
+    let keys m = List.map fst (bindings m)
+
+    let values m = List.map snd (bindings m)
+
+    let print pp m =
+      Print.sequence ","
+        (fun (k, v) ppf -> Format.fprintf ppf "%t ↦ %t" (print k) (pp v))
+        (bindings m)
+  end
 end

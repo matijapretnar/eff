@@ -1,0 +1,22 @@
+effect Decide : bool;;
+
+type intlist =
+  | IntNil
+  | IntCons of int * intlist;;
+
+(* Top-level let-rec *)
+let rec concat xs = (
+  match xs with
+  | IntNil         -> fun ys -> ys
+  | IntCons (z,zs) -> fun ys -> IntCons (z, concat zs ys)
+) ;;
+
+(* This returns a list of four possibilities [10; 5; 20; 15] *)
+with
+  (* This handler collects all results that we can get by making different choices. *)
+  (handler
+   | x -> IntNil
+  )
+handle (
+  1
+)

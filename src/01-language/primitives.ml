@@ -30,6 +30,7 @@ type primitive_value =
   | IntegerMod
   | IntegerMul
   | IntegerNeg
+  | IntegerAbs
   | IntegerPow
   | IntegerSub
   | IntOfFloat
@@ -77,6 +78,7 @@ let primitive_values =
     IntegerMod;
     IntegerMul;
     IntegerNeg;
+    IntegerAbs;
     IntegerPow;
     IntegerSub;
     IntOfFloat;
@@ -122,6 +124,7 @@ let primitive_value_name = function
   | IntegerMod -> "mod"
   | IntegerMul -> "*"
   | IntegerNeg -> "~-"
+  | IntegerAbs -> "abs"
   | IntegerPow -> "**"
   | IntegerSub -> "-"
   | IntOfFloat -> "int_of_float"

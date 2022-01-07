@@ -1,0 +1,120 @@
+fun no_attack((a,b),(c,d)) {
+  a <> c && b <> d && abs(a - c) <> abs(b - d)
+}
+
+fun not_attacked (y, l) {
+  switch (l) {
+    case [] -> true
+    case x :: xs -> if (no_attack(y, x)) not_attacked(y, xs)
+                    else false
+  }
+}
+
+fun available(number_of_queens, x, qs) {
+  # filter(fun(b) { for_all(noAttack((a,b)), qs) }, l)
+
+  fun loop(possible, y) {
+      if (y < 1) possible
+      else if (not_attacked((x, y), qs)) loop ((y :: possible), (y - 1))
+      else {
+        loop (possible, (y - 1))
+      }
+  }
+
+  loop([], number_of_queens)
+}
+
+## Non-deterministic choice operation
+sig decide : () {Decide:Bool |_}~> Bool
+fun decide() { do Decide }
+
+sig fail : () {Fail:Int |_}~> Int
+fun fail() { do Fail }
+
+sig choose : ([Int]) {Decide:Bool,Fail:Int|_}~> Int
+fun choose(xs) {
+  switch (xs) {
+    case [] -> fail()
+    case x :: xs -> if (decide()) x
+                    else choose(xs)
+  }
+}
+
+fun choose_all(m)() {
+  open handle(m) {
+     case Return(x) -> [x]
+     case Fail(k) -> []
+     case Decide(k) -> k(true) ++ k(false)
+  }
+}
+
+fun optionalize(m)() {
+  open handle(m) {
+     case Return(x) -> Just(x)
+     case Fail(k) -> Nothing
+     case Decide(k) ->
+        switch (k(true)) {
+            case Just(x) -> Just(x)
+            case Nothing -> k(false)
+        }
+  }
+}
+
+fun backtrack(m)() {
+  open handle(m) {
+     case Return(x) -> {
+         fun res(a) {
+           x
+         }
+         res
+     }
+     case Fail(k) -> {
+         fun res(kf) {
+           kf()
+         }
+         res
+     }
+     case Decide(k) -> {
+         fun res(kf) {
+            fun res2() {
+              k(false)(kf)
+            }
+            k(true)(res2)
+         }
+         res
+     }
+  }
+}
+
+fun queens() {
+    var number_of_queens = 9;
+    fun place(x, qs) {
+        if (x > number_of_queens) qs
+        else {
+          var y = choose(available(number_of_queens, x, qs));
+          place(x+1, (x,y) :: qs)
+        }
+    }
+
+    place(1, [])
+}
+
+## Running a computation
+fun run(m) { m() }
+
+fun failFun() { do Fail }
+
+fun choose_all_queens() {
+  var _ = run(choose_all(queens));
+  ()
+}
+fun choose_one_queens_option() {
+  var _ = run(optionalize(queens));
+  ()
+}
+fun choose_one_queens_cps() {
+  var _ = backtrack(queens)()(failFun);
+  ()
+}
+
+choose_all_queens()

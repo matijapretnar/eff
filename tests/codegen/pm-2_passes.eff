@@ -1,0 +1,32 @@
+
+effect Decide : bool;;
+
+(* handle (let rec f x = if perform (Decide ()) then 0 else f (x - 1) in f 0) with | effect Decide k -> k true;; *)
+
+let two   = 2;;
+let three = 3;;
+
+type intlist =
+  | IntNil
+  | IntCons of int * intlist;;
+
+
+(* This handler collects all results that we can get by making different choices. *)
+
+
+(* This returns a list of four possibilities [10; 5; 20; 15] *)
+
+let rec concat xs = (
+  match xs with
+  | IntNil         -> fun ys -> ys
+  | IntCons (z,zs) -> fun ys -> IntCons (z, concat zs ys)
+) in
+  with
+    (handler
+     | effect Decide k -> concat (k true) (k false)
+     | x -> IntCons (x,IntNil)
+    )
+  handle
+    let rec f x = if perform (Decide ()) then 2 else 3 in f ()
+    (* let rec f x = if perform (Decide ()) then two else three in f () *)
+

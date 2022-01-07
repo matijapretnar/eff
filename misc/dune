@@ -1,0 +1,5 @@
+(data_only_dirs
+ exeff-skeleff-multicore
+ noeff-alternative
+ old-benchmarks-for-other-systems
+ type-inference-time-complexity)

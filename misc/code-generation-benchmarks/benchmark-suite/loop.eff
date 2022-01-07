@@ -1,0 +1,77 @@
+(******************************************************************************)
+
+let rec loop_pure n =
+    if n = 0 then
+        ()
+    else
+        loop_pure (n - 1)
+
+let test_pure n =
+    loop_pure n
+
+(******************************************************************************)
+
+
+effect Fail : unit -> empty
+
+let rec loop_latent n =
+    if n = 0 then
+        ()
+    else if n < 0 then
+        ( match (perform (Fail ())) with)
+    else
+        loop_latent (n - 1)
+
+let test_latent n =
+    loop_latent n
+
+(******************************************************************************)
+
+effect Incr : unit -> unit
+
+let rec loop_incr n =
+    if n = 0 then
+        ()
+    else
+        (perform (Incr ()); loop_incr (n - 1))
+
+let test_incr n =
+    let incr_handler = handler
+    | y -> (fun x -> x)
+    | effect (Incr ()) k -> (fun x -> k () (x + 1))
+    in
+    (with incr_handler handle loop_incr n) 0
+
+(******************************************************************************)
+
+let rec loop_incr' n =
+    if n = 0 then
+        ()
+    else
+        (loop_incr' (n - 1); perform (Incr ()))
+
+let test_incr' n =
+    let incr_handler = handler
+    | y -> (fun x -> x)
+    | effect (Incr ()) k -> (fun x -> k () (x + 1))
+    in
+    (with incr_handler handle loop_incr' n) 0
+
+(******************************************************************************)
+
+effect Get: unit -> int
+effect Put: int -> unit
+
+let rec loop_state n =
+    if n = 0 then
+        ()
+    else
+        (perform (Put ((perform (Get ())) + 1)); loop_state (n - 1))
+
+let test_state n =
+    let state_handler = handler
+    | y -> (fun x -> x)
+    | effect (Get ()) k -> (fun s -> k s s)
+    | effect (Put s') k -> (fun _ -> k () s')
+    in
+    (with state_handler handle loop_state n) 0

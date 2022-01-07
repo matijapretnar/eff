@@ -1,0 +1,10 @@
+effect Decide : unit -> bool
+;;
+
+let choose_sum = handler
+  | effect (Decide ()) k -> k true + k false
+  | x -> x
+in
+let decide_func1 x  =
+    (if perform (Decide ()) then x else 20) in
+with choose_sum handle (decide_func1 10 )

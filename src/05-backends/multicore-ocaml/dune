@@ -1,0 +1,11 @@
+(library
+ (name multicoreOCaml)
+ (libraries language typechecker))
+
+(rule
+ (with-stdout-to
+  stdlib_eff.ml
+  (progn
+   (echo "let source = {|")
+   (cat stdlib.eff)
+   (echo "|}"))))

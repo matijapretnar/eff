@@ -1,0 +1,193 @@
+(* Triple *)
+
+effect TripleFlip : unit -> bool
+effect TripleFail: unit -> empty
+;;
+type triple_int_list = TripleCons of ((int*int*int) * triple_int_list) | TripleNil
+
+let rec ( @ ) xs ys =
+  match xs with
+  | TripleNil -> ys
+  | TripleCons (x, xs) -> TripleCons (x, xs @ ys)
+
+let testTriple n s = 
+  let absurd void = (match void with) in
+  let absurd1 void = (match void with) in
+  let rec choice n =
+    if (n < 1)
+      then (absurd (perform (TripleFail ())))
+      else if (perform (TripleFlip ()))
+        then n
+        else choice (n - 1)
+  in
+  let triple n s =
+    let i = choice n in
+    let j = choice (i - 1) in
+    let k = choice (j - 1) in
+    if (i + j + k = s)
+      then (i, j, k)
+      else (absurd1 (perform (TripleFail ())))
+  in
+  handle 
+  (let r = triple n s in TripleCons(r, TripleNil)
+  ) with 
+  | effect (TripleFail _) k -> TripleNil
+  | effect (TripleFlip ()) k -> (
+    let xs = k true in 
+    let ys = k false in 
+    xs @ ys 
+  )
+
+let handleTripleWrap (x, y) = testTriple x y
+
+(* Queens *)
+
+(* Taken verbatim from 
+https://github.com/ocaml-multicore/effects-examples/blob/68f16120873f1ade4536ab3916ccce47fd424f9e/queens.ml 
+*)
+
+type queen = int * int
+type queen_list = Nil | Cons of (queen * queen_list) 
+type queen_list_list = QNil | QCons of (queen_list * queen_list_list)
+type intlist = End | Lst of (int * intlist)
+type option = Some of queen_list | None
+;;
+effect Select: intlist -> int
+
+let rec filter p = function
+  | End -> End
+  | Lst(x, xs) ->
+    if p x then Lst(x, filter p xs) else filter p xs
+
+let rec forall p = function
+  | Nil -> true
+  | Cons(x, xs) -> if p x then forall p xs else false
+
+let no_attack (x,y) (x',y') =
+  x <> x' && y <> y' && abs (x - x') <> abs (y - y')
+
+  let available x qs l =
+    filter (fun y -> forall (no_attack (x,y)) qs) l
+
+let find_solution n =
+  handle
+    let rec init i acc =
+      if i = 0 then acc else init (i-1) (Lst(i, acc)) 
+    in
+    let ___l = init n End in
+    let rec place (x, qs) =
+      if x = n+1 then Some qs else
+        let y = perform (Select (available x qs ___l)) in
+        place ((x+1), (Cons((x, y), qs)))
+    in place (1,Nil)
+  with
+  | effect (Select lst) k ->
+    let rec loop k = function
+    | End -> None
+    | Lst(x,xs) ->
+        match k x with
+        | None -> loop k xs
+        | Some x -> Some x
+    in
+    loop k lst
+
+let queens_all number_of_queens =
+  find_solution number_of_queens
+
+(* Count *)
+
+effect CountPut: int -> unit
+effect CountGet: unit -> int 
+;;
+let rec count () = 
+  let i = perform (CountGet ()) in
+  if i = 0 then i 
+  else(
+    (perform (CountPut (i-1)));
+    count ()
+  )
+
+let testCount m = 
+  let monad_state = handler 
+  | y -> (fun x -> x)
+  | effect (CountGet ()) k -> (
+    fun s -> (k s) s
+  )
+  | effect (CountPut s) k -> (
+    fun _ -> (k ()) s
+  )
+  in
+  (with monad_state handle count ()) m
+
+
+(* Generator *)
+
+effect GeneratorPut: int -> unit
+effect GeneratorGet: unit -> int 
+effect GeneratorYield: int -> unit
+;;
+
+let testGenerator n = 
+  let rec generateFromTo (l,u) = 
+    if l > u then ()
+    else ( 
+      perform (GeneratorYield l); generateFromTo ((l+1) , u))
+  in
+  ( handle (handle (generateFromTo (1,n)) with 
+    | effect (GeneratorYield e) k -> (
+      (perform (GeneratorPut (perform (GeneratorGet ()) + e)));
+      k ()
+    )
+  ) with 
+  | x -> (fun s -> s)   
+  | effect (GeneratorPut s') k -> (fun s ->  k () s')
+  | effect (GeneratorGet _) k -> (fun s -> k s s)
+  ) 0 
+
+(* 
+
+
+let testGenerator n = 
+  let rec generateFromTo u = 
+    if u = 0 then ()
+    else ( 
+      (* perform (GeneratorPut (perform (GeneratorGet ())));   *)
+      perform (GeneratorYield u); generateFromTo ( u-1))
+  in
+  ( handle (handle (generateFromTo (n)) with 
+    | effect (GeneratorYield e) k -> (
+      (perform (GeneratorPut e));
+      k ()
+    )
+  ) with 
+  | x -> (fun s -> (s,x))   
+  | effect (GeneratorPut s') k -> k ()
+  | effect (GeneratorGet _) k -> (fun s -> k s s)
+  ) *)
+
+(*
+let testGenerator m = 
+  let n = 42 in
+  let rec sum i = 
+    if i = 0 then perform (GeneratorGet ())
+    else 
+      (perform (GeneratorPut ( (perform (GeneratorGet ())) + (perform (GeneratorProduce i))));
+      sum (i-1))
+  in 
+  let monad_state = handler 
+    | effect (GeneratorGet ()) k -> (
+      fun s -> (k s) s
+    )
+    | effect (GeneratorPut s) k -> (
+      fun _ -> (k ()) s
+    )
+    | y -> (fun _ -> y)
+  in
+  let produce_handler = handler 
+    | effect (GeneratorProduce i) k -> (k (i mod n))
+  in
+  (with monad_state handle (
+    with produce_handler handle (sum m) 
+  )) m 
+*)
+  

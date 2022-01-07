@@ -1,0 +1,6 @@
+effect Op1 : int -> int ;;
+effect Op2 : int -> int ;;
+
+#type match perform (Op1 1) with
+  | x -> x 
+  | effect (Op1 n) k -> perform (Op2 2) ;;

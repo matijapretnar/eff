@@ -1,0 +1,10 @@
+effect Eff : int -> int
+
+;;
+
+
+handle
+  perform (Eff (1 + 3))
+with
+| effect (Eff x) k -> k (x + 2)
+| y -> y + 4

@@ -1,0 +1,4 @@
+effect Op : int -> int ;;
+
+#type (fun f -> f 1) (fun x -> perform (Op x));;
+

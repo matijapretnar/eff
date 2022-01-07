@@ -1,0 +1,447 @@
+effect Dummy : unit -> int;;
+
+let h89 = handler
+        | effect (Dummy _) k -> 8
+        | x -> x
+in
+
+let h88 = handler
+        | effect (Dummy _) k -> with h89 handle 8
+        | x -> x
+in
+
+let h87 = handler
+        | effect (Dummy _) k -> with h88 handle 8
+        | x -> x
+in
+
+let h86 = handler
+        | effect (Dummy _) k -> with h87 handle 8
+        | x -> x
+in
+
+let h85 = handler
+        | effect (Dummy _) k -> with h86 handle 8
+        | x -> x
+in
+
+let h84 = handler
+        | effect (Dummy _) k -> with h85 handle 8
+        | x -> x
+in
+
+let h83 = handler 
+	| effect (Dummy _) k -> with h84 handle 8
+	| x -> x
+in 
+
+let h82 = handler
+        | effect (Dummy _) k -> with h83 handle 8
+        | x -> x
+in
+
+let h81 = handler 
+	| effect (Dummy _) k -> with h82 handle 8
+	| x -> x
+in 
+
+let h80 = handler
+        | effect (Dummy _) k -> with h81 handle 8
+        | x -> x
+in
+
+let h79 = handler
+        | effect (Dummy _) k -> with h80 handle 7
+        | x -> x
+in
+
+let h78 = handler
+        | effect (Dummy _) k -> with h79 handle 7
+        | x -> x
+in
+
+let h77 = handler
+        | effect (Dummy _) k -> with h78 handle 7
+        | x -> x
+in
+
+let h76 = handler
+        | effect (Dummy _) k -> with h77 handle 7
+        | x -> x
+in
+
+let h75 = handler
+        | effect (Dummy _) k -> with h76 handle 7
+        | x -> x
+in
+
+let h74 = handler
+        | effect (Dummy _) k -> with h75 handle 7
+        | x -> x
+in
+
+let h73 = handler 
+	| effect (Dummy _) k -> with h74 handle 7
+	| x -> x
+in 
+
+let h72 = handler
+        | effect (Dummy _) k -> with h73 handle 7
+        | x -> x
+in
+
+let h71 = handler 
+	| effect (Dummy _) k -> with h72 handle 7
+	| x -> x
+in 
+
+let h70 = handler
+        | effect (Dummy _) k -> with h71 handle 7
+        | x -> x
+in
+
+let h69 = handler
+        | effect (Dummy _) k -> with h70 handle 6
+        | x -> x
+in
+
+let h68 = handler
+        | effect (Dummy _) k -> with h69 handle 6
+        | x -> x
+in
+
+let h67 = handler
+        | effect (Dummy _) k -> with h68 handle 6
+        | x -> x
+in
+
+let h66 = handler
+        | effect (Dummy _) k -> with h67 handle 6
+        | x -> x
+in
+
+let h65 = handler
+        | effect (Dummy _) k -> with h66 handle 6
+        | x -> x
+in
+
+let h64 = handler
+        | effect (Dummy _) k -> with h65 handle 6
+        | x -> x
+in
+
+let h63 = handler 
+	| effect (Dummy _) k -> with h64 handle 6
+	| x -> x
+in 
+
+let h62 = handler
+        | effect (Dummy _) k -> with h63 handle 6
+        | x -> x
+in
+
+let h61 = handler 
+	| effect (Dummy _) k -> with h62 handle 6
+	| x -> x
+in 
+
+let h60 = handler
+        | effect (Dummy _) k -> with h61 handle 6
+        | x -> x
+in
+
+let h59 = handler
+        | effect (Dummy _) k -> with h60 handle 5
+        | x -> x
+in
+
+let h58 = handler
+        | effect (Dummy _) k -> with h59 handle 5
+        | x -> x
+in
+
+let h57 = handler
+        | effect (Dummy _) k -> with h58 handle 5
+        | x -> x
+in
+
+let h56 = handler
+        | effect (Dummy _) k -> with h57 handle 5
+        | x -> x
+in
+
+let h55 = handler
+        | effect (Dummy _) k -> with h56 handle 5
+        | x -> x
+in
+
+let h54 = handler
+        | effect (Dummy _) k -> with h55 handle 5
+        | x -> x
+in
+
+let h53 = handler 
+	| effect (Dummy _) k -> with h54 handle 5
+	| x -> x
+in 
+
+let h52 = handler
+        | effect (Dummy _) k -> with h53 handle 5
+        | x -> x
+in
+
+let h51 = handler 
+	| effect (Dummy _) k -> with h52 handle 5
+	| x -> x
+in 
+
+let h50 = handler
+        | effect (Dummy _) k -> with h51 handle 5
+        | x -> x
+in
+
+let h49 = handler
+        | effect (Dummy _) k -> with h50 handle 4
+        | x -> x
+in
+
+let h48 = handler
+        | effect (Dummy _) k -> with h49 handle 4
+        | x -> x
+in
+
+let h47 = handler
+        | effect (Dummy _) k -> with h48 handle 4
+        | x -> x
+in
+
+let h46 = handler
+        | effect (Dummy _) k -> with h47 handle 4
+        | x -> x
+in
+
+let h45 = handler
+        | effect (Dummy _) k -> with h46 handle 4
+        | x -> x
+in
+
+let h44 = handler
+        | effect (Dummy _) k -> with h45 handle 4
+        | x -> x
+in
+
+let h43 = handler 
+	| effect (Dummy _) k -> with h44 handle 4
+	| x -> x
+in 
+
+let h42 = handler
+        | effect (Dummy _) k -> with h43 handle 4
+        | x -> x
+in
+
+let h41 = handler 
+	| effect (Dummy _) k -> with h42 handle 4
+	| x -> x
+in 
+
+let h40 = handler
+        | effect (Dummy _) k -> with h41 handle 4
+        | x -> x
+in
+
+let h39 = handler
+        | effect (Dummy _) k -> with h40 handle 3
+        | x -> x
+in
+
+let h38 = handler
+        | effect (Dummy _) k -> with h39 handle 3
+        | x -> x
+in
+
+let h37 = handler
+        | effect (Dummy _) k -> with h38 handle 3
+        | x -> x
+in
+
+let h36 = handler
+        | effect (Dummy _) k -> with h37 handle 3
+        | x -> x
+in
+
+let h35 = handler
+        | effect (Dummy _) k -> with h36 handle 3
+        | x -> x
+in
+
+let h34 = handler
+        | effect (Dummy _) k -> with h35 handle 3
+        | x -> x
+in
+
+let h33 = handler 
+	| effect (Dummy _) k -> with h34 handle 3
+	| x -> x
+in 
+
+let h32 = handler
+        | effect (Dummy _) k -> with h33 handle 3
+        | x -> x
+in
+
+let h31 = handler 
+	| effect (Dummy _) k -> with h32 handle 3
+	| x -> x
+in 
+
+let h30 = handler
+        | effect (Dummy _) k -> with h31 handle 3
+        | x -> x
+in
+
+let h29 = handler
+        | effect (Dummy _) k -> with h30 handle 3
+        | x -> x
+in
+
+let h28 = handler
+        | effect (Dummy _) k -> with h29 handle 3
+        | x -> x
+in
+
+let h27 = handler
+        | effect (Dummy _) k -> with h28 handle 3
+        | x -> x
+in
+
+let h26 = handler
+        | effect (Dummy _) k -> with h27 handle 3
+        | x -> x
+in
+
+let h25 = handler
+        | effect (Dummy _) k -> with h26 handle 3
+        | x -> x
+in
+
+let h24 = handler
+        | effect (Dummy _) k -> with h25 handle 3
+        | x -> x
+in
+
+let h23 = handler 
+	| effect (Dummy _) k -> with h24 handle 3
+	| x -> x
+in 
+
+let h22 = handler
+        | effect (Dummy _) k -> with h23 handle 3
+        | x -> x
+in
+
+let h21 = handler
+        | effect (Dummy _) k -> with h22 handle 3
+        | x -> x
+in
+
+let h20 = handler
+        | effect (Dummy _) k -> with h21 handle 3
+        | x -> x
+in
+
+let h19 = handler
+        | effect (Dummy _) k -> with h20 handle 3
+        | x -> x
+in
+
+let h18 = handler
+        | effect (Dummy _) k -> with h19 handle 3
+        | x -> x
+in
+
+let h17 = handler
+        | effect (Dummy _) k -> with h18 handle 3
+        | x -> x
+in
+
+let h16 = handler 
+	| effect (Dummy _) k -> with h17 handle 3
+	| x -> x
+in 
+
+let h15 = handler
+        | effect (Dummy _) k -> with h16 handle 3
+        | x -> x
+in
+
+let h14 = handler
+        | effect (Dummy _) k -> with h15 handle 3
+        | x -> x
+in
+
+let h13 = handler
+        | effect (Dummy _) k -> with h14 handle 3
+        | x -> x
+in
+
+let h12 = handler
+        | effect (Dummy _) k -> with h13 handle 3
+        | x -> x
+in
+
+let h11 = handler
+        | effect (Dummy _) k -> with h12 handle 3
+        | x -> x
+in
+
+let h10 = handler
+        | effect (Dummy _) k -> with h11 handle 3
+        | x -> x
+in
+
+let h9 = handler
+        | effect (Dummy _) k -> with h10 handle 3
+        | x -> x
+in
+
+let h8 = handler 
+	| effect (Dummy _) k -> with h9 handle 3
+	| x -> x
+in 
+
+let h7 = handler
+        | effect (Dummy _) k -> with h8 handle 3
+        | x -> x
+in
+
+let h6 = handler
+        | effect (Dummy _) k -> with h7 handle 3
+        | x -> x
+in
+
+let h5 = handler
+        | effect (Dummy _) k -> with h6 handle 3
+        | x -> x
+in
+
+let h4 = handler
+        | effect (Dummy _) k -> with h5 handle 3
+        | x -> x
+in
+
+let h3 = handler
+        | effect (Dummy _) k -> with h4 handle 3
+        | x -> x
+in
+
+let h2 = handler
+        | effect (Dummy _) k -> with h3 handle 3
+        | x -> x
+in
+
+let h1 = handler
+        | effect (Dummy _) k -> with h2 handle 3
+        | x -> x
+
+in (with h1 handle (perform (Dummy ()))) 

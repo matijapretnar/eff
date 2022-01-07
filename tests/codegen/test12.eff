@@ -1,0 +1,7 @@
+effect Op1 : int -> int ;;
+effect Op2 : int -> int ;;
+
+handler
+  | x -> x 
+  | effect (Op1 n) k -> 1 
+  | effect (Op2 n) k -> 2 ;;
