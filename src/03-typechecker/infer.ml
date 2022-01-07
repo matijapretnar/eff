@@ -480,43 +480,26 @@ and infer_computation' ~loc state = function
       let outExpr = Term.Match (matchExp, cases) in
       let outCs = Constraint.list_union [ omegaCtScr; cs1; cs2 ] in
       ((outExpr, dirtyOut), outCs)
-  | Apply (val1, val2) ->
-      (* Infer the types of val1 and val2 *)
-      let trgVal1, cs1 = infer_expression state val1 in
-      let trgVal2, cs2 = infer_expression state val2 in
-
-      (* Generate fresh variables for the result *)
+  | Apply (expr1, expr2) ->
+      let expr1', cs1 = infer_expression state expr1 in
+      let expr2', cs2 = infer_expression state expr2 in
       let outType = Type.fresh_dirty_with_fresh_skel () in
-
-      (* Create the constraint and the cast elaborated expression *)
-      let castVal1, omegaCt =
-        Constraint.cast_expression trgVal1 (Type.arrow (trgVal2.ty, outType))
+      let castexpr1, omegaCt =
+        Constraint.cast_expression expr1' (Type.arrow (expr2'.ty, outType))
       in
-      let outExpr = Term.Apply (castVal1, trgVal2) in
+      let outExpr = Term.Apply (castexpr1, expr2') in
       let outCs = Constraint.list_union [ omegaCt; cs1; cs2 ] in
       ((outExpr, outType), outCs)
   | Handle (hand, cmp) ->
-      (* Typecheck the handler and the computation *)
-      let trgHand, cs1 = infer_expression state hand in
-      (* Typecheck the handler *)
-      let trgCmp, cs2 = infer_computation state cmp in
-
-      (* Typecheck the computation *)
-
-      (* Generate fresh variables *)
-      let dirty1 = Type.fresh_dirty_with_fresh_skel () in
-      let dirty2 = Type.fresh_dirty_with_fresh_skel () in
-
-      (* Create all constraints *)
+      let hand', cs1 = infer_expression state hand in
+      let cmp', cs2 = infer_computation state cmp in
+      let out_ty = Type.fresh_dirty_with_fresh_skel () in
       let castHand, omegaCt1 =
-        Constraint.cast_expression trgHand (Type.handler (dirty1, dirty2))
+        Constraint.cast_expression hand' (Type.handler (cmp'.ty, out_ty))
       in
-      let castCmp, omegaCt23 = Constraint.cast_computation trgCmp dirty1 in
-
-      (* Combine all the outputs *)
-      let outExpr = Term.Handle (castHand, castCmp) in
-      let outCs = Constraint.list_union [ omegaCt1; omegaCt23; cs1; cs2 ] in
-      ((outExpr, dirty2), outCs)
+      let outExpr = Term.Handle (castHand, cmp') in
+      let outCs = Constraint.list_union [ omegaCt1; cs1; cs2 ] in
+      ((outExpr, out_ty), outCs)
   | Check cmp ->
       let cmp', cnstrs = infer_computation state cmp in
       ((Term.Check (loc, cmp'), Type.pure_ty Type.unit_ty), cnstrs)

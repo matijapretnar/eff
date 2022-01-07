@@ -4239,7 +4239,7 @@
   
   let op = _op
   
-  let _max _tycoer _tycoer _tycoer _tycoer _tycoer (_a : 'ty166) (_b : 'ty167) =
+  let _max _tycoer _tycoer _tycoer _tycoer _tycoer (_a : 'ty165) (_b : 'ty166) =
     coer_return
       (coer_arrow _tycoer (coer_return coer_refl_ty))
       (( > ) (_tycoer _a))
@@ -4380,7 +4380,7 @@
   
   type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
   
-  let _absurd _tycoer (_void : 'ty406) =
+  let _absurd _tycoer (_void : 'ty403) =
     match _tycoer _void with _ -> assert false
   
   let absurd = _absurd
