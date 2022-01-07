@@ -582,11 +582,6 @@ and tcComp' state loc : Untyped.plain_computation -> tcCompOutput' = function
       let subCmp = { it = Untyped.Let (rest, c2); at = c2.at } in
       tcComp' state loc (Untyped.Let ([ (pat, c1) ], subCmp))
   | LetRec (defs, c2) -> tcLetRecNoGen state defs c2
-  (* Pattern Matching: Special Case 2: Variable-binding *)
-  | Match (scr, [ (p, c) ]) when isLocatedVarPat p ->
-      tcComp' state loc
-        (Untyped.Let ([ (p, { it = Untyped.Value scr; at = p.at }) ], c))
-  (* Pattern Matching: General Case: Monomorphic patterns *)
   | Match (scr, cases) -> tcMatch state scr cases
   | Apply (val1, val2) -> tcApply state val1 val2
   | Handle (hand, cmp) -> tcHandle state hand cmp

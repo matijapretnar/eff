@@ -542,6 +542,7 @@ and reduce_computation' state comp =
         (optimize_computation state
            (Term.handle (exp, cast_computation state cmp drty_coer1)))
         drty_coer2
+  | Term.Match (exp, [ abs ]) -> beta_reduce state abs exp
   | Term.Match (({ term = Term.Const _; _ } as c), abs)
   | Term.Match (({ term = Term.Variant _; _ } as c), abs) -> (
       match reduce_constant_match state c abs with Some t -> t | None -> comp)
