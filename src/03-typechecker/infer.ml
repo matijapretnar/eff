@@ -62,34 +62,22 @@ let fresh_instantiation (params : Type.Params.t) (constraints : Constraints.t) =
   |> Constraints.DirtConstraints.fold_expanded add_dirt_constraint
        constraints.dirt_constraints
 
-module TypingEnv = struct
-  type t = (Term.Variable.t, TyScheme.t) Assoc.t
-
-  let empty = Assoc.empty
-
-  let update ctx x sch = Assoc.update x sch ctx
-end
-
 type state = {
-  variables : TypingEnv.t;
+  variables : TyScheme.t Term.Variable.Map.t;
   effects : (Type.ty * Type.ty) Effect.Map.t;
   type_definitions : TypeDefinitionContext.state;
 }
 
 (* Add a single term binding to the global typing environment *)
-let extend_var env x ty =
-  {
-    env with
-    variables = TypingEnv.update env.variables x (TyScheme.monotype ty);
-  }
-
 let extend_poly_var env x ty_scheme =
-  { env with variables = TypingEnv.update env.variables x ty_scheme }
+  { env with variables = Term.Variable.Map.add x ty_scheme env.variables }
+
+let extend_var env x ty = extend_poly_var env x (TyScheme.monotype ty)
 
 (* Initial type inference state: everything is empty *)
 let initial_state : state =
   {
-    variables = TypingEnv.empty;
+    variables = Term.Variable.Map.empty;
     effects = Effect.Map.empty;
     type_definitions = TypeDefinitionContext.initial_state;
   }
@@ -198,15 +186,13 @@ let rec infer_expression state exp =
   ({ term = trm; ty }, cnstrs)
 
 and infer_expression' state = function
-  | Untyped.Var x -> (
-      match Assoc.lookup x state.variables with
-      | None -> assert false
-      | Some ty_scheme ->
-          let subst, cnstrs =
-            fresh_instantiation ty_scheme.TyScheme.params ty_scheme.constraints
-          in
-          let x = Term.poly_var x subst ty_scheme.ty in
-          ((x.term, x.ty), cnstrs))
+  | Untyped.Var x ->
+      let ty_scheme = Term.Variable.Map.find x state.variables in
+      let subst, cnstrs =
+        fresh_instantiation ty_scheme.TyScheme.params ty_scheme.constraints
+      in
+      let x = Term.poly_var x subst ty_scheme.ty in
+      ((x.term, x.ty), cnstrs)
   | Untyped.Const c -> ((Term.Const c, Type.type_const c), Constraint.empty)
   | Untyped.Annotated (e, ty) ->
       let e', cnstrs = infer_expression state e in
