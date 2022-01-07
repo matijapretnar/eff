@@ -378,56 +378,15 @@ and infer_computation' ~loc state = function
   | Let ([], c2) ->
       let c, cnstrs = infer_computation state c2 in
       (c, cnstrs)
-  | Let ([ (pdef, c1) ], c2) -> (
-      match c1.it with
-      | Untyped.Value e1 ->
-          let trgE1, cs1 = infer_expression state e1 in
-
-          (* 2: Typecheck abstraction *)
-          let abs, cs2 = infer_abstraction state (pdef, c2) in
-          let ty_in, _ = abs.ty in
-          (* 3: Combine the results *)
-          let exp', cnstr = Constraint.cast_expression trgE1 ty_in in
-          let outExpr = Term.letVal (exp', abs) in
-          let outCs = Constraint.list_union [ cnstr; cs1; cs2 ] in
-          (outExpr, outCs)
-      | _other_computation ->
-          (* 1: Typecheck c1, the pattern, and c2 *)
-          let trgC1, cs1 = infer_computation state c1 in
-          let tyA1, dirtD1 = trgC1.ty in
-          let trgPat, vars, csPat = infer_pattern state pdef in
-          let midState = extend_state vars state in
-          let csPat' = Constraint.add_ty_equality (trgPat.ty, tyA1) csPat in
-          let trgC2, cs2 = infer_computation midState c2 in
-          let tyA2, dirtD2 = trgC2.ty in
-
-          (* 2: Generate a fresh dirt variable for the result *)
-          let delta = Dirt.fresh () in
-
-          (* 3: Generate the coercions for the dirts *)
-          let omega1, omegaCt1 = Constraint.fresh_dirt_coer (dirtD1, delta) in
-          (* s2(D1) <= delta *)
-          let omega2, omegaCt2 = Constraint.fresh_dirt_coer (dirtD2, delta) in
-
-          (*    D2  <= delta *)
-          let cresC1 =
-            Term.castComp
-              (trgC1, Coercion.bangCoercion (Coercion.reflTy tyA1, omega1))
-          in
-          let cresC2 =
-            Term.castComp
-              (trgC2, Coercion.bangCoercion (Coercion.reflTy tyA2, omega2))
-          in
-
-          let outExpr =
-            Term.bind
-              (cresC1, Term.abstraction ({ trgPat with ty = tyA1 }, cresC2))
-          in
-          let outCs =
-            Constraint.list_union [ omegaCt1; omegaCt2; cs1; cs2; csPat' ]
-          in
-
-          (outExpr, outCs))
+  | Let ([ (pdef, c1) ], c2) ->
+      let trgC1, cs1 = infer_computation state c1 in
+      let trgC2, cs2 = infer_abstraction state (pdef, c2) in
+      let ty1', (ty2, _) = trgC2.ty in
+      let delta = Dirt.fresh () in
+      let cresC1, omegaCt1 = Constraint.cast_computation trgC1 (ty1', delta) in
+      let cresC2, omegaCt2 = Constraint.cast_abstraction trgC2 (ty2, delta) in
+      let outCs = Constraint.list_union [ omegaCt1; omegaCt2; cs1; cs2 ] in
+      (Term.bind (cresC1, cresC2), outCs)
   | Let ((pat, c1) :: rest, c2) ->
       let subCmp = { it = Untyped.Let (rest, c2); at = c2.at } in
       infer_computation' ~loc state (Untyped.Let ([ (pat, c1) ], subCmp))
