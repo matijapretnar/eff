@@ -68,11 +68,12 @@ type state = {
   type_definitions : TypeDefinitionContext.state;
 }
 
-(* Add a single term binding to the global typing environment *)
-let extend_poly_var env x ty_scheme =
-  { env with variables = Term.Variable.Map.add x ty_scheme env.variables }
+let extend_poly_var x ty_scheme state =
+  { state with variables = Term.Variable.Map.add x ty_scheme state.variables }
 
-let extend_var env x ty = extend_poly_var env x (TyScheme.monotype ty)
+let extend_var x ty state = extend_poly_var x (TyScheme.monotype ty) state
+
+let extend_vars vars state = Term.Variable.Map.fold extend_var vars state
 
 (* Initial type inference state: everything is empty *)
 let initial_state : state =
@@ -164,9 +165,6 @@ and infer_pattern' ~loc state = function
           ([], Term.Variable.Map.empty, Constraint.empty)
       in
       (Term.pRecord out_ty (Type.Field.Map.of_bindings flds'), vars, cnstrs')
-
-let extend_state vars state =
-  Term.Variable.Map.fold (fun x ty state -> extend_var state x ty) vars state
 
 (* ************************************************************************* *)
 (*                             VALUE TYPING                                  *)
@@ -388,7 +386,7 @@ and infer_computation' ~loc state = function
       let defs', cs1 = infer_rec_definitions state defs in
       let state' =
         List.fold_left
-          (fun state (x, abs) -> extend_var state x (Type.arrow abs.ty))
+          (fun state (x, abs) -> extend_var x (Type.arrow abs.ty) state)
           state (Assoc.to_list defs')
       in
       (* 3: Typecheck c2 *)
@@ -458,7 +456,7 @@ and infer_rec_definitions state defs =
   let state' =
     List.fold_left
       (fun state (x, _, alpha, betadelta, _) ->
-        extend_var state x (Type.arrow (alpha, betadelta)))
+        extend_var x (Type.arrow (alpha, betadelta)) state)
       state defs'
   in
   let defs'', cnstrs =
@@ -478,7 +476,7 @@ and infer_rec_definitions state defs =
 
 and infer_abstraction state (pat, cmp) : Term.abstraction * Constraint.t =
   let trgPat, vars, cs1 = infer_pattern state pat in
-  let state' = extend_state vars state in
+  let state' = extend_vars vars state in
   let trgCmp, cs2 = infer_computation state' cmp in
   (Term.abstraction (trgPat, trgCmp), Constraint.union cs1 cs2)
 
@@ -487,7 +485,7 @@ and infer_abstraction2 state (pat1, pat2, cmp) :
   let trgPat1, vars1, cs1 = infer_pattern state pat1 in
   let trgPat2, vars2, cs2 = infer_pattern state pat2 in
   let state' =
-    extend_state (Term.Variable.Map.compatible_union vars1 vars2) state
+    extend_vars (Term.Variable.Map.compatible_union vars1 vars2) state
   in
   let trgCmp, cs = infer_computation state' cmp in
   ( Term.abstraction2 (trgPat1, trgPat2, trgCmp),
@@ -539,7 +537,7 @@ let process_top_let ~loc state defs =
     in
     let state'' =
       Term.Variable.Map.fold
-        (fun x ty state -> extend_poly_var state x { params; constraints; ty })
+        (fun x ty state -> extend_poly_var x { params; constraints; ty } state)
         vars' state'
     in
     Exhaust.is_irrefutable state.type_definitions pat;
@@ -561,7 +559,7 @@ let process_top_let_rec ~loc state un_defs =
         let (ty_scheme : TyScheme.t) =
           TyScheme.{ params; constraints; ty = Type.arrow abs.ty }
         in
-        let state' = extend_poly_var state f ty_scheme in
+        let state' = extend_poly_var f ty_scheme state in
         (state', (f, (params, constraints, abs)) :: defs))
       defs (state, [])
   in
@@ -596,4 +594,4 @@ let load_primitive_effect state eff prim =
 
 let load_primitive_value state x prim =
   let ty = TypeCheckerPrimitives.primitive_value_type_scheme prim in
-  extend_poly_var state x ty
+  extend_poly_var x ty state
