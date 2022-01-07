@@ -78,13 +78,10 @@ let effect_to_symbol ~loc state name =
   | Some sym -> (state, sym)
   | None -> Error.syntax ~loc "Unknown effect %s" name
 
-let field_to_symbol state name =
+let field_to_symbol ~loc state name =
   match StringMap.find_opt name state.field_symbols with
   | Some sym -> (state, sym)
-  | None ->
-      let sym = Type.Field.fresh name in
-      let field_symbols' = StringMap.add name sym state.field_symbols in
-      ({ state with field_symbols = field_symbols' }, sym)
+  | None -> Error.syntax ~loc "Unknown field %s" name
 
 let tyname_to_symbol ~loc state name =
   match StringMap.find_opt name state.tyname_symbols with
@@ -158,8 +155,14 @@ let desugar_tydef ~loc state params ty_name def =
     match def with
     | Sugared.TyRecord flds ->
         let field_desugar st (f, t) =
-          let st', f' = field_to_symbol st f in
-          let st'', t' = desugar_type ty_sbst st' t in
+          let f' = Type.Field.fresh f in
+          let st', t' = desugar_type ty_sbst st t in
+          let st'' =
+            {
+              st' with
+              field_symbols = add_unique ~loc "Field" f f' st'.field_symbols;
+            }
+          in
           (st'', (f', t'))
         in
         let state', flds' = Assoc.kfold_map field_desugar state flds in
@@ -278,7 +281,7 @@ let desugar_pattern state p =
           (state', Untyped.PTuple ps')
       | Sugared.PRecord flds ->
           let field_desugar st (f, p) =
-            let st', f' = field_to_symbol st f in
+            let st', f' = field_to_symbol ~loc st f in
             let st'', p' = desugar_pattern st' p in
             (st'', (f', p'))
           in
@@ -355,7 +358,7 @@ let rec desugar_expression state { it = t; at = loc } =
     | Sugared.Record ts ->
         if not (List.no_duplicates (Assoc.keys_of ts)) then
           Error.syntax ~loc "Fields in a record must be distinct";
-        let state', w, es = desugar_record_fields state ts in
+        let state', w, es = desugar_record_fields ~loc state ts in
         (state', w, Untyped.Record es)
     | Sugared.Variant (lbl, t) -> (
         match StringMap.find_opt lbl state.constructors with
@@ -514,10 +517,10 @@ and desugar_expressions state = function
       let state'', ws, es = desugar_expressions state' ts in
       (state'', w @ ws, e :: es)
 
-and desugar_record_fields state flds =
+and desugar_record_fields ~loc state flds =
   Assoc.fold_right
     (fun (fld, t) (st, ws, mp) ->
-      let state', fld' = field_to_symbol st fld in
+      let state', fld' = field_to_symbol ~loc st fld in
       let state'', w, e = desugar_expression state' t in
       (state'', w @ ws, Type.Field.Map.add fld' e mp))
     flds

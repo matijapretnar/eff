@@ -8,8 +8,8 @@
   ======================================================================
   invalid/duplicate_field_tydef_record.eff
   ----------------------------------------------------------------------
-  Typing error (file "invalid/duplicate_field_tydef_record.eff", line 2, char 1):
-  Field labels in a record type must be distinct
+  Syntax error (file "invalid/duplicate_field_tydef_record.eff", line 2, char 1):
+  Field a defined multiple times.
   ======================================================================
   invalid/duplicate_let.eff
   ----------------------------------------------------------------------
@@ -84,8 +84,8 @@
   ======================================================================
   invalid/shadow_field.eff
   ----------------------------------------------------------------------
-  Typing error (file "invalid/shadow_field.eff", line 2, char 1):
-  Record field label horn is already used in type cow
+  Syntax error (file "invalid/shadow_field.eff", line 2, char 1):
+  Field horn defined multiple times.
   ======================================================================
   invalid/shadow_label.eff
   ----------------------------------------------------------------------
