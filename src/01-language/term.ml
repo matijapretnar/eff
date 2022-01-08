@@ -1,9 +1,6 @@
 open Utils
 (** Syntax of the core language. *)
 
-module Variable = Symbol.Make (Symbol.String)
-(** variable symbols *)
-
 type variable = Variable.t
 
 type poly_variable = (Variable.t, TyScheme.t) typed

@@ -5,7 +5,7 @@ type return_clause_kind =
   | FixedReturnClause of Term.abstraction
   | VaryingReturnClause
 
-exception ReturnClauseNotFixed of Language.Term.Variable.t
+exception ReturnClauseNotFixed of Language.Variable.t
 
 type optimization_config = {
   specialize_functions : bool;
@@ -16,11 +16,11 @@ type optimization_config = {
 }
 
 type state = {
-  declared_functions : (Language.Term.Variable.t, Term.abstraction) Assoc.t;
+  declared_functions : (Language.Variable.t, Term.abstraction) Assoc.t;
   fuel : int;
   (* Cache of already specialized functions *)
   specialized_functions :
-    ( Term.EffectFingerprint.t * Language.Term.Variable.t,
+    ( Term.EffectFingerprint.t * Language.Variable.t,
       Term.variable * Type.ty * return_clause_kind )
     Assoc.t;
   config : optimization_config;
@@ -59,7 +59,7 @@ type inlinability =
 let abstraction_inlinability { term = pat, cmp; _ } =
   match pat.term with
   | Term.PVar v
-    when Term.Variable.fold
+    when Variable.fold
            (fun v _ -> String.length v >= 3 && String.sub v 0 3 = "___")
            v ->
       NotInlinable
@@ -67,7 +67,7 @@ let abstraction_inlinability { term = pat, cmp; _ } =
       let free_vars_cmp = Term.free_vars_comp cmp in
       let aux x _ inlinability =
         let occ =
-          Term.Variable.Map.find_opt x free_vars_cmp |> Option.value ~default:0
+          Variable.Map.find_opt x free_vars_cmp |> Option.value ~default:0
         in
         if occ > 1 then NotInlinable
         else
@@ -75,7 +75,7 @@ let abstraction_inlinability { term = pat, cmp; _ } =
           | NotPresent -> if occ = 0 then NotPresent else Inlinable
           | inlinability -> inlinability
       in
-      Term.Variable.Map.fold aux (Term.pattern_vars pat) NotPresent
+      Variable.Map.fold aux (Term.pattern_vars pat) NotPresent
 
 let keep_used_bindings defs cmp =
   (* Do proper call graph analysis *)
@@ -429,7 +429,7 @@ and reduce_computation' state comp =
       in
       let attempt_specialization ret_clause_kinds =
         let add_specialized specialized (f, abs) =
-          let f' = Language.Term.Variable.refresh f in
+          let f' = Language.Variable.refresh f in
           let ret_clause_kind =
             match Assoc.lookup f ret_clause_kinds with
             | Some ret_clause_kind -> ret_clause_kind

@@ -4,17 +4,17 @@ open Language
 module V = Value
 
 type state = {
-  environment : V.value Term.Variable.Map.t;
+  environment : V.value Variable.Map.t;
   runners : (V.value -> V.value) Effect.Map.t;
 }
 
 let initial_state =
-  { environment = Term.Variable.Map.empty; runners = Effect.Map.empty }
+  { environment = Variable.Map.empty; runners = Effect.Map.empty }
 
 let update x v state =
-  { state with environment = Term.Variable.Map.add x v state.environment }
+  { state with environment = Variable.Map.add x v state.environment }
 
-let lookup x state = Term.Variable.Map.find_opt x state.environment
+let lookup x state = Variable.Map.find_opt x state.environment
 
 let add_runner eff runner state =
   { state with runners = Effect.Map.add eff.term runner state.runners }
@@ -118,8 +118,7 @@ and veval state e =
       match lookup x.variable state with
       | Some v -> v
       | None ->
-          Error.runtime "Name %t is not defined."
-            (Term.Variable.print x.variable))
+          Error.runtime "Name %t is not defined." (Variable.print x.variable))
   | Term.Const c -> V.Const c
   (* | Term.Annotated (t, _ty) -> veval state t *)
   | Term.Tuple es -> V.Tuple (List.map (veval state) es)

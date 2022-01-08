@@ -45,7 +45,7 @@ module Backend : Language.Backend.S = struct
     Assoc.iter
       (fun (f, ((params : Type.Params.t), _constraints, abs)) ->
         Format.fprintf !Config.output_formatter "@[val %t : %t = <fun>@]@."
-          (Language.Term.Variable.print f)
+          (Language.Variable.print f)
           (Type.print_pretty params.skel_params (Type.arrow abs.ty).ty))
       defs;
     Eval.extend_let_rec state (Assoc.map (fun (_, _, abs) -> abs) defs)

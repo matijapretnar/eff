@@ -2,7 +2,7 @@ open Utils
 
 (** Syntax of the core language. *)
 
-type variable = Term.Variable.t
+type variable = Variable.t
 
 type effect = Effect.t
 
@@ -64,8 +64,8 @@ and abstraction2 = pattern * pattern * computation
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match p.it with
-  | PVar x -> print "%t" (Term.Variable.print x)
-  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Term.Variable.print x)
+  | PVar x -> print "%t" (Variable.print x)
+  | PAs (p, x) -> print "%t as %t" (print_pattern p) (Variable.print x)
   | PAnnotated (p, _ty) -> print_pattern ?max_level p ppf
   | PConst c -> Const.print c ppf
   | PTuple lst -> Print.tuple print_pattern lst ppf
@@ -117,7 +117,7 @@ let rec print_computation ?max_level c ppf =
 and print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match e.it with
-  | Var x -> print "%t" (Term.Variable.print x)
+  | Var x -> print "%t" (Variable.print x)
   | Const c -> print "%t" (Const.print c)
   | Annotated (t, _ty) -> print_expression ?max_level t ppf
   | Tuple lst -> Print.tuple print_expression lst ppf
@@ -143,7 +143,7 @@ and let_abstraction (p, c) ppf =
   Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
 
 and letrec_abstraction (v, (p, c)) ppf =
-  Format.fprintf ppf "%t %t = %t" (Term.Variable.print v) (print_pattern p)
+  Format.fprintf ppf "%t %t = %t" (Variable.print v) (print_pattern p)
     (print_computation c)
 
 and case a ppf = Format.fprintf ppf "%t" (abstraction a)

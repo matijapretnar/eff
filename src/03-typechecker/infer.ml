@@ -63,22 +63,22 @@ let fresh_instantiation (params : Type.Params.t) (constraints : Constraints.t) =
        constraints.dirt_constraints
 
 type state = {
-  variables : TyScheme.t Term.Variable.Map.t;
+  variables : TyScheme.t Variable.Map.t;
   effects : Term.effect Effect.Map.t;
   type_definitions : TypeDefinitionContext.state;
 }
 
 let extend_poly_var x ty_scheme state =
-  { state with variables = Term.Variable.Map.add x ty_scheme state.variables }
+  { state with variables = Variable.Map.add x ty_scheme state.variables }
 
 let extend_var x ty state = extend_poly_var x (TyScheme.monotype ty) state
 
-let extend_vars vars state = Term.Variable.Map.fold extend_var vars state
+let extend_vars vars state = Variable.Map.fold extend_var vars state
 
 (* Initial type inference state: everything is empty *)
 let initial_state : state =
   {
-    variables = Term.Variable.Map.empty;
+    variables = Variable.Map.empty;
     effects = Effect.Map.empty;
     type_definitions = TypeDefinitionContext.initial_state;
   }
@@ -161,7 +161,7 @@ let rec infer_expression state exp =
 
 and infer_expression' state = function
   | Untyped.Var x ->
-      let ty_scheme = Term.Variable.Map.find x state.variables in
+      let ty_scheme = Variable.Map.find x state.variables in
       let subst, cnstrs =
         fresh_instantiation ty_scheme.TyScheme.params ty_scheme.constraints
       in
@@ -394,7 +394,7 @@ and infer_abstraction2 state (pat1, pat2, cmp) :
   let trgPat2, cs2 = infer_pattern state pat2 in
   let state' =
     extend_vars
-      (Term.Variable.Map.compatible_union
+      (Variable.Map.compatible_union
          (Term.pattern_vars trgPat1)
          (Term.pattern_vars trgPat2))
       state
@@ -437,9 +437,7 @@ let process_top_let ~loc state defs =
       (Term.apply_sub_pat sub pat', Term.apply_sub_comp sub cmp')
     in
     let vars' =
-      Term.Variable.Map.map
-        (Substitution.apply_sub_ty sub)
-        (Term.pattern_vars pat')
+      Variable.Map.map (Substitution.apply_sub_ty sub) (Term.pattern_vars pat')
     in
     let params =
       match cmp.it with
@@ -450,7 +448,7 @@ let process_top_let ~loc state defs =
       | _ -> Type.Params.empty
     in
     let state'' =
-      Term.Variable.Map.fold
+      Variable.Map.fold
         (fun x ty state -> extend_poly_var x { params; constraints; ty } state)
         vars' state'
     in

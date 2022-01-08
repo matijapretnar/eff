@@ -29,8 +29,8 @@ and of_expression exp =
           let e' = of_expression e in
           match (p', e') with
           | PVar v1, Var v2
-            when v1 = v2
-                 && Term.Variable.fold (fun desc _ -> desc = "$function") v1 ->
+            when v1 = v2 && Variable.fold (fun desc _ -> desc = "$function") v1
+            ->
               let converter abs = ValueClause (of_abstraction abs) in
               Function (List.map converter abs_lst)
           | _ -> Lambda (of_abstraction abs))
@@ -50,7 +50,7 @@ and of_handler
       (Assoc.to_list effect_part)
   in
   let value_clause' = ValueClause (of_abstraction value_clause) in
-  let ghost_bind = Term.Variable.fresh "$c_thunk" in
+  let ghost_bind = Variable.fresh "$c_thunk" in
   let match_handler =
     Match (Apply (Var ghost_bind, Tuple []), value_clause' :: effect_clauses')
   in

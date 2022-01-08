@@ -25,7 +25,7 @@ module Backend : Language.Backend.S = struct
     prog : (SyntaxNoEff.cmd * Language.Constraints.t list) list;
     no_eff_optimizer_state : NoEffOptimizer.state;
     primitive_values :
-      (Language.Term.Variable.t, Language.Primitives.primitive_value) Assoc.t;
+      (Language.Variable.t, Language.Primitives.primitive_value) Assoc.t;
     primitive_effects : Term.effect list;
   }
 

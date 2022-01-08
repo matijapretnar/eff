@@ -23,7 +23,7 @@ let add_unique ~loc kind str symb string_map =
     string_map
 
 type state = {
-  context : Term.Variable.t StringMap.t;
+  context : Variable.t StringMap.t;
   effect_symbols : Effect.t StringMap.t;
   field_symbols : Type.Field.t StringMap.t;
   tyname_symbols : (TyName.t * (Type.TyParam.t * variance) list) StringMap.t;
@@ -282,8 +282,8 @@ let desugar_tydefs ~loc (state : state) sugared_defs =
 
 (** [fresh_var opt] creates a fresh variable on each call *)
 let fresh_var = function
-  | None -> Term.Variable.fresh "$anon"
-  | Some x -> Term.Variable.fresh x
+  | None -> Variable.fresh "$anon"
+  | Some x -> Variable.fresh x
 
 let id_abstraction loc =
   let x = fresh_var (Some "$id_par") in

@@ -7,7 +7,7 @@ type optimization_config = { purity_aware_translation : bool }
 
 type state = {
   inlinable_primitives :
-    (Language.Term.Variable.t, Language.Primitives.primitive_value) Assoc.t;
+    (Language.Variable.t, Language.Primitives.primitive_value) Assoc.t;
   optimization_config : optimization_config;
 }
 
@@ -77,7 +77,7 @@ let pp_variable ?(safe = true) state var ppf =
               | _ -> Format.fprintf ppf "_x_%d" n)
           | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
       in
-      Language.Term.Variable.fold printer var
+      Language.Variable.fold printer var
 
 let pp_field pp sep (field, value) ppf =
   print ppf "%t %s %t" (Type.Field.print field) sep (pp value)

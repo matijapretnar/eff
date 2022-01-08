@@ -29,7 +29,7 @@ val desugar_top_let :
 val desugar_top_let_rec :
   state ->
   (SugaredSyntax.variable * SugaredSyntax.term) list ->
-  state * (Term.Variable.t * UntypedSyntax.abstraction) list
+  state * (Variable.t * UntypedSyntax.abstraction) list
 
 val desugar_tydefs :
   loc:Utils.Location.t ->

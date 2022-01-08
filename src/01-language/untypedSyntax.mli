@@ -2,7 +2,7 @@ open Utils
 
 (** Syntax of the core language. *)
 
-type variable = Term.Variable.t
+type variable = Variable.t
 
 type effect = Effect.t
 

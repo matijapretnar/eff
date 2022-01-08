@@ -327,7 +327,7 @@ let rec print_coercion ?max_level coer ppf =
   | NCoerTuple _ls -> print "tuplecoer"
   | NCoerApply (_ty_name, _cs) -> print "applycoer"
 
-let print_variable = Language.Term.Variable.print ~safe:true
+let print_variable = Language.Variable.print ~safe:true
 
 let rec print_pattern ?max_level p ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in

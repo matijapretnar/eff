@@ -2,7 +2,7 @@ open Language
 module Assoc = Utils.Assoc
 module Print = Utils.Print
 
-type variable = Term.Variable.t
+type variable = Variable.t
 (** Syntax of the core language. *)
 
 type effect = Effect.t

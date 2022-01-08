@@ -31,7 +31,7 @@ let print_variable var ppf =
           | _ -> Format.fprintf ppf "_x_%d" n)
       | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
   in
-  Term.Variable.fold printer var
+  Variable.fold printer var
 
 let print_effect eff ppf = Effect.print eff ppf
 
