@@ -1,4 +1,5 @@
 open Utils
+open Language
 
 (** Syntax of the core language. *)
 

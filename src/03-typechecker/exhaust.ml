@@ -1,6 +1,6 @@
 open Utils
 open Language
-module Untyped = UntypedSyntax
+module Untyped = Parser.UntypedSyntax
 
 (* Pattern matching exhaustiveness checking as described by Maranget [1]. These
    functions assume that patterns are type correct, so they should be run only

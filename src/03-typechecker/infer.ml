@@ -1,7 +1,7 @@
 open Utils
 module TypeCheckerPrimitives = Primitives
 open Language
-module Untyped = UntypedSyntax
+module Untyped = Parser.UntypedSyntax
 
 let identity_instantiation (params : Type.Params.t)
     (constraints : Constraints.t) =
@@ -414,7 +414,7 @@ let process_computation state comp =
   let cmp' = Term.apply_sub_comp sub comp' in
   let params =
     match comp.it with
-    | Language.UntypedSyntax.Value _ ->
+    | Parser.UntypedSyntax.Value _ ->
         Type.Params.union
           (Type.free_params_dirty cmp'.ty)
           (Constraints.free_params residuals)
@@ -441,7 +441,7 @@ let process_top_let ~loc state defs =
     in
     let params =
       match cmp.it with
-      | Language.UntypedSyntax.Value _ ->
+      | Parser.UntypedSyntax.Value _ ->
           Type.Params.union
             (Type.free_params_dirty cmp''.ty)
             (Constraints.free_params constraints)

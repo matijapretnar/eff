@@ -6,12 +6,12 @@
 *)
 
 val is_irrefutable :
-  TypeDefinitionContext.state -> Language.UntypedSyntax.pattern -> unit
+  TypeDefinitionContext.state -> Parser.UntypedSyntax.pattern -> unit
 (** Check that a pattern is irrefutable. *)
 
 val check_computation :
-  TypeDefinitionContext.state -> Language.UntypedSyntax.computation -> unit
+  TypeDefinitionContext.state -> Parser.UntypedSyntax.computation -> unit
 
 val check_expression :
-  TypeDefinitionContext.state -> Language.UntypedSyntax.expression -> unit
+  TypeDefinitionContext.state -> Parser.UntypedSyntax.expression -> unit
 (** Check for refutable patterns in let statements and non-exhaustive match statements. *)
