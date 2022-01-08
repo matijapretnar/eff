@@ -65,20 +65,17 @@ let abstraction_inlinability { term = pat, cmp; _ } =
       NotInlinable
   | _ ->
       let free_vars_cmp = Term.free_vars_comp cmp in
-      let rec check_variables = function
-        | [] -> NotPresent
-        | x :: xs -> (
-            let occ =
-              Term.Variable.Map.find_opt x free_vars_cmp
-              |> Option.value ~default:0
-            in
-            if occ > 1 then NotInlinable
-            else
-              match check_variables xs with
-              | NotPresent -> if occ = 0 then NotPresent else Inlinable
-              | inlinability -> inlinability)
+      let aux x _ inlinability =
+        let occ =
+          Term.Variable.Map.find_opt x free_vars_cmp |> Option.value ~default:0
+        in
+        if occ > 1 then NotInlinable
+        else
+          match inlinability with
+          | NotPresent -> if occ = 0 then NotPresent else Inlinable
+          | inlinability -> inlinability
       in
-      check_variables (Term.pattern_vars pat)
+      Term.Variable.Map.fold aux (Term.pattern_vars pat) NotPresent
 
 let keep_used_bindings defs cmp =
   (* Do proper call graph analysis *)

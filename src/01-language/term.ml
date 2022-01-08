@@ -44,15 +44,20 @@ let pRecord ty flds =
 
 let rec pattern_vars pat =
   match pat.term with
-  | PVar x -> [ x ]
-  | PAs (p, x) -> x :: pattern_vars p
-  | PTuple lst -> List.flatten (List.map pattern_vars lst)
+  | PVar x -> Variable.Map.singleton x pat.ty
+  | PAs (p, x) -> Variable.Map.add x pat.ty (pattern_vars p)
+  | PTuple lst ->
+      List.fold_right
+        (fun p -> Variable.Map.compatible_union (pattern_vars p))
+        lst Variable.Map.empty
   | PRecord lst ->
-      List.flatten (List.map pattern_vars (Type.Field.Map.values lst))
-  | PVariant (_, None) -> []
+      Type.Field.Map.fold
+        (fun _fld p -> Variable.Map.compatible_union (pattern_vars p))
+        lst Variable.Map.empty
+  | PVariant (_, None) -> Variable.Map.empty
   | PVariant (_, Some p) -> pattern_vars p
-  | PConst _ -> []
-  | PNonbinding -> []
+  | PConst _ -> Variable.Map.empty
+  | PNonbinding -> Variable.Map.empty
 
 type expression = (expression', Type.ty) typed
 (** Pure expressions *)
@@ -778,10 +783,13 @@ and free_vars_handler h =
 and free_vars_finally_handler (h, finally_clause) =
   free_vars_handler h @@@ free_vars_abs finally_clause
 
-and free_vars_abs { term = p, c; _ } = free_vars_comp c --- pattern_vars p
+and free_vars_abs { term = p, c; _ } =
+  free_vars_comp c --- Variable.Map.keys (pattern_vars p)
 
 and free_vars_abs2 { term = p1, p2, c; _ } =
-  free_vars_comp c --- pattern_vars p2 --- pattern_vars p1
+  free_vars_comp c
+  --- Variable.Map.keys (pattern_vars p2)
+  --- Variable.Map.keys (pattern_vars p1)
 
 let does_not_occur v vars =
   match Variable.Map.find_opt v vars with Some x -> x = 0 | None -> true
