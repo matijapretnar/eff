@@ -241,97 +241,48 @@ and infer_expression' state = function
       (outVal, [ cnstrs ])
   | Untyped.Handler hand -> infer_handler state hand
 
-(* Handlers(Op Case) *)
-and infer_effect_clause state (dirtyOut : Type.dirty)
-    ((eff, abs2) : Untyped.effect * Untyped.abstraction2)
-      (* Op clause *)
-      (* Expected output type *) =
-  (* 1: Lookup the type of Opi *)
-  let eff' = Effect.Map.find eff state.effects in
-  let tyAi, tyBi = eff'.ty in
-
-  (* 2: Generate fresh variables for the type of the codomain of the continuation *)
-  let dirtyi = Type.fresh_dirty_with_fresh_skel () in
-
-  let ty_cont = Type.arrow (tyBi, dirtyi) in
-
-  (* 3: Typecheck the clause *)
-  let { term = trgPat1, trgPat2, trgCmp; _ }, cs =
-    infer_abstraction2 state abs2
-  in
-  let trgPat1' = { trgPat1 with ty = tyAi }
-  and trgPat2' = { trgPat2 with ty = ty_cont } in
-  let abs2 = Term.abstraction2 (trgPat1', trgPat2', trgCmp)
-  and csi =
-    cs
-    |> Constraint.add_ty_equality (trgPat1.ty, tyAi)
-    |> Constraint.add_ty_equality (trgPat2.ty, ty_cont)
-  in
-
-  let (xop, kop, trgCop), (_, _, (tyBOpi, dirtDOpi)) = (abs2.term, abs2.ty) in
-
-  (* 4: Make sure that the pattern for k is a variable one.
-   *    We do not support anything else at the moment *)
-  let k =
-    match kop.term with
-    | Term.PVar k -> k
-    | Term.PNonbinding -> Term.Variable.fresh "k"
-    | _ -> failwith __LOC__
-  in
-
-  (* 5: Generate all the needed constraints *)
-  let omega34i, omegaCt34i =
-    Constraint.fresh_dirty_coer ((tyBOpi, dirtDOpi), dirtyOut)
-  in
-  let leftty = Type.arrow (tyBi, dirtyOut) in
-  let rightty = Type.arrow (tyBi, dirtyi) in
-
-  (* 6: Create the elaborated clause *)
-  let l_pat, l_var = Term.fresh_variable "l" leftty in
-  let castExp, omegaCt5i = Constraint.cast_expression l_var rightty in
-  let lsub = Term.subst_comp (Assoc.of_list [ (k, castExp) ]) in
-  let outExpr =
-    (eff', Term.abstraction2 (xop, l_pat, Term.castComp (lsub trgCop, omega34i)))
-  in
-
-  (* 7: Combine the results *)
-  let outCs = Constraint.list_union [ omegaCt34i; omegaCt5i; csi ] in
-  (outExpr, outCs)
-
-(* Handlers *)
 and infer_handler state { Untyped.value_clause; effect_clauses; finally_clause }
     =
-  (* 1: Generate fresh variables for the input and output types *)
-  let dirt_row_param = Dirt.Param.fresh ()
-  and ty_mid = Type.fresh_ty_with_fresh_skel ()
-  and ty_out = Type.fresh_ty_with_fresh_skel () in
+  let ty_mid = Type.fresh_ty_with_fresh_skel ()
+  and ty_out = Type.fresh_ty_with_fresh_skel ()
+  and drt_out = Dirt.fresh () in
 
-  let drt_out = Dirt.fresh () in
+  let dirty_mid = (ty_mid, drt_out) and dirty_out = (ty_out, drt_out) in
 
-  (* 2: Process the return and the operation clauses *)
+  let infer_effect_clause (eff, abs2) =
+    let eff' = Effect.Map.find eff state.effects in
+    let ty_eff1, ty_eff2 = eff'.ty in
+    let ty_cont = Type.arrow (ty_eff2, dirty_mid) in
+    let { term = pat1, pat2, cmp; _ }, cs = infer_abstraction2 state abs2 in
+    let pat1' = { pat1 with ty = ty_eff1 }
+    and pat2' = { pat2 with ty = ty_cont } in
+    let csi =
+      cs
+      |> Constraint.add_ty_equality (pat1.ty, ty_eff1)
+      |> Constraint.add_ty_equality (pat2.ty, ty_cont)
+    in
+    let cmp', cast_cs = Constraint.cast_computation cmp dirty_mid in
+    let outExpr = (eff', Term.abstraction2 (pat1', pat2', cmp')) in
+    (outExpr, Constraint.list_union [ cast_cs; csi ])
+  in
+
   let value_clause', value_clause_cnstrs = infer_abstraction state value_clause
   and effect_clauses', effect_clauses_cnstrs =
-    infer_many
-      (infer_effect_clause state (ty_mid, drt_out))
-      (Assoc.to_list effect_clauses)
+    infer_many infer_effect_clause (Assoc.to_list effect_clauses)
   and finally_clause', finally_clause_cnstrs =
     infer_abstraction state finally_clause
   in
 
-  let drt_in =
-    Dirt.
-      {
-        effect_set = Term.handled_effects (Assoc.of_list effect_clauses');
-        row = Dirt.Row.Param dirt_row_param;
-      }
-  in
-
   let value_clause'', value_clause_cast_cnstrs =
-    Constraint.cast_abstraction value_clause' (ty_mid, drt_out)
+    Constraint.cast_abstraction value_clause' dirty_mid
   and finally_clause'', finally_clause_cast_cnstrs =
-    Constraint.full_cast_abstraction finally_clause' ty_mid (ty_out, drt_out)
+    Constraint.full_cast_abstraction finally_clause' ty_mid dirty_out
   in
 
+  let drt_in =
+    drt_out
+    |> Dirt.add_effects (Term.handled_effects (Assoc.of_list effect_clauses'))
+  in
   let handler =
     Term.handlerWithFinally
       (Term.handler_clauses value_clause''
