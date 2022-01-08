@@ -11,51 +11,6 @@ type effect_fingerprint = EffectFingerprint.t
 
 type effect = (Effect.t, Type.ty * Type.ty) typed
 
-type pattern = (pattern', Type.ty) typed
-
-and pattern' =
-  | PVar of variable
-  | PAs of pattern * variable
-  | PTuple of pattern list
-  | PRecord of pattern Type.Field.Map.t
-  | PVariant of Type.Label.t * pattern option
-  | PConst of Const.t
-  | PNonbinding
-
-let pVar p ty = { term = PVar p; ty }
-
-let pAs (p, x) = { term = PAs (p, x); ty = p.ty }
-
-let pNonbinding ty = { term = PNonbinding; ty }
-
-let pConst c = { term = PConst c; ty = Type.type_const c }
-
-let pTuple ps =
-  { term = PTuple ps; ty = Type.tuple (List.map (fun x -> x.ty) ps) }
-
-let pVariant (lbl, pat) ty = { term = PVariant (lbl, pat); ty }
-
-let pRecord ty flds =
-  (* Ideally, we could reconstruct ty from the field names *)
-  { term = PRecord flds; ty }
-
-let rec pattern_vars pat =
-  match pat.term with
-  | PVar x -> Variable.Map.singleton x pat.ty
-  | PAs (p, x) -> Variable.Map.add x pat.ty (pattern_vars p)
-  | PTuple lst ->
-      List.fold_right
-        (fun p -> Variable.Map.compatible_union (pattern_vars p))
-        lst Variable.Map.empty
-  | PRecord lst ->
-      Type.Field.Map.fold
-        (fun _fld p -> Variable.Map.compatible_union (pattern_vars p))
-        lst Variable.Map.empty
-  | PVariant (_, None) -> Variable.Map.empty
-  | PVariant (_, Some p) -> pattern_vars p
-  | PConst _ -> Variable.Map.empty
-  | PNonbinding -> Variable.Map.empty
-
 type expression = (expression', Type.ty) typed
 (** Pure expressions *)
 
@@ -101,13 +56,13 @@ and effect_clauses = {
   fingerprint : effect_fingerprint;
 }
 
-and abstraction = (pattern * computation, Type.ty * Type.dirty) typed
+and abstraction = (Pattern.t * computation, Type.ty * Type.dirty) typed
 (** Abstractions that take one argument. *)
 
 and rec_definitions = (variable, abstraction) Assoc.t
 
 and abstraction2 =
-  (pattern * pattern * computation, Type.ty * Type.ty * Type.dirty) typed
+  (Pattern.t * Pattern.t * computation, Type.ty * Type.ty * Type.dirty) typed
 (** Abstractions that take two arguments. *)
 
 type top_rec_definitions =
@@ -124,7 +79,7 @@ let poly_var x instantiation ty =
 
 let fresh_variable x ty =
   let x' = Variable.fresh x in
-  (pVar x' ty, mono_var x' ty)
+  (Pattern.pVar x' ty, mono_var x' ty)
 
 let const (c : Const.t) : expression =
   { term = Const c; ty = Type.tyBasic (Const.infer_ty c) }
@@ -267,22 +222,6 @@ let print_effect eff ppf = Print.print ppf "%t" (Effect.print eff.term)
 
 let print_variable x = Variable.print ~safe:true x
 
-let rec print_pattern ?max_level p ppf =
-  let print ?at_level = Print.print ?max_level ?at_level ppf in
-  match p.term with
-  | PVar x -> print "%t" (print_variable x)
-  | PAs (p, x) -> print "%t as %t" (print_pattern p) (print_variable x)
-  | PConst c -> Const.print c ppf
-  | PTuple lst -> Print.tuple print_pattern lst ppf
-  | PRecord lst ->
-      Print.record Type.Field.print print_pattern
-        (Type.Field.Map.bindings lst)
-        ppf
-  | PVariant (lbl, None) -> print ~at_level:0 "%t" (Type.Label.print lbl)
-  | PVariant (lbl, Some p) ->
-      print ~at_level:1 "%t %t" (Type.Label.print lbl) (print_pattern p)
-  | PNonbinding -> print "_"
-
 let rec print_expression ?max_level e ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   (* print "(%t : %t)" (print_expression' e.term) (Type.print_ty e.ty) *)
@@ -303,7 +242,7 @@ and print_expression' ?max_level e ppf =
       print ~at_level:1 "%t %t" (Type.Label.print lbl)
         (print_expression ~max_level:0 e)
   | Lambda { term = x, c; _ } ->
-      print ~at_level:2 "λ(%t:%t). %t" (print_pattern x) (Type.print_ty x.ty)
+      print ~at_level:2 "λ(%t:%t). %t" (Pattern.print x) (Type.print_ty x.ty)
         (print_computation c)
   | Handler h ->
       print "{ret %t; %t}"
@@ -351,7 +290,7 @@ and print_computation' ?max_level c ppf =
         (print_expression ~max_level:1 e)
         (print_abstraction a)
   | Bind (c1, { term = p, c2; _ }) ->
-      print ~at_level:3 "do %t ← %t in %t" (print_pattern p)
+      print ~at_level:3 "do %t ← %t in %t" (Pattern.print p)
         (print_computation c1)
         (print_computation ~max_level:3 c2)
   | CastComp (c1, dc) ->
@@ -359,7 +298,7 @@ and print_computation' ?max_level c ppf =
         (print_computation ~max_level:2 c1)
         (Coercion.print_dirty_coercion ~max_level:0 dc)
   | LetVal (e1, { term = p, c1; _ }) ->
-      print ~at_level:3 "let %t = %t in %t" (print_pattern p)
+      print ~at_level:3 "let %t = %t in %t" (Pattern.print p)
         (print_expression e1) (print_computation c1)
   | Check (_loc, c) ->
       print ~at_level:1 "check %t" (print_computation ~max_level:0 c)
@@ -369,15 +308,15 @@ and print_effect_clause (eff, a2) ppf =
   print ~at_level:2 "%t %t" (print_effect eff) (print_abstraction2 a2)
 
 and print_abstraction { term = p, c; _ } ppf =
-  Format.fprintf ppf "(%t:%t) ↦ %t" (print_pattern p) (Type.print_ty p.ty)
+  Format.fprintf ppf "(%t:%t) ↦ %t" (Pattern.print p) (Type.print_ty p.ty)
     (print_computation c)
 
 and print_abstraction2 { term = p1, p2, c; _ } ppf =
-  Format.fprintf ppf "%t %t ↦ %t" (print_pattern p1) (print_pattern p2)
+  Format.fprintf ppf "%t %t ↦ %t" (Pattern.print p1) (Pattern.print p2)
     (print_computation c)
 
 and print_let_abstraction { term = p, c; _ } ppf =
-  Format.fprintf ppf "%t = %t" (print_pattern p) (print_computation c)
+  Format.fprintf ppf "%t = %t" (Pattern.print p) (print_computation c)
 
 and print_let_rec_abstraction (f, abs) ppf =
   Format.fprintf ppf "(%t : %t) %t" (print_variable f)
@@ -498,42 +437,6 @@ let apply_substitutions_to_abstraction = apply_sub_abs
 
 let refresh_variable x = Variable.refresh x
 
-let rec refresh_pattern sbst pat =
-  let sbst', pat' = refresh_pattern' sbst pat.term in
-  (sbst', { pat with term = pat' })
-
-and refresh_pattern' sbst = function
-  | PVar x ->
-      let x' = refresh_variable x in
-      (Assoc.update x x' sbst, PVar x')
-  | PAs (p, x) ->
-      let x' = refresh_variable x in
-      let sbst, p' = refresh_pattern (Assoc.update x x' sbst) p in
-      (sbst, PAs (p', x'))
-  | PTuple ps ->
-      let sbst, ps' =
-        List.fold_right
-          (fun p (sbst, ps') ->
-            let sbst, p' = refresh_pattern sbst p in
-            (sbst, p' :: ps'))
-          ps (sbst, [])
-      in
-      (sbst, PTuple ps')
-  | PRecord flds ->
-      let sbst, flds' =
-        Type.Field.Map.fold
-          (fun lbl p (sbst, flds') ->
-            let sbst, p' = refresh_pattern sbst p in
-            (sbst, Type.Field.Map.add lbl p' flds'))
-          flds
-          (sbst, Type.Field.Map.empty)
-      in
-      (sbst, PRecord flds')
-  | PVariant (lbl, Some p) ->
-      let sbst, p' = refresh_pattern sbst p in
-      (sbst, PVariant (lbl, Some p'))
-  | (PConst _ | PNonbinding | PVariant (_, None)) as p -> (sbst, p)
-
 let rec refresh_expression sbst exp =
   { exp with term = refresh_expression' sbst exp.term }
 
@@ -610,12 +513,12 @@ and refresh_handler sbst { term = h; ty } =
   }
 
 and refresh_abstraction sbst { term = p, c; ty } =
-  let sbst, p' = refresh_pattern sbst p in
+  let sbst, p' = Pattern.refresh sbst p in
   { term = (p', refresh_computation sbst c); ty }
 
 and refresh_abstraction2 sbst { term = p1, p2, c; ty } =
-  let sbst, p1' = refresh_pattern sbst p1 in
-  let sbst, p2' = refresh_pattern sbst p2 in
+  let sbst, p1' = Pattern.refresh sbst p1 in
+  let sbst, p2' = Pattern.refresh sbst p2 in
   let c' = refresh_computation sbst c in
   { term = (p1', p2', c'); ty }
 
@@ -691,7 +594,7 @@ let pattern_match p e =
   assert (Type.equal_ty p.ty e.ty);
   let rec extend_subst p e sbst =
     match (p.term, e.term) with
-    | PVar x, _ -> Some (Assoc.update x e sbst)
+    | Pattern.PVar x, _ -> Some (Assoc.update x e sbst)
     | PAs (p, x), _ ->
         Option.bind (extend_subst p e sbst) (fun sbst ->
             Some (Assoc.update x e sbst))
@@ -781,12 +684,12 @@ and free_vars_finally_handler (h, finally_clause) =
   free_vars_handler h @@@ free_vars_abs finally_clause
 
 and free_vars_abs { term = p, c; _ } =
-  free_vars_comp c --- Variable.Map.keys (pattern_vars p)
+  free_vars_comp c --- Variable.Map.keys (Pattern.bound_vars p)
 
 and free_vars_abs2 { term = p1, p2, c; _ } =
   free_vars_comp c
-  --- Variable.Map.keys (pattern_vars p2)
-  --- Variable.Map.keys (pattern_vars p1)
+  --- Variable.Map.keys (Pattern.bound_vars p2)
+  --- Variable.Map.keys (Pattern.bound_vars p1)
 
 let does_not_occur v vars =
   match Variable.Map.find_opt v vars with Some x -> x = 0 | None -> true

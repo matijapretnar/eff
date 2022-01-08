@@ -35,7 +35,7 @@ module Backend : Language.Backend.S = struct
     | [ (pat, (params : Type.Params.t), _constraints, comp) ] ->
         let v = Eval.run state comp in
         Format.fprintf !Config.output_formatter "@[val %t : %t = %t@]@."
-          (Language.Term.print_pattern pat)
+          (Language.Pattern.print pat)
           (Type.print_pretty params.skel_params (fst comp.ty).ty)
           (V.print_value v);
         Eval.extend pat v state

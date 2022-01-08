@@ -23,14 +23,14 @@ exception PatternMatch
 
 let rec extend_value p v state =
   match (p.term, v) with
-  | Term.PVar x, v -> update x v state
-  (* | Term.PAnnotated (p, _t), v -> extend_value p v state *)
-  | Term.PAs (p, x), v ->
+  | Pattern.PVar x, v -> update x v state
+  (* | Pattern.PAnnotated (p, _t), v -> extend_value p v state *)
+  | Pattern.PAs (p, x), v ->
       let state = extend_value p v state in
       update x v state
-  | Term.PNonbinding, _ -> state
-  | Term.PTuple ps, V.Tuple vs -> List.fold_right2 extend_value ps vs state
-  | Term.PRecord ps, V.Record vs -> (
+  | Pattern.PNonbinding, _ -> state
+  | Pattern.PTuple ps, V.Tuple vs -> List.fold_right2 extend_value ps vs state
+  | Pattern.PRecord ps, V.Record vs -> (
       let extender f p state =
         match Type.Field.Map.find_opt f vs with
         | None -> raise Not_found
@@ -38,10 +38,11 @@ let rec extend_value p v state =
       in
       try Type.Field.Map.fold extender ps state
       with Not_found -> raise PatternMatch)
-  | Term.PVariant (lbl, None), V.Variant (lbl', None) when lbl = lbl' -> state
-  | Term.PVariant (lbl, Some p), V.Variant (lbl', Some v) when lbl = lbl' ->
+  | Pattern.PVariant (lbl, None), V.Variant (lbl', None) when lbl = lbl' ->
+      state
+  | Pattern.PVariant (lbl, Some p), V.Variant (lbl', Some v) when lbl = lbl' ->
       extend_value p v state
-  | Term.PConst c, V.Const c' when Const.equal c c' -> state
+  | Pattern.PConst c, V.Const c' when Const.equal c c' -> state
   | _, _ -> raise PatternMatch
 
 let extend p v state =

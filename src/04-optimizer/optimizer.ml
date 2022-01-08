@@ -58,7 +58,7 @@ type inlinability =
 
 let abstraction_inlinability { term = pat, cmp; _ } =
   match pat.term with
-  | Term.PVar v
+  | Pattern.PVar v
     when Variable.fold
            (fun v _ -> String.length v >= 3 && String.sub v 0 3 = "___")
            v ->
@@ -75,7 +75,7 @@ let abstraction_inlinability { term = pat, cmp; _ } =
           | NotPresent -> if occ = 0 then NotPresent else Inlinable
           | inlinability -> inlinability
       in
-      Variable.Map.fold aux (Term.pattern_vars pat) NotPresent
+      Variable.Map.fold aux (Pattern.bound_vars pat) NotPresent
 
 let keep_used_bindings defs cmp =
   (* Do proper call graph analysis *)
@@ -216,8 +216,8 @@ and optimize_abstraction state abs =
 and optimize_abstraction' state (pat, cmp) =
   let cmp' = optimize_computation state cmp in
   match (pat.term, cmp'.term) with
-  | Term.PVar v, Term.Match ({ term = Var v'; _ }, [ abs ])
-  | Term.PVar v, Term.LetVal ({ term = Var v'; _ }, abs)
+  | Pattern.PVar v, Term.Match ({ term = Var v'; _ }, [ abs ])
+  | Pattern.PVar v, Term.LetVal ({ term = Var v'; _ }, abs)
     when v = v'.variable && Term.does_not_occur v (Term.free_vars_abs abs) ->
       abs.term
   | _ -> (pat, cmp')
@@ -493,7 +493,7 @@ and reduce_computation' state comp =
                         }
                       in
                       let abs' =
-                        Term.abstraction (Term.pTuple [ pat; k_pat ], cmp)
+                        Term.abstraction (Pattern.pTuple [ pat; k_pat ], cmp)
                       in
                       (f', handle_abstraction state' hnd' abs')
                   | _ -> assert false)
@@ -562,7 +562,7 @@ let process_top_let state defs =
       List.fold_left
         (fun state (pat, _, _, comp) ->
           match (pat, comp) with
-          | ( { term = Term.PVar f; _ },
+          | ( { term = Pattern.PVar f; _ },
               { term = Term.Value { term = Term.Lambda abs; _ }; _ } ) ->
               add_function state f abs
           | _ -> state)

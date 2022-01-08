@@ -6,7 +6,7 @@ val of_computation : Term.computation -> Syntax.term
 
 val of_abstraction : Term.abstraction -> Syntax.abstraction
 
-val of_pattern : Term.pattern -> Syntax.pattern
+val of_pattern : Pattern.t -> Syntax.pattern
 
 val of_type : Type.ty -> Syntax.ty
 

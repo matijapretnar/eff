@@ -89,16 +89,16 @@ and of_computation cmp =
 
 and of_pattern pat =
   match pat.term with
-  | Term.PVar var -> PVar var
-  | Term.PAs (p, var) -> PAs (of_pattern p, var)
-  | Term.PTuple ps -> PTuple (List.map of_pattern ps)
-  | Term.PRecord assoc -> PRecord (Type.Field.Map.map of_pattern assoc)
-  | Term.PVariant (lbl, p_opt) -> (
+  | Pattern.PVar var -> PVar var
+  | Pattern.PAs (p, var) -> PAs (of_pattern p, var)
+  | Pattern.PTuple ps -> PTuple (List.map of_pattern ps)
+  | Pattern.PRecord assoc -> PRecord (Type.Field.Map.map of_pattern assoc)
+  | Pattern.PVariant (lbl, p_opt) -> (
       match p_opt with
       | None -> PVariant (lbl, None)
       | Some p -> PVariant (lbl, Some (of_pattern p)))
-  | Term.PConst const -> PConst const
-  | Term.PNonbinding -> PNonbinding
+  | Pattern.PConst const -> PConst const
+  | Pattern.PNonbinding -> PNonbinding
 
 and of_type ty =
   match ty.term with

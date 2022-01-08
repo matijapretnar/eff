@@ -13,7 +13,7 @@ module type S = sig
 
   val process_top_let :
     state ->
-    (Term.pattern * Type.Params.t * Constraints.t * Term.computation) list ->
+    (Pattern.t * Type.Params.t * Constraints.t * Term.computation) list ->
     state
 
   val process_top_let_rec : state -> Term.top_rec_definitions -> state

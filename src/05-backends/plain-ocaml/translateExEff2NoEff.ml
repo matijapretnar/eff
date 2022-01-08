@@ -247,7 +247,7 @@ and computation_coercion_to_impure_dirt empty_dirt_params (ty1, drt) =
 
 let rec elab_pattern state p =
   match p.term with
-  | PVar x -> PNVar x
+  | Pattern.PVar x -> PNVar x
   | PAs (p, x) -> PNAs (elab_pattern state p, x)
   | PTuple ps -> PNTuple (List.map (elab_pattern state) ps)
   | PConst c -> PNConst c
@@ -315,7 +315,7 @@ and elab_handler state h elabfc =
         let eff' = elab_effect eff in
         let elabcomp = elab_computation state comp in
         match p2.term with
-        | PVar x ->
+        | Pattern.PVar x ->
             ( eff',
               ( elab_pattern state p1,
                 elab_pattern state p2,
