@@ -96,74 +96,56 @@ let infer_many infer xs =
 (* ************************************************************************* *)
 
 let rec infer_pattern state pat =
-  let pat', vars, cnstrs = infer_pattern' ~loc:pat.at state pat.it in
-  (pat', vars, cnstrs)
+  let pat', cnstrs = infer_pattern' ~loc:pat.at state pat.it in
+  (pat', cnstrs)
 
 and infer_pattern' ~loc state = function
   | Untyped.PVar x ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
-      (Term.pVar x alpha, Term.Variable.Map.singleton x alpha, Constraint.empty)
+      (Term.pVar x alpha, Constraint.empty)
   | Untyped.PAnnotated (p, ty) ->
-      let p', vars, cnstrs = infer_pattern state p in
-      ({ p' with ty }, vars, Constraint.add_ty_equality (ty, p'.ty) cnstrs)
+      let p', cnstrs = infer_pattern state p in
+      ({ p' with ty }, Constraint.add_ty_equality (ty, p'.ty) cnstrs)
   | Untyped.PNonbinding ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
-      (Term.pNonbinding alpha, Term.Variable.Map.empty, Constraint.empty)
-  | Untyped.PConst c ->
-      (Term.pConst c, Term.Variable.Map.empty, Constraint.empty)
+      (Term.pNonbinding alpha, Constraint.empty)
+  | Untyped.PConst c -> (Term.pConst c, Constraint.empty)
   | Untyped.PTuple ps ->
-      let fold p (ps', vars, cnstrs) =
-        let p', vars', cnstrs' = infer_pattern state p in
-        ( p' :: ps',
-          Term.Variable.Map.compatible_union vars vars',
-          Constraint.union cnstrs' cnstrs )
-      in
-      let ps', vars, cnstrs =
-        List.fold_right fold ps ([], Term.Variable.Map.empty, Constraint.empty)
-      in
+      let ps', cnstrs = infer_many (infer_pattern state) ps in
       let p = Term.pTuple ps' in
-      (p, vars, cnstrs)
+      (p, Constraint.list_union cnstrs)
   | Untyped.PVariant (lbl, p) -> (
       match
         (p, TypeDefinitionContext.infer_variant lbl state.type_definitions)
       with
       | None, (None, out_ty) ->
-          ( Term.pVariant (lbl, None) out_ty,
-            Term.Variable.Map.empty,
-            Constraint.empty )
+          (Term.pVariant (lbl, None) out_ty, Constraint.empty)
       | Some p, (Some in_ty, out_ty) ->
-          let p', vars, cnstrs = infer_pattern state p in
+          let p', cnstrs = infer_pattern state p in
           ( Term.pVariant (lbl, Some p') out_ty,
-            vars,
             Constraint.add_ty_equality (in_ty, p'.ty) cnstrs )
       | _ -> assert false)
   | Untyped.PAs (p, x) ->
-      let p', vars, cnstrs = infer_pattern state p in
-      (Term.pAs (p', x), Term.Variable.Map.add x p'.ty vars, cnstrs)
+      let p', cnstrs = infer_pattern state p in
+      (Term.pAs (p', x), cnstrs)
   | Untyped.PRecord flds ->
       let hd_fld, _ = List.hd (Type.Field.Map.bindings flds) in
       let out_ty, (ty_name, fld_tys) =
         TypeDefinitionContext.infer_field hd_fld state.type_definitions
       in
-      let fold fld p (flds', vars, cnstrs) =
-        let p', vars', cnstrs' = infer_pattern state p in
+      let infer_field (fld, p) =
+        let p', cnstrs' = infer_pattern state p in
         match Type.Field.Map.find_opt fld fld_tys with
         | None ->
             Error.typing ~loc "Field %t does not belong to type %t"
               (Type.Field.print fld)
               (Language.TyName.print ty_name)
         | Some fld_ty ->
-            ( (fld, p') :: flds',
-              Term.Variable.Map.compatible_union vars vars',
-              Constraint.union
-                (Constraint.add_ty_equality (fld_ty, p'.ty) cnstrs')
-                cnstrs )
+            ((fld, p'), Constraint.add_ty_equality (fld_ty, p'.ty) cnstrs')
       in
-      let flds', vars, cnstrs' =
-        Language.TyName.Map.fold fold flds
-          ([], Term.Variable.Map.empty, Constraint.empty)
-      in
-      (Term.pRecord out_ty (Type.Field.Map.of_bindings flds'), vars, cnstrs')
+      let flds', cnstrs' = infer_many infer_field (Effect.Map.bindings flds) in
+      ( Term.pRecord out_ty (Type.Field.Map.of_bindings flds'),
+        Constraint.list_union cnstrs' )
 
 (* ************************************************************************* *)
 (*                             VALUE TYPING                                  *)
@@ -401,17 +383,21 @@ and infer_rec_definitions state defs =
   (Assoc.of_list defs'', Constraint.list_union cnstrs)
 
 and infer_abstraction state (pat, cmp) : Term.abstraction * Constraint.t =
-  let trgPat, vars, cs1 = infer_pattern state pat in
-  let state' = extend_vars vars state in
+  let trgPat, cs1 = infer_pattern state pat in
+  let state' = extend_vars (Term.pattern_vars trgPat) state in
   let trgCmp, cs2 = infer_computation state' cmp in
   (Term.abstraction (trgPat, trgCmp), Constraint.union cs1 cs2)
 
 and infer_abstraction2 state (pat1, pat2, cmp) :
     Term.abstraction2 * Constraint.t =
-  let trgPat1, vars1, cs1 = infer_pattern state pat1 in
-  let trgPat2, vars2, cs2 = infer_pattern state pat2 in
+  let trgPat1, cs1 = infer_pattern state pat1 in
+  let trgPat2, cs2 = infer_pattern state pat2 in
   let state' =
-    extend_vars (Term.Variable.Map.compatible_union vars1 vars2) state
+    extend_vars
+      (Term.Variable.Map.compatible_union
+         (Term.pattern_vars trgPat1)
+         (Term.pattern_vars trgPat2))
+      state
   in
   let trgCmp, cs = infer_computation state' cmp in
   ( Term.abstraction2 (trgPat1, trgPat2, trgCmp),
@@ -437,7 +423,7 @@ let process_computation state comp =
 
 let process_top_let ~loc state defs =
   let fold (pat, cmp) (state', defs) =
-    let pat', vars, cnstrs_pat = infer_pattern state pat in
+    let pat', cnstrs_pat = infer_pattern state pat in
     let cmp', cnstrs_cmp = infer_computation state cmp in
     let sub, constraints =
       Unification.solve ~loc
@@ -448,7 +434,11 @@ let process_top_let ~loc state defs =
     let pat'', cmp'' =
       (Term.apply_sub_pat sub pat', Term.apply_sub_comp sub cmp')
     in
-    let vars' = Term.Variable.Map.map (Substitution.apply_sub_ty sub) vars in
+    let vars' =
+      Term.Variable.Map.map
+        (Substitution.apply_sub_ty sub)
+        (Term.pattern_vars pat')
+    in
     let params =
       match cmp.it with
       | Language.UntypedSyntax.Value _ ->
