@@ -31,23 +31,7 @@ let list_tyname = TyName.fresh "list"
 
 let empty_tyname = TyName.fresh "empty"
 
-(** type parameters *)
-module TyParam = struct
-  include Symbol.Make (Symbol.Parameter (struct
-    let ascii_symbol = "ty"
-
-    let utf8_symbol = "\207\132"
-  end))
-
-  let print_old ?(poly = []) k ppf =
-    let c = if List.mem k poly then "'" else "'_" in
-    fold
-      (fun _ k ->
-        if 0 <= k && k <= 25 then
-          Format.fprintf ppf "%s%c" c (char_of_int (k + int_of_char 'a'))
-        else Format.fprintf ppf "%sty%i" c (k - 25))
-      k
-end
+module TyParam = Utils.TyParam
 
 (** type coercion parameters *)
 module TyCoercionParam = Symbol.Make (Symbol.Parameter (struct
@@ -67,7 +51,8 @@ type ty = (ty', Skeleton.t) typed
 
 and ty' =
   | TyParam of TyParam.t
-  | Apply of { ty_name : TyName.t; ty_args : ty list }
+  | Apply of { ty_name : TyName.t; ty_args : (ty * variance) TyParam.Map.t }
+  (* | Apply of { ty_name : TyName.t; ty_args : ty list } *)
   | Arrow of abs_ty
   | Tuple of ty list
   | Handler of dirty * dirty
@@ -88,13 +73,17 @@ let rec print_ty ?max_level ty ppf =
   | Arrow (t1, (t2, drt)) ->
       print ~at_level:3 "%t -%t→ %t" (print_ty ~max_level:2 t1)
         (Dirt.print drt) (print_ty ~max_level:3 t2)
-  | Apply { ty_name; ty_args = [] } -> print "%t" (TyName.print ty_name)
-  | Apply { ty_name; ty_args = [ s ] } ->
-      print ~at_level:1 "%t %t" (print_ty ~max_level:1 s) (TyName.print ty_name)
-  | Apply { ty_name; ty_args } ->
-      print ~at_level:1 "(%t) %t"
-        (Print.sequence ", " print_ty ty_args)
-        (TyName.print ty_name)
+  | Apply { ty_name; ty_args } -> (
+      match TyParam.Map.bindings ty_args with
+      | [] -> print "%t" (TyName.print ty_name)
+      | [ (_, (s, _)) ] ->
+          print ~at_level:1 "%t %t" (print_ty ~max_level:1 s)
+            (TyName.print ty_name)
+      | ty_args ->
+          let ty_args = ty_args |> List.map (fun (_, (s, _)) -> s) in
+          print ~at_level:1 "(%t) %t"
+            (Print.sequence ", " print_ty ty_args)
+            (TyName.print ty_name))
   | Tuple [] -> print "𝟙"
   | Tuple tys ->
       print ~at_level:2 "%t" (Print.sequence "×" (print_ty ~max_level:1) tys)
@@ -130,7 +119,15 @@ let arrow (ty1, drty2) =
 let apply (ty_name, ty_args) =
   {
     term = Apply { ty_name; ty_args };
-    ty = Skeleton.Apply (ty_name, List.map (fun ty -> skeleton_of_ty ty) ty_args);
+    ty =
+      Skeleton.Apply
+        {
+          ty_name;
+          skel_args =
+            ty_args
+            |> TyParam.Map.map (fun (ty, variance) ->
+                   (skeleton_of_ty ty, variance));
+        };
   }
 
 let tuple tup =
@@ -149,7 +146,7 @@ let tyBasic pt = { term = TyBasic pt; ty = Skeleton.Basic pt }
 
 let unit_ty = tuple []
 
-let empty_ty = apply (empty_tyname, [])
+let empty_ty = apply (empty_tyname, TyParam.Map.empty)
 
 let int_ty = tyBasic Const.IntegerTy
 
@@ -222,7 +219,9 @@ end
 let rec free_params_skeleton = function
   | Skeleton.Param p -> Params.skel_singleton p
   | Skeleton.Basic _ -> Params.empty
-  | Skeleton.Apply (_, sks) -> Params.union_map free_params_skeleton sks
+  | Skeleton.Apply { skel_args; _ } ->
+      skel_args |> TyParam.Map.values
+      |> Params.union_map (fun (s, _) -> free_params_skeleton s)
   | Skeleton.Arrow (sk1, sk2) ->
       Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
   | Skeleton.Handler (sk1, sk2) ->
@@ -240,8 +239,11 @@ and free_params_ty' skel = function
   | Handler (cty1, cty2) ->
       Params.union (free_params_dirty cty1) (free_params_dirty cty2)
   | TyBasic _prim_ty -> Params.empty
-  | Apply { ty_args; _ } -> Params.union_map free_params_ty ty_args
+  | Apply { ty_args; _ } ->
+      ty_args |> TyParam.Map.values
+      |> Params.union_map (fun (ty, _) -> free_params_ty ty)
 
+(*Params.union_map free_params_ty ty_args *)
 and free_params_dirty (ty, dirt) =
   Params.union (free_params_ty ty) (free_params_dirt dirt)
 
@@ -272,7 +274,21 @@ type tydef =
   | Sum of ty option Field.Map.t
   | Inline of ty
 
-type type_data = { params : Params.t; type_def : tydef }
+type tydef_params = {
+  type_params : (Skeleton.t * variance) TyParam.Map.t;
+  dirt_params : Dirt.Param.Set.t;
+  (* dirt_params :  *)
+  skel_params : Skeleton.Param.Set.t;
+}
+
+let empty_tydef_params =
+  {
+    type_params = TyParam.Map.empty;
+    dirt_params = Dirt.Param.Set.empty;
+    skel_params = Skeleton.Param.Set.empty;
+  }
+
+type type_data = { params : tydef_params; type_def : tydef }
 
 let print_ct_ty (ty1, ty2) ppf =
   let print ?at_level = Print.print ?at_level ppf in
@@ -305,8 +321,7 @@ and equal_ty' ty1' ty2' =
   | ( Apply { ty_name = ty_name1; ty_args = tys1 },
       Apply { ty_name = ty_name2; ty_args = tys2 } ) ->
       ty_name1 = ty_name2
-      && List.length tys1 = List.length tys2
-      && List.for_all2 equal_ty tys1 tys2
+      && TyParam.Map.equal (fun (ty1, _) (ty2, _) -> equal_ty ty1 ty2) tys1 tys2
   | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
       equal_dirty dirtya1 dirtyb1 && equal_dirty dirtya2 dirtyb2
   | TyBasic ptya, TyBasic ptyb -> ptya = ptyb
@@ -357,8 +372,12 @@ let fresh_ty_with_skel skel =
       let tvars = List.map fresh_ty_with_skel sks in
       tuple tvars
   (* α : ty_name (τ₁, τ₂, ...) *)
-  | Skeleton.Apply (ty_name, sks) ->
-      let tvars = List.map fresh_ty_with_skel sks in
+  | Skeleton.Apply { ty_name; skel_args } ->
+      let tvars =
+        TyParam.Map.map
+          (fun (s, variance) -> (fresh_ty_with_skel s, variance))
+          skel_args
+      in
       apply (ty_name, tvars)
   (* α : τ₁ => τ₂ *)
   | Skeleton.Handler (sk1, sk2) ->
@@ -385,15 +404,18 @@ let rec print_pretty_skel ?max_level free params skel ppf =
       print ~at_level:3 "%t -> %t"
         (print_pretty_skel ~max_level:2 free params skel1)
         (print_pretty_skel ~max_level:3 free params skel2)
-  | Skeleton.Apply (t, []) -> print "%t" (TyName.print t)
-  | Skeleton.Apply (t, [ s ]) ->
-      print ~at_level:1 "%t %t"
-        (print_pretty_skel ~max_level:1 free params s)
-        (TyName.print t)
-  | Skeleton.Apply (t, skels) ->
-      print ~at_level:1 "(%t) %t"
-        (Print.sequence ", " (print_pretty_skel free params) skels)
-        (TyName.print t)
+  | Skeleton.Apply { ty_name; skel_args } -> (
+      match TyParam.Map.values skel_args with
+      | [] -> print "%t" (TyName.print ty_name)
+      | [ (s, _) ] ->
+          print ~at_level:1 "%t %t"
+            (print_pretty_skel ~max_level:1 free params s)
+            (TyName.print ty_name)
+      | skels ->
+          let skels = List.map fst skels in
+          print ~at_level:1 "(%t) %t"
+            (Print.sequence ", " (print_pretty_skel free params) skels)
+            (TyName.print ty_name))
   | Skeleton.Tuple [] -> print "unit"
   | Skeleton.Tuple skels ->
       print ~at_level:2 "%t"

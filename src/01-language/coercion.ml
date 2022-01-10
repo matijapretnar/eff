@@ -7,7 +7,10 @@ and ty_coercion' =
   | ArrowCoercion of ty_coercion * dirty_coercion
   | HandlerCoercion of dirty_coercion * dirty_coercion
   | TyCoercionVar of Type.TyCoercionParam.t
-  | ApplyCoercion of TyName.t * ty_coercion list
+  | ApplyCoercion of {
+      ty_name : TyName.t;
+      tcoers : (ty_coercion * variance) TyParam.Map.t;
+    }
   | TupleCoercion of ty_coercion list
 
 and dirt_coercion = (dirt_coercion', Type.ct_dirt) typed
@@ -45,11 +48,19 @@ let tupleCoercion tcoers =
   let tys, tys' = tcoers |> List.map (fun tcoer -> tcoer.ty) |> List.split in
   { term = TupleCoercion tcoers; ty = (Type.tuple tys, Type.tuple tys') }
 
-let applyCoercion (tyname, tcoers) =
-  let tys, tys' = tcoers |> List.map (fun tcoer -> tcoer.ty) |> List.split in
+let applyCoercion (ty_name, tcoers) =
+  let tys, tys' =
+    TyParam.Map.bindings tcoers
+    |> List.map (fun (p, (tcoer, variance)) ->
+           let t1, t2 = tcoer.ty in
+           ((p, (t1, variance)), (p, (t2, variance))))
+    |> List.split
+  in
   {
-    term = ApplyCoercion (tyname, tcoers);
-    ty = (Type.apply (tyname, tys), Type.apply (tyname, tys'));
+    term = ApplyCoercion { ty_name; tcoers };
+    ty =
+      ( Type.apply (ty_name, tys |> TyParam.Map.of_bindings),
+        Type.apply (ty_name, tys' |> TyParam.Map.of_bindings) );
   }
 
 let handlerCoercion (dtcoer1, dtcoer2) =
@@ -94,15 +105,18 @@ let rec print_ty_coercion ?max_level c ppf =
         (print_dirty_coercion ~max_level:2 dc1)
         (print_dirty_coercion ~max_level:2 dc2)
   | TyCoercionVar tcp -> print "%t" (Type.TyCoercionParam.print tcp)
-  | ApplyCoercion (t, []) -> print "%t" (TyName.print t)
-  | ApplyCoercion (t, [ c ]) ->
-      print ~at_level:1 "%t %t"
-        (print_ty_coercion ~max_level:1 c)
-        (TyName.print t)
-  | ApplyCoercion (t, cs) ->
-      print ~at_level:1 "(%t) %t"
-        (Print.sequence ", " print_ty_coercion cs)
-        (TyName.print t)
+  | ApplyCoercion { ty_name; tcoers } -> (
+      match TyParam.Map.values tcoers with
+      | [] -> print "%t" (TyName.print ty_name)
+      | [ (c, _) ] ->
+          print ~at_level:1 "%t %t"
+            (print_ty_coercion ~max_level:1 c)
+            (TyName.print ty_name)
+      | cs ->
+          let cs = List.map fst cs in
+          print ~at_level:1 "(%t) %t"
+            (Print.sequence ", " print_ty_coercion cs)
+            (TyName.print ty_name))
   | TupleCoercion [] -> print "𝟙"
   | TupleCoercion cos ->
       print ~at_level:2 "%t"
@@ -149,10 +163,11 @@ and free_params_ty_coercion' = function
       List.fold_left
         (fun free tc -> Type.Params.union free (free_params_ty_coercion tc))
         Type.Params.empty tcs
-  | ApplyCoercion (_ty_name, tcs) ->
-      List.fold_left
-        (fun free tc -> Type.Params.union free (free_params_ty_coercion tc))
-        Type.Params.empty tcs
+  | ApplyCoercion { tcoers; _ } ->
+      TyParam.Map.fold
+        (fun _ (tc, _) free ->
+          Type.Params.union free (free_params_ty_coercion tc))
+        tcoers Type.Params.empty
 
 and free_params_dirt_coercion coer = Type.free_params_ct_dirt coer.ty
 

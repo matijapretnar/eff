@@ -106,7 +106,11 @@ rule token = parse
                         }
   | uname               { UNAME (Lexing.lexeme lexbuf) }
   | '\'' lname          { let str = Lexing.lexeme lexbuf in
-                          PARAM (String.sub str 1 (String.length str - 1)) }
+                          PARAM (String.sub str 1 (String.length str - 1), Invariant) }
+  | "+\'" lname         { let str = Lexing.lexeme lexbuf in
+                          PARAM (String.sub str 2 (String.length str - 2), Covariant) }
+  | "-\'" lname         { let str = Lexing.lexeme lexbuf in
+                          PARAM (String.sub str 2 (String.length str - 2), Contravariant) }
   | '_'                 { UNDERSCORE }
   | '('                 { LPAREN }
   | ')'                 { RPAREN }

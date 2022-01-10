@@ -28,8 +28,10 @@ type state = {
   field_symbols : Type.Field.t StringMap.t;
   tyname_symbols : (TyName.t * int) StringMap.t;
   constructors : (Type.Label.t * constructor_kind) StringMap.t;
-  local_type_annotations : Type.ty StringMap.t;
+  local_type_annotations : (Type.TyParam.t * Type.ty) StringMap.t;
   inlined_types : Type.ty StringMap.t;
+  param_variance : VarianceSet.t Type.TyParam.Map.t;
+  type_application_names : (Type.TyParam.t * variance) list Term.Variable.Map.t;
 }
 
 let initial_state =
@@ -62,6 +64,9 @@ let initial_state =
     constructors;
     local_type_annotations = StringMap.empty;
     inlined_types;
+    param_variance = Type.TyParam.Map.empty;
+    type_application_names =
+      Term.Variable.Map.of_bindings [ (Type.empty_tyname, []) ];
   }
 
 let add_variables vars state =
@@ -88,6 +93,9 @@ let tyname_to_symbol ~loc state name =
   | Some sym -> sym
   | None -> Error.syntax ~loc "Unknown type %s" name
 
+let force_param ty =
+  match ty.term with Type.TyParam t -> t | _ -> failwith "Cant get param"
+
 (* ***** Desugaring of types. ***** *)
 (* Desugar a type, where only the given type, dirt and region parameters may appear.
    If a type application with missing dirt and region parameters is encountered,
@@ -107,12 +115,24 @@ let desugar_type type_sbst state =
         match StringMap.find_opt t state.inlined_types with
         | Some ty -> (state, ty)
         | None ->
-            let state', tys' = List.fold_map desugar_type state tys in
-            (state', T.apply (t', tys')))
+            let t', n = tyname_to_symbol ~loc state t in
+            if List.length tys <> n then
+              Error.syntax ~loc "Type %t expects %d arguments" (TyName.print t')
+                n
+            else
+              let state', tys' = List.fold_map desugar_type state tys in
+              Print.debug "Var: %t\n" (Term.Variable.print t');
+              let type_info =
+                Term.Variable.Map.find t' state.type_application_names
+                |> List.map2
+                     (fun ty (param, variance) -> (param, (ty, variance)))
+                     tys'
+              in
+              (state', T.apply (t', Type.TyParam.Map.of_bindings type_info)))
     | Sugared.TyParam t -> (
         match StringMap.find_opt t type_sbst with
         | None -> Error.syntax ~loc "Unbound type parameter '%s" t
-        | Some ty -> (state, ty))
+        | Some (_, ty, _) -> (state, ty))
     | Sugared.TyArrow (t1, t2) ->
         let state', t1' = desugar_type state t1 in
         let state'', t2' = desugar_dirty_type state' t2 in
@@ -142,15 +162,30 @@ let free_type_params t =
   in
   List.unique_elements (ty_params t)
 
+(* let get_variance param =
+  match param.[0] with
+  | '+' -> (Covariant, String.sub param 1 (String.length param - 1))
+  | '-' -> (Contravariant, String.sub param 1 (String.length param - 1))
+  | _ -> (Invariant, param) *)
+
+let fresh_ty_param () =
+  let ty = Type.fresh_ty_with_fresh_skel () in
+  let param = force_param ty in
+  (param, ty)
+
 let syntax_to_core_params ts =
-  ts |> List.to_seq
-  |> Seq.map (fun p -> (p, Type.fresh_ty_with_fresh_skel ()))
-  |> StringMap.of_seq
+  let core_params =
+    ts
+    |> List.map (fun (p, variance) ->
+           let param, ty = fresh_ty_param () in
+           (p, (param, ty, variance)))
+  in
+  core_params |> List.to_seq |> StringMap.of_seq
 
 (** [desugar_tydef state params def] desugars the type definition with parameters
     [params] and definition [def]. *)
-let desugar_tydef ~loc state params ty_name def =
-  let ty_sbst = syntax_to_core_params params in
+let desugar_tydef ~loc state
+    (ty_sbst : (T.TyParam.t * T.ty * variance) StringMap.t) ty_name def =
   let state', def' =
     match def with
     | Sugared.TyRecord flds ->
@@ -202,25 +237,72 @@ let desugar_tydef ~loc state params ty_name def =
         in
         (state'', Type.Inline t')
   in
-  let params' =
+  let ty_params =
     ty_sbst |> StringMap.bindings
-    |> Type.Params.union_map (fun (_, ty) -> Type.free_params_ty ty)
+    |> List.map (fun (_, (param, ty, variance)) -> (param, (ty.ty, variance)))
+    |> Type.TyParam.Map.of_bindings
   in
-  (state', { Type.params = params'; type_def = def' })
+
+  (* let _calculate_variance p_set =
+       assert (VarianceSet.cardinal p_set <= 2);
+       assert (VarianceSet.for_all (( <> ) Invariant) p_set);
+       if VarianceSet.cardinal p_set = 1 then VarianceSet.choose p_set
+       else Invariant
+     in
+     let params' =
+       ty_sbst |> StringMap.bindings
+       |> Type.Params.union_map (fun (_, (_, ty, _)) -> Type.free_params_ty ty)
+     in *)
+  (* Print.debug "Params: %t\n" (Type.Params.print params');
+     let t_params =
+       params'.ty_params |> T.TyParam.Map.mapi (fun _p skel -> skel)
+       (*,
+         match Type.TyParam.Map.find_opt p state'.param_variance with
+         | Some p_set -> calculate_variance p_set
+         | None ->
+             (* param does not need to appear in type, for example in phantom types *)
+             Invariant ) *)
+     in *)
+  (*  TODO: HERE UPDATE *)
+  let ty_params =
+    {
+      Type.type_params = ty_params;
+      dirt_params = Dirt.Param.Set.empty;
+      skel_params =
+        Type.TyParam.Map.fold
+          (fun _ (skeleton, _) skels ->
+            Skeleton.Param.Set.union
+              (skeleton |> Type.free_params_skeleton).skel_params skels)
+          ty_params Skeleton.Param.Set.empty;
+    }
+  in
+  (state', { Type.params = ty_params; type_def = def' })
 
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
 let desugar_tydefs ~loc state sugared_defs =
-  let add_ty_names tyname_symbols (name, (params, _)) =
+  let add_ty_names (tyname_symbols, type_application_names)
+      (name, (params, tydef)) =
     let sym = TyName.fresh name in
-    add_unique ~loc "Type" name (sym, List.length params) tyname_symbols
+    let tyname_symbols =
+      add_unique ~loc "Type" name (sym, List.length params) tyname_symbols
+    in
+    let ty_sbst = syntax_to_core_params params in
+    let ty_param_subs =
+      params
+      |> List.map (fun (pname, _) ->
+             ty_sbst |> StringMap.find pname |> fun (_, ty, variance) ->
+             (force_param ty, variance))
+    in
+    ( ( tyname_symbols,
+        type_application_names |> Term.Variable.Map.add sym ty_param_subs ),
+      (name, (ty_sbst, tydef)) )
   in
-  let state' =
-    {
-      state with
-      tyname_symbols =
-        Assoc.fold_left add_ty_names state.tyname_symbols sugared_defs;
-    }
+  let (tyname_symbols, type_application_names), sugared_defs =
+    Assoc.kfold_map add_ty_names
+      (state.tyname_symbols, state.type_application_names)
+      sugared_defs
   in
+  let state' = { state with tyname_symbols; type_application_names } in
   let desugar_fold st (name, (params, def)) =
     (* First desugar the type names *)
     let sym, _ = StringMap.find name st.tyname_symbols in
@@ -258,15 +340,18 @@ let desugar_pattern state p =
           let bind bound_ps p =
             match StringMap.find_opt p bound_ps with
             | Some _ty_param -> bound_ps
-            | None ->
-                StringMap.add p (Type.fresh_ty_with_fresh_skel ()) bound_ps
+            | None -> StringMap.add p (fresh_ty_param ()) bound_ps
           in
           let free_params = free_type_params t in
           let bound_params = state.local_type_annotations in
           let bound_params' = List.fold_left bind bound_params free_params in
           let state' = { state with local_type_annotations = bound_params' } in
           let state'', p' = desugar_pattern state' p in
-          let state''', t' = desugar_type bound_params' state'' t in
+          let state''', t' =
+            desugar_type
+              (bound_params' |> StringMap.map (fun (p, t) -> (p, t, Invariant)))
+              state'' t
+          in
           (state''', Untyped.PAnnotated (p', t'))
       | Sugared.PAs (p, x) ->
           let x' = fresh_var (Some x) in
@@ -328,14 +413,18 @@ let rec desugar_expression state { it = t; at = loc } =
         let bind bound_ps p =
           match StringMap.find_opt p bound_ps with
           | Some _ty_param -> bound_ps
-          | None -> StringMap.add p (Type.fresh_ty_with_fresh_skel ()) bound_ps
+          | None -> StringMap.add p (fresh_ty_param ()) bound_ps
         in
         let free_params = free_type_params ty in
         let bound_params = state.local_type_annotations in
         let bound_params' = List.fold_left bind bound_params free_params in
         let state' = { state with local_type_annotations = bound_params' } in
         let state'', w, e = desugar_expression state' t in
-        let state''', ty' = desugar_type bound_params' state'' ty in
+        let state''', ty' =
+          desugar_type
+            (bound_params' |> StringMap.map (fun (p, t) -> (p, t, Invariant)))
+            state'' ty
+        in
         (state''', w, Untyped.Annotated (e, ty'))
     | Sugared.Lambda a ->
         let state', a' = desugar_abstraction state a in

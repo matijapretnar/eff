@@ -34,5 +34,7 @@ val desugar_top_let_rec :
 val desugar_tydefs :
   loc:Utils.Location.t ->
   state ->
-  (string, SugaredSyntax.typaram list * SugaredSyntax.tydef) Assoc.t ->
+  ( string,
+    (SugaredSyntax.typaram * variance) list * SugaredSyntax.tydef )
+  Assoc.t ->
   state * (TyName.t, Type.type_data) Assoc.t

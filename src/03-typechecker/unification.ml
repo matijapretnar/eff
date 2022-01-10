@@ -83,12 +83,17 @@ let skel_eq_step ~loc sub (paused : Constraints.t) rest_queue sk1 sk2 =
         rest_queue
         |> Constraint.add_skeleton_equality (ska, skc)
         |> Constraint.add_skeleton_equality (skb, skd) )
-  | Apply (ty_name1, sks1), Apply (ty_name2, sks2) when ty_name1 = ty_name2 ->
+  | ( Apply { ty_name = ty_name1; skel_args = sks1 },
+      Apply { ty_name = ty_name2; skel_args = sks2 } )
+    when ty_name1 = ty_name2
+         && TyParam.Map.cardinal sks1 = TyParam.Map.cardinal sks2 ->
       ( sub,
         paused,
         List.fold_right2
-          (fun sk1 sk2 -> Constraint.add_skeleton_equality (sk1, sk2))
-          sks1 sks2 rest_queue )
+          (fun (sk1, _) (sk2, _) -> Constraint.add_skeleton_equality (sk1, sk2))
+          (sks1 |> TyParam.Map.values)
+          (sks2 |> TyParam.Map.values)
+          rest_queue )
   | Tuple sks1, Tuple sks2 when List.length sks1 = List.length sks2 ->
       ( sub,
         paused,
@@ -135,13 +140,16 @@ and ty_eq_step sub (paused : Constraints.t) rest_queue (ty1 : Type.ty)
         |> Constraint.add_dirt_equality (drtb, drtd) )
   | ( Apply { ty_name = ty_name1; ty_args = tys1 },
       Apply { ty_name = ty_name2; ty_args = tys2 } )
-    when ty_name1 = ty_name2 ->
+    when ty_name1 = ty_name2
+         && TyParam.Map.cardinal tys1 = TyParam.Map.cardinal tys2 ->
       ( sub,
         paused,
         List.fold_right2
-          (fun ty1 ty2 -> Constraint.add_ty_equality (ty1, ty2))
-          tys1 tys2 rest_queue )
-  | Tuple tys1, Tuple tys2 ->
+          (fun (ty1, _) (ty2, _) -> Constraint.add_ty_equality (ty1, ty2))
+          (tys1 |> TyParam.Map.values)
+          (tys2 |> TyParam.Map.values)
+          rest_queue )
+  | Tuple tys1, Tuple tys2 when List.length tys1 = List.length tys2 ->
       ( sub,
         paused,
         List.fold_right2
@@ -184,22 +192,41 @@ and ty_omega_step sub (paused : Constraints.t) cons rest_queue omega = function
         paused,
         Constraint.union conss rest_queue )
   (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
-  (* we assume that all type parameters are positive *)
   | ( { term = Type.Apply { ty_name = ty_name1; ty_args = tys1 }; _ },
       { term = Type.Apply { ty_name = ty_name2; ty_args = tys2 }; _ } )
-    when ty_name1 = ty_name2 ->
-      let coercions, conss =
+    when ty_name1 = ty_name2
+         && TyParam.Map.cardinal tys1 = TyParam.Map.cardinal tys2 ->
+      (* If the type param is invariant a dummy <= is produced along with an equality constraint  *)
+      let coercions, cons =
         List.fold_right2
-          (fun ty ty' (coercions, conss) ->
-            let coercion, ty_cons = Constraint.fresh_ty_coer (ty, ty') in
-            (coercion :: coercions, Constraint.union ty_cons conss))
-          tys1 tys2 ([], Constraint.empty)
+          (fun (p1, (ty, v1)) (p2, (ty', v2)) (coercions, conss) ->
+            assert (p1 = p2);
+            assert (v1 = v2);
+            let coercion, ty_cons =
+              match v1 with
+              | Covariant ->
+                  let coercion, ty_cons = Constraint.fresh_ty_coer (ty, ty') in
+                  (coercion, ty_cons)
+              | Contravariant ->
+                  let coercion, ty_cons = Constraint.fresh_ty_coer (ty', ty) in
+                  (coercion, ty_cons)
+              | Invariant ->
+                  Print.debug "invriant\n";
+                  let coercion, ty_cons = Constraint.fresh_ty_coer (ty, ty') in
+                  (coercion, Constraint.add_ty_equality (ty, ty') ty_cons)
+            in
+            ((p1, (coercion, v1)) :: coercions, Constraint.union ty_cons conss))
+          (TyParam.Map.bindings tys1)
+          (TyParam.Map.bindings tys2)
+          ([], Constraint.empty)
       in
       let k = omega in
-      let v = Coercion.applyCoercion (ty_name1, coercions) in
+      let v =
+        Coercion.applyCoercion (ty_name1, coercions |> TyParam.Map.of_bindings)
+      in
       ( Substitution.add_type_coercion k v sub,
         paused,
-        Constraint.union conss rest_queue )
+        Constraint.union cons rest_queue )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
   | ( { term = Type.Handler (drty11, drty12); _ },
       { term = Type.Handler (drty21, drty22); _ } ) ->

@@ -35,7 +35,7 @@
 %token <bool> BOOL
 %token <float> FLOAT
 %token <SugaredSyntax.label> UNAME
-%token <SugaredSyntax.typaram> PARAM
+%token <SugaredSyntax.typaram * Utils.variance> PARAM
 %token TYPE ARROW HARROW OF EFFECT PERFORM
 %token MATCH WITH FUNCTION HASH
 %token LET REC AND IN
@@ -453,7 +453,7 @@ cases(case):
 mark_position(X):
   x = X
   { {it= x; at= Location.make $startpos $endpos}}
-
+(*  popravi tukaj *)
 params:
   |
     { [] }
@@ -506,7 +506,7 @@ plain_simple_ty:
   | t = tyname
     { TyApply (t, []) }
   | t = PARAM
-    { TyParam t }
+    { TyParam (fst t) }
   | LPAREN t = ty RPAREN
     { t.it }
 
