@@ -14,8 +14,7 @@ let initial_state =
 let update x v state =
   { state with environment = Term.Variable.Map.add x v state.environment }
 
-let lookup x state =
-  try Some (Term.Variable.Map.find x state.environment) with Not_found -> None
+let lookup x state = Term.Variable.Map.find_opt x state.environment
 
 let add_runner eff runner state =
   { state with runners = Effect.Map.add eff.term runner state.runners }
