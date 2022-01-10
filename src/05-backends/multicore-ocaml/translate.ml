@@ -46,7 +46,7 @@ and of_handler
   (* Non-trivial case *)
   let effect_clauses' =
     List.map
-      (fun ((eff, _), abs) -> EffectClause (eff, of_abstraction2 abs))
+      (fun (eff, abs) -> EffectClause (eff.term, of_abstraction2 abs))
       (Assoc.to_list effect_part)
   in
   let value_clause' = ValueClause (of_abstraction value_clause) in
@@ -81,9 +81,9 @@ and of_computation cmp =
       let modified_handler = of_expression e in
       let thunked_c = Lambda (PNonbinding, of_computation c) in
       Apply (modified_handler, thunked_c)
-  | Term.Call ((eff, _), e, a) ->
+  | Term.Call (eff, e, a) ->
       let p, c = of_abstraction a in
-      Let ([ (p, Apply (Effect eff, of_expression e)) ], c)
+      Let ([ (p, Apply (Effect eff.term, of_expression e)) ], c)
   | Term.CastComp (c, _) -> of_computation c
   | Term.Check (_, c) -> Check (of_computation c)
 

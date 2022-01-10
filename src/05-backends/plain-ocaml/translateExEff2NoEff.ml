@@ -50,6 +50,10 @@ let rec get_effectset_temp set effects =
 
 let get_effectset effects = get_effectset_temp Effect.Set.empty effects
 
+let elab_effect eff : n_effect =
+  let ty1, ty2 = eff.ty in
+  (eff.term, (elab_ty ty1, elab_ty ty2))
+
 let rec elab_ty_coercion state coer =
   match coer.term with
   | Coercion.ReflTy -> NoEff.NCoerRefl
@@ -302,13 +306,12 @@ and elab_handler state h elabfc =
   else
     let _, (_ty, dirt) = h.term.value_clause.ty in
     if Dirt.is_empty dirt (* Handler - Case 2 *) then
-      let subst_cont_effect ((eff, (ty1, ty2)), { term = p1, p2, comp; _ }) =
-        let elab1 = elab_ty ty1 in
-        let elab2 = elab_ty ty2 in
+      let subst_cont_effect (eff, { term = p1, p2, comp; _ }) =
+        let eff' = elab_effect eff in
         let elabcomp = elab_computation state comp in
         match p2.term with
         | PVar x ->
-            ( (eff, (elab1, elab2)),
+            ( eff',
               ( elab_pattern state p1,
                 elab_pattern state p2,
                 NReturn
@@ -331,12 +334,10 @@ and elab_handler state h elabfc =
           finally_clause = elabfc;
         } (* Handler - Case 3 *)
     else
-      let elab_effect_clause ((eff, (ty1, ty2)), { term = p1, p2, comp; _ }) =
-        let elab1 = elab_ty ty1 in
-        let elab2 = elab_ty ty2 in
+      let elab_effect_clause (eff, { term = p1, p2, comp; _ }) =
+        let eff' = elab_effect eff in
         let elabcomp = elab_computation state comp in
-        ( (eff, (elab1, elab2)),
-          (elab_pattern state p1, elab_pattern state p2, elabcomp) )
+        (eff', (elab_pattern state p1, elab_pattern state p2, elabcomp))
       in
       NoEff.NHandler
         {
@@ -397,12 +398,11 @@ and elab_computation' state c _is_empty =
             (* Handle - Case 3 *)
           else NoEff.NHandle (elabc, velab)
       | _ -> assert false)
-  | ExEff.Call ((eff, (ty1, ty2)), value, abs) ->
-      let t1 = elab_ty ty1 in
-      let t2 = elab_ty ty2 in
+  | ExEff.Call (eff, value, abs) ->
+      let eff' = elab_effect eff in
       let velab = elab_expression state value in
       let aelab = elab_abstraction_with_param_ty state abs in
-      NoEff.NCall ((eff, (t1, t2)), velab, aelab)
+      NoEff.NCall (eff', velab, aelab)
   | ExEff.Bind (c1, abs) ->
       let _ty1, dirt1 = c1.ty
       and elab1 = elab_computation state c1
@@ -426,8 +426,6 @@ let elab_tydef = function
       let converter = function None -> None | Some ty -> Some (elab_ty ty) in
       NoEff.TyDefSum (Type.Field.Map.map converter assoc)
   | Inline ty -> NoEff.TyDefInline (elab_ty ty)
-
-let elab_effect (eff, (ty1, ty2)) : n_effect = (eff, (elab_ty ty1, elab_ty ty2))
 
 let elab_constraints cnstrs =
   Constraints.TyConstraints.fold

@@ -12,7 +12,7 @@ module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
 
 type effect_fingerprint = EffectFingerprint.t
 
-type effect = Effect.t * (Type.ty * Type.ty)
+type effect = (Effect.t, Type.ty * Type.ty) typed
 
 type pattern = (pattern', Type.ty) typed
 
@@ -27,20 +27,37 @@ and pattern' =
 
 let pVar p ty = { term = PVar p; ty }
 
+let pAs (p, x) = { term = PAs (p, x); ty = p.ty }
+
+let pNonbinding ty = { term = PNonbinding; ty }
+
+let pConst c = { term = PConst c; ty = Type.type_const c }
+
 let pTuple ps =
   { term = PTuple ps; ty = Type.tuple (List.map (fun x -> x.ty) ps) }
 
+let pVariant (lbl, pat) ty = { term = PVariant (lbl, pat); ty }
+
+let pRecord ty flds =
+  (* Ideally, we could reconstruct ty from the field names *)
+  { term = PRecord flds; ty }
+
 let rec pattern_vars pat =
   match pat.term with
-  | PVar x -> [ x ]
-  | PAs (p, x) -> x :: pattern_vars p
-  | PTuple lst -> List.flatten (List.map pattern_vars lst)
+  | PVar x -> Variable.Map.singleton x pat.ty
+  | PAs (p, x) -> Variable.Map.add x pat.ty (pattern_vars p)
+  | PTuple lst ->
+      List.fold_right
+        (fun p -> Variable.Map.compatible_union (pattern_vars p))
+        lst Variable.Map.empty
   | PRecord lst ->
-      List.flatten (List.map pattern_vars (Type.Field.Map.values lst))
-  | PVariant (_, None) -> []
+      Type.Field.Map.fold
+        (fun _fld p -> Variable.Map.compatible_union (pattern_vars p))
+        lst Variable.Map.empty
+  | PVariant (_, None) -> Variable.Map.empty
   | PVariant (_, Some p) -> pattern_vars p
-  | PConst _ -> []
-  | PNonbinding -> []
+  | PConst _ -> Variable.Map.empty
+  | PNonbinding -> Variable.Map.empty
 
 type expression = (expression', Type.ty) typed
 (** Pure expressions *)
@@ -128,13 +145,14 @@ let lambda abs = { term = Lambda abs; ty = Type.arrow abs.ty }
 
 let handled_effects effect_part =
   effect_part |> Assoc.keys_of
-  |> List.map (fun (eff, _) -> eff)
+  |> List.map (fun eff -> eff.term)
   |> Effect.Set.of_list
 
 let handler_clauses (value_clause : abstraction) effect_part drt_in =
   let fingerprint = EffectFingerprint.fresh () in
   let ty_in, ((_, drt_out) as drty_out) = value_clause.ty in
-  let check_effect_clause ((_eff, (ty1, ty2)), abs) =
+  let check_effect_clause (eff, abs) =
+    let ty1, ty2 = eff.ty in
     let pty1, pty2, drty = abs.ty in
     assert (Type.equal_ty ty1 pty1);
     assert (Type.equal_ty (Type.arrow (ty2, drty_out)) pty2);
@@ -220,13 +238,13 @@ let handle (exp, comp) =
   | _ -> assert false
 
 let call (eff, e, a) =
-  let eff_name, (in_ty, out_ty) = eff in
+  let in_ty, out_ty = eff.ty in
   let p_ty, (r_ty, r_ty_dirt) = a.ty in
   assert (Type.equal_ty in_ty e.ty);
   assert (Type.equal_ty out_ty p_ty);
   {
     term = Call (eff, e, a);
-    ty = (r_ty, Dirt.add_effects (Effect.Set.singleton eff_name) r_ty_dirt);
+    ty = (r_ty, Dirt.add_effects (Effect.Set.singleton eff.term) r_ty_dirt);
   }
 
 let bind (comp1, abs2) =
@@ -248,7 +266,7 @@ let abstraction (p, c) : abstraction = { term = (p, c); ty = (p.ty, c.ty) }
 let abstraction2 (p1, p2, c) : abstraction2 =
   { term = (p1, p2, c); ty = (p1.ty, p2.ty, c.ty) }
 
-let print_effect (eff, _) ppf = Print.print ppf "%t" (Effect.print eff)
+let print_effect eff ppf = Print.print ppf "%t" (Effect.print eff.term)
 
 let print_variable x = Variable.print ~safe:true x
 
@@ -765,10 +783,13 @@ and free_vars_handler h =
 and free_vars_finally_handler (h, finally_clause) =
   free_vars_handler h @@@ free_vars_abs finally_clause
 
-and free_vars_abs { term = p, c; _ } = free_vars_comp c --- pattern_vars p
+and free_vars_abs { term = p, c; _ } =
+  free_vars_comp c --- Variable.Map.keys (pattern_vars p)
 
 and free_vars_abs2 { term = p1, p2, c; _ } =
-  free_vars_comp c --- pattern_vars p2 --- pattern_vars p1
+  free_vars_comp c
+  --- Variable.Map.keys (pattern_vars p2)
+  --- Variable.Map.keys (pattern_vars p1)
 
 let does_not_occur v vars =
   match Variable.Map.find_opt v vars with Some x -> x = 0 | None -> true

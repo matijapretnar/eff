@@ -2,23 +2,22 @@
 open Utils
 open Language
 module V = Value
-module RuntimeEnv = Term.Variable.Map
 
 type state = {
-  environment : V.value RuntimeEnv.t;
-  runners : (Effect.t, V.value -> V.value) Assoc.t;
+  environment : V.value Term.Variable.Map.t;
+  runners : (V.value -> V.value) Effect.Map.t;
 }
 
-let initial_state = { environment = RuntimeEnv.empty; runners = Assoc.empty }
+let initial_state =
+  { environment = Term.Variable.Map.empty; runners = Effect.Map.empty }
 
 let update x v state =
-  { state with environment = RuntimeEnv.add x v state.environment }
+  { state with environment = Term.Variable.Map.add x v state.environment }
 
-let lookup x state =
-  try Some (RuntimeEnv.find x state.environment) with Not_found -> None
+let lookup x state = Term.Variable.Map.find_opt x state.environment
 
-let add_runner (eff, _) runner state =
-  { state with runners = Assoc.update eff runner state.runners }
+let add_runner eff runner state =
+  { state with runners = Effect.Map.add eff.term runner state.runners }
 
 exception PatternMatch
 
@@ -83,9 +82,9 @@ let rec ceval state c =
   | Term.LetRec (defs, c) ->
       let state = extend_let_rec state defs in
       ceval state c
-  | Term.Call ((eff, _), e, a) ->
+  | Term.Call (eff, e, a) ->
       let e' = veval state e in
-      V.Call (eff, e', eval_closure state a.term)
+      V.Call (eff.term, e', eval_closure state a.term)
   | Term.Bind (c1, { term = p, c2; _ }) -> eval_let state [ (p, c1) ] c2
   | Term.CastComp (c, _) -> ceval state c
   | Term.Check (loc, c) ->
@@ -144,10 +143,10 @@ and eval_handler state
         };
       _;
     } (fin : V.closure) =
-  let eval_op ((eff, _), a2) =
+  let eval_op (eff, a2) =
     let p, kvar, c = a2.term in
     let f u k = eval_closure (extend kvar (V.Closure k) state) (p, c) u in
-    (eff, f)
+    (eff.term, f)
   in
   let ops = Assoc.kmap eval_op ops in
   let rec h = function
@@ -168,7 +167,7 @@ let rec top_handle state op =
   match op with
   | V.Value v -> v
   | V.Call (eff, v, k) -> (
-      match Assoc.lookup eff state.runners with
+      match Effect.Map.find_opt eff state.runners with
       | Some f ->
           let w = f v in
           top_handle state (k w)

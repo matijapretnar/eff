@@ -65,20 +65,17 @@ let abstraction_inlinability { term = pat, cmp; _ } =
       NotInlinable
   | _ ->
       let free_vars_cmp = Term.free_vars_comp cmp in
-      let rec check_variables = function
-        | [] -> NotPresent
-        | x :: xs -> (
-            let occ =
-              Term.Variable.Map.find_opt x free_vars_cmp
-              |> Option.value ~default:0
-            in
-            if occ > 1 then NotInlinable
-            else
-              match check_variables xs with
-              | NotPresent -> if occ = 0 then NotPresent else Inlinable
-              | inlinability -> inlinability)
+      let aux x _ inlinability =
+        let occ =
+          Term.Variable.Map.find_opt x free_vars_cmp |> Option.value ~default:0
+        in
+        if occ > 1 then NotInlinable
+        else
+          match inlinability with
+          | NotPresent -> if occ = 0 then NotPresent else Inlinable
+          | inlinability -> inlinability
       in
-      check_variables (Term.pattern_vars pat)
+      Term.Variable.Map.fold aux (Term.pattern_vars pat) NotPresent
 
 let keep_used_bindings defs cmp =
   (* Do proper call graph analysis *)
@@ -106,7 +103,7 @@ let recast_computation hnd comp =
       let handled_effs =
         Effect.Set.of_list
           (List.map
-             (fun ((eff, _), _) -> eff)
+             (fun (eff, _) -> eff.term)
              (Assoc.to_list hnd.term.Term.effect_clauses.effect_part))
       in
       if Effect.Set.disjoint effs handled_effs then
@@ -542,6 +539,7 @@ and reduce_computation' state comp =
         (optimize_computation state
            (Term.handle (exp, cast_computation state cmp drty_coer1)))
         drty_coer2
+  | Term.Match (exp, [ abs ]) -> beta_reduce state abs exp
   | Term.Match (({ term = Term.Const _; _ } as c), abs)
   | Term.Match (({ term = Term.Variant _; _ } as c), abs) -> (
       match reduce_constant_match state c abs with Some t -> t | None -> comp)
