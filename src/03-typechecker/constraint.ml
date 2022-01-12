@@ -47,17 +47,17 @@ let list_union conss = List.fold_left union empty conss
 
 let print c =
   let print_skeleton_equality (sk1, sk2) ppf =
-    Print.print ppf "%t = %t" (Skeleton.print sk1) (Skeleton.print sk2)
+    Print.print ppf "SE: %t = %t" (Skeleton.print sk1) (Skeleton.print sk2)
   and print_dirt_equality (drt1, drt2) ppf =
-    Print.print ppf "%t = %t" (Dirt.print drt1) (Dirt.print drt2)
+    Print.print ppf "DE: %t = %t" (Dirt.print drt1) (Dirt.print drt2)
   and print_dirt_inequality (p, (ty1, ty2)) ppf =
     Print.print ppf "%t: (%t ≤ %t)"
       (Type.DirtCoercionParam.print p)
       (Dirt.print ty1) (Dirt.print ty2)
   and print_ty_equality (ty1, ty2) ppf =
-    Print.print ppf "%t = %t" (Type.print_ty ty1) (Type.print_ty ty2)
+    Print.print ppf "TE:  %t = %t" (Type.print_ty ty1) (Type.print_ty ty2)
   and print_ty_inequality (p, (ty1, ty2)) ppf =
-    Print.print ppf "%t: (%t ≤ %t)"
+    Print.print ppf "TIE: %t: (%t ≤ %t)"
       (Type.TyCoercionParam.print p)
       (Type.print_ty ty1) (Type.print_ty ty2)
   in

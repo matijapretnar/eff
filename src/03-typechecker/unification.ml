@@ -197,6 +197,7 @@ and ty_omega_step sub (paused : Constraints.t) cons rest_queue omega = function
     when ty_name1 = ty_name2
          && TyParam.Map.cardinal tys1 = TyParam.Map.cardinal tys2 ->
       (* If the type param is invariant a dummy <= is produced along with an equality constraint  *)
+      Print.debug "here";
       let coercions, cons =
         List.fold_right2
           (fun (p1, (ty, v1)) (p2, (ty', v2)) (coercions, conss) ->
@@ -409,8 +410,10 @@ let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
       ty_eq_step sub paused { queue with ty_equalities } ty1 ty2 |> unify ~loc
   | { ty_inequalities = (_, (ty1, ty2)) :: _; _ }
     when not (Skeleton.equal ty1.ty ty2.ty) ->
+      Print.debug "TIE in solve when not eq skel";
       skel_eq_step ~loc sub paused queue ty1.ty ty2.ty |> unify ~loc
   | { ty_inequalities = (omega, tycons) :: ty_inequalities; _ } ->
+      Print.debug "TIE in solve when eq skel";
       let cons =
         Constraint.add_ty_inequality (omega, tycons) Constraint.empty
       in
@@ -457,7 +460,8 @@ let garbage_collect { Language.Constraints.ty_constraints; _ } =
   ty_constraints
 
 let solve ~loc constraints =
-  (* Print.debug "constraints: %t" (Constraint.print_constraints constraints); *)
+  Print.debug "solve";
+  Print.debug "constraints: %t" (Constraint.print constraints);
   let sub, constraints =
     unify ~loc (Substitution.empty, Constraints.empty, constraints)
   in

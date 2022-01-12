@@ -29,9 +29,7 @@ let initial_state =
                    a_ty;
                    apply
                      ( Type.list_tyname,
-                       TyParam.Map.singleton a (a_ty, Covariant)
-                       (* TODO; LIST WILL NOT WORK *)
-                       (* [ a_ty ] *) );
+                       TyParam.Map.singleton a (a_ty, Covariant) );
                  ]) )
         in
         {
@@ -83,6 +81,8 @@ let apply_to_tydef_params tyname (ps : tydef_params) =
       ps.type_params
       |> TyParam.Map.mapi (fun p (skel, variance) -> (tyParam p skel, variance))
     )
+
+(* TODO: THIS IS WRONG NOW *)
 
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
     with refreshed type parameters and additional information needed for type
