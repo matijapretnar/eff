@@ -239,7 +239,9 @@ let desugar_tydef ~loc state
   in
   let ty_params =
     ty_sbst |> StringMap.bindings
-    |> List.map (fun (_, (param, ty, variance)) -> (param, (ty.ty, variance)))
+    |> List.map (fun (_, (param, ty, variance)) ->
+           Print.debug "typaram in tydef: %t" (TyParam.print param);
+           (param, (ty.ty, variance)))
     |> Type.TyParam.Map.of_bindings
   in
 
