@@ -193,7 +193,10 @@ let of_tydef_parameters (params : Type.tydef_params) =
   in
   let params' =
     {
-      type_params = ty_params' |> List.map snd |> Type.TyParam.Map.of_bindings;
+      type_params =
+        ty_params'
+        |> List.map (fun (p, (_, m)) -> (p, m))
+        |> Type.TyParam.Map.of_bindings;
       dirt_params =
         Dirt.Param.Map.bindings dirt_params'
         |> List.map fst |> Dirt.Param.Set.of_list;
