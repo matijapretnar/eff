@@ -75,12 +75,13 @@ let find_field fld (st : state) =
   in
   find_some construct (Assoc.to_list st)
 
-let apply_to_tydef_params tyname (ps : tydef_params) =
+let apply_to_tydef_params tyname (ps : tydef_params) p_map =
   apply
     ( tyname,
-      ps.type_params
-      |> TyParam.Map.mapi (fun p (skel, variance) -> (tyParam p skel, variance))
-    )
+      p_map
+      |> TyParam.Map.map (fun p ->
+             let skel, variance = TyParam.Map.find p ps.type_params in
+             (tyParam p skel, variance)) )
 
 (* TODO: THIS IS WRONG NOW *)
 
@@ -91,14 +92,18 @@ let infer_variant lbl st =
   match find_variant lbl st with
   | None -> assert false
   | Some (ty_name, ps, _, u) ->
-      let ps', fresh_subst = Substitution.of_tydef_parameters ps in
+      let ps', fresh_subst, p_map = Substitution.of_tydef_parameters ps in
       let u' =
         match u with
         | None -> None
         | Some x ->
+            Print.debug "ttty before: %t ~> %t" (Type.print_ty x)
+              (Type.print_ty
+                 (Substitution.apply_substitutions_to_type fresh_subst x));
+
             Some (Substitution.apply_substitutions_to_type fresh_subst x)
       in
-      (u', apply_to_tydef_params ty_name ps')
+      (u', apply_to_tydef_params ty_name ps' p_map)
 
 (** [infer_field fld] finds a record type that defines the field [fld] and returns it with
     refreshed type parameters and additional information needed for type inference. *)
@@ -106,13 +111,13 @@ let infer_field fld st =
   match find_field fld st with
   | None -> assert false
   | Some (ty_name, ps, us) ->
-      let ps', fresh_subst = Substitution.of_tydef_parameters ps in
+      let ps', fresh_subst, p_map = Substitution.of_tydef_parameters ps in
       let us' =
         Type.Field.Map.map
           (Substitution.apply_substitutions_to_type fresh_subst)
           us
       in
-      (apply_to_tydef_params ty_name ps', (ty_name, us'))
+      (apply_to_tydef_params ty_name ps' p_map, (ty_name, us'))
 
 (** [extend_type_definitions tydefs state] checks that the simulatenous type definitions [tydefs] are
     well-formed and returns the extended type context. *)

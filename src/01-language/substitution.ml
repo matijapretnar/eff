@@ -193,10 +193,7 @@ let of_tydef_parameters (params : Type.tydef_params) =
   in
   let params' =
     {
-      type_params =
-        ty_params'
-        |> List.map (fun (p, (_, m)) -> (p, m))
-        |> Type.TyParam.Map.of_bindings;
+      type_params = ty_params' |> List.map snd |> Type.TyParam.Map.of_bindings;
       dirt_params =
         Dirt.Param.Map.bindings dirt_params'
         |> List.map fst |> Dirt.Param.Set.of_list;
@@ -215,7 +212,10 @@ let of_tydef_parameters (params : Type.tydef_params) =
     }
   in
   (* Print.debug "SUBSTITUTION': %t" (print subst'); *)
-  (params', subst')
+  ( params',
+    subst',
+    List.map (fun (p, (p', _)) -> (p, p')) ty_params' |> TyParam.Map.of_bindings
+  )
 
 let of_parameters (params : Type.Params.t) =
   let skel_params' =
