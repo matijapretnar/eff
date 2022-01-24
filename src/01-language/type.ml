@@ -3,6 +3,8 @@ open Utils
 (** effect symbols *)
 
 module Label = Symbol.Make (Symbol.String)
+module TyParam = Utils.TyParam
+
 (** variant labels *)
 
 (** Variants for the built-in list type *)
@@ -30,8 +32,6 @@ let float_tyname = TyName.fresh "float"
 let list_tyname = TyName.fresh "list"
 
 let empty_tyname = TyName.fresh "empty"
-
-module TyParam = Utils.TyParam
 
 (** type coercion parameters *)
 module TyCoercionParam = Symbol.Make (Symbol.Parameter (struct
@@ -429,3 +429,5 @@ let rec print_pretty_skel ?max_level free params skel ppf =
   | Skeleton.Basic p -> print "%t" (Const.print_ty p)
 
 let print_pretty free = print_pretty_skel free (ref Assoc.empty)
+
+let list_ty_param, list_skel = fresh_ty_param ()
