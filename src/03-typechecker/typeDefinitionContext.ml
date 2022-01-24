@@ -18,8 +18,9 @@ let initial_state =
       ( Type.float_tyname,
         { params = empty_tydef_params; type_def = Inline float_ty } );
       ( Type.list_tyname,
-        let a, skel = Type.fresh_ty_param () in
-        let a_ty = Type.tyParam a (Skeleton.Param skel) in
+        let a_ty =
+          Type.tyParam Type.list_ty_param (Skeleton.Param Type.list_skel)
+        in
         let list_nil = (Type.nil, None) in
         let list_cons =
           ( Type.cons,
@@ -29,7 +30,8 @@ let initial_state =
                    a_ty;
                    apply
                      ( Type.list_tyname,
-                       TyParam.Map.singleton a (a_ty, Covariant) );
+                       TyParam.Map.singleton Type.list_ty_param (a_ty, Covariant)
+                     );
                  ]) )
         in
         {
@@ -37,8 +39,9 @@ let initial_state =
             {
               empty_tydef_params with
               type_params =
-                TyParam.Map.singleton a (Skeleton.Param skel, Covariant);
-              skel_params = Skeleton.Param.Set.singleton skel;
+                TyParam.Map.singleton Type.list_ty_param
+                  (Skeleton.Param Type.list_skel, Covariant);
+              skel_params = Skeleton.Param.Set.singleton Type.list_skel;
             };
           type_def = Sum (Type.Field.Map.of_bindings [ list_nil; list_cons ]);
         } );

@@ -66,7 +66,11 @@ let initial_state =
     inlined_types;
     param_variance = Type.TyParam.Map.empty;
     type_application_names =
-      Term.Variable.Map.of_bindings [ (Type.empty_tyname, []) ];
+      Term.Variable.Map.of_bindings
+        [
+          (Type.empty_tyname, []);
+          (Type.list_tyname, [ (Type.list_ty_param, Covariant) ]);
+        ];
   }
 
 let add_variables vars state =
@@ -161,12 +165,6 @@ let free_type_params t =
     | Sugared.TyHandler (t1, t2) -> ty_params t1 @ ty_params t2
   in
   List.unique_elements (ty_params t)
-
-(* let get_variance param =
-  match param.[0] with
-  | '+' -> (Covariant, String.sub param 1 (String.length param - 1))
-  | '-' -> (Contravariant, String.sub param 1 (String.length param - 1))
-  | _ -> (Invariant, param) *)
 
 let fresh_ty_param () =
   let ty = Type.fresh_ty_with_fresh_skel () in
