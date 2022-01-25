@@ -198,9 +198,6 @@ module Params = struct
       ty_params =
         TyParam.Map.union
           (fun _ skel1 skel2 ->
-            (* Print.debug "%t %t = %t"
-               (TyParam.print t)
-               (print_skeleton skel1) (print_skeleton skel2); *)
             assert (skel1 = skel2);
             Some skel1)
           fp1.ty_params fp2.ty_params;

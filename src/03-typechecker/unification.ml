@@ -196,8 +196,6 @@ and ty_omega_step sub (paused : Constraints.t) cons rest_queue omega = function
       { term = Type.Apply { ty_name = ty_name2; ty_args = tys2 }; _ } )
     when ty_name1 = ty_name2
          && TyParam.Map.cardinal tys1 = TyParam.Map.cardinal tys2 ->
-      (* If the type param is invariant a dummy <= is produced along with an equality constraint  *)
-      Print.debug "here";
       let coercions, cons =
         List.fold_right2
           (fun (p1, (ty, v1)) (p2, (ty', v2)) (coercions, conss) ->
@@ -212,20 +210,18 @@ and ty_omega_step sub (paused : Constraints.t) cons rest_queue omega = function
                   let coercion, ty_cons = Constraint.fresh_ty_coer (ty', ty) in
                   (coercion, ty_cons)
               | Invariant ->
-                  Print.debug "invriant\n";
-                  let coercion, ty_cons = Constraint.fresh_ty_coer (ty, ty') in
-                  (coercion, Constraint.add_ty_equality (ty, ty') ty_cons)
+                  ( Coercion.reflTy ty,
+                    Constraint.add_ty_equality (ty, ty') Constraint.empty )
             in
             ((p1, (coercion, v1)) :: coercions, Constraint.union ty_cons conss))
           (TyParam.Map.bindings tys1)
           (TyParam.Map.bindings tys2)
           ([], Constraint.empty)
       in
-      let k = omega in
       let v =
         Coercion.applyCoercion (ty_name1, coercions |> TyParam.Map.of_bindings)
       in
-      ( Substitution.add_type_coercion k v sub,
+      ( Substitution.add_type_coercion omega v sub,
         paused,
         Constraint.union cons rest_queue )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
@@ -410,10 +406,8 @@ let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
       ty_eq_step sub paused { queue with ty_equalities } ty1 ty2 |> unify ~loc
   | { ty_inequalities = (_, (ty1, ty2)) :: _; _ }
     when not (Skeleton.equal ty1.ty ty2.ty) ->
-      Print.debug "TIE in solve when not eq skel";
       skel_eq_step ~loc sub paused queue ty1.ty ty2.ty |> unify ~loc
   | { ty_inequalities = (omega, tycons) :: ty_inequalities; _ } ->
-      Print.debug "TIE in solve when eq skel";
       let cons =
         Constraint.add_ty_inequality (omega, tycons) Constraint.empty
       in
@@ -460,12 +454,9 @@ let garbage_collect { Language.Constraints.ty_constraints; _ } =
   ty_constraints
 
 let solve ~loc constraints =
-  Print.debug "solve";
-  Print.debug "constraints: %t" (Constraint.print constraints);
   let sub, constraints =
     unify ~loc (Substitution.empty, Constraints.empty, constraints)
   in
-
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
   let constraints' = garbage_collect constraints in

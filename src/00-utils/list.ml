@@ -37,3 +37,9 @@ let list_diff lst1 lst2 =
   Stdlib.List.filter (fun x -> not (Stdlib.List.mem x lst2)) lst1
 
 let concat_map f lst = Stdlib.List.concat (Stdlib.List.map f lst)
+
+let rec equal eq l1 l2 =
+  match (l1, l2) with
+  | [], [] -> true
+  | [], _ :: _ | _ :: _, [] -> false
+  | a1 :: l1, a2 :: l2 -> eq a1 a2 && equal eq l1 l2

@@ -97,14 +97,9 @@ let infer_variant lbl st =
   | Some (ty_name, ps, _, u) ->
       let ps', fresh_subst, p_map = Substitution.of_tydef_parameters ps in
       let u' =
-        match u with
-        | None -> None
-        | Some x ->
-            Print.debug "ttty before: %t ~> %t" (Type.print_ty x)
-              (Type.print_ty
-                 (Substitution.apply_substitutions_to_type fresh_subst x));
-
-            Some (Substitution.apply_substitutions_to_type fresh_subst x)
+        Option.map
+          (fun x -> Substitution.apply_substitutions_to_type fresh_subst x)
+          u
       in
       (u', apply_to_tydef_params ty_name ps' p_map)
 

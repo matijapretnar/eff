@@ -198,9 +198,6 @@ and infer_expression' state = function
       with
       | (None, ty_out), None -> (Term.variant (lbl, None) ty_out, [])
       | (Some ty_in, ty_out), Some e ->
-          Print.debug "sme %t : %t ~> %t "
-            (Untyped.print_expression e)
-            (Type.print_ty ty_in) (Type.print_ty ty_out);
           let e', cs1 = infer_expression state e in
           let castExp, castCt = Constraint.cast_expression e' ty_in in
           (Term.variant (lbl, Some castExp) ty_out, [ castCt; cs1 ])
@@ -298,7 +295,6 @@ and infer_computation state cmp =
 (* Dispatch: Type inference for a plan computation *)
 and infer_computation' ~loc state = function
   | Untyped.Value exp ->
-      Print.debug "in value";
       let exp', outCs = infer_expression state exp in
       (Term.value exp', [ outCs ])
   (* Nest a list of let-bindings *)
@@ -428,9 +424,7 @@ let process_computation state comp =
 let process_top_let ~loc state defs =
   let fold (pat, cmp) (state', defs) =
     let pat', cnstrs_pat = infer_pattern state pat in
-    Print.debug "pat: %t" (Constraint.print cnstrs_pat);
     let cmp', cnstrs_cmp = infer_computation state cmp in
-    Print.debug "comp: %t" (Constraint.print cnstrs_cmp);
     let sub, constraints =
       Unification.solve ~loc
         (Constraint.add_ty_equality

@@ -183,7 +183,6 @@ let of_tydef_parameters (params : Type.tydef_params) =
         Skeleton.Param.Map.map (fun s' -> Skeleton.Param s') skel_params';
     }
   in
-  (* Print.debug "SUBSTITUTION: %t" (print subst); *)
   let ty_params' =
     Type.TyParam.Map.bindings params.type_params
     |> List.map (fun (p, (skel, variance)) ->
@@ -211,7 +210,6 @@ let of_tydef_parameters (params : Type.tydef_params) =
         |> Type.TyParam.Map.of_bindings;
     }
   in
-  (* Print.debug "SUBSTITUTION': %t" (print subst'); *)
   ( params',
     subst',
     List.map (fun (p, (p', _)) -> (p, p')) ty_params' |> TyParam.Map.of_bindings
@@ -236,7 +234,6 @@ let of_parameters (params : Type.Params.t) =
         Skeleton.Param.Map.map (fun s' -> Skeleton.Param s') skel_params';
     }
   in
-  (* Print.debug "SUBSTITUTION: %t" (print subst); *)
   let ty_params' =
     Type.TyParam.Map.bindings params.ty_params
     |> List.map (fun (p, skel) ->
@@ -263,7 +260,6 @@ let of_parameters (params : Type.Params.t) =
         |> Type.TyParam.Map.of_bindings;
     }
   in
-  (* Print.debug "SUBSTITUTION': %t" (print subst'); *)
   (params', subst')
 
 let apply_substitutions_to_substitution new_sub old_sub =
@@ -314,7 +310,8 @@ let add_type_coercion_e parameter t_coercion =
   }
 
 let add_type_coercion parameter t_coercion sub =
-  assert (t_coercion = apply_sub_tycoer sub t_coercion);
+  assert (
+    Coercion.equal_ty_coercion t_coercion (apply_sub_tycoer sub t_coercion));
   merge (add_type_coercion_e parameter t_coercion) sub
 
 let add_type_substitution_e parameter ty =

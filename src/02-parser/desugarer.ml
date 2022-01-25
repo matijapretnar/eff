@@ -125,7 +125,6 @@ let desugar_type type_sbst state =
                 n
             else
               let state', tys' = List.fold_map desugar_type state tys in
-              Print.debug "Var: %t\n" (Term.Variable.print t');
               let type_info =
                 Term.Variable.Map.find t' state.type_application_names
                 |> List.map2
@@ -237,33 +236,9 @@ let desugar_tydef ~loc state
   in
   let ty_params =
     ty_sbst |> StringMap.bindings
-    |> List.map (fun (_, (param, ty, variance)) ->
-           Print.debug "typaram in tydef: %t" (TyParam.print param);
-           (param, (ty.ty, variance)))
+    |> List.map (fun (_, (param, ty, variance)) -> (param, (ty.ty, variance)))
     |> Type.TyParam.Map.of_bindings
   in
-
-  (* let _calculate_variance p_set =
-       assert (VarianceSet.cardinal p_set <= 2);
-       assert (VarianceSet.for_all (( <> ) Invariant) p_set);
-       if VarianceSet.cardinal p_set = 1 then VarianceSet.choose p_set
-       else Invariant
-     in
-     let params' =
-       ty_sbst |> StringMap.bindings
-       |> Type.Params.union_map (fun (_, (_, ty, _)) -> Type.free_params_ty ty)
-     in *)
-  (* Print.debug "Params: %t\n" (Type.Params.print params');
-     let t_params =
-       params'.ty_params |> T.TyParam.Map.mapi (fun _p skel -> skel)
-       (*,
-         match Type.TyParam.Map.find_opt p state'.param_variance with
-         | Some p_set -> calculate_variance p_set
-         | None ->
-             (* param does not need to appear in type, for example in phantom types *)
-             Invariant ) *)
-     in *)
-  (*  TODO: HERE UPDATE *)
   let ty_params =
     {
       Type.type_params = ty_params;

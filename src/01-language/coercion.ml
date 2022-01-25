@@ -87,6 +87,47 @@ let unionDirt (effs, dcoer) =
     ty = (Dirt.add_effects effs drt, Dirt.add_effects effs drt');
   }
 
+let rec equal_ty_coercion tc1 tc2 =
+  let t1, t1' = tc1.ty and t2, t2' = tc2.ty in
+  Type.equal_ty t1 t2 && Type.equal_ty t1' t2'
+  &&
+  match (tc1.term, tc2.term) with
+  | ReflTy, ReflTy -> true
+  | ArrowCoercion (tc1, dc1), ArrowCoercion (tc2, dc2) ->
+      equal_ty_coercion tc1 tc2 && equal_dirty_coercion dc1 dc2
+  | HandlerCoercion (dc1, dc1'), HandlerCoercion (dc2, dc2') ->
+      equal_dirty_coercion dc1 dc2 && equal_dirty_coercion dc1' dc2'
+  | TupleCoercion tc1, TupleCoercion tc2 -> List.equal equal_ty_coercion tc1 tc2
+  | ( ApplyCoercion { ty_name = ty_name1; tcoers = tcoers1 },
+      ApplyCoercion { ty_name = ty_name2; tcoers = tcoers2 } ) ->
+      ty_name1 = ty_name2
+      && assert (TyParam.Map.keys tcoers1 = TyParam.Map.keys tcoers2) = ()
+      && TyParam.Map.equal
+           (fun (c1, v1) (c2, v2) ->
+             assert (v1 = v2);
+             v1 = v2 && equal_ty_coercion c1 c2)
+           tcoers1 tcoers2
+  | TyCoercionVar tv1, TyCoercionVar tv2 -> tv1 = tv2
+  | _ -> false
+
+and equal_dirty_coercion { term = tc1, dc1; ty = dt1, dt1' }
+    { term = tc2, dc2; ty = dt2, dt2' } =
+  Type.equal_dirty dt1 dt2 && Type.equal_dirty dt1' dt2'
+  && equal_dirt_coercion dc1 dc2
+  && equal_ty_coercion tc1 tc2
+
+and equal_dirt_coercion dc1 dc2 =
+  let d1, d1' = dc1.ty and d2, d2' = dc2.ty in
+  Type.equal_dirt d1 d2 && Type.equal_dirt d1' d2'
+  &&
+  match (dc1.term, dc2.term) with
+  | ReflDirt, ReflDirt -> true
+  | Empty, Empty -> true
+  | DirtCoercionVar dv1, DirtCoercionVar dv2 -> dv1 = dv2
+  | UnionDirt (es1, dc1), UnionDirt (es2, dc2) ->
+      Effect.Set.equal es1 es2 && equal_dirt_coercion dc1 dc2
+  | _ -> false
+
 (* ************************************************************************* *)
 (*                         COERCION VARIABLES OF                             *)
 (* ************************************************************************* *)

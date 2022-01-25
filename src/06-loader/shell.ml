@@ -183,10 +183,6 @@ module Make (Backend : Language.Backend.S) = struct
         let desugarer_state', tydefs' =
           Desugarer.desugar_tydefs ~loc state.desugarer_state tydefs
         in
-        Assoc.iter
-          (fun (tyname, _tydef) ->
-            Print.debug "ty: %t = \n" (Type.Label.print tyname))
-          tydefs';
         let type_system_state' =
           TypeSystem.add_type_definitions state.type_system_state
             (tydefs' |> Assoc.to_list |> Type.Field.Map.of_bindings)
