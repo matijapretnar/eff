@@ -1,4 +1,5 @@
 open Utils
+module TyParam = TyParam.TyParam
 
 type ty_coercion = (ty_coercion', Type.ct_ty) typed
 
@@ -7,6 +8,7 @@ and ty_coercion' =
   | ArrowCoercion of ty_coercion * dirty_coercion
   | HandlerCoercion of dirty_coercion * dirty_coercion
   | TyCoercionVar of Type.TyCoercionParam.t
+  (* TODO: variance should be read from ty_name parameter *)
   | ApplyCoercion of {
       ty_name : TyName.t;
       tcoers : (ty_coercion * variance) TyParam.Map.t;
@@ -49,6 +51,7 @@ let tupleCoercion tcoers =
   { term = TupleCoercion tcoers; ty = (Type.tuple tys, Type.tuple tys') }
 
 let applyCoercion (ty_name, tcoers) =
+  (* TODO add assert according to ty_name information *)
   let tys, tys' =
     TyParam.Map.bindings tcoers
     |> List.map (fun (p, (tcoer, variance)) ->

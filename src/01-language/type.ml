@@ -3,7 +3,7 @@ open Utils
 (** effect symbols *)
 
 module Label = Symbol.Make (Symbol.String)
-module TyParam = Utils.TyParam
+module TyParam = TyParam.TyParam
 
 (** variant labels *)
 
@@ -51,8 +51,8 @@ type ty = (ty', Skeleton.t) typed
 
 and ty' =
   | TyParam of TyParam.t
+  (* TODO: variance should be read from ty_name parameter *)
   | Apply of { ty_name : TyName.t; ty_args : (ty * variance) TyParam.Map.t }
-  (* | Apply of { ty_name : TyName.t; ty_args : ty list } *)
   | Arrow of abs_ty
   | Tuple of ty list
   | Handler of dirty * dirty
@@ -240,7 +240,6 @@ and free_params_ty' skel = function
       ty_args |> TyParam.Map.values
       |> Params.union_map (fun (ty, _) -> free_params_ty ty)
 
-(*Params.union_map free_params_ty ty_args *)
 and free_params_dirty (ty, dirt) =
   Params.union (free_params_ty ty) (free_params_dirt dirt)
 
@@ -274,7 +273,6 @@ type tydef =
 type tydef_params = {
   type_params : (Skeleton.t * variance) TyParam.Map.t;
   dirt_params : Dirt.Param.Set.t;
-  (* dirt_params :  *)
   skel_params : Skeleton.Param.Set.t;
 }
 

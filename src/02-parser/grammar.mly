@@ -455,7 +455,7 @@ mark_position(X):
   { {it= x; at= Location.make $startpos $endpos}}
 
 param_with_variance:
-  | EQUAL? p = PARAM
+  | p = PARAM
     { (p, Invariant) }
   | PLUS p = PARAM
     { (p, Covariant) }

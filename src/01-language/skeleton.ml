@@ -1,4 +1,5 @@
 open Utils
+module TyParam = TyParam.TyParam
 
 (** skeleton parameters *)
 module Param = Symbol.Make (Symbol.Parameter (struct
@@ -11,6 +12,7 @@ type t =
   | Param of Param.t
   | Basic of Const.ty
   | Arrow of t * t
+  (* TODO: We won't be needing this after tyname has enough information to reconstruct types *)
   | Apply of { ty_name : TyName.t; skel_args : (t * variance) TyParam.Map.t }
   | Handler of t * t
   | Tuple of t list

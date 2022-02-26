@@ -105,7 +105,8 @@ and of_type ty =
   | Type.Apply { ty_name; ty_args } ->
       TyApply
         ( ty_name,
-          List.map of_type (ty_args |> TyParam.Map.values |> List.map fst) )
+          List.map of_type
+            (ty_args |> TyParam.TyParam.Map.values |> List.map fst) )
   | Type.TyParam ty_param -> TyParam ty_param
   | Type.TyBasic s -> TyBasic s
   | Type.Tuple tys -> TyTuple (List.map of_type tys)

@@ -30,7 +30,6 @@ type state = {
   constructors : (Type.Label.t * constructor_kind) StringMap.t;
   local_type_annotations : (Type.TyParam.t * Type.ty) StringMap.t;
   inlined_types : Type.ty StringMap.t;
-  param_variance : VarianceSet.t Type.TyParam.Map.t;
   type_application_names : (Type.TyParam.t * variance) list Term.Variable.Map.t;
 }
 
@@ -64,7 +63,6 @@ let initial_state =
     constructors;
     local_type_annotations = StringMap.empty;
     inlined_types;
-    param_variance = Type.TyParam.Map.empty;
     type_application_names =
       Term.Variable.Map.of_bindings
         [
