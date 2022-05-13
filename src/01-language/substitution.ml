@@ -54,10 +54,7 @@ let rec apply_sub_skel sub skeleton =
       Apply
         {
           ty_name;
-          skel_args =
-            TyParam.Map.map
-              (fun (s, variance) -> (apply_sub_skel sub s, variance))
-              skel_args;
+          skel_args = TyParam.Map.map (fun s -> apply_sub_skel sub s) skel_args;
         }
   | Tuple skels -> Tuple (List.map (apply_sub_skel sub) skels)
 

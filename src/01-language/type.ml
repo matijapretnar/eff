@@ -124,9 +124,7 @@ let apply (ty_name, ty_args) =
         {
           ty_name;
           skel_args =
-            ty_args
-            |> TyParam.Map.map (fun (ty, variance) ->
-                   (skeleton_of_ty ty, variance));
+            ty_args |> TyParam.Map.map (fun (ty, _) -> skeleton_of_ty ty);
         };
   }
 
@@ -218,7 +216,7 @@ let rec free_params_skeleton = function
   | Skeleton.Basic _ -> Params.empty
   | Skeleton.Apply { skel_args; _ } ->
       skel_args |> TyParam.Map.values
-      |> Params.union_map (fun (s, _) -> free_params_skeleton s)
+      |> Params.union_map (fun s -> free_params_skeleton s)
   | Skeleton.Arrow (sk1, sk2) ->
       Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
   | Skeleton.Handler (sk1, sk2) ->
@@ -351,7 +349,7 @@ let fresh_ty_with_fresh_skel () = fresh_ty_with_skel (fresh_skel ())
 
 let fresh_dirty_with_fresh_skel () = fresh_dirty_param_with_skel (fresh_skel ())
 
-let fresh_ty_with_skel skel =
+let fresh_ty_with_skel type_definitions skel =
   match skel with
   (* α : ς *)
   | Skeleton.Param _ -> assert false
@@ -369,9 +367,16 @@ let fresh_ty_with_skel skel =
   (* α : ty_name (τ₁, τ₂, ...) *)
   | Skeleton.Apply { ty_name; skel_args } ->
       let tvars =
-        TyParam.Map.map
-          (fun (s, variance) -> (fresh_ty_with_skel s, variance))
-          skel_args
+        match Assoc.lookup ty_name type_definitions with
+        | Some tydata ->
+            TyParam.Map.mapi
+              (fun ty_param s ->
+                ( fresh_ty_with_skel s,
+                  TyParam.Map.find ty_param tydata.params.type_params
+                  |> fun (_skel, variance) -> variance ))
+              skel_args
+        | None -> assert false
+        (* Type should be known *)
       in
       apply (ty_name, tvars)
   (* α : τ₁ => τ₂ *)
@@ -402,12 +407,11 @@ let rec print_pretty_skel ?max_level free params skel ppf =
   | Skeleton.Apply { ty_name; skel_args } -> (
       match TyParam.Map.values skel_args with
       | [] -> print "%t" (TyName.print ty_name)
-      | [ (s, _) ] ->
+      | [ s ] ->
           print ~at_level:1 "%t %t"
             (print_pretty_skel ~max_level:1 free params s)
             (TyName.print ty_name)
       | skels ->
-          let skels = List.map fst skels in
           print ~at_level:1 "(%t) %t"
             (Print.sequence ", " (print_pretty_skel free params) skels)
             (TyName.print ty_name))

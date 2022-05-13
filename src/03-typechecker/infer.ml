@@ -408,7 +408,9 @@ and infer_abstraction2 state (pat1, pat2, cmp) :
 
 let process_computation state comp =
   let comp', cnstrs = infer_computation state comp in
-  let sub, residuals = Unification.solve ~loc:comp.at cnstrs in
+  let sub, residuals =
+    Unification.solve ~loc:comp.at state.type_definitions cnstrs
+  in
   let cmp' = Term.apply_sub_comp sub comp' in
   let params =
     match comp.it with
@@ -426,7 +428,7 @@ let process_top_let ~loc state defs =
     let pat', cnstrs_pat = infer_pattern state pat in
     let cmp', cnstrs_cmp = infer_computation state cmp in
     let sub, constraints =
-      Unification.solve ~loc
+      Unification.solve ~loc state.type_definitions
         (Constraint.add_ty_equality
            (pat'.ty, fst cmp'.ty)
            (Constraint.union cnstrs_pat cnstrs_cmp))
@@ -465,7 +467,7 @@ let process_top_let_rec ~loc state un_defs =
       Exhaust.check_computation state.type_definitions c)
     un_defs;
   let defs', cnstrs = infer_rec_definitions state (Assoc.to_list un_defs) in
-  let sub, constraints = Unification.solve ~loc cnstrs in
+  let sub, constraints = Unification.solve state.type_definitions ~loc cnstrs in
   let defs = Assoc.map (Term.apply_substitutions_to_abstraction sub) defs' in
   let defs_params = Term.free_params_definitions defs in
   let cnstrs_params = Constraints.free_params constraints in

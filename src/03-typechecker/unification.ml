@@ -90,7 +90,7 @@ let skel_eq_step ~loc sub (paused : Constraints.t) rest_queue sk1 sk2 =
       ( sub,
         paused,
         List.fold_right2
-          (fun (sk1, _) (sk2, _) -> Constraint.add_skeleton_equality (sk1, sk2))
+          (fun sk1 sk2 -> Constraint.add_skeleton_equality (sk1, sk2))
           (sks1 |> TyParam.Map.values)
           (sks2 |> TyParam.Map.values)
           rest_queue )
@@ -157,7 +157,8 @@ and ty_eq_step sub (paused : Constraints.t) rest_queue (ty1 : Type.ty)
           tys1 tys2 rest_queue )
   | _ -> assert false
 
-and ty_omega_step sub (paused : Constraints.t) cons rest_queue omega = function
+and ty_omega_step type_definitions sub (paused : Constraints.t) cons rest_queue
+    omega = function
   (* ω : A <= A *)
   | ty1, ty2 when Type.equal_ty ty1 ty2 ->
       let k = omega in
@@ -258,7 +259,7 @@ and ty_omega_step sub (paused : Constraints.t) cons rest_queue omega = function
             rest_queue ))
   | { term = Type.TyParam tv; ty = skel }, _
   | _, { term = Type.TyParam tv; ty = skel } ->
-      let ty = fresh_ty_with_skel skel in
+      let ty = fresh_ty_with_skel type_definitions skel in
       apply_substitution
         (Substitution.add_type_substitution_e tv ty)
         sub paused
@@ -383,36 +384,41 @@ and dirt_eq_step ~loc sub paused rest_queue { Dirt.effect_set = o1; row = row1 }
   let sub' = Substitution.merge (Substitution.merge sub1 sub2) row_sub in
   apply_substitution sub' sub paused rest_queue
 
-let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
+let rec unify ~loc type_definitions (sub, paused, (queue : Constraint.t)) =
   Print.debug "SUB: %t" (Substitution.print sub);
   Print.debug "PAUSED: %t" (Constraints.print paused);
   Print.debug "QUEUE: %t" (Constraint.print queue);
   match queue with
   | { skeleton_equalities = (sk1, sk2) :: skeleton_equalities; _ } ->
       skel_eq_step ~loc sub paused { queue with skeleton_equalities } sk1 sk2
-      |> unify ~loc
+      |> unify ~loc type_definitions
   | { dirt_equalities = (drt1, drt2) :: dirt_equalities; _ } ->
       dirt_eq_step ~loc sub paused { queue with dirt_equalities } drt1 drt2
-      |> unify ~loc
+      |> unify ~loc type_definitions
   | { dirt_inequalities = (omega, dcons) :: dirt_inequalities; _ } ->
       dirt_omega_step ~loc sub paused
         { queue with dirt_inequalities }
         omega dcons
-      |> unify ~loc
+      |> unify ~loc type_definitions
   | { ty_equalities = (ty1, ty2) :: _; _ }
     when not (Skeleton.equal ty1.ty ty2.ty) ->
-      skel_eq_step ~loc sub paused queue ty1.ty ty2.ty |> unify ~loc
+      skel_eq_step ~loc sub paused queue ty1.ty ty2.ty
+      |> unify ~loc type_definitions
   | { ty_equalities = (ty1, ty2) :: ty_equalities; _ } ->
-      ty_eq_step sub paused { queue with ty_equalities } ty1 ty2 |> unify ~loc
+      ty_eq_step sub paused { queue with ty_equalities } ty1 ty2
+      |> unify ~loc type_definitions
   | { ty_inequalities = (_, (ty1, ty2)) :: _; _ }
     when not (Skeleton.equal ty1.ty ty2.ty) ->
-      skel_eq_step ~loc sub paused queue ty1.ty ty2.ty |> unify ~loc
+      skel_eq_step ~loc sub paused queue ty1.ty ty2.ty
+      |> unify ~loc type_definitions
   | { ty_inequalities = (omega, tycons) :: ty_inequalities; _ } ->
       let cons =
         Constraint.add_ty_inequality (omega, tycons) Constraint.empty
       in
-      ty_omega_step sub paused cons { queue with ty_inequalities } omega tycons
-      |> unify ~loc
+      ty_omega_step type_definitions sub paused cons
+        { queue with ty_inequalities }
+        omega tycons
+      |> unify ~loc type_definitions
   | {
    skeleton_equalities = [];
    dirt_equalities = [];
@@ -453,12 +459,15 @@ let garbage_collect { Language.Constraints.ty_constraints; _ } =
   in
   ty_constraints
 
-let solve ~loc constraints =
+let solve ~loc type_definitions constraints =
   let sub, constraints =
-    unify ~loc (Substitution.empty, Constraints.empty, constraints)
+    unify ~loc type_definitions
+      (Substitution.empty, Constraints.empty, constraints)
   in
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
   let constraints' = garbage_collect constraints in
-  let subs', constraints' = unify ~loc (sub, constraints, constraints') in
+  let subs', constraints' =
+    unify ~loc type_definitions (sub, constraints, constraints')
+  in
   (Substitution.merge subs' sub, constraints')

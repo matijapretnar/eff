@@ -86,8 +86,6 @@ let apply_to_tydef_params tyname (ps : tydef_params) p_map =
              let skel, variance = TyParam.Map.find p ps.type_params in
              (tyParam p skel, variance)) )
 
-(* TODO: THIS IS WRONG NOW *)
-
 (** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
     with refreshed type parameters and additional information needed for type
     inference. *)
