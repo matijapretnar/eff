@@ -26,11 +26,10 @@ type state = {
   context : Term.Variable.t StringMap.t;
   effect_symbols : Effect.t StringMap.t;
   field_symbols : Type.Field.t StringMap.t;
-  tyname_symbols : (TyName.t * int) StringMap.t;
+  tyname_symbols : (TyName.t * (Type.TyParam.t * variance) list) StringMap.t;
   constructors : (Type.Label.t * constructor_kind) StringMap.t;
   local_type_annotations : (Type.TyParam.t * Type.ty) StringMap.t;
   inlined_types : Type.ty StringMap.t;
-  type_application_names : (Type.TyParam.t * variance) list Term.Variable.Map.t;
 }
 
 let initial_state =
@@ -40,13 +39,14 @@ let initial_state =
     |> StringMap.add Type.nil_annot (Type.nil, Variant false)
   and tyname_symbols =
     StringMap.empty
-    |> StringMap.add "bool" (Type.bool_tyname, 0)
-    |> StringMap.add "int" (Type.int_tyname, 0)
-    |> StringMap.add "unit" (Type.unit_tyname, 0)
-    |> StringMap.add "string" (Type.string_tyname, 0)
-    |> StringMap.add "float" (Type.float_tyname, 0)
-    |> StringMap.add "list" (Type.list_tyname, 1)
-    |> StringMap.add "empty" (Type.empty_tyname, 0)
+    |> StringMap.add "bool" (Type.bool_tyname, [])
+    |> StringMap.add "int" (Type.int_tyname, [])
+    |> StringMap.add "unit" (Type.unit_tyname, [])
+    |> StringMap.add "string" (Type.string_tyname, [])
+    |> StringMap.add "float" (Type.float_tyname, [])
+    |> StringMap.add "list"
+         (Type.list_tyname, [ (Type.list_ty_param, Covariant) ])
+    |> StringMap.add "empty" (Type.empty_tyname, [])
   and inlined_types =
     StringMap.empty
     |> StringMap.add "bool" Type.bool_ty
@@ -63,12 +63,6 @@ let initial_state =
     constructors;
     local_type_annotations = StringMap.empty;
     inlined_types;
-    type_application_names =
-      Term.Variable.Map.of_bindings
-        [
-          (Type.empty_tyname, []);
-          (Type.list_tyname, [ (Type.list_ty_param, Covariant) ]);
-        ];
   }
 
 let add_variables vars state =
@@ -111,20 +105,22 @@ let desugar_type type_sbst state =
   let rec desugar_type state { it = t; at = loc } =
     match t with
     | Sugared.TyApply (t, tys) -> (
-        let t', n = tyname_to_symbol ~loc state t in
+        let t', lst = tyname_to_symbol ~loc state t in
+        let n = List.length lst in
         if List.length tys <> n then
           Error.syntax ~loc "Type %t expects %d arguments" (TyName.print t') n;
         match StringMap.find_opt t state.inlined_types with
         | Some ty -> (state, ty)
         | None ->
-            let t', n = tyname_to_symbol ~loc state t in
+            let t', lst = tyname_to_symbol ~loc state t in
+            let n = List.length lst in
             if List.length tys <> n then
               Error.syntax ~loc "Type %t expects %d arguments" (TyName.print t')
                 n
             else
               let state', tys' = List.fold_map desugar_type state tys in
               let type_info =
-                Term.Variable.Map.find t' state.type_application_names
+                lst
                 |> List.map2
                      (fun ty (param, variance) -> (param, (ty, variance)))
                      tys'
@@ -252,13 +248,13 @@ let desugar_tydef ~loc state
   (state', { Type.params = ty_params; type_def = def' })
 
 (** [desugar_tydefs defs] desugars the simultaneous type definitions [defs]. *)
-let desugar_tydefs ~loc state sugared_defs =
-  let add_ty_names (tyname_symbols, type_application_names)
+let desugar_tydefs ~loc (state : state) sugared_defs =
+  let add_ty_names
+      (tyname_symbols :
+        (TyName.t * (Type.TyParam.t * variance) list) StringMap.t)
       (name, (params, tydef)) =
     let sym = TyName.fresh name in
-    let tyname_symbols =
-      add_unique ~loc "Type" name (sym, List.length params) tyname_symbols
-    in
+
     let ty_sbst = syntax_to_core_params params in
     let ty_param_subs =
       params
@@ -266,16 +262,13 @@ let desugar_tydefs ~loc state sugared_defs =
              ty_sbst |> StringMap.find pname |> fun (_, ty, variance) ->
              (force_param ty, variance))
     in
-    ( ( tyname_symbols,
-        type_application_names |> Term.Variable.Map.add sym ty_param_subs ),
+    ( add_unique ~loc "Type" name (sym, ty_param_subs) tyname_symbols,
       (name, (ty_sbst, tydef)) )
   in
-  let (tyname_symbols, type_application_names), sugared_defs =
-    Assoc.kfold_map add_ty_names
-      (state.tyname_symbols, state.type_application_names)
-      sugared_defs
+  let tyname_symbols, sugared_defs =
+    Assoc.kfold_map add_ty_names state.tyname_symbols sugared_defs
   in
-  let state' = { state with tyname_symbols; type_application_names } in
+  let state' = { state with tyname_symbols } in
   let desugar_fold st (name, (params, def)) =
     (* First desugar the type names *)
     let sym, _ = StringMap.find name st.tyname_symbols in
