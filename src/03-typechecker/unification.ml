@@ -428,13 +428,13 @@ let rec unify ~loc type_definitions (sub, paused, (queue : Constraint.t)) =
   } ->
       (sub, paused)
 
-let garbage_collect { Language.Constraints.ty_constraints; _ } =
+let collapse_cycles { Language.Constraints.ty_constraints; _ } =
   let open Language.Constraints in
   (* Remove type cycles *)
   let garbage_collect_skeleton_component skel graph new_constr =
     let pack ty_param = { term = TyParam ty_param; ty = Skeleton.Param skel } in
     let components = TyConstraints.TyParamGraph.scc graph in
-    (* For each component: pick one and add equal consstraint  *)
+    (* For each component: pick one and add equal constraint  *)
     let new_constr' =
       List.fold
         (fun new_constr component ->
@@ -459,6 +459,122 @@ let garbage_collect { Language.Constraints.ty_constraints; _ } =
   in
   ty_constraints
 
+let join_simple_nodes { Language.Constraints.ty_constraints; _ } =
+  let open Language.Constraints in
+  let module G = TyConstraints.TyParamGraph in
+  let join_component skel graph new_constr =
+    let pack ty_param = { term = TyParam ty_param; ty = Skeleton.Param skel } in
+    (* We can assume that the graph is a DAG *)
+    let inverse_graph = G.reverse graph in
+    let increment v m =
+      TyParam.Map.update v
+        (function None -> Some 1 | Some x -> Some (x + 1))
+        m
+    in
+    let indeg, outdeg =
+      G.fold
+        (fun source sink _edge (indeg, outdeg) ->
+          (increment sink indeg, increment source outdeg))
+        graph
+        (TyParam.Map.empty, TyParam.Map.empty)
+    in
+    (* Sanity check *)
+    let assert_degrees grph line =
+      TyParam.Map.iter
+        (fun p n ->
+          let sz = G.get_edges p grph |> G.Edges.cardinal in
+          assert (n = sz))
+        line
+    in
+    assert_degrees inverse_graph indeg;
+    assert_degrees graph outdeg;
+    (* Find the node with the least indegree *)
+    let get_ones (k, n) =
+      assert (n <> 0);
+      if n = 1 then Some k else None
+    in
+    let filter line =
+      line |> TyParam.Map.bindings |> List.filter_map get_ones
+      |> TyParam.Set.of_list
+    in
+    let indeg_line = filter indeg and outdeg_line = filter outdeg in
+    let process_part_general ?(mode = "incoming") target
+        (indeg_line, outdeg_line) (base_graph, reverse_graph) constr =
+      (* Removing outging/incoming edges with degree 1 is practically the same but on different (reversed) graph
+         The naming in this function assumes that the input graph is original graph and we are removing edges with
+         exactly 1 incoming edge *)
+      Print.debug "In mode %s, removing: %t" mode (TyParam.print target);
+      let incoming = G.get_edges target reverse_graph in
+      assert (G.Edges.cardinal incoming = 1);
+      let source, _edge = G.Vertex.Map.choose incoming in
+      let next = G.get_edges target base_graph in
+      let base_graph =
+        base_graph
+        |> G.remove_edge source target (* remove this edge *)
+        |> G.Edges.fold (* rewire other edges *)
+             (fun next e acc ->
+               acc |> G.remove_edge target next
+               |> G.add_edge (* Triangels can produce duplicate edges *)
+                    ~allow_duplicate:true source next e)
+             next
+        |> G.remove_vertex_unsafe target
+      and reverse_graph =
+        reverse_graph
+        |> G.remove_edge target source
+        |> G.Edges.fold (* rewire other edges *)
+             (fun next e acc ->
+               acc |> G.remove_edge next target
+               |> G.add_edge ~allow_duplicate:true next source e)
+             next
+        |> G.remove_vertex_unsafe target
+      in
+      let remove_edges base_graph line =
+        line |> TyParam.Set.remove target
+        |> G.Edges.fold
+             (fun potential _ acc ->
+               let num =
+                 base_graph |> G.get_edges potential |> G.Edges.cardinal
+               in
+               if num = 1 then acc |> TyParam.Set.add potential
+               else acc |> TyParam.Set.remove potential)
+             (next
+             |> G.Vertex.Map.map (fun _ -> ())
+             (* Treat source as any other *)
+             |> G.Edges.add_edge ~allow_duplicate:true source ())
+      in
+      let indeg_line = remove_edges reverse_graph indeg_line
+      and outdeg_line = remove_edges base_graph outdeg_line in
+      ( (indeg_line, outdeg_line),
+        (base_graph, reverse_graph),
+        Constraint.add_ty_equality (pack source, pack target) constr )
+    in
+    let rec process (indeg_line, outdeg_line) (graph, reverse_graph) constr =
+      match TyParam.Set.choose_opt indeg_line with
+      | Some v ->
+          let (indeg_line, outdeg_line), (graph, reverse_graph), constr =
+            process_part_general v (indeg_line, outdeg_line)
+              (graph, reverse_graph) constr
+          in
+          process (indeg_line, outdeg_line) (graph, reverse_graph) constr
+      | None -> (
+          match TyParam.Set.choose_opt outdeg_line with
+          | Some v ->
+              let (outdeg_line, indeg_line), (reverse_graph, graph), constr =
+                process_part_general ~mode:"outgoing" v
+                  (outdeg_line, indeg_line) (reverse_graph, graph) constr
+              in
+              process (indeg_line, outdeg_line) (graph, reverse_graph) constr
+          | None ->
+              (* TODO: a bunch of asserts *)
+              constr)
+    in
+    process (indeg_line, outdeg_line) (graph, inverse_graph) new_constr
+  in
+  let ty_constraints =
+    Skeleton.Param.Map.fold join_component ty_constraints Constraint.empty
+  in
+  ty_constraints
+
 let solve ~loc type_definitions constraints =
   let sub, constraints =
     unify ~loc type_definitions
@@ -466,8 +582,14 @@ let solve ~loc type_definitions constraints =
   in
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
-  let constraints' = garbage_collect constraints in
-  let subs', constraints' =
-    unify ~loc type_definitions (sub, constraints, constraints')
+  let cycle_constraints = collapse_cycles constraints in
+  let subs', cycle_constraints' =
+    unify ~loc type_definitions (sub, constraints, cycle_constraints)
   in
-  (Substitution.merge subs' sub, constraints')
+  let simple_one_constraints = join_simple_nodes cycle_constraints' in
+  let subs'', simple_one_constraints' =
+    unify ~loc type_definitions
+      (subs', cycle_constraints', simple_one_constraints)
+  in
+  ( sub |> Substitution.merge subs' |> Substitution.merge subs'',
+    simple_one_constraints' )

@@ -4,12 +4,23 @@ module MakeEdges (Vertex : Symbol.S) = struct
   let empty = Vertex.Map.empty
   let get_edge t edges = Vertex.Map.find_opt t edges
 
-  let add_edge t w edges =
+  let add_edge ?(allow_duplicate = false) t w edges =
     Vertex.Map.update t
-      (function None -> Some w | Some _ -> assert false)
+      (function
+        | None -> Some w
+        | Some v ->
+            if not allow_duplicate then assert false;
+            Some v)
+      edges
+
+  let remove_edge v2 edges =
+    Vertex.Map.update v2
+      (function None -> assert false | Some _ -> None)
       edges
 
   let fold f edges acc = Vertex.Map.fold f edges acc
+
+  let cardinal g = Vertex.Map.cardinal g
 end
 
 module Make
@@ -19,6 +30,7 @@ module Make
       val print : ?safe:bool -> t -> Format.formatter -> unit
     end) =
 struct
+  module Vertex = Vertex
   module Edges = MakeEdges (Vertex)
 
   type t = Edge.t Edges.t Vertex.Map.t
@@ -29,9 +41,17 @@ struct
   let get_edges t graph =
     Vertex.Map.find_opt t graph |> Option.value ~default:Edges.empty
 
-  let add_edge v1 v2 e graph =
-    let v1_edges' = get_edges v1 graph |> Edges.add_edge v2 e in
+  let add_edge ?(allow_duplicate = false) v1 v2 e graph =
+    let v1_edges' =
+      get_edges v1 graph |> Edges.add_edge ~allow_duplicate v2 e
+    in
     Vertex.Map.add v1 v1_edges' graph
+
+  let remove_edge v1 v2 graph =
+    let v1_edges' = get_edges v1 graph |> Edges.remove_edge v2 in
+    Vertex.Map.add v1 v1_edges' graph
+
+  let remove_vertex_unsafe v graph = Vertex.Map.remove v graph
 
   let fold f graph acc = Vertex.Map.fold (fun v -> Edges.fold (f v)) graph acc
 
