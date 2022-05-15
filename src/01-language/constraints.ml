@@ -20,6 +20,12 @@ module DirtConstraints = struct
 
   let empty = DirtParamGraph.empty
 
+  let clean (graph : t) : t =
+    DirtParamGraph.fold
+      (fun p1 p2 _e acc ->
+        if p1 = p2 then DirtParamGraph.remove_edge p1 p2 acc else acc)
+      graph graph
+
   (* Since we only add and never remove type constraints, the set of constraints
      is empty if and only iff there are no skeleton graphs in it *)
   let is_empty = DirtParamGraph.is_empty
@@ -102,6 +108,9 @@ let empty =
     ty_constraints = TyConstraints.empty;
     dirt_constraints = DirtConstraints.empty;
   }
+
+let clean g =
+  { g with dirt_constraints = g.dirt_constraints |> DirtConstraints.clean }
 
 let is_empty constraints =
   TyConstraints.is_empty constraints.ty_constraints

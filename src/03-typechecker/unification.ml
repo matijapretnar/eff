@@ -428,7 +428,7 @@ let rec unify ~loc type_definitions (sub, paused, (queue : Constraint.t)) =
   } ->
       (sub, paused)
 
-let collapse_cycles { Language.Constraints.ty_constraints; _ } =
+let collapse_cycles { Language.Constraints.ty_constraints; dirt_constraints } =
   let open Language.Constraints in
   (* Remove type cycles *)
   let garbage_collect_skeleton_component skel graph new_constr =
@@ -456,6 +456,47 @@ let collapse_cycles { Language.Constraints.ty_constraints; _ } =
   let ty_constraints =
     Skeleton.Param.Map.fold garbage_collect_skeleton_component ty_constraints
       Constraint.empty
+  in
+  (* Dirt constraints *)
+  let components = DirtConstraints.DirtParamGraph.scc dirt_constraints in
+  let ty_constraints =
+    List.fold_left
+      (fun ty_constraints component ->
+        if
+          Dirt.Param.Set.cardinal component = 1
+          || not (* If the cycle is simple *)
+               (Dirt.Param.Set.for_all
+                  (fun v ->
+                    let edges =
+                      DirtConstraints.DirtParamGraph.get_edges v
+                        dirt_constraints
+                    in
+                    Dirt.Param.Set.for_all
+                      (fun target ->
+                        match
+                          DirtConstraints.DirtParamGraph.Edges.get_edge target
+                            edges
+                        with
+                        | None -> true
+                        | Some (_, dirts) -> Effect.Set.is_empty dirts)
+                      component)
+                  component)
+        then ty_constraints
+        else
+          (* Pick one and set all other to equal it *)
+          let representative = Dirt.Param.Set.choose component in
+          let ty_constraints =
+            Dirt.Param.Set.fold
+              (fun v acc ->
+                if v <> representative then
+                  Constraint.add_dirt_equality
+                    (Dirt.no_effect v, Dirt.no_effect representative)
+                    acc
+                else acc)
+              component ty_constraints
+          in
+          ty_constraints)
+      ty_constraints components
   in
   ty_constraints
 
@@ -586,6 +627,7 @@ let solve ~loc type_definitions constraints =
   let subs', cycle_constraints' =
     unify ~loc type_definitions (sub, constraints, cycle_constraints)
   in
+  let cycle_constraints' = Constraints.clean cycle_constraints' in
   let simple_one_constraints = join_simple_nodes cycle_constraints' in
   let subs'', simple_one_constraints' =
     unify ~loc type_definitions
