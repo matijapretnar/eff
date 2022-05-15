@@ -634,6 +634,158 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ } =
   in
   new_constr
 
+let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } =
+  let open Language.Constraints in
+  let join_dirt_component add_constraint is_collapsible graph new_constr =
+    let module BaseSym = Dirt.Param in
+    let module G = DirtConstraints.DirtParamGraph in
+    (* We can assume that the graph is a DAG *)
+    let inverse_graph = G.reverse graph in
+    let increment v m =
+      BaseSym.Map.update v
+        (function None -> Some 1 | Some x -> Some (x + 1))
+        m
+    in
+    let indeg, outdeg =
+      G.fold
+        (fun source sink _edge (indeg, outdeg) ->
+          (increment sink indeg, increment source outdeg))
+        graph
+        (BaseSym.Map.empty, BaseSym.Map.empty)
+    in
+    (* Sanity check *)
+    let assert_degrees grph line =
+      BaseSym.Map.iter
+        (fun p n ->
+          let sz = G.get_edges p grph |> G.Edges.cardinal in
+          assert (n = sz))
+        line
+    in
+    assert_degrees inverse_graph indeg;
+    assert_degrees graph outdeg;
+    (* Find the node with the least indegree *)
+    let get_ones (k, n) =
+      assert (n <> 0);
+      if n = 1 then Some k else None
+    in
+    let filter line =
+      line |> BaseSym.Map.bindings |> List.filter_map get_ones
+      |> BaseSym.Set.of_list
+    in
+    let indeg_line = filter indeg and outdeg_line = filter outdeg in
+    let process_part_general ?(mode = "incoming") target
+        (indeg_line, outdeg_line) (base_graph, reverse_graph) (visited, changed)
+        constr =
+      (* Removing outging/incoming edges with degree 1 is practically the same but on different (reversed) graph
+         The naming in this function assumes that the input graph is original graph and we are removing edges with
+         exactly 1 incoming edge *)
+      let remove_current_node_from_list = BaseSym.Set.remove target in
+      let visited = BaseSym.Set.add target visited in
+      Print.debug "In mode %s, removing: %t" mode (BaseSym.print target);
+      let incoming = G.get_edges target reverse_graph in
+      assert (G.Edges.cardinal incoming = 1);
+      let source, edge = G.Vertex.Map.choose incoming in
+
+      if is_collapsible edge then
+        let next = G.get_edges target base_graph in
+        let only_empty =
+          G.Edges.fold
+            (fun _ (_, drt) acc -> Effect.Set.is_empty drt && acc)
+            next true
+        in
+        (* If all the rewired edges are simple, we can update graph, otherwise we have to re-solve and don't update graph just yet *)
+        let base_graph =
+          if only_empty then
+            base_graph
+            |> G.remove_edge source target (* remove this edge *)
+            |> G.Edges.fold (* rewire other edges *)
+                 (fun next e acc ->
+                   acc |> G.remove_edge target next
+                   |> G.add_edge (* Triangels can produce duplicate edges *)
+                        ~allow_duplicate:true source next e)
+                 next
+            |> G.remove_vertex_unsafe target
+          else base_graph
+        and reverse_graph =
+          if only_empty then
+            reverse_graph
+            |> G.remove_edge target source
+            |> G.Edges.fold (* rewire other edges *)
+                 (fun next e acc ->
+                   acc |> G.remove_edge next target
+                   |> G.add_edge ~allow_duplicate:true next source e)
+                 next
+            |> G.remove_vertex_unsafe target
+          else reverse_graph
+        in
+        let remove_edges base_graph line =
+          line |> remove_current_node_from_list
+          |> G.Edges.fold
+               (fun potential _ acc ->
+                 let num =
+                   base_graph |> G.get_edges potential |> G.Edges.cardinal
+                 in
+                 if num = 1 then acc |> BaseSym.Set.add potential
+                 else acc |> BaseSym.Set.remove potential)
+               (next
+               |> G.Vertex.Map.map (fun _ -> ())
+               (* Treat source as any other *)
+               |> G.Edges.add_edge ~allow_duplicate:true source ())
+        in
+        let indeg_line = remove_edges reverse_graph indeg_line
+        and outdeg_line = remove_edges base_graph outdeg_line in
+        ( (indeg_line, outdeg_line),
+          (base_graph, reverse_graph),
+          (visited, BaseSym.Set.add target changed),
+          (* TODO here or somewhere *)
+          add_constraint source target constr )
+      else
+        ( ( indeg_line |> remove_current_node_from_list,
+            outdeg_line |> remove_current_node_from_list ),
+          (base_graph, reverse_graph),
+          (visited, changed),
+          add_constraint source target constr )
+    in
+    let rec process (indeg_line, outdeg_line) (graph, reverse_graph)
+        (visited, changed) constr =
+      match BaseSym.Set.choose_opt indeg_line with
+      | Some v when BaseSym.Set.mem v visited |> not ->
+          let ( (indeg_line, outdeg_line),
+                (graph, reverse_graph),
+                (visited, changed),
+                constr ) =
+            process_part_general v (indeg_line, outdeg_line)
+              (graph, reverse_graph) (visited, changed) constr
+          in
+          process (indeg_line, outdeg_line) (graph, reverse_graph)
+            (visited, changed) constr
+      | _ -> (
+          match BaseSym.Set.choose_opt outdeg_line with
+          | Some v when BaseSym.Set.mem v visited |> not ->
+              let ( (outdeg_line, indeg_line),
+                    (reverse_graph, graph),
+                    (visited, changed),
+                    constr ) =
+                process_part_general ~mode:"outgoing" v
+                  (outdeg_line, indeg_line) (reverse_graph, graph)
+                  (visited, changed) constr
+              in
+              process (indeg_line, outdeg_line) (graph, reverse_graph)
+                (visited, changed) constr
+          | _ ->
+              (* TODO: a bunch of asserts *)
+              (constr, changed))
+    in
+    process (indeg_line, outdeg_line) (graph, inverse_graph)
+      (Dirt.Param.Set.empty, Dirt.Param.Set.empty)
+      new_constr
+  in
+  join_dirt_component
+    (fun p1 p2 ->
+      Constraint.add_dirt_equality (Dirt.no_effect p1, Dirt.no_effect p2))
+    (fun (_, drt) -> Effect.Set.is_empty drt)
+    dirt_constraints Constraint.empty
+
 let solve ~loc type_definitions constraints =
   let sub, constraints =
     unify ~loc type_definitions
@@ -649,7 +801,22 @@ let solve ~loc type_definitions constraints =
   let simple_one_constraints = join_simple_nodes cycle_constraints' in
   let subs'', simple_one_constraints' =
     unify ~loc type_definitions
-      (subs', cycle_constraints', simple_one_constraints)
+      ( sub |> Substitution.merge subs',
+        cycle_constraints',
+        simple_one_constraints )
   in
-  ( sub |> Substitution.merge subs' |> Substitution.merge subs'',
-    simple_one_constraints' )
+  let rec runner subs_state cons_state =
+    let new_cons, changed = join_simple_dirt_nodes cons_state in
+    let subs_state', cons_state' =
+      unify ~loc type_definitions (subs_state, cons_state, new_cons)
+    in
+    let cons_state' = Constraints.clean cons_state' in
+    if Dirt.Param.Set.is_empty changed then (subs_state', cons_state')
+    else runner subs_state' cons_state'
+  in
+  let subs, constraints =
+    runner
+      (sub |> Substitution.merge subs' |> Substitution.merge subs'')
+      simple_one_constraints'
+  in
+  (subs, constraints)
