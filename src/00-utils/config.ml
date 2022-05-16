@@ -16,6 +16,9 @@ let error_formatter = ref Format.err_formatter
 let enable_optimization = ref true
 let profiling = ref false
 let print_graph = ref false
+
+let garbage_collect = ref true
+
 let optimization_fuel = ref 5
 
 type 'a optimizator_base_config = {

@@ -92,6 +92,9 @@ let options =
       ( "-g",
         Arg.Set Config.print_graph,
         "<n> Enable constraint graph printing <n>" );
+      ( "-gc",
+        Arg.Clear Config.garbage_collect,
+        "<n> Disable minimization of constraints <n>" );
     ]
 
 (* Treat anonymous arguments as files to be run. *)

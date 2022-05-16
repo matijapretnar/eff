@@ -38,6 +38,8 @@ val enable_optimization : bool ref
 
 val print_graph : bool ref
 
+val garbage_collect : bool ref
+
 val profiling : bool ref
 (** Should profiling be enabled? *)
 

@@ -793,30 +793,32 @@ let solve ~loc type_definitions constraints =
   in
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
-  let cycle_constraints = collapse_cycles constraints in
-  let subs', cycle_constraints' =
-    unify ~loc type_definitions (sub, constraints, cycle_constraints)
-  in
-  let cycle_constraints' = Constraints.clean cycle_constraints' in
-  let simple_one_constraints = join_simple_nodes cycle_constraints' in
-  let subs'', simple_one_constraints' =
-    unify ~loc type_definitions
-      ( sub |> Substitution.merge subs',
-        cycle_constraints',
-        simple_one_constraints )
-  in
-  let rec runner subs_state cons_state =
-    let new_cons, changed = join_simple_dirt_nodes cons_state in
-    let subs_state', cons_state' =
-      unify ~loc type_definitions (subs_state, cons_state, new_cons)
+  if !Config.garbage_collect then
+    let cycle_constraints = collapse_cycles constraints in
+    let subs', cycle_constraints' =
+      unify ~loc type_definitions (sub, constraints, cycle_constraints)
     in
-    let cons_state' = Constraints.clean cons_state' in
-    if Dirt.Param.Set.is_empty changed then (subs_state', cons_state')
-    else runner subs_state' cons_state'
-  in
-  let subs, constraints =
-    runner
-      (sub |> Substitution.merge subs' |> Substitution.merge subs'')
-      simple_one_constraints'
-  in
-  (subs, constraints)
+    let cycle_constraints' = Constraints.clean cycle_constraints' in
+    let simple_one_constraints = join_simple_nodes cycle_constraints' in
+    let subs'', simple_one_constraints' =
+      unify ~loc type_definitions
+        ( sub |> Substitution.merge subs',
+          cycle_constraints',
+          simple_one_constraints )
+    in
+    let rec runner subs_state cons_state =
+      let new_cons, changed = join_simple_dirt_nodes cons_state in
+      let subs_state', cons_state' =
+        unify ~loc type_definitions (subs_state, cons_state, new_cons)
+      in
+      let cons_state' = Constraints.clean cons_state' in
+      if Dirt.Param.Set.is_empty changed then (subs_state', cons_state')
+      else runner subs_state' cons_state'
+    in
+    let subs, constraints =
+      runner
+        (sub |> Substitution.merge subs' |> Substitution.merge subs'')
+        simple_one_constraints'
+    in
+    (subs, constraints)
+  else (sub, constraints)
