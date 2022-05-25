@@ -23,7 +23,20 @@ let poly_ty ty_body =
     TyScheme.constraints = Constraints.empty;
   }
 
-let comparison_ty = poly_ty (fun ty -> binary_op_ty ty ty bool_ty)
+let poly_ty2 ty_body =
+  let skel = Type.fresh_skel () in
+  let ty1 = Type.fresh_ty_param_with_skel skel
+  and ty2 = Type.fresh_ty_param_with_skel skel in
+  let params =
+    Type.Params.union (Type.free_params_ty ty1) (Type.free_params_ty ty2)
+  in
+  {
+    TyScheme.params;
+    TyScheme.ty = ty_body ty1 ty2;
+    TyScheme.constraints = Constraints.empty;
+  }
+
+let comparison_ty = poly_ty2 (fun ty1 ty2 -> binary_op_ty ty1 ty2 bool_ty)
 
 let primitive_value_type_scheme = function
   | Language.Primitives.CompareEq -> comparison_ty
