@@ -18,7 +18,9 @@ let rec elab_ty (ty : ExEffTypes.ty) =
   match ty.term with
   | ExEffTypes.TyParam x -> NoEff.NTyParam x
   | ExEffTypes.Apply { ty_name; ty_args } ->
-      NoEff.NTyApply (ty_name, List.map elab_ty ty_args)
+      NoEff.NTyApply
+        ( ty_name,
+          List.map elab_ty (ty_args |> TyParam.Map.values |> List.map fst) )
   | ExEffTypes.Arrow (t, dirty) ->
       let elab1 = elab_ty t in
       let elab2 = elab_dirty dirty in
@@ -96,8 +98,11 @@ let rec elab_ty_coercion state coer =
                   then NoEff.NCoerHandToFun (elab1, elab2)
                   else assert false))
   | Coercion.TyCoercionVar par -> NoEff.NCoerVar par
-  | Coercion.ApplyCoercion (name, coer_list) ->
-      NoEff.NCoerApply (name, List.map (elab_ty_coercion state) coer_list)
+  | Coercion.ApplyCoercion { ty_name; tcoers } ->
+      NoEff.NCoerApply
+        ( ty_name,
+          tcoers |> TyParam.Map.values |> List.map fst
+          |> List.map (elab_ty_coercion state) )
   | Coercion.TupleCoercion lst ->
       let elabs = List.map (elab_ty_coercion state) lst in
       NoEff.NCoerTuple elabs

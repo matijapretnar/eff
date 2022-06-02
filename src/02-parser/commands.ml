@@ -5,8 +5,10 @@ module Sugared = SugaredSyntax
 type t = plain_command located
 
 and plain_command =
-  | Tydef of (Sugared.tyname, Sugared.typaram list * Sugared.tydef) Assoc.t
-      (** [type t = tydef] *)
+  | Tydef of
+      ( Sugared.tyname,
+        (Sugared.typaram * variance) list * Sugared.tydef )
+      Assoc.t  (** [type t = tydef] *)
   | TopLet of (Sugared.pattern * Sugared.term) list
       (** [let p1 = t1 and ... and pn = tn] *)
   | TopLetRec of (Sugared.variable * Sugared.term) list

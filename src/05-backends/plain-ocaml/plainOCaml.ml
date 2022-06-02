@@ -123,7 +123,7 @@ module Backend : Language.Backend.S = struct
 
   let process_tydef state tydefs =
     let converter Type.{ params; type_def } =
-      ( Type.TyParam.Map.bindings params.ty_params |> List.map fst,
+      ( Type.TyParam.Map.bindings params.type_params |> List.map fst,
         TranslateExEff2NoEff.elab_tydef type_def )
     in
     let tydefs' = Assoc.map converter tydefs |> Assoc.to_list in

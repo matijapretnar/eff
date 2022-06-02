@@ -83,12 +83,17 @@ let skel_eq_step ~loc sub (paused : Constraints.t) rest_queue sk1 sk2 =
         rest_queue
         |> Constraint.add_skeleton_equality (ska, skc)
         |> Constraint.add_skeleton_equality (skb, skd) )
-  | Apply (ty_name1, sks1), Apply (ty_name2, sks2) when ty_name1 = ty_name2 ->
+  | ( Apply { ty_name = ty_name1; skel_args = sks1 },
+      Apply { ty_name = ty_name2; skel_args = sks2 } )
+    when ty_name1 = ty_name2
+         && TyParam.Map.cardinal sks1 = TyParam.Map.cardinal sks2 ->
       ( sub,
         paused,
         List.fold_right2
           (fun sk1 sk2 -> Constraint.add_skeleton_equality (sk1, sk2))
-          sks1 sks2 rest_queue )
+          (sks1 |> TyParam.Map.values)
+          (sks2 |> TyParam.Map.values)
+          rest_queue )
   | Tuple sks1, Tuple sks2 when List.length sks1 = List.length sks2 ->
       ( sub,
         paused,
@@ -135,13 +140,16 @@ and ty_eq_step sub (paused : Constraints.t) rest_queue (ty1 : Type.ty)
         |> Constraint.add_dirt_equality (drtb, drtd) )
   | ( Apply { ty_name = ty_name1; ty_args = tys1 },
       Apply { ty_name = ty_name2; ty_args = tys2 } )
-    when ty_name1 = ty_name2 ->
+    when ty_name1 = ty_name2
+         && TyParam.Map.cardinal tys1 = TyParam.Map.cardinal tys2 ->
       ( sub,
         paused,
         List.fold_right2
-          (fun ty1 ty2 -> Constraint.add_ty_equality (ty1, ty2))
-          tys1 tys2 rest_queue )
-  | Tuple tys1, Tuple tys2 ->
+          (fun (ty1, _) (ty2, _) -> Constraint.add_ty_equality (ty1, ty2))
+          (tys1 |> TyParam.Map.values)
+          (tys2 |> TyParam.Map.values)
+          rest_queue )
+  | Tuple tys1, Tuple tys2 when List.length tys1 = List.length tys2 ->
       ( sub,
         paused,
         List.fold_right2
@@ -149,7 +157,8 @@ and ty_eq_step sub (paused : Constraints.t) rest_queue (ty1 : Type.ty)
           tys1 tys2 rest_queue )
   | _ -> assert false
 
-and ty_omega_step sub (paused : Constraints.t) cons rest_queue omega = function
+and ty_omega_step type_definitions sub (paused : Constraints.t) cons rest_queue
+    omega = function
   (* ω : A <= A *)
   | ty1, ty2 when Type.equal_ty ty1 ty2 ->
       let k = omega in
@@ -184,22 +193,38 @@ and ty_omega_step sub (paused : Constraints.t) cons rest_queue omega = function
         paused,
         Constraint.union conss rest_queue )
   (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
-  (* we assume that all type parameters are positive *)
   | ( { term = Type.Apply { ty_name = ty_name1; ty_args = tys1 }; _ },
       { term = Type.Apply { ty_name = ty_name2; ty_args = tys2 }; _ } )
-    when ty_name1 = ty_name2 ->
-      let coercions, conss =
+    when ty_name1 = ty_name2
+         && TyParam.Map.cardinal tys1 = TyParam.Map.cardinal tys2 ->
+      let coercions, cons =
         List.fold_right2
-          (fun ty ty' (coercions, conss) ->
-            let coercion, ty_cons = Constraint.fresh_ty_coer (ty, ty') in
-            (coercion :: coercions, Constraint.union ty_cons conss))
-          tys1 tys2 ([], Constraint.empty)
+          (fun (p1, (ty, v1)) (p2, (ty', v2)) (coercions, conss) ->
+            assert (p1 = p2);
+            assert (v1 = v2);
+            let coercion, ty_cons =
+              match v1 with
+              | Covariant ->
+                  let coercion, ty_cons = Constraint.fresh_ty_coer (ty, ty') in
+                  (coercion, ty_cons)
+              | Contravariant ->
+                  let coercion, ty_cons = Constraint.fresh_ty_coer (ty', ty) in
+                  (coercion, ty_cons)
+              | Invariant ->
+                  ( Coercion.reflTy ty,
+                    Constraint.add_ty_equality (ty, ty') Constraint.empty )
+            in
+            ((p1, (coercion, v1)) :: coercions, Constraint.union ty_cons conss))
+          (TyParam.Map.bindings tys1)
+          (TyParam.Map.bindings tys2)
+          ([], Constraint.empty)
       in
-      let k = omega in
-      let v = Coercion.applyCoercion (ty_name1, coercions) in
-      ( Substitution.add_type_coercion k v sub,
+      let v =
+        Coercion.applyCoercion (ty_name1, coercions |> TyParam.Map.of_bindings)
+      in
+      ( Substitution.add_type_coercion omega v sub,
         paused,
-        Constraint.union conss rest_queue )
+        Constraint.union cons rest_queue )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
   | ( { term = Type.Handler (drty11, drty12); _ },
       { term = Type.Handler (drty21, drty22); _ } ) ->
@@ -234,7 +259,7 @@ and ty_omega_step sub (paused : Constraints.t) cons rest_queue omega = function
             rest_queue ))
   | { term = Type.TyParam tv; ty = skel }, _
   | _, { term = Type.TyParam tv; ty = skel } ->
-      let ty = fresh_ty_with_skel skel in
+      let ty = fresh_ty_with_skel type_definitions skel in
       apply_substitution
         (Substitution.add_type_substitution_e tv ty)
         sub paused
@@ -359,36 +384,41 @@ and dirt_eq_step ~loc sub paused rest_queue { Dirt.effect_set = o1; row = row1 }
   let sub' = Substitution.merge (Substitution.merge sub1 sub2) row_sub in
   apply_substitution sub' sub paused rest_queue
 
-let rec unify ~loc (sub, paused, (queue : Constraint.t)) =
+let rec unify ~loc type_definitions (sub, paused, (queue : Constraint.t)) =
   Print.debug "SUB: %t" (Substitution.print sub);
   Print.debug "PAUSED: %t" (Constraints.print paused);
   Print.debug "QUEUE: %t" (Constraint.print queue);
   match queue with
   | { skeleton_equalities = (sk1, sk2) :: skeleton_equalities; _ } ->
       skel_eq_step ~loc sub paused { queue with skeleton_equalities } sk1 sk2
-      |> unify ~loc
+      |> unify ~loc type_definitions
   | { dirt_equalities = (drt1, drt2) :: dirt_equalities; _ } ->
       dirt_eq_step ~loc sub paused { queue with dirt_equalities } drt1 drt2
-      |> unify ~loc
+      |> unify ~loc type_definitions
   | { dirt_inequalities = (omega, dcons) :: dirt_inequalities; _ } ->
       dirt_omega_step ~loc sub paused
         { queue with dirt_inequalities }
         omega dcons
-      |> unify ~loc
+      |> unify ~loc type_definitions
   | { ty_equalities = (ty1, ty2) :: _; _ }
     when not (Skeleton.equal ty1.ty ty2.ty) ->
-      skel_eq_step ~loc sub paused queue ty1.ty ty2.ty |> unify ~loc
+      skel_eq_step ~loc sub paused queue ty1.ty ty2.ty
+      |> unify ~loc type_definitions
   | { ty_equalities = (ty1, ty2) :: ty_equalities; _ } ->
-      ty_eq_step sub paused { queue with ty_equalities } ty1 ty2 |> unify ~loc
+      ty_eq_step sub paused { queue with ty_equalities } ty1 ty2
+      |> unify ~loc type_definitions
   | { ty_inequalities = (_, (ty1, ty2)) :: _; _ }
     when not (Skeleton.equal ty1.ty ty2.ty) ->
-      skel_eq_step ~loc sub paused queue ty1.ty ty2.ty |> unify ~loc
+      skel_eq_step ~loc sub paused queue ty1.ty ty2.ty
+      |> unify ~loc type_definitions
   | { ty_inequalities = (omega, tycons) :: ty_inequalities; _ } ->
       let cons =
         Constraint.add_ty_inequality (omega, tycons) Constraint.empty
       in
-      ty_omega_step sub paused cons { queue with ty_inequalities } omega tycons
-      |> unify ~loc
+      ty_omega_step type_definitions sub paused cons
+        { queue with ty_inequalities }
+        omega tycons
+      |> unify ~loc type_definitions
   | {
    skeleton_equalities = [];
    dirt_equalities = [];
@@ -429,14 +459,15 @@ let garbage_collect { Language.Constraints.ty_constraints; _ } =
   in
   ty_constraints
 
-let solve ~loc constraints =
-  (* Print.debug "constraints: %t" (Constraint.print_constraints constraints); *)
+let solve ~loc type_definitions constraints =
   let sub, constraints =
-    unify ~loc (Substitution.empty, Constraints.empty, constraints)
+    unify ~loc type_definitions
+      (Substitution.empty, Constraints.empty, constraints)
   in
-
   (* Print.debug "sub: %t" (Substitution.print_substitutions sub); *)
   (* Print.debug "solved: %t" (Constraint.print_constraints solved); *)
   let constraints' = garbage_collect constraints in
-  let subs', constraints' = unify ~loc (sub, constraints, constraints') in
+  let subs', constraints' =
+    unify ~loc type_definitions (sub, constraints, constraints')
+  in
   (Substitution.merge subs' sub, constraints')

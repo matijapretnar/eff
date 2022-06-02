@@ -454,12 +454,20 @@ mark_position(X):
   x = X
   { {it= x; at= Location.make $startpos $endpos}}
 
+param_with_variance:
+  | p = PARAM
+    { (p, Invariant) }
+  | PLUS p = PARAM
+    { (p, Covariant) }
+  | MINUS p = PARAM
+    { (p, Contravariant) }
+
 params:
   |
     { [] }
-  | p = PARAM
+  | p = param_with_variance
     { [p] }
-  | LPAREN ps = separated_nonempty_list(COMMA, PARAM) RPAREN
+  | LPAREN ps = separated_nonempty_list(COMMA, param_with_variance) RPAREN
     { ps }
 
 ty_def:

@@ -50,7 +50,12 @@ let rec apply_sub_skel sub skeleton =
   | Handler (sk1, sk2) ->
       Handler (apply_sub_skel sub sk1, apply_sub_skel sub sk2)
   (* Really consider other cases *)
-  | Apply (t, l) -> Apply (t, List.map (apply_sub_skel sub) l)
+  | Apply { ty_name; skel_args } ->
+      Apply
+        {
+          ty_name;
+          skel_args = TyParam.Map.map (fun s -> apply_sub_skel sub s) skel_args;
+        }
   | Tuple skels -> Tuple (List.map (apply_sub_skel sub) skels)
 
 let rec apply_sub_ty sub ty =
@@ -66,7 +71,11 @@ and apply_sub_ty' sub ty : ty =
   | Arrow (tty1, tty2) ->
       arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
   | Apply { ty_name; ty_args } ->
-      Type.apply (ty_name, List.map (apply_sub_ty sub) ty_args)
+      Type.apply
+        ( ty_name,
+          TyParam.Map.map
+            (fun (ty, variance) -> (apply_sub_ty sub ty, variance))
+            ty_args )
   | Tuple ttyl -> Type.tuple (List.map (fun x -> apply_sub_ty sub x) ttyl)
   | Handler (tydrty1, tydrty2) ->
       Type.handler
@@ -104,9 +113,12 @@ let rec apply_sub_tycoer sub ty_coer =
         (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
   | TupleCoercion tcl ->
       Coercion.tupleCoercion (List.map (fun x -> apply_sub_tycoer sub x) tcl)
-  | ApplyCoercion (ty_name, tcl) ->
+  | ApplyCoercion { ty_name; tcoers } ->
       Coercion.applyCoercion
-        (ty_name, List.map (fun x -> apply_sub_tycoer sub x) tcl)
+        ( ty_name,
+          TyParam.Map.map
+            (fun (x, variance) -> (apply_sub_tycoer sub x, variance))
+            tcoers )
 
 and apply_sub_dirtcoer sub drt_coer =
   match drt_coer.term with
@@ -149,6 +161,57 @@ let print subs =
   ]
   |> Print.printer_sequence ", "
 
+let of_tydef_parameters (params : Type.tydef_params) =
+  let skel_params' =
+    Skeleton.Param.Set.elements params.skel_params
+    |> List.map (fun s -> (s, Skeleton.Param.refresh s))
+    |> Skeleton.Param.Map.of_bindings
+  and dirt_params' =
+    Dirt.Param.Set.elements params.dirt_params
+    |> List.map (fun d -> (d, Dirt.Param.refresh d))
+    |> Dirt.Param.Map.of_bindings
+  in
+  let subst =
+    {
+      empty with
+      dirt_var_to_dirt_subs =
+        Dirt.Param.Map.map (fun d' -> Dirt.no_effect d') dirt_params';
+      skel_param_to_skel_subs =
+        Skeleton.Param.Map.map (fun s' -> Skeleton.Param s') skel_params';
+    }
+  in
+  let ty_params' =
+    Type.TyParam.Map.bindings params.type_params
+    |> List.map (fun (p, (skel, variance)) ->
+           ( p,
+             ( TyParam.refresh p,
+               (apply_substitutions_to_skeleton subst skel, variance) ) ))
+  in
+  let params' =
+    {
+      type_params = ty_params' |> List.map snd |> Type.TyParam.Map.of_bindings;
+      dirt_params =
+        Dirt.Param.Map.bindings dirt_params'
+        |> List.map fst |> Dirt.Param.Set.of_list;
+      skel_params =
+        Skeleton.Param.Map.bindings skel_params'
+        |> List.map fst |> Skeleton.Param.Set.of_list;
+    }
+  and subst' =
+    {
+      subst with
+      type_param_to_type_subs =
+        List.map
+          (fun (k, (p', (skel, _))) -> (k, Type.tyParam p' skel))
+          ty_params'
+        |> Type.TyParam.Map.of_bindings;
+    }
+  in
+  ( params',
+    subst',
+    List.map (fun (p, (p', _)) -> (p, p')) ty_params' |> TyParam.Map.of_bindings
+  )
+
 let of_parameters (params : Type.Params.t) =
   let skel_params' =
     Skeleton.Param.Set.elements params.skel_params
@@ -168,7 +231,6 @@ let of_parameters (params : Type.Params.t) =
         Skeleton.Param.Map.map (fun s' -> Skeleton.Param s') skel_params';
     }
   in
-  (* Print.debug "SUBSTITUTION: %t" (print subst); *)
   let ty_params' =
     Type.TyParam.Map.bindings params.ty_params
     |> List.map (fun (p, skel) ->
@@ -195,7 +257,6 @@ let of_parameters (params : Type.Params.t) =
         |> Type.TyParam.Map.of_bindings;
     }
   in
-  (* Print.debug "SUBSTITUTION': %t" (print subst'); *)
   (params', subst')
 
 let apply_substitutions_to_substitution new_sub old_sub =
@@ -246,7 +307,8 @@ let add_type_coercion_e parameter t_coercion =
   }
 
 let add_type_coercion parameter t_coercion sub =
-  assert (t_coercion = apply_sub_tycoer sub t_coercion);
+  assert (
+    Coercion.equal_ty_coercion t_coercion (apply_sub_tycoer sub t_coercion));
   merge (add_type_coercion_e parameter t_coercion) sub
 
 let add_type_substitution_e parameter ty =

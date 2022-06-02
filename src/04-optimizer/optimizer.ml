@@ -122,10 +122,10 @@ let recast_computation hnd comp =
 
 let rec optimize_expression state exp =
   let exp' = optimize_expression' state exp in
-  (* if exp <> exp' then
+  (* if exp' <> exp'' then
      Print.debug "%t ~> %t"
-       (Term.print_expression exp)
-       (Term.print_expression exp'); *)
+       (Term.print_expression exp')
+       (Term.print_expression exp''); *)
   assert (Type.equal_ty exp.ty exp'.ty);
   let exp'' = reduce_expression state exp' in
   (* if exp' <> exp'' then

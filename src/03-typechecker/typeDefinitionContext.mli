@@ -15,10 +15,13 @@ val infer_field :
 val find_field :
   Type.Field.t ->
   state ->
-  (TyName.t * Type.Params.t * Type.ty Type.Field.Map.t) option
+  (TyName.t * Type.tydef_params * Type.ty Type.Field.Map.t) option
 
 val find_variant :
   Type.Label.t ->
   state ->
-  (TyName.t * Type.Params.t * Type.ty option Type.Field.Map.t * Type.ty option)
+  (TyName.t
+  * Type.tydef_params
+  * Type.ty option Type.Field.Map.t
+  * Type.ty option)
   option
