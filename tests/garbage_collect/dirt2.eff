@@ -1,0 +1,13 @@
+effect A : unit -> unit
+effect B : unit -> unit
+effect C : unit -> unit
+
+let a f g x l m =
+  let q = l < m in
+  handle (
+    let a = f x in
+    let c = perform (B ()) in
+    let b = g x in 
+    (a, ( (perform (C ())) ) < c, b, perform (A ()), (if true then (g x, f x) else (f x, g x)), q   )
+  ) with
+  | effect (C ()) k -> k (g () )

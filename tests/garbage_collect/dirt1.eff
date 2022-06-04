@@ -1,0 +1,22 @@
+effect A : unit -> unit
+effect B : unit -> int
+
+effect C : float -> float
+
+let a () = 
+  let comp f h g x = 
+    if true then
+      f (g x)
+    else 
+      h (g x)
+  in
+  let f x = 
+    perform (A ());
+    (0, x)
+  in
+  let h x = 
+    let b = perform (B ()) in
+    (b, x)
+  in
+  let k = comp f h (fun x -> x) in
+  k
