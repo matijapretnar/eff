@@ -549,8 +549,8 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ } =
       let incoming = G.get_edges target reverse_graph in
       assert (G.Edges.cardinal incoming = 1);
       let source, edge = G.Vertex.Map.choose incoming in
-      if is_collapsible edge then
-        let next = G.get_edges target base_graph in
+      let next = G.get_edges target base_graph in
+      if is_collapsible edge && G.Vertex.Map.is_empty next |> not then
         let base_graph =
           base_graph
           |> G.remove_edge source target (* remove this edge *)
@@ -681,18 +681,20 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } =
          exactly 1 incoming edge *)
       let remove_current_node_from_list = BaseSym.Set.remove target in
       let visited = BaseSym.Set.add target visited in
-      Print.debug "In mode %s, removing: %t" mode (BaseSym.print target);
+      Print.debug "Contracting drit, in mode %s, removing: %t" mode
+        (BaseSym.print target);
       let incoming = G.get_edges target reverse_graph in
       assert (G.Edges.cardinal incoming = 1);
       let source, edge = G.Vertex.Map.choose incoming in
-
-      if is_collapsible edge then
-        let next = G.get_edges target base_graph in
-        let only_empty =
-          G.Edges.fold
-            (fun _ (_, drt) acc -> Effect.Set.is_empty drt && acc)
-            next true
-        in
+      let next = G.get_edges target base_graph in
+      let only_empty =
+        G.Edges.fold
+          (fun _ (_, drt) acc -> Effect.Set.is_empty drt && acc)
+          next true
+      in
+      if is_collapsible edge && G.Vertex.Map.is_empty next |> not then (
+        Print.debug "Contracting dirt, in mode %s, really removing: %t" mode
+          (BaseSym.print target);
         (* If all the rewired edges are simple, we can update graph, otherwise we have to re-solve and don't update graph just yet *)
         let base_graph =
           if only_empty then
@@ -738,7 +740,7 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } =
           (base_graph, reverse_graph),
           (visited, BaseSym.Set.add target changed),
           (* TODO here or somewhere *)
-          add_constraint source target constr )
+          add_constraint source target constr ))
       else
         ( ( indeg_line |> remove_current_node_from_list,
             outdeg_line |> remove_current_node_from_list ),
@@ -806,17 +808,17 @@ let solve ~loc type_definitions constraints =
           cycle_constraints',
           simple_one_constraints )
     in
-    let rec runner subs_state cons_state =
+    let rec runner level subs_state cons_state =
       let new_cons, changed = join_simple_dirt_nodes cons_state in
       let subs_state', cons_state' =
         unify ~loc type_definitions (subs_state, cons_state, new_cons)
       in
       let cons_state' = Constraints.clean cons_state' in
       if Dirt.Param.Set.is_empty changed then (subs_state', cons_state')
-      else runner subs_state' cons_state'
+      else runner (level + 1) subs_state' cons_state'
     in
     let subs, constraints =
-      runner
+      runner 0
         (sub |> Substitution.merge subs' |> Substitution.merge subs'')
         simple_one_constraints'
     in
