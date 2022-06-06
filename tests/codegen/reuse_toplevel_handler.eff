@@ -1,0 +1,8 @@
+let h = handler 
+  | x -> x
+;;
+(* If the value restriction kicks in, handler types won't match)   *)
+with h handle 1
+;;
+
+with h handle (1,2)
