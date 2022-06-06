@@ -464,23 +464,32 @@ let collapse_cycles { Language.Constraints.ty_constraints; dirt_constraints } =
       (fun ty_constraints component ->
         if
           Dirt.Param.Set.cardinal component = 1
-          || not (* If the cycle is simple *)
-               (Dirt.Param.Set.for_all
-                  (fun v ->
-                    let edges =
-                      DirtConstraints.DirtParamGraph.get_edges v
-                        dirt_constraints
-                    in
-                    Dirt.Param.Set.for_all
-                      (fun target ->
-                        match
-                          DirtConstraints.DirtParamGraph.Edges.get_edge target
-                            edges
-                        with
-                        | None -> true
-                        | Some (_, dirts) -> Effect.Set.is_empty dirts)
-                      component)
-                  component)
+          (* Compress cycles with the effect edges *)
+          || not
+               (let edge_labels =
+                  Dirt.Param.Set.fold
+                    (fun v l ->
+                      let edges =
+                        DirtConstraints.DirtParamGraph.get_edges v
+                          dirt_constraints
+                      in
+                      Dirt.Param.Set.fold
+                        (fun target l ->
+                          [
+                            DirtConstraints.DirtParamGraph.Edges.get_edge target
+                              edges;
+                          ]
+                          @ l)
+                        component l)
+                    component []
+                  |> List.filter_map (fun x -> x)
+                in
+                let _, drt =
+                  match edge_labels with [] -> assert false | x :: _ -> x
+                in
+                List.for_all
+                  (fun (_, drt') -> Effect.Set.equal drt drt')
+                  edge_labels)
         then ty_constraints
         else
           (* Pick one and set all other to equal it *)
@@ -550,7 +559,7 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ } =
       assert (G.Edges.cardinal incoming = 1);
       let source, edge = G.Vertex.Map.choose incoming in
       let next = G.get_edges target base_graph in
-      if is_collapsible edge && G.Vertex.Map.is_empty next |> not then
+      if is_collapsible edge then
         let base_graph =
           base_graph
           |> G.remove_edge source target (* remove this edge *)
@@ -594,7 +603,7 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ } =
         ( ( indeg_line |> remove_current_node_from_list,
             outdeg_line |> remove_current_node_from_list ),
           (base_graph, reverse_graph),
-          add_constraint source target constr )
+          constr )
     in
     let rec process (indeg_line, outdeg_line) (graph, reverse_graph) constr =
       match BaseSym.Set.choose_opt indeg_line with
@@ -692,7 +701,7 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } =
           (fun _ (_, drt) acc -> Effect.Set.is_empty drt && acc)
           next true
       in
-      if is_collapsible edge && G.Vertex.Map.is_empty next |> not then (
+      if is_collapsible edge then (
         Print.debug "Contracting dirt, in mode %s, really removing: %t" mode
           (BaseSym.print target);
         (* If all the rewired edges are simple, we can update graph, otherwise we have to re-solve and don't update graph just yet *)
