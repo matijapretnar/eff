@@ -493,8 +493,8 @@
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  let _compose (_f : 'ty7 -> 'ty9 computation) (_g : 'ty10 -> 'ty7 computation)
-      (_x : 'ty10) =
+  let _compose (_f : 'ty8 -> 'ty10 computation) (_g : 'ty11 -> 'ty8 computation)
+      (_x : 'ty11) =
     _g _x >>= fun _b -> _f _b
   
   let compose = _compose
@@ -1454,7 +1454,7 @@
   
   let rec _map _x =
     Value
-      (fun (_x : 'ty25 list) ->
+      (fun (_x : 'ty26 list) ->
         match _x with
         | [] -> Value []
         | _x :: _xs ->
@@ -1615,7 +1615,8 @@
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  let _f (_x : 'ty4) = ()
+  let _f (_x : 'ty5) = ()
+  
   let f = _f
   ======================================================================
   codegen/not-found.eff
@@ -1884,13 +1885,13 @@
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  let _absurd (_void : 'ty5) = match _void with _ -> assert false
+  let _absurd (_void : 'ty6) = match _void with _ -> assert false
   
   let absurd = _absurd
   
   let rec _op (* @ *) _x =
     Value
-      (fun (_ys : 'ty22 list) ->
+      (fun (_ys : 'ty23 list) ->
         match _x with
         | [] -> Value _ys
         | _x :: _xs ->
@@ -1912,7 +1913,7 @@
     handler
       {
         value_clause =
-          (fun (_x : 'ty51) ->
+          (fun (_x : 'ty50) ->
             Value
               (fun (_s : string list) ->
                 match _s with [] -> Value _x | _ -> _fail ()));
@@ -1935,14 +1936,14 @@
                           if _b then _k _x >>= fun _b -> _b _xs else _fail ())
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
-      (fun (_x : string list -> 'ty51 computation) -> Value _x)
+      (fun (_x : string list -> 'ty50 computation) -> Value _x)
   
   let parse = _parse
   
   let _allsols =
     handler
       {
-        value_clause = (fun (_x : 'ty113) -> Value [ _x ]);
+        value_clause = (fun (_x : 'ty101) -> Value [ _x ]);
         effect_clauses =
           (fun (type a b) (eff : (a, b) eff_internal_effect) :
                (a -> (b -> _) -> _) ->
@@ -1955,14 +1956,14 @@
             | Fail -> fun (_ : unit) _ -> Value []
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
-      (fun (_x : 'ty113 list) -> Value _x)
+      (fun (_x : 'ty101 list) -> Value _x)
   
   let allsols = _allsols
   
   let _backtrack =
     handler
       {
-        value_clause = (fun (_id : 'ty149) -> Value _id);
+        value_clause = (fun (_id : 'ty133) -> Value _id);
         effect_clauses =
           (fun (type a b) (eff : (a, b) eff_internal_effect) :
                (a -> (b -> _) -> _) ->
@@ -1971,7 +1972,7 @@
                 fun (_ : unit) _k ->
                   (handler
                      {
-                       value_clause = (fun (_id : 'ty149) -> Value _id);
+                       value_clause = (fun (_id : 'ty133) -> Value _id);
                        effect_clauses =
                          (fun (type a b) (eff : (a, b) eff_internal_effect) :
                               (a -> (b -> _) -> _) ->
@@ -1979,11 +1980,11 @@
                            | Fail -> fun (_ : unit) _ -> _k false
                            | eff' -> fun arg k -> Call (eff', arg, k));
                      }
-                     (fun (_x : 'ty149) -> Value _x))
+                     (fun (_x : 'ty133) -> Value _x))
                     (_k true)
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
-      (fun (_x : 'ty149) -> Value _x)
+      (fun (_x : 'ty133) -> Value _x)
   
   let backtrack = _backtrack
   
@@ -2329,7 +2330,7 @@
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  let _f (_ : 'ty4) =
+  let _f (_ : 'ty5) =
     (handler
        {
          value_clause = (fun (_x : int) -> Value 5);
@@ -2375,7 +2376,7 @@
   type optional_solution = None | Some of solution
   type void = Void
   
-  let _absurd (_void : 'ty5) = match _void with _ -> assert false
+  let _absurd (_void : 'ty6) = match _void with _ -> assert false
   
   let absurd = _absurd
   
@@ -2774,7 +2775,7 @@
   
   type (_, _) eff_internal_effect += Ping : (unit, unit) eff_internal_effect
   
-  let _test_simple (_x : 'ty4) =
+  let _test_simple (_x : 'ty5) =
     (handler
        {
          value_clause = (fun (_id : unit * int) -> Value _id);
@@ -3428,12 +3429,12 @@
   ;;
   handler
     {
-      value_clause = (fun (_x : 'ty3) -> Value _x);
+      value_clause = (fun (_x : 'ty4) -> Value _x);
       effect_clauses =
         (fun (type a b) (eff : (a, b) eff_internal_effect) : (a -> (b -> _) -> _) ->
           match eff with eff' -> fun arg k -> Call (eff', arg, k));
     }
-    (fun (_x : 'ty3) -> Value _x)
+    (fun (_x : 'ty4) -> Value _x)
   ======================================================================
   codegen/test4.eff
   ----------------------------------------------------------------------
@@ -3762,13 +3763,10 @@
   
   let tester = _tester
   
-  let _max _tycoer _tycoer _tycoer _tycoer (_a : 'ty97) (_b : 'ty106) =
-    coer_return
-      (coer_arrow _tycoer (coer_return coer_refl_ty))
-      (( > ) (_tycoer _a))
+  let _max (_a : 'ty69) (_b : 'ty69) =
+    coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( > ) _a)
     >>= fun _b ->
-    _b _b >>= fun _b ->
-    if _b then coer_return _tycoer _a else coer_return _tycoer _b
+    _b _b >>= fun _b -> if _b then Value _a else Value _b
   
   let max = _max
   
@@ -3800,8 +3798,7 @@
              | Choose ->
                  fun (() : unit) _k ->
                    _k true >>= fun _b ->
-                   _k false >>= fun _b ->
-                   _max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _b _b
+                   _k false >>= fun _b -> _max _b _b
              | eff' -> fun arg k -> Call (eff', arg, k));
        }
        (fun (_x : int) -> Value _x))
@@ -3820,13 +3817,10 @@
   
   let op = _op
   
-  let _max _tycoer _tycoer _tycoer _tycoer (_a : 'ty187) (_b : 'ty196) =
-    coer_return
-      (coer_arrow _tycoer (coer_return coer_refl_ty))
-      (( > ) (_tycoer _a))
+  let _max (_a : 'ty143) (_b : 'ty143) =
+    coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( > ) _a)
     >>= fun _b ->
-    _b _b >>= fun _b ->
-    if _b then coer_return _tycoer _a else coer_return _tycoer _b
+    _b _b >>= fun _b -> if _b then Value _a else Value _b
   
   let max = _max
   
@@ -3850,8 +3844,7 @@
           match _x with
           | Nil -> Value _x
           | Cons (_x, _xs) ->
-              _max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x
-              >>= fun _b ->
+              _max _x _x >>= fun _b ->
               _maxl _b >>= fun _b -> _b _xs)
     in
     _tester _m >>= fun _t ->
@@ -3895,8 +3888,7 @@
           match _x with
           | Nil -> Value _x
           | Cons (_x, _xs) ->
-              _max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x
-              >>= fun _b ->
+              _max _x _x >>= fun _b ->
               _maxl _b >>= fun _b -> _b _xs)
     in
     _tester _m >>= fun ____t ->
@@ -3959,7 +3951,7 @@
   
   type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
   
-  let _absurd (_void : 'ty460) = match _void with _ -> assert false
+  let _absurd (_void : 'ty340) = match _void with _ -> assert false
   
   let absurd = _absurd
   
@@ -3970,8 +3962,7 @@
           match _x with
           | Nil -> Value _x
           | Cons (_x, _xs) ->
-              _max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x
-              >>= fun _b ->
+              _max _x _x >>= fun _b ->
               _maxl _b >>= fun _b -> _b _xs)
     in
     let rec _populate_leafs _x =
@@ -4061,8 +4052,7 @@
           match _x with
           | Nil -> Value _x
           | Cons (_x, _xs) ->
-              _max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x
-              >>= fun _b ->
+              _max _x _x >>= fun _b ->
               _maxl _b >>= fun _b -> _b _xs)
     in
     let rec _populate_leafs _x =
@@ -4178,8 +4168,7 @@
           match _x with
           | Nil -> Value _x
           | Cons (_x, _xs) ->
-              _max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x
-              >>= fun _b ->
+              _max _x _x >>= fun _b ->
               _maxl _b >>= fun _b -> _b _xs)
     in
     _tester _m >>= fun _t ->
@@ -4252,8 +4241,7 @@
           match _x with
           | Nil -> Value _x
           | Cons (_x, _xs) ->
-              _max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x
-              >>= fun _b ->
+              _max _x _x >>= fun _b ->
               _maxl _b >>= fun _b -> _b _xs)
     in
     _tester _m >>= fun ____t ->
@@ -4350,8 +4338,7 @@
           match _x with
           | Nil -> Value _x
           | Cons (_x, _xs) ->
-              _max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x
-              >>= fun _b ->
+              _max _x _x >>= fun _b ->
               _maxl _b >>= fun _b -> _b _xs)
     in
     _tester _m >>= fun _t ->
@@ -4419,8 +4406,7 @@
           match _x with
           | Nil -> Value _x
           | Cons (_x, _xs) ->
-              _max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x
-              >>= fun _b ->
+              _max _x _x >>= fun _b ->
               _maxl _b >>= fun _b -> _b _xs)
     in
     _tester _m >>= fun ____t ->
