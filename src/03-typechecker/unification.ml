@@ -701,7 +701,13 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } =
           (fun _ (_, drt) acc -> Effect.Set.is_empty drt && acc)
           next true
       in
-      if is_collapsible edge then (
+      let all_edges_same =
+        let l = G.Edges.fold (fun _ (_, drt) l -> drt :: l) next [] in
+        match l with
+        | [] -> false
+        | x :: xs -> List.for_all (fun y -> Effect.Set.equal x y) xs
+      in
+      if is_collapsible edge || all_edges_same then (
         Print.debug "Contracting dirt, in mode %s, really removing: %t" mode
           (BaseSym.print target);
         (* If all the rewired edges are simple, we can update graph, otherwise we have to re-solve and don't update graph just yet *)
