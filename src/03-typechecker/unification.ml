@@ -746,7 +746,8 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } =
             outdeg_line |> remove_current_node_from_list ),
           (base_graph, reverse_graph),
           (visited, changed),
-          add_constraint source target constr )
+          (* Do not contract constraints if the edge is not collapsible *)
+          constr )
     in
     let rec process (indeg_line, outdeg_line) (graph, reverse_graph)
         (visited, changed) constr =
