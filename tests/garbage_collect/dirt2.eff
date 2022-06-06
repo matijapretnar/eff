@@ -8,6 +8,23 @@ let a f g x l m =
     let a = f x in
     let c = perform (B ()) in
     let b = g x in 
-    (a, ( (perform (C ())) ) < c, b, perform (A ()), (if true then (g x, f x) else (f x, g x)), q   )
+    (a, f () = g (), ( (perform (C ())) ) < c, b, perform (A ()), (if true then (g x, f x) else (f x, g x)), q   )
   ) with
   | effect (C ()) k -> k (g () )
+  | effect (A ()) k -> k ()
+  | effect (B ()) k -> k (f () )
+
+let b = a (fun _ -> ()) (fun _ -> ()) () 1 2
+
+let comp f g x = 
+  f (g x)
+
+let f x =
+  perform (A ());
+  perform (A x) 
+
+let g x =
+  perform (B ());
+  perform (B x) 
+
+let k = comp f g ()

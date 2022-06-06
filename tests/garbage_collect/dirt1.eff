@@ -3,9 +3,9 @@ effect B : unit -> int
 
 effect C : float -> float
 
-let a () = 
+let a u () = 
   let comp f h g x = 
-    if true then
+    if u x then
       f (g x)
     else 
       h (g x)
@@ -18,5 +18,11 @@ let a () =
     let b = perform (B ()) in
     (b, x)
   in
-  let k = comp f h (fun x -> x) in
-  k
+  handle (
+    (* this fails if 1 is not applied *)
+    comp f h (fun z -> z) 0
+  )
+  with
+  | x -> x
+  | effect (A ()) k -> k ()
+  | effect (B ()) k -> k 100 
