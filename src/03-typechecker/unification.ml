@@ -804,6 +804,117 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } =
     (fun (_, drt) -> Effect.Set.is_empty drt)
     dirt_constraints Constraint.empty
 
+let calculate_lower_bound { Language.Constraints.dirt_constraints; _ }
+    allow_contraction =
+  (* Ths is a bad implementation of toposort, but it should work from now, to see, how it goes
+     (at some point cycle detection should also sort it) *)
+  let open Language.Constraints in
+  let module BaseSym = Dirt.Param in
+  let module G = DirtConstraints.DirtParamGraph in
+  (* Toposort *)
+  let components = G.scc_tarjan dirt_constraints in
+  (* First combine multinodes *)
+  let node_effects, parents, _component_parent =
+    List.fold_left
+      (fun (node_w, parents, component_parent) component ->
+        match component with
+        | top :: _ ->
+            let effects, parents =
+              List.fold
+                (fun (effects, parents) start ->
+                  (* Add parent node *)
+                  let parents = BaseSym.Map.add start top parents in
+                  let edges = G.get_edges start dirt_constraints in
+                  (* loop over all outgoing in the same cycle *)
+                  let effects =
+                    List.fold
+                      (fun effects target ->
+                        let edge_effects =
+                          edges |> G.Edges.get_edge target
+                          |> Option.default_map Effect.Set.empty snd
+                        in
+                        Effect.Set.union effects edge_effects)
+                      effects component
+                  in
+                  (effects, parents))
+                (Effect.Set.empty, parents)
+                component
+            in
+            (* add cycle effects to all nodes in this scc *)
+            ( List.fold
+                (fun acc v -> BaseSym.Map.add v effects acc)
+                node_w component,
+              parents,
+              component_parent |> BaseSym.Map.add top component )
+        | [] -> assert false)
+      (BaseSym.Map.empty, BaseSym.Map.empty, BaseSym.Map.empty)
+      components
+  in
+  (* Calculate lower bound for all nodes *)
+  let lower_bounds = BaseSym.Map.empty in
+  (* Traverse in topological sort order, and push all  *)
+  let lower_bounds =
+    List.fold_left
+      (fun lower_bounds component ->
+        let parent = List.hd component in
+        let parent = BaseSym.Map.find parent parents in
+        let component_lower_bound =
+          match BaseSym.Map.find_opt parent lower_bounds with
+          | Some lb -> lb
+          | None -> Effect.Set.empty
+        in
+        let component_lower_bound =
+          Effect.Set.union component_lower_bound
+            (BaseSym.Map.find parent node_effects)
+        in
+        let lower_bounds =
+          List.fold
+            (fun lower_bounds v ->
+              let edges = G.get_edges v dirt_constraints in
+              let lower_bounds =
+                BaseSym.Map.fold
+                  (fun target (_, eff) lower_bounds ->
+                    let pushed = Effect.Set.union eff component_lower_bound in
+                    let target_parent = BaseSym.Map.find target parents in
+                    let lower_bounds =
+                      BaseSym.Map.update target_parent
+                        (function
+                          | None -> Some pushed
+                          | Some existing ->
+                              Some (Effect.Set.union existing pushed))
+                        lower_bounds
+                    in
+                    lower_bounds)
+                  edges lower_bounds
+              in
+              lower_bounds)
+            lower_bounds component
+        in
+        lower_bounds)
+      lower_bounds components
+  in
+  let constraints, change =
+    G.fold
+      (fun source target ((_, drt_set) as e) ((cons, _) as acc) ->
+        let target_parent = BaseSym.Map.find target parents in
+        let source_parent = BaseSym.Map.find source parents in
+        if BaseSym.compare source target_parent = 0 then acc
+        else if
+          Effect.Set.subset drt_set
+            (Option.value
+               (BaseSym.Map.find_opt source_parent lower_bounds)
+               ~default:Effect.Set.empty)
+          && allow_contraction e
+        then
+          ( Constraint.add_dirt_equality
+              (Dirt.no_effect source, Dirt.no_effect target)
+              cons,
+            true )
+        else acc)
+      dirt_constraints (Constraint.empty, false)
+  in
+  (constraints, change)
+
 let solve ~loc type_definitions constraints =
   let sub, constraints =
     unify ~loc type_definitions
@@ -826,11 +937,15 @@ let solve ~loc type_definitions constraints =
     in
     let rec runner level subs_state cons_state =
       let new_cons, changed = join_simple_dirt_nodes cons_state in
+      let new_cons', ch = calculate_lower_bound cons_state (fun _ -> true) in
+
       let subs_state', cons_state' =
-        unify ~loc type_definitions (subs_state, cons_state, new_cons)
+        unify ~loc type_definitions
+          (subs_state, cons_state, Constraint.union new_cons new_cons')
       in
       let cons_state' = Constraints.clean cons_state' in
-      if Dirt.Param.Set.is_empty changed then (subs_state', cons_state')
+      if Dirt.Param.Set.is_empty changed && not ch then
+        (subs_state', cons_state')
       else runner (level + 1) subs_state' cons_state'
     in
     let subs, constraints =

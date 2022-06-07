@@ -83,6 +83,99 @@ struct
   let component graph reverse source =
     Vertex.Set.inter (traverse source graph) (traverse source reverse)
 
+  let scc_tarjan graph =
+    let rec strong_connect (v_index, v_lowlink, stack, on_stack, index) v =
+      let v_index =
+        Vertex.Map.update v
+          (function None -> Some index | Some _ -> assert false)
+          v_index
+      in
+      let v_lowlink = Vertex.Map.add v index v_lowlink in
+
+      let index = index + 1 in
+      let on_stack = on_stack |> Vertex.Set.add v in
+      let stack = v :: stack in
+      (* Loop over all successors *)
+      let v_index, v_lowlink, stack, on_stack, index, components =
+        Edges.fold
+          (fun to_ _ (v_index, v_lowlink, stack, on_stack, index, components) ->
+            if Vertex.Map.find_opt to_ v_index = None then
+              let v_index, v_lowlink, stack, on_stack, index, components' =
+                strong_connect (v_index, v_lowlink, stack, on_stack, index) to_
+              in
+              let components = components' @ components in
+              let v_lowlink =
+                Vertex.Map.update to_
+                  (function
+                    | None -> assert false
+                    | Some lowlink ->
+                        Some (min lowlink (Vertex.Map.find v v_lowlink)))
+                  v_lowlink
+              in
+              (v_index, v_lowlink, stack, on_stack, index, components)
+            else if Vertex.Set.mem to_ on_stack then
+              let v_lowlink =
+                Vertex.Map.update to_
+                  (function
+                    | None -> assert false
+                    | Some lowlink ->
+                        Some (min lowlink (Vertex.Map.find v v_lowlink)))
+                  v_lowlink
+              in
+              (v_index, v_lowlink, stack, on_stack, index, components)
+            else (v_index, v_lowlink, stack, on_stack, index, components))
+          (get_edges v graph)
+          (v_index, v_lowlink, stack, on_stack, index, [])
+      in
+      (* Check lowlink invariants *)
+      let on_stack, component, stack =
+        if Vertex.Map.find v v_index = Vertex.Map.find v v_lowlink then
+          let rec popper on_stack component stack =
+            match stack with
+            | top :: rest ->
+                let on_stack = Vertex.Set.remove top on_stack in
+                let component = top :: component in
+                if Vertex.compare top v = 0 then (on_stack, component, rest)
+                else popper on_stack component rest
+            | [] -> (on_stack, component, stack)
+          in
+          let on_stack, component, stack = popper on_stack [] stack in
+          (on_stack, [ component ], stack)
+        else (on_stack, [], stack)
+      in
+      assert (List.length component <= 1);
+
+      (v_index, v_lowlink, stack, on_stack, index, component @ components)
+    in
+    let v_index = Vertex.Map.empty in
+    let v_lowlink = v_index in
+    let on_stack = Vertex.Set.empty in
+    let _, _, stack, on_stack, index, components =
+      Vertex.Set.fold
+        (fun v ((v_index, v_lowlink, stack, on_stack, index, components) as acc) ->
+          match Vertex.Map.find_opt v v_index with
+          | None ->
+              let v_index, v_lowlink, stack, on_stack, index, components' =
+                strong_connect (v_index, v_lowlink, stack, on_stack, index) v
+              in
+              ( v_index,
+                v_lowlink,
+                stack,
+                on_stack,
+                index,
+                components' @ components )
+          | Some _ -> acc)
+        (vertices graph)
+        (v_index, v_lowlink, [], on_stack, 0, [])
+    in
+    assert (stack = []);
+    assert (Vertex.Set.is_empty on_stack);
+    assert (index = (graph |> vertices |> Vertex.Set.cardinal));
+    assert (
+      components |> List.map List.length |> List.fold ( + ) 0
+      = (graph |> vertices |> Vertex.Set.cardinal));
+    components
+
   let scc graph =
     let reversed = reverse graph in
     let visited = Vertex.Set.empty in
