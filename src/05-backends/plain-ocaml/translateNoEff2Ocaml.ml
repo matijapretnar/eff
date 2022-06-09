@@ -176,7 +176,7 @@ let pp_lets keyword pp_let_def lst ppf =
 let pp_coercion_vars ws =
   Print.sequence " " (Type.TyCoercionParam.print ~safe:true) ws
 
-let rec pp_term ?max_level state noEff_term ppf =
+let rec pp_term ?max_level ?(top_level = false) state noEff_term ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
   match noEff_term with
   | NVar v when v.coercions = [] -> print "%t" (pp_variable state v.variable)
@@ -216,12 +216,26 @@ let rec pp_term ?max_level state noEff_term ppf =
         (pp_term state ~max_level:0 t)
   | NReturn t -> print ~at_level:1 "Value %t" (pp_term state ~max_level:0 t)
   | NHandler { effect_clauses; return_clause; finally_clause } ->
-      print ~at_level:2
-        "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_clauses = \
-         %t;@]} (@[<hov>(fun %t)@])"
-        (pp_abs_with_ty state return_clause)
-        (pp_effect_cls state effect_clauses)
-        (pp_abs_with_ty state finally_clause)
+      (* Top level handlers need to be printed in a fully applied form,
+         otherwise value restriction kicks in when compiling the
+         resulting files with OCaml*)
+      if top_level then
+        let v = Variable.fresh "cmd" in
+        print ~at_level:2
+          "(fun %t -> handler {@[<hov>value_clause = (fun %t);@] \
+           @[<hov>effect_clauses = %t;@]} (@[<hov>(fun %t)@]) %t)"
+          (pp_variable state v)
+          (pp_abs_with_ty state return_clause)
+          (pp_effect_cls state effect_clauses)
+          (pp_abs_with_ty state finally_clause)
+          (pp_term state (SyntaxNoEff.NVar { variable = v; coercions = [] }))
+      else
+        print ~at_level:2
+          "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_clauses = \
+           %t;@]} (@[<hov>(fun %t)@])"
+          (pp_abs_with_ty state return_clause)
+          (pp_effect_cls state effect_clauses)
+          (pp_abs_with_ty state finally_clause)
   | NLet (t1, (pat, t2)) ->
       print ~at_level:2 "@[<hv>@[<hv>let %t = %t in@] @,%t@]"
         (pp_pattern state pat) (pp_term state t1) (pp_term state t2)
@@ -317,9 +331,9 @@ let pp_def_effect (eff, (ty1, ty2)) ppf =
      @]@.;;"
     (Effect.print eff) (pp_type ty1) (pp_type ty2)
 
-let pp_let_def state (p, ws, t) ppf =
+let pp_let_def ?(top_level = false) state (p, ws, t) ppf =
   print ppf "%t %t = @,%t" (pp_pattern state p) (pp_coercion_vars ws)
-    (pp_term state t)
+    (pp_term ~top_level state t)
 
 let pp_external state name symbol_name ppf =
   print ppf "let %t = ( %s )@.;;" (pp_variable state name) symbol_name
@@ -355,7 +369,7 @@ let pp_cmd state cmd ppf =
   | DefEffect e -> pp_def_effect e ppf
   | TopLet defs ->
       print ppf "%t@.;; let %t = %t@.;;"
-        (pp_lets "let" (pp_let_def state) defs)
+        (pp_lets "let" (pp_let_def ~top_level:true state) defs)
         (Print.sequence ","
            (fun (f, _, _) -> pp_pattern ~safe:false state f)
            defs)

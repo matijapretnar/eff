@@ -2096,7 +2096,7 @@
   let fail = _fail
   
   let _parse _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer
-      _tycoer _tycoer _tycoer _tycoer =
+      _tycoer _tycoer _tycoer _tycoer _cmd =
     handler
       {
         value_clause =
@@ -2139,10 +2139,12 @@
         coer_return
           (coer_arrow coer_refl_ty (coer_computation _tycoer))
           (coer_arrow coer_refl_ty (coer_computation _tycoer) _x))
+      _cmd
   
   let parse = _parse
   
-  let _allsols _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer =
+  let _allsols _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer
+      _cmd =
     handler
       {
         value_clause =
@@ -2165,10 +2167,11 @@
       }
       (fun (_x : 'ty124 list) ->
         coer_return (coer_list _tycoer) (coer_list _tycoer _x))
+      _cmd
   
   let allsols = _allsols
   
-  let _backtrack _tycoer _tycoer _tycoer =
+  let _backtrack _tycoer _tycoer _tycoer _cmd =
     handler
       {
         value_clause = (fun (_id : 'ty152) -> coer_return _tycoer _id);
@@ -2193,6 +2196,7 @@
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
       (fun (_x : 'ty155) -> coer_return _tycoer (_tycoer _x))
+      _cmd
   
   let backtrack = _backtrack
   
@@ -3093,6 +3097,62 @@
       (Call (Ping, (), fun (_y : unit) -> Value _y))
   
   let test_simple2 = _test_simple2
+  ======================================================================
+  codegen/reuse_toplevel_handler.eff
+  ----------------------------------------------------------------------
+  (* primitive effect *)
+  
+  type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
+  
+  (* primitive effect *)
+  
+  type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
+  
+  (* primitive effect *)
+  
+  type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
+  
+  (* primitive effect *)
+  
+  type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
+  
+  (* primitive effect *)
+  
+  type (_, _) eff_internal_effect +=
+    | RandomFloat : (float, float) eff_internal_effect
+  
+  (* primitive effect *)
+  
+  type (_, _) eff_internal_effect +=
+    | Write : (string * string, unit) eff_internal_effect
+  
+  let _h _tycoer _tycoer _tycoer _tycoer _tycoer _cmd =
+    handler
+      {
+        value_clause =
+          (fun (_x : 'ty6) ->
+            coer_computation _tycoer (coer_return _tycoer (_tycoer _x)));
+        effect_clauses =
+          (fun (type a b) (eff : (a, b) eff_internal_effect) :
+               (a -> (b -> _) -> _) ->
+            match eff with eff' -> fun arg k -> Call (eff', arg, k));
+      }
+      (fun (_x : 'ty4) -> coer_return _tycoer (_tycoer _x))
+      _cmd
+  
+  let h = _h
+  
+  ;;
+  _h coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty (Value 1)
+  
+  ;;
+  _h
+    (coer_tuple (coer_refl_ty, coer_refl_ty))
+    coer_refl_ty
+    (coer_tuple (coer_refl_ty, coer_refl_ty))
+    coer_refl_ty
+    (coer_tuple (coer_refl_ty, coer_refl_ty))
+    (Value (1, 2))
   ======================================================================
   codegen/substitution.eff
   ----------------------------------------------------------------------
