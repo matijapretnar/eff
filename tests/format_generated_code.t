@@ -1909,7 +1909,7 @@
   
   let fail = _fail
   
-  let _parse =
+  let _parse _cmd =
     handler
       {
         value_clause =
@@ -1937,10 +1937,11 @@
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
       (fun (_x : string list -> 'ty50 computation) -> Value _x)
+      _cmd
   
   let parse = _parse
   
-  let _allsols =
+  let _allsols _cmd =
     handler
       {
         value_clause = (fun (_x : 'ty101) -> Value [ _x ]);
@@ -1957,10 +1958,11 @@
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
       (fun (_x : 'ty101 list) -> Value _x)
+      _cmd
   
   let allsols = _allsols
   
-  let _backtrack =
+  let _backtrack _cmd =
     handler
       {
         value_clause = (fun (_id : 'ty133) -> Value _id);
@@ -1985,6 +1987,7 @@
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
       (fun (_x : 'ty133) -> Value _x)
+      _cmd
   
   let backtrack = _backtrack
   
@@ -2829,31 +2832,24 @@
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  let _h _tycoer _tycoer _tycoer _tycoer _tycoer _cmd =
+  let _h _cmd =
     handler
       {
-        value_clause =
-          (fun (_x : 'ty6) ->
-            coer_computation _tycoer (coer_return _tycoer (_tycoer _x)));
+        value_clause = (fun (_x : 'ty5) -> Value _x);
         effect_clauses =
           (fun (type a b) (eff : (a, b) eff_internal_effect) :
                (a -> (b -> _) -> _) ->
             match eff with eff' -> fun arg k -> Call (eff', arg, k));
       }
-      (fun (_x : 'ty4) -> coer_return _tycoer (_tycoer _x))
+      (fun (_x : 'ty5) -> Value _x)
       _cmd
   
   let h = _h;;
   
-  _h coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty (Value 1);;
+  _h (Value 1);;
   
-  _h
-    (coer_tuple (coer_refl_ty, coer_refl_ty))
-    coer_refl_ty
-    (coer_tuple (coer_refl_ty, coer_refl_ty))
-    coer_refl_ty
-    (coer_tuple (coer_refl_ty, coer_refl_ty))
-    (Value (1, 2))
+  ;;
+  _h (Value (1, 2))
   ======================================================================
   codegen/substitution.eff
   ----------------------------------------------------------------------
