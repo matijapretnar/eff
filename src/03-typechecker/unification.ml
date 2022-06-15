@@ -710,11 +710,10 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } =
       (* Check if outgoing edges strictly dominate this edge - only on outgoing *)
       let next_from_source = G.Vertex.Map.find source base_graph in
       let is_dominated =
-        G.Edges.cardinal next_from_source > 0
-        && Effect.Set.subset dirts
-             (G.Edges.fold
-                (fun _ (_, drt) -> Effect.Set.inter drt)
-                next_from_source dirts)
+        Effect.Set.subset dirts
+          (G.Edges.fold
+             (fun _ (_, drt) -> Effect.Set.inter drt)
+             next_from_source dirts)
         && mode = "outgoing"
       in
       let can_continue_on_graph = all_edges_same && not is_dominated in
