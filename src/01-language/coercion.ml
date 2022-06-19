@@ -1,6 +1,46 @@
 open Utils
 module TyParam = TyParam.TyParam
 
+module Params = struct
+  type t = {
+    type_coercion_params : Type.TyCoercionParam.Set.t;
+    dirt_coercion_params : Type.DirtCoercionParam.Set.t;
+  }
+
+  let empty =
+    {
+      type_coercion_params = Type.TyCoercionParam.Set.empty;
+      dirt_coercion_params = Type.DirtCoercionParam.Set.empty;
+    }
+
+  let print params ppf =
+    Format.fprintf ppf "{ %t, %t }"
+      (Type.TyCoercionParam.Set.print params.type_coercion_params)
+      (Type.DirtCoercionParam.Set.print params.dirt_coercion_params)
+
+  let union p1 p2 =
+    {
+      type_coercion_params =
+        Type.TyCoercionParam.Set.union p1.type_coercion_params
+          p2.type_coercion_params;
+      dirt_coercion_params =
+        Type.DirtCoercionParam.Set.union p1.dirt_coercion_params
+          p2.dirt_coercion_params;
+    }
+
+  let type_coercion_params_singelton param =
+    {
+      empty with
+      type_coercion_params = Type.TyCoercionParam.Set.singleton param;
+    }
+
+  let dirt_coercion_singelton param =
+    {
+      empty with
+      dirt_coercion_params = Type.DirtCoercionParam.Set.singleton param;
+    }
+end
+
 type ty_coercion = (ty_coercion', Type.ct_ty) typed
 
 and ty_coercion' =
@@ -212,3 +252,35 @@ and free_params_dirt_coercion coer = Type.free_params_ct_dirt coer.ty
 
 and free_params_dirty_coercion { term = tc, dc; _ } =
   Type.Params.union (free_params_ty_coercion tc) (free_params_dirt_coercion dc)
+
+let rec coercion_params_ty_coercion coer =
+  coercion_params_ty_coercion' coer.term
+
+and coercion_params_ty_coercion' = function
+  | ReflTy -> Params.empty
+  | ArrowCoercion (tc, _) -> coercion_params_ty_coercion tc
+  | HandlerCoercion (dc1, dc2) ->
+      Params.union
+        (coercion_params_dirty_coercion dc1)
+        (coercion_params_dirty_coercion dc2)
+  | TyCoercionVar tcp -> Params.type_coercion_params_singelton tcp
+  | TupleCoercion tcs ->
+      List.fold_left
+        (fun free tc -> Params.union free (coercion_params_ty_coercion tc))
+        Params.empty tcs
+  | ApplyCoercion { tcoers; _ } ->
+      TyParam.Map.fold
+        (fun _ (tc, _) free ->
+          Params.union free (coercion_params_ty_coercion tc))
+        tcoers Params.empty
+
+and coercion_params_dirt_coercion = function
+  | { term = ReflDirt; _ } -> Params.empty
+  | { term = DirtCoercionVar dvar; _ } -> Params.dirt_coercion_singelton dvar
+  | { term = Empty; _ } -> Params.empty
+  | { term = UnionDirt (_, dcoer); _ } -> coercion_params_dirt_coercion dcoer
+
+and coercion_params_dirty_coercion { term = tc, dc; _ } =
+  Params.union
+    (coercion_params_ty_coercion tc)
+    (coercion_params_dirt_coercion dc)
