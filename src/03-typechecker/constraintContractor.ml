@@ -14,6 +14,170 @@ let empty =
     dirt_coercion = DirtCoercionParam.Map.empty;
   }
 
+module EdgeDirection = struct
+  type edge_direction = Incoming | Outgoing
+
+  let compare_direction d1 d2 =
+    match (d1, d2) with
+    | Incoming, Incoming | Outgoing, Outgoing -> 0
+    | Incoming, Outgoing -> -1
+    | Outgoing, Incoming -> 1
+
+  let reverse_edge_direction = function
+    | Incoming -> Outgoing
+    | Outgoing -> Incoming
+
+  let string_of_edge_direction = function
+    | Incoming -> "Incoming"
+    | Outgoing -> "Outgoing"
+end
+
+type ('a, 'b) reduction_candidate = {
+  node : 'a;
+  edge : 'b;
+  edge_direction : EdgeDirection.edge_direction;
+}
+
+let print_reduction_candidate pn pe { node; edge; edge_direction } ppf =
+  Format.fprintf ppf "{ %t; %t; %s }" (pn node) (pe edge)
+    (EdgeDirection.string_of_edge_direction edge_direction)
+
+module ReductionQueue (Node : Symbol.S) (Edge : Symbol.S) = struct
+  (* Bad immutabble priority queue *)
+
+  open EdgeDirection
+
+  let uid = ref 0
+
+  type key = float * int
+
+  type elt = (Node.t, Edge.t) reduction_candidate
+
+  type e_dir = Edge.t * edge_direction
+
+  module EdgeDirectionMap = Map.Make (struct
+    type t = e_dir
+
+    let compare (e1, d1) (e2, d2) =
+      let c = Edge.compare e1 e2 in
+      if c = 0 then compare_direction d1 d2 else c
+  end)
+
+  module EdM = EdgeDirectionMap
+
+  module FloatPairMap = Map.Make (struct
+    type t = key
+
+    let compare = compare
+  end)
+
+  type t = {
+    queue : elt FloatPairMap.t;
+    keys : key EdM.t;
+    endpoints : e_dir list Node.Map.t;
+  }
+
+  let empty =
+    { queue = FloatPairMap.empty; keys = EdM.empty; endpoints = Node.Map.empty }
+
+  let append_to_map edge = function
+    | None -> Some [ edge ]
+    | Some x -> Some (edge :: x)
+
+  let insert_new cost ({ edge; node; edge_direction } as r_cand)
+      ({ queue; keys; endpoints } as pq) =
+    let e_dir = (edge, edge_direction) in
+    match EdM.find_opt e_dir keys with
+    (* Key should have the same cost *)
+    | Some (cost', _) ->
+        assert (cost = cost');
+        pq
+    | None ->
+        incr uid;
+        let key = (cost, !uid) in
+        {
+          queue = FloatPairMap.add key r_cand queue;
+          keys = EdM.add e_dir key keys;
+          endpoints = Node.Map.update node (append_to_map e_dir) endpoints;
+        }
+
+  let of_list l =
+    List.fold (fun acc (cost, cand) -> insert_new cost cand acc) empty l
+
+  let find_min { queue; _ } = FloatPairMap.min_binding_opt queue
+
+  let replace_node old new_ ({ endpoints; _ } as q) =
+    (* Rethink how this works with e_dir *)
+    Print.debug "Replacing node %t with %t" (Node.print old) (Node.print new_);
+    let edges = Node.Map.find_opt old endpoints |> Option.value ~default:[] in
+    List.fold
+      (fun ({ endpoints; keys; _ } as acc) edge ->
+        let endpoints =
+          endpoints |> Node.Map.remove old
+          |> Node.Map.update new_ (append_to_map edge)
+        in
+        match EdM.find_opt edge keys with
+        | Some key ->
+            Print.debug "Replaced node %t with %t" (Node.print old)
+              (Node.print new_);
+            {
+              acc with
+              queue =
+                acc.queue
+                |> FloatPairMap.update key (function
+                     | None -> assert false
+                     | Some r_cand -> Some { r_cand with node = new_ });
+              endpoints;
+            }
+        | None -> acc)
+      q edges
+
+  let remove edge ({ queue; keys; _ } as q) =
+    let key = EdM.find edge keys in
+    (* assert (Edge.compare edge (Node.Map.find node endpoints) = 0); *)
+    {
+      q with
+      queue = FloatPairMap.remove key queue;
+      keys = EdM.remove edge keys;
+    }
+
+  let remove_non_strict edge ({ queue; keys; _ } as q) =
+    match EdM.find_opt edge keys with
+    | Some key ->
+        (* assert (Edge.compare edge (Node.Map.find node endpoints) = 0); *)
+        {
+          q with
+          queue = FloatPairMap.remove key queue;
+          keys = EdM.remove edge keys;
+        }
+    | None -> q
+
+  let remove_node node ({ endpoints; _ } as q) =
+    Print.debug "Removing node %t" (Node.print node);
+    let edges = Node.Map.find_opt node endpoints |> Option.value ~default:[] in
+    List.fold (fun q edge -> remove_non_strict edge q) q edges
+
+  let print_rc = print_reduction_candidate Node.print Edge.print
+
+  let print { queue; endpoints; _ } ppf =
+    Format.fprintf ppf "{ %t;\n %t }"
+      (Print.sequence ", "
+         (fun ((c, uid), rc) ppf ->
+           Format.fprintf ppf "(%f, %d) ↦ %t " c uid (print_rc rc))
+         (FloatPairMap.bindings queue))
+      (Node.Map.print
+         (fun lst ppf ->
+           Format.fprintf ppf "[ %t ]"
+             (Print.sequence ", "
+                (fun (e, dir) ppf ->
+                  Format.fprintf ppf "(%t, %s)" (Edge.print e)
+                    (string_of_edge_direction dir))
+                lst))
+         endpoints)
+
+  let iter fn { queue; _ } = FloatPairMap.iter fn queue
+end
+
 let print counter ppf =
   Format.fprintf ppf "{tycoerc: %t;\ndirtcoerc: %t}"
     (TyCoercionParam.Map.print
@@ -134,11 +298,23 @@ let collapse_cycles { Language.Constraints.ty_constraints; dirt_constraints } =
   in
   ty_constraints
 
-let join_simple_nodes { Language.Constraints.ty_constraints; _ } =
+let graph_to_constraints skel_param graph =
   let open Language.Constraints in
-  let join_skeleton_component add_constraint is_collapsible graph new_constr =
+  let module BaseSym = TyParam in
+  let module EdgeSym = TyCoercionParam in
+  let module G = TyConstraints.TyParamGraph in
+  G.fold (add_ty_constraint skel_param) graph empty
+
+let join_simple_nodes { Language.Constraints.ty_constraints; _ }
+    ({ type_coercions; _ } as cnt) =
+  Print.debug "Counter: %t" (print cnt);
+  let open Language.Constraints in
+  let join_skeleton_component _skel add_constraint is_collapsible graph
+      new_constr =
     let module BaseSym = TyParam in
+    let module EdgeSym = TyCoercionParam in
     let module G = TyConstraints.TyParamGraph in
+    let module Q = ReductionQueue (BaseSym) (EdgeSym) in
     (* We can assume that the graph is a DAG *)
     let inverse_graph = G.reverse graph in
     let increment v m =
@@ -164,25 +340,89 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ } =
     assert_degrees inverse_graph indeg;
     assert_degrees graph outdeg;
     (* Find the node with the least indegree *)
-    let get_ones (k, n) =
+    let get_ones direction core_graph (node, n) =
+      Print.debug "Direction: %s"
+        (EdgeDirection.string_of_edge_direction direction);
+      Print.debug "%t" (BaseSym.print node);
       assert (n <> 0);
-      if n = 1 then Some k else None
+      if n = 1 then
+        Some
+          {
+            edge_direction = direction;
+            node;
+            edge =
+              (G.get_edges node core_graph |> BaseSym.Map.bindings |> function
+               | [ ((_, e) : BaseSym.t * EdgeSym.t) ] -> e
+               | [] -> assert false
+               | _ -> assert false);
+          }
+      else None
     in
-    let filter line =
-      line |> BaseSym.Map.bindings |> List.filter_map get_ones
-      |> BaseSym.Set.of_list
+    let filter direction core_graph line =
+      line |> BaseSym.Map.bindings
+      |> List.filter_map (get_ones direction core_graph)
     in
-    let indeg_line = filter indeg and outdeg_line = filter outdeg in
-    let process_part_general ?(mode = "incoming") target
-        (indeg_line, outdeg_line) (base_graph, reverse_graph) constr =
+    let indeg_line = filter Incoming inverse_graph indeg in
+    let outdeg_line = filter Outgoing graph outdeg in
+    let reduction_heap =
+      Q.of_list
+        (indeg_line @ outdeg_line
+        |> List.map (fun rc ->
+               ( type_coercions
+                 |> EdgeSym.Map.find_opt rc.edge
+                 |> Option.value ~default:Float.infinity,
+                 rc )))
+    in
+    let process_part_general
+        ({ node = target; edge_direction; edge } :
+          (BaseSym.t, EdgeSym.t) reduction_candidate)
+        (base_graph, reverse_graph) parents queue constr =
       (* Removing outging/incoming edges with degree 1 is practically the same but on different (reversed) graph
          The naming in this function assumes that the input graph is original graph and we are removing edges with
          exactly 1 incoming edge *)
-      let remove_current_node_from_list = BaseSym.Set.remove target in
-      Print.debug "In mode %s, removing: %t" mode (BaseSym.print target);
+      (* Set the correct direction *)
+      let direction_changer =
+        match edge_direction with
+        | Incoming -> fun x -> x
+        | Outgoing -> EdgeDirection.reverse_edge_direction
+      in
+      let graph_reversal =
+        match edge_direction with
+        | Incoming -> fun (x, y) -> (x, y)
+        | Outgoing -> fun (x, y) -> (y, x)
+      in
+      (* Sanity check *)
+      Q.iter
+        (fun _ { node; edge_direction = ed; _ } ->
+          (* graphs are not yet reversed here *)
+          let g, rg = (base_graph, reverse_graph) in
+          match ed with
+          | Incoming -> assert (G.get_edges node rg |> G.Edges.cardinal = 1)
+          | Outgoing -> assert (G.get_edges node g |> G.Edges.cardinal = 1))
+        queue;
+
+      (* Node can get identified during the contraction phase, so we have to recheck it *)
+      let target =
+        BaseSym.Map.find_opt target parents |> Option.value ~default:target
+      in
+      (* Swap graphs according to edge direction *)
+      let base_graph, reverse_graph =
+        graph_reversal (base_graph, reverse_graph)
+      in
+      let remove_current_edge q =
+        q
+        |> Q.remove_non_strict (edge, Incoming)
+        |> Q.remove_non_strict (edge, Outgoing)
+      in
       let incoming = G.get_edges target reverse_graph in
+      Print.debug "Incoming edges: %d" (G.Edges.cardinal incoming);
       assert (G.Edges.cardinal incoming = 1);
-      let source, edge = G.Vertex.Map.choose incoming in
+      let source, edge' = G.Vertex.Map.choose incoming in
+      Print.debug "In mode %s, removing: %t %t with %t"
+        (EdgeDirection.string_of_edge_direction edge_direction)
+        (BaseSym.print target) (EdgeSym.print edge) (BaseSym.print source);
+      assert (edge = edge');
+      assert (EdgeSym.compare edge edge' = 0);
       let next = G.get_edges target base_graph in
       if is_collapsible edge then
         let base_graph =
@@ -205,52 +445,92 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ } =
                next
           |> G.remove_vertex_unsafe target
         in
-        let remove_edges base_graph line =
-          line |> remove_current_node_from_list
+        let update_queue base_graph direction queue =
+          queue
           |> G.Edges.fold
-               (fun potential _ acc ->
+               (fun potential edg acc ->
                  let num =
                    base_graph |> G.get_edges potential |> G.Edges.cardinal
                  in
-                 if num = 1 then acc |> BaseSym.Set.add potential
-                 else acc |> BaseSym.Set.remove potential)
-               (next
-               |> G.Vertex.Map.map (fun _ -> ())
-               (* Treat source as any other *)
-               |> G.Edges.add_edge ~allow_duplicate:true source ())
+                 if num = 1 then
+                   acc
+                   |> Q.insert_new
+                        (* If the coercion is not present, we assign it the largest value *)
+                        (EdgeSym.Map.find_opt edg type_coercions
+                        |> Option.value ~default:Float.infinity)
+                        {
+                          node = potential;
+                          edge = edg;
+                          edge_direction = direction;
+                        }
+                 else (
+                   Print.debug "Removing: %t" (EdgeSym.print edg);
+                   acc
+                   |> Q.remove_non_strict (edg, direction)
+                   |> Q.remove_node potential))
+               next
+          (* Also check source *)
+          |> fun acc ->
+          let edgs = base_graph |> G.get_edges source in
+          if G.Edges.cardinal edgs = 1 then (
+            let edg = G.Edges.fold (fun _ e acc -> e :: acc) edgs [] in
+            assert (List.length edg = 1);
+            let edg = List.hd edg in
+            acc
+            |> Q.insert_new
+                 (EdgeSym.Map.find_opt edg type_coercions
+                 |> Option.value ~default:Float.infinity)
+                 { node = source; edge = edg; edge_direction = direction })
+          else acc |> Q.remove_node source
+          (* |> Q.remove edg -> Do we need to remove anything here *)
         in
-        let indeg_line = remove_edges reverse_graph indeg_line
-        and outdeg_line = remove_edges base_graph outdeg_line in
-        ( (indeg_line, outdeg_line),
-          (base_graph, reverse_graph),
-          add_constraint source target constr )
+
+        let queue =
+          queue |> remove_current_edge
+          |> Q.replace_node target source
+          |> update_queue reverse_graph (direction_changer Incoming)
+          |> update_queue base_graph (direction_changer Outgoing)
+        in
+        (* Clean up at the end *)
+        let base_graph, reverse_graph =
+          graph_reversal (base_graph, reverse_graph)
+        in
+        ((base_graph, reverse_graph), queue, add_constraint source target constr)
       else
-        ( ( indeg_line |> remove_current_node_from_list,
-            outdeg_line |> remove_current_node_from_list ),
-          (base_graph, reverse_graph),
-          constr )
+        (* Clean up at the end *)
+        let base_graph, reverse_graph =
+          graph_reversal (base_graph, reverse_graph)
+        in
+        ((base_graph, reverse_graph), queue |> remove_current_edge, constr)
     in
-    let rec process (indeg_line, outdeg_line) (graph, reverse_graph) constr =
-      match BaseSym.Set.choose_opt indeg_line with
-      | Some v ->
-          let (indeg_line, outdeg_line), (graph, reverse_graph), constr =
-            process_part_general v (indeg_line, outdeg_line)
-              (graph, reverse_graph) constr
+    let rec process parents (graph, reverse_graph) (queue : Q.t) visited constr
+        =
+      (* Choose next one *)
+      Print.debug "Queue: %t" (Q.print queue);
+      let rec find_next (queue : Q.t) =
+        match Q.find_min queue with
+        | Some (_, min) ->
+            Print.debug "Trying: %t" (EdgeSym.print min.edge);
+            let queue =
+              queue
+              |> Q.remove_non_strict (min.edge, Incoming)
+              |> Q.remove_non_strict (min.edge, Outgoing)
+            in
+            if EdgeSym.Set.mem min.edge visited then find_next queue
+            else Some (min, queue)
+        | None -> None
+      in
+      match find_next queue with
+      | Some (m, queue) ->
+          let visited = EdgeSym.Set.add m.edge visited in
+          let (graph, reverse_graph), queue, constr =
+            process_part_general m (graph, reverse_graph) parents queue constr
           in
-          process (indeg_line, outdeg_line) (graph, reverse_graph) constr
-      | None -> (
-          match BaseSym.Set.choose_opt outdeg_line with
-          | Some v ->
-              let (outdeg_line, indeg_line), (reverse_graph, graph), constr =
-                process_part_general ~mode:"outgoing" v
-                  (outdeg_line, indeg_line) (reverse_graph, graph) constr
-              in
-              process (indeg_line, outdeg_line) (graph, reverse_graph) constr
-          | None ->
-              (* TODO: a bunch of asserts *)
-              constr)
+          process parents (graph, reverse_graph) queue visited constr
+      | None -> constr
     in
-    process (indeg_line, outdeg_line) (graph, inverse_graph) new_constr
+    process BaseSym.Map.empty (graph, inverse_graph) reduction_heap
+      EdgeSym.Set.empty new_constr
   in
   let new_constr =
     Skeleton.Param.Map.fold
@@ -261,7 +541,7 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ } =
         let add_constraint source target constraints =
           Constraint.add_ty_equality (pack source, pack target) constraints
         in
-        join_skeleton_component add_constraint
+        join_skeleton_component skel add_constraint
           (fun _ -> (* collapse all edges *) true)
           graph acc)
       ty_constraints Constraint.empty
@@ -647,14 +927,41 @@ and score_computation c =
 
   combine cur (multiply 0.5 cong)
 
-let optimize_top_let subs constraints defs =
-  let counter =
-    List.fold
-      (fun acc abs -> score_abstraction abs ++ acc)
-      empty (Assoc.values_of defs)
+let optimize_constraints ~loc type_definitions subs constraints counter =
+  let cycle_constraints = collapse_cycles constraints in
+  let subs', cycle_constraints' =
+    Unification.unify ~loc type_definitions
+      (subs, constraints, cycle_constraints)
   in
-  Print.debug "counter %t" (print counter);
-  (subs, constraints)
+  let cycle_constraints' = Constraints.clean cycle_constraints' in
+  if true then
+    let simple_one_constraints = join_simple_nodes cycle_constraints' counter in
+    let subs'', simple_one_constraints' =
+      Unification.unify ~loc type_definitions
+        ( subs |> Substitution.merge subs',
+          cycle_constraints',
+          simple_one_constraints )
+    in
+    (subs'', simple_one_constraints')
+  else (subs', cycle_constraints')
+
+let optimize_computation ~loc type_definitions subs constraints cmp =
+  if !Config.garbage_collect then
+    let counter = score_computation cmp in
+    let counter = multiply (-1.0) counter in
+    optimize_constraints ~loc type_definitions subs constraints counter
+  else (subs, constraints)
+
+let optimize_top_let_rec ~loc type_definitions subs constraints defs =
+  if !Config.garbage_collect then
+    let counter =
+      List.fold
+        (fun acc abs -> score_abstraction abs ++ acc)
+        empty (Assoc.values_of defs)
+    in
+    let counter = multiply (-1.0) counter in
+    optimize_constraints ~loc type_definitions subs constraints counter
+  else (subs, constraints)
 
 (* 
 if !Config.garbage_collect then

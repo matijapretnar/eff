@@ -405,10 +405,14 @@ and infer_abstraction2 state (pat1, pat2, cmp) :
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
-let process_computation state comp =
+let process_computation ~loc state comp =
   let comp', cnstrs = infer_computation state comp in
   let sub, residuals =
     Unification.solve ~loc:comp.at state.type_definitions cnstrs
+  in
+  let sub, residuals =
+    ConstraintContractor.optimize_computation ~loc state.type_definitions sub
+      residuals comp'
   in
   let cmp' = Term.apply_sub_comp sub comp' in
   let params =
@@ -431,6 +435,10 @@ let process_top_let ~loc state defs =
         (Constraint.add_ty_equality
            (pat'.ty, fst cmp'.ty)
            (Constraint.union cnstrs_pat cnstrs_cmp))
+    in
+    let sub, constraints =
+      ConstraintContractor.optimize_computation ~loc state.type_definitions sub
+        constraints cmp'
     in
     let pat'', cmp'' =
       (Term.apply_sub_pat sub pat', Term.apply_sub_comp sub cmp')
@@ -467,6 +475,10 @@ let process_top_let_rec ~loc state un_defs =
     un_defs;
   let defs', cnstrs = infer_rec_definitions state (Assoc.to_list un_defs) in
   let sub, constraints = Unification.solve state.type_definitions ~loc cnstrs in
+  let sub, constraints =
+    ConstraintContractor.optimize_top_let_rec ~loc state.type_definitions sub
+      constraints defs'
+  in
   let defs = Assoc.map (Term.apply_substitutions_to_abstraction sub) defs' in
   let defs_params = Term.free_params_definitions defs in
   let cnstrs_params = Constraints.free_params constraints in

@@ -493,7 +493,7 @@
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  let _compose (_f : 'ty8 -> 'ty10 computation) (_g : 'ty11 -> 'ty8 computation)
+  let _compose (_f : 'ty9 -> 'ty10 computation) (_g : 'ty11 -> 'ty9 computation)
       (_x : 'ty11) =
     _g _x >>= fun _b -> _f _b
   
@@ -1909,14 +1909,18 @@
   
   let fail = _fail
   
-  let _parse _cmd =
+  let _parse _tycoer _tycoer _tycoer _tycoer _tycoer _cmd =
     handler
       {
         value_clause =
           (fun (_x : 'ty50) ->
-            Value
-              (fun (_s : string list) ->
-                match _s with [] -> Value _x | _ -> _fail ()));
+            coer_computation
+              (coer_arrow coer_refl_ty (coer_computation _tycoer))
+              (Value
+                 (fun (_s : string list) ->
+                   match _s with
+                   | [] -> coer_return _tycoer _x
+                   | _ -> coer_computation _tycoer (_fail ()))));
         effect_clauses =
           (fun (type a b) (eff : (a, b) eff_internal_effect) :
                (a -> (b -> _) -> _) ->
@@ -1926,17 +1930,18 @@
                   Value
                     (fun (_s : string list) ->
                       match _s with
-                      | [] -> _fail ()
+                      | [] -> coer_computation _tycoer (_fail ())
                       | _x :: _xs ->
                           coer_return
                             (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
                             (( = ) _c)
                           >>= fun _b ->
                           _b _x >>= fun _b ->
-                          if _b then _k _x >>= fun _b -> _b _xs else _fail ())
+                          if _b then _k _x >>= fun _b -> _b _xs
+                          else coer_computation _tycoer (_fail ()))
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
-      (fun (_x : string list -> 'ty50 computation) -> Value _x)
+      (fun (_x : string list -> 'ty81 computation) -> Value _x)
       _cmd
   
   let parse = _parse
@@ -1962,10 +1967,10 @@
   
   let allsols = _allsols
   
-  let _backtrack _cmd =
+  let _backtrack _tycoer _cmd =
     handler
       {
-        value_clause = (fun (_id : 'ty133) -> Value _id);
+        value_clause = (fun (_id : 'ty137) -> Value _id);
         effect_clauses =
           (fun (type a b) (eff : (a, b) eff_internal_effect) :
                (a -> (b -> _) -> _) ->
@@ -1974,7 +1979,7 @@
                 fun (_ : unit) _k ->
                   (handler
                      {
-                       value_clause = (fun (_id : 'ty133) -> Value _id);
+                       value_clause = (fun (_id : 'ty137) -> Value _id);
                        effect_clauses =
                          (fun (type a b) (eff : (a, b) eff_internal_effect) :
                               (a -> (b -> _) -> _) ->
@@ -1982,11 +1987,11 @@
                            | Fail -> fun (_ : unit) _ -> _k false
                            | eff' -> fun arg k -> Call (eff', arg, k));
                      }
-                     (fun (_x : 'ty133) -> Value _x))
+                     (fun (_x : 'ty137) -> Value _x))
                     (_k true)
             | eff' -> fun arg k -> Call (eff', arg, k));
       }
-      (fun (_x : 'ty133) -> Value _x)
+      (fun (_x : 'ty137) -> Value (_tycoer _x))
       _cmd
   
   let backtrack = _backtrack
@@ -2114,8 +2119,9 @@
   
   let _parseTest (() : unit) =
     _allsols
-      ( _parse (_expr ()) >>= fun _b ->
-        _b [ "4"; "3"; "*"; "("; "3"; "+"; "3"; ")" ] )
+      ( _parse coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty
+          (_expr ())
+      >>= fun _b -> _b [ "4"; "3"; "*"; "("; "3"; "+"; "3"; ")" ] )
   
   let parseTest = _parseTest
   let _x = _parseTest ()
