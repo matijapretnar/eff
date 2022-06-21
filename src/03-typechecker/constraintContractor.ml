@@ -89,9 +89,10 @@ module ReductionQueue (Node : Symbol.S) (Edge : Symbol.S) = struct
     let e_dir = (edge, edge_direction) in
     match EdM.find_opt e_dir keys with
     (* Key should have the same cost *)
-    | Some (cost', _) ->
+    | Some ((cost', _) as key) ->
         assert (cost = cost');
-        pq
+        (* We might need to reinsert  *)
+        { pq with queue = FloatPairMap.add key r_cand queue }
     | None ->
         incr uid;
         let key = (cost, !uid) in
@@ -481,8 +482,10 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ }
                  (EdgeSym.Map.find_opt edg type_coercions
                  |> Option.value ~default:Float.infinity)
                  { node = source; edge = edg; edge_direction = direction })
-          else acc |> Q.remove_node source
-          (* |> Q.remove edg -> Do we need to remove anything here *)
+          else (
+            Print.debug "Removing source %t %s" (BaseSym.print source)
+              (EdgeDirection.string_of_edge_direction direction);
+            acc |> Q.remove_node source)
         in
 
         let queue =
@@ -511,11 +514,7 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ }
         match Q.find_min queue with
         | Some (_, min) ->
             Print.debug "Trying: %t" (EdgeSym.print min.edge);
-            let queue =
-              queue
-              |> Q.remove_non_strict (min.edge, Incoming)
-              |> Q.remove_non_strict (min.edge, Outgoing)
-            in
+            let queue = queue |> Q.remove (min.edge, min.edge_direction) in
             if EdgeSym.Set.mem min.edge visited then find_next queue
             else Some (min, queue)
         | None -> None
