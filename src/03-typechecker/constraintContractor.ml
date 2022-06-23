@@ -153,9 +153,13 @@ module ReductionQueue (Node : Symbol.S) (Edge : Symbol.S) = struct
         }
     | None -> q
 
-  let remove_node node ({ endpoints; _ } as q) =
+  let remove_node node direction ({ endpoints; _ } as q) =
     Print.debug "Removing node %t" (Node.print node);
-    let edges = Node.Map.find_opt node endpoints |> Option.value ~default:[] in
+    let edges =
+      Node.Map.find_opt node endpoints
+      |> Option.value ~default:[]
+      |> List.filter (fun (_, d) -> d = direction)
+    in
     List.fold (fun q edge -> remove_non_strict edge q) q edges
 
   let print_rc = print_reduction_candidate Node.print Edge.print
@@ -424,7 +428,21 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ }
         (BaseSym.print target) (EdgeSym.print edge) (BaseSym.print source);
       assert (edge = edge');
       assert (EdgeSym.compare edge edge' = 0);
+      let get_vertices = G.Edges.vertices in
       let next = G.get_edges target base_graph in
+      let next_v = next |> get_vertices in
+      let next_rev_v = G.get_edges target reverse_graph |> get_vertices in
+      let source_next_v = G.get_edges source base_graph |> get_vertices in
+      let source_next_rev_v =
+        G.get_edges source reverse_graph |> get_vertices
+      in
+      Print.debug "Next: %t"
+        (Print.sequence "," EdgeSym.print (next |> BaseSym.Map.values));
+
+      (* We have to recalculaculate for 4 sets:
+         incoming/outgiong from source and incoming/outgoing from target
+          + joined source/target
+      *)
       if is_collapsible edge then
         let base_graph =
           base_graph
@@ -446,9 +464,28 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ }
                next
           |> G.remove_vertex_unsafe target
         in
-        let update_queue base_graph direction queue =
-          queue
-          |> G.Edges.fold
+        (* TODO: zdi se, da tega na novo nastalega ne pogledam pravilno (tj source)  *)
+        let update_queue base_graph vertices direction queue =
+          List.fold
+            (fun acc potential_v ->
+              let edges =
+                base_graph |> G.get_edges potential_v |> G.Edges.edges
+              in
+              match edges with
+              | [ potential_e ] ->
+                  acc
+                  |> Q.insert_new
+                       (* If the coercion is not present, we assign it the largest value *)
+                       (EdgeSym.Map.find_opt potential_e type_coercions
+                       |> Option.value ~default:Float.infinity)
+                       {
+                         node = potential_v;
+                         edge = potential_e;
+                         edge_direction = direction;
+                       }
+              | _ -> acc |> Q.remove_node potential_v direction)
+            queue vertices
+          (* |> List.fold_right
                (fun potential edg acc ->
                  let num =
                    base_graph |> G.get_edges potential |> G.Edges.cardinal
@@ -468,31 +505,36 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ }
                    Print.debug "Removing: %t" (EdgeSym.print edg);
                    acc
                    |> Q.remove_non_strict (edg, direction)
-                   |> Q.remove_node potential))
-               next
+                   |> Q.remove_node potential)) *)
+
           (* Also check source *)
-          |> fun acc ->
-          let edgs = base_graph |> G.get_edges source in
-          if G.Edges.cardinal edgs = 1 then (
-            let edg = G.Edges.fold (fun _ e acc -> e :: acc) edgs [] in
-            assert (List.length edg = 1);
-            let edg = List.hd edg in
-            acc
-            |> Q.insert_new
-                 (EdgeSym.Map.find_opt edg type_coercions
-                 |> Option.value ~default:Float.infinity)
-                 { node = source; edge = edg; edge_direction = direction })
-          else (
-            Print.debug "Removing source %t %s" (BaseSym.print source)
-              (EdgeDirection.string_of_edge_direction direction);
-            acc |> Q.remove_node source)
+          (* |> fun acc ->
+             let edgs = base_graph |> G.get_edges source in
+             if G.Edges.cardinal edgs = 1 then (
+               Print.debug "Adding source %t %s" (BaseSym.print source)
+                 (EdgeDirection.string_of_edge_direction direction);
+               let edg = G.Edges.fold (fun _ e acc -> e :: acc) edgs [] in
+               assert (List.length edg = 1);
+               let edg = List.hd edg in
+               acc
+               |> Q.insert_new
+                    (EdgeSym.Map.find_opt edg type_coercions
+                    |> Option.value ~default:Float.infinity)
+                    { node = source; edge = edg; edge_direction = direction })
+             else (
+               Print.debug "Removing source %t %s" (BaseSym.print source)
+                 (EdgeDirection.string_of_edge_direction direction);
+               acc |> Q.remove_node source) *)
         in
 
+        let potential =
+          (source :: next_v) @ next_rev_v @ source_next_v @ source_next_rev_v
+        in
         let queue =
           queue |> remove_current_edge
           |> Q.replace_node target source
-          |> update_queue reverse_graph (direction_changer Incoming)
-          |> update_queue base_graph (direction_changer Outgoing)
+          |> update_queue reverse_graph potential (direction_changer Incoming)
+          |> update_queue base_graph potential (direction_changer Outgoing)
         in
         (* Clean up at the end *)
         let base_graph, reverse_graph =
@@ -510,6 +552,8 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ }
         =
       (* Choose next one *)
       Print.debug "Queue: %t" (Q.print queue);
+      Print.debug "Graph: %t"
+        (graph |> graph_to_constraints _skel |> Constraints.print_dot);
       let rec find_next (queue : Q.t) =
         match Q.find_min queue with
         | Some (_, min) ->
@@ -933,6 +977,7 @@ let optimize_constraints ~loc type_definitions subs constraints counter =
       (subs, constraints, cycle_constraints)
   in
   let cycle_constraints' = Constraints.clean cycle_constraints' in
+  Print.debug "Here: %t" (Constraints.print_dot cycle_constraints');
   if true then
     let simple_one_constraints = join_simple_nodes cycle_constraints' counter in
     let subs'', simple_one_constraints' =
