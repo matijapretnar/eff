@@ -311,7 +311,7 @@ let graph_to_constraints skel_param graph =
   G.fold (add_ty_constraint skel_param) graph empty
 
 let join_simple_nodes { Language.Constraints.ty_constraints; _ }
-    ({ type_coercions; _ } as cnt) =
+    ({ type_coercions; _ } as cnt) (_params : FreeParams.params) =
   Print.debug "Counter: %t" (print cnt);
   let open Language.Constraints in
   let join_skeleton_component _skel add_constraint is_collapsible graph
@@ -350,6 +350,7 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ }
         (EdgeDirection.string_of_edge_direction direction);
       Print.debug "%t" (BaseSym.print node);
       assert (n <> 0);
+      (* assert (BaseSym.Set.is_empty params.type_params.positive); *)
       if n = 1 then
         Some
           {
@@ -970,7 +971,8 @@ and score_computation c =
 
   combine cur (multiply 0.5 cong)
 
-let optimize_constraints ~loc type_definitions subs constraints counter =
+let optimize_constraints ~loc type_definitions subs constraints
+    (get_counter, get_params) =
   let cycle_constraints = collapse_cycles constraints in
   let subs', cycle_constraints' =
     Unification.unify ~loc type_definitions
@@ -979,7 +981,9 @@ let optimize_constraints ~loc type_definitions subs constraints counter =
   let cycle_constraints' = Constraints.clean cycle_constraints' in
   Print.debug "Here: %t" (Constraints.print_dot cycle_constraints');
   if true then
-    let simple_one_constraints = join_simple_nodes cycle_constraints' counter in
+    let simple_one_constraints =
+      join_simple_nodes cycle_constraints' (get_counter subs) (get_params subs)
+    in
     let subs'', simple_one_constraints' =
       Unification.unify ~loc type_definitions
         ( subs |> Substitution.merge subs',
@@ -990,21 +994,41 @@ let optimize_constraints ~loc type_definitions subs constraints counter =
   else (subs', cycle_constraints')
 
 let optimize_computation ~loc type_definitions subs constraints cmp =
+  Print.debug "cmp: %t" (Term.print_computation cmp);
   if !Config.garbage_collect then
-    let counter = score_computation cmp in
-    let counter = multiply (-1.0) counter in
-    optimize_constraints ~loc type_definitions subs constraints counter
+    optimize_constraints ~loc type_definitions subs constraints
+      ( (fun subs ->
+          let cmp = Term.apply_sub_comp subs cmp in
+          let counter = score_computation cmp in
+          let counter = multiply (-1.0) counter in
+          counter),
+        fun subs ->
+          let cmp = Term.apply_sub_comp subs cmp in
+          let parity = calculate_parity_dirty_ty cmp.ty in
+          parity )
   else (subs, constraints)
 
 let optimize_top_let_rec ~loc type_definitions subs constraints defs =
   if !Config.garbage_collect then
-    let counter =
-      List.fold
-        (fun acc abs -> score_abstraction abs ++ acc)
-        empty (Assoc.values_of defs)
-    in
-    let counter = multiply (-1.0) counter in
-    optimize_constraints ~loc type_definitions subs constraints counter
+    optimize_constraints ~loc type_definitions subs constraints
+      ( (fun subs ->
+          let defs = Assoc.map (Term.apply_sub_abs subs) defs in
+          let counter =
+            List.fold
+              (fun acc abs -> score_abstraction abs ++ acc)
+              empty (Assoc.values_of defs)
+          in
+          let counter = multiply (-1.0) counter in
+          counter),
+        fun subs ->
+          let defs = Assoc.map (Term.apply_sub_abs subs) defs in
+          let counter =
+            List.fold
+              (fun acc abs ->
+                FreeParams.union (calculate_parity_abs_ty abs.ty) acc)
+              FreeParams.empty (Assoc.values_of defs)
+          in
+          counter )
   else (subs, constraints)
 
 (* 
