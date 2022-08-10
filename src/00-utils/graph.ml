@@ -21,6 +21,10 @@ module MakeEdges (Vertex : Symbol.S) = struct
   let fold f edges acc = Vertex.Map.fold f edges acc
 
   let cardinal g = Vertex.Map.cardinal g
+
+  let vertices = Vertex.Map.keys
+
+  let edges = Vertex.Map.values
 end
 
 module Make
@@ -50,6 +54,9 @@ struct
   let remove_edge v1 v2 graph =
     let v1_edges' = get_edges v1 graph |> Edges.remove_edge v2 in
     Vertex.Map.add v1 v1_edges' graph
+
+  let remove_edges v edges (graph : t) : t =
+    Vertex.Map.fold (fun v2 _ graph -> remove_edge v v2 graph) edges graph
 
   let remove_vertex_unsafe v graph = Vertex.Map.remove v graph
 
@@ -226,24 +233,30 @@ struct
     in
     l
 
-  let print_node node ppf =
+  let print_node additonal_label node ppf =
     let vertex = Vertex.print node in
-    Print.print ppf "node_%t[label=\"%t\"];" vertex vertex
+    let additional_label = additonal_label node in
+    Print.print ppf "node_%t[label=\"%t%s\"];" vertex vertex additional_label
 
   let print_edge (v1, edge, v2) ppf =
     Print.print ppf "@[<h>node_%t -> node_%t [label=\"%t\"]@]" (Vertex.print v1)
       (Vertex.print v2) (Edge.print edge)
 
-  let print_node_component cluster_name (ind, cmp) ppf =
+  let print_node_component cluster_name additional_label (ind, cmp) ppf =
     if Vertex.Set.cardinal cmp = 1 then
-      Print.print ppf "%t" (print_node (Vertex.Set.choose cmp))
+      Print.print ppf "%t" (print_node additional_label (Vertex.Set.choose cmp))
     else
       Print.print ppf
         "subgraph cluster_%t_%d {label=\"\"; graph[style=dotted]; \n %t \n}"
         cluster_name ind
-        (Print.sequence "\n" print_node (Vertex.Set.elements cmp))
+        (Print.sequence "\n"
+           (print_node additional_label)
+           (Vertex.Set.elements cmp))
 
-  let print_dot graph cluster_name header ppf =
+  let print_dot additional_label graph cluster_name header ppf =
+    let additional_label =
+      match additional_label with None -> fun _ -> "" | Some f -> f
+    in
     let _vertices, edges =
       fold
         (fun source sink edge (vertices, edges) ->
@@ -252,11 +265,10 @@ struct
         graph (Vertex.Set.empty, [])
     in
     let components = scc graph in
-    (* let vertices = Vertex.Set.elements vertices in *)
     Print.print ppf "subgraph %t{\n%t\n//nodes\n%t\n\n//edges\n%t\n\n}\n"
       cluster_name header
       (Print.sequence "\n"
-         (print_node_component cluster_name)
+         (print_node_component cluster_name additional_label)
          (List.mapi (fun x i -> (x, i)) components))
       (Print.sequence "\n" print_edge edges)
 end

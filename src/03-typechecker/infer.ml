@@ -367,16 +367,16 @@ and infer_rec_definitions state defs =
   in
   let state_extended_with_all_defs =
     List.fold_left
-      (fun state (x, _, ty_in, ty_out) ->
-        extend_var x (Type.arrow (ty_in, ty_out)) state)
+      (fun state (f, _, ty_in, ty_out) ->
+        extend_var f (Type.arrow (ty_in, ty_out)) state)
       state defs_with_fresh_types
   in
   let defs'', cnstrs =
     infer_many
-      (fun (x, abs, ty_in, ty_out) ->
+      (fun (f, abs, ty_in, ty_out) ->
         let abs', cs1 = infer_abstraction state_extended_with_all_defs abs in
         let abs'', cs2 = Constraint.full_cast_abstraction abs' ty_in ty_out in
-        ((x, abs''), Constraint.list_union [ cs1; cs2 ]))
+        ((f, abs''), Constraint.list_union [ cs1; cs2 ]))
       defs_with_fresh_types
   in
   (Assoc.of_list defs'', Constraint.list_union cnstrs)

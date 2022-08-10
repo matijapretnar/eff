@@ -17,7 +17,35 @@ let enable_optimization = ref true
 let profiling = ref false
 let print_graph = ref false
 
-let garbage_collect = ref true
+type type_contraction = { contract_cycles : bool; contract_simple_nodes : bool }
+
+type dirt_contraction = {
+  contract_cycles : bool;
+  contract_source_nodes : bool;
+  contract_same_dirt_cycles : bool;
+  contract_sink_nodes : bool;
+  contract_simple_nodes : bool;
+}
+
+type constraint_contraction_config = {
+  type_contraction : type_contraction;
+  dirt_contraction : dirt_contraction;
+}
+
+let garbage_collect =
+  ref
+    {
+      type_contraction =
+        { contract_cycles = true; contract_simple_nodes = true };
+      dirt_contraction =
+        {
+          contract_cycles = true;
+          contract_same_dirt_cycles = true;
+          contract_source_nodes = true;
+          contract_sink_nodes = true;
+          contract_simple_nodes = true;
+        };
+    }
 
 let optimization_fuel = ref 5
 

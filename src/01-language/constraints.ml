@@ -159,23 +159,40 @@ let print_dirt_edge (source, (edge, effect_set), sink) ppf : unit =
     (DirtCoercionParam.print edge)
     print_effect_set
 
-let print_skeleton_graph (skel_param, graph) ppf : unit =
-  TyConstraints.TyParamGraph.print_dot graph
+let print_skeleton_graph additional_label (skel_param, graph) ppf : unit =
+  TyConstraints.TyParamGraph.print_dot additional_label graph
     (fun ppf -> Print.print ppf "cluster_%t" (Skeleton.Param.print skel_param))
     (fun ppf ->
       Print.print ppf "label=\"Skeleton param: %t\""
         (Skeleton.Param.print skel_param))
     ppf
 
-let print_dirt_graph graph ppf : unit =
-  DirtConstraints.DirtParamGraph.print_dot graph
+let print_dirt_graph additional_label graph ppf : unit =
+  DirtConstraints.DirtParamGraph.print_dot additional_label graph
     (fun ppf -> Print.print ppf "cluster_dirt_graph")
     (fun ppf -> Print.print ppf "label=\"Dirt constraints\"")
     ppf
 
-let print_dot c ppf =
+let print_dot ?(param_polarity : FreeParams.params option) c ppf =
   let skeleton_graphs = Skeleton.Param.Map.bindings c.ty_constraints in
-
+  let additional_label_ty =
+    match param_polarity with
+    | None -> fun _ -> ""
+    | Some param_polarity -> (
+        fun ty ->
+          match Type.FreeParams.get_type_polarity ty param_polarity with
+          | None -> "X"
+          | Some polarity -> FreeParams.string_of_polarity polarity)
+  in
+  let additional_label_dirt =
+    match param_polarity with
+    | None -> fun _ -> ""
+    | Some param_polarity -> (
+        fun drt ->
+          match Type.FreeParams.get_dirt_polarity drt param_polarity with
+          | None -> "X"
+          | Some polarity -> FreeParams.string_of_polarity polarity)
+  in
   Print.print ppf
     "digraph {\n\
      labelloc=b\n\
@@ -188,8 +205,10 @@ let print_dot c ppf =
      // Dirt\n\
     \       %t\n\
     \ }"
-    (Print.sequence "\n" print_skeleton_graph skeleton_graphs)
-    (print_dirt_graph c.dirt_constraints)
+    (Print.sequence "\n"
+       (print_skeleton_graph (Some additional_label_ty))
+       skeleton_graphs)
+    (print_dirt_graph (Some additional_label_dirt) c.dirt_constraints)
 
 let print c =
   let print_dirt_constraint w drt1 drt2 ppf =

@@ -93,7 +93,21 @@ let options =
         Arg.Set Config.print_graph,
         "<n> Enable constraint graph printing <n>" );
       ( "-gc",
-        Arg.Clear Config.garbage_collect,
+        Arg.Unit
+          (fun () ->
+            Config.garbage_collect :=
+              {
+                type_contraction =
+                  { contract_cycles = false; contract_simple_nodes = false };
+                dirt_contraction =
+                  {
+                    contract_cycles = false;
+                    contract_same_dirt_cycles = false;
+                    contract_source_nodes = false;
+                    contract_sink_nodes = false;
+                    contract_simple_nodes = false;
+                  };
+              }),
         "<n> Disable minimization of constraints <n>" );
     ]
 

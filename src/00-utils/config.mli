@@ -38,7 +38,22 @@ val enable_optimization : bool ref
 
 val print_graph : bool ref
 
-val garbage_collect : bool ref
+type type_contraction = { contract_cycles : bool; contract_simple_nodes : bool }
+
+type dirt_contraction = {
+  contract_cycles : bool;
+  contract_source_nodes : bool;
+  contract_same_dirt_cycles : bool;
+  contract_sink_nodes : bool;
+  contract_simple_nodes : bool;
+}
+
+type constraint_contraction_config = {
+  type_contraction : type_contraction;
+  dirt_contraction : dirt_contraction;
+}
+
+val garbage_collect : constraint_contraction_config ref
 
 val profiling : bool ref
 (** Should profiling be enabled? *)

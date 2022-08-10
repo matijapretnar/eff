@@ -410,3 +410,139 @@ let rec print_pretty_skel ?max_level free params skel ppf =
 
 let print_pretty free = print_pretty_skel free (ref Assoc.empty)
 let list_ty_param, list_skel = fresh_ty_param ()
+
+module FreeParams = struct
+  module Params (S : Symbol.S) = struct
+    type params = { positive : S.Set.t; negative : S.Set.t; zero : S.Set.t }
+
+    let empty =
+      { positive = S.Set.empty; negative = S.Set.empty; zero = S.Set.empty }
+
+    let add_positive p params =
+      if S.Set.mem p params.negative || S.Set.mem p params.zero then
+        {
+          params with
+          zero = S.Set.add p params.zero;
+          negative = S.Set.remove p params.negative;
+        }
+      else { params with positive = S.Set.add p params.positive }
+
+    let add_negative p params =
+      if S.Set.mem p params.positive || S.Set.mem p params.zero then
+        {
+          params with
+          positive = S.Set.remove p params.positive;
+          negative = S.Set.add p params.negative;
+        }
+      else { params with negative = S.Set.add p params.negative }
+
+    let add_zero p params =
+      {
+        zero = S.Set.add p params.zero;
+        positive = S.Set.remove p params.positive;
+        negative = S.Set.remove p params.negative;
+      }
+
+    let union p1 p2 =
+      let adder fn set params = S.Set.fold fn set params in
+      p2
+      |> adder add_positive p1.positive
+      |> adder add_negative p1.negative
+      |> adder add_zero p1.zero
+
+    let can_be_positive p params =
+      not (S.Set.mem p params.negative || S.Set.mem p params.zero)
+
+    let can_be_negative p params =
+      not (S.Set.mem p params.positive || S.Set.mem p params.zero)
+
+    let switch params =
+      { params with positive = params.negative; negative = params.positive }
+  end
+
+  module TypeParams = Params (TyParam)
+  module DirtParams = Params (Dirt.Param)
+
+  type params = {
+    type_params : TypeParams.params;
+    dirt_params : DirtParams.params;
+  }
+
+  type polarity = Positive | Negative | Zero
+
+  let get_type_polarity p params =
+    if TyParam.Set.mem p params.type_params.positive then Some Positive
+    else if TyParam.Set.mem p params.type_params.negative then Some Negative
+    else if TyParam.Set.mem p params.type_params.zero then Some Zero
+    else None
+
+  let get_dirt_polarity p params =
+    if Dirt.Param.Set.mem p params.dirt_params.positive then Some Positive
+    else if Dirt.Param.Set.mem p params.dirt_params.negative then Some Negative
+    else if Dirt.Param.Set.mem p params.dirt_params.zero then Some Zero
+    else None
+
+  let string_of_polarity polarity =
+    match polarity with Positive -> "+" | Negative -> "-" | Zero -> "0"
+
+  let empty = { type_params = TypeParams.empty; dirt_params = DirtParams.empty }
+
+  let union p1 p2 =
+    {
+      type_params = TypeParams.union p1.type_params p2.type_params;
+      dirt_params = DirtParams.union p1.dirt_params p2.dirt_params;
+    }
+
+  let switch { type_params; dirt_params } =
+    {
+      type_params = TypeParams.switch type_params;
+      dirt_params = DirtParams.switch dirt_params;
+    }
+end
+
+let rec calculate_parity_type (ty : ty) =
+  match ty with
+  | { term = TyParam tp; _ } ->
+      {
+        FreeParams.empty with
+        type_params =
+          FreeParams.TypeParams.add_positive tp FreeParams.TypeParams.empty;
+      }
+  | { term = Apply { ty_args; _ }; _ } ->
+      TyParam.Map.fold
+        (fun _ (ty, variance) acc ->
+          let down = calculate_parity_type ty in
+          FreeParams.union acc
+            (match variance with
+            | Covariant -> down
+            | Contravariant -> FreeParams.switch down
+            | Invariant -> down (* failwith "Not implemented yet" *)))
+        ty_args FreeParams.empty
+  | { term = Arrow abs_ty; _ } -> calculate_parity_abs_ty abs_ty
+  | { term = Tuple tys; _ } ->
+      tys
+      |> List.map calculate_parity_type
+      |> List.fold FreeParams.union FreeParams.empty
+  | { term = Handler (cty1, cty2); _ } ->
+      FreeParams.union
+        (calculate_parity_dirty_ty cty1 |> FreeParams.switch)
+        (calculate_parity_dirty_ty cty2)
+  | { term = TyBasic _; _ } -> FreeParams.empty
+
+and calculate_parity_abs_ty (ty, dirty) =
+  FreeParams.union
+    (calculate_parity_type ty |> FreeParams.switch)
+    (calculate_parity_dirty_ty dirty)
+
+and calculate_parity_dirty_ty (ty, dirt) =
+  FreeParams.union (calculate_parity_type ty) (calculate_parity_dirt dirt)
+
+and calculate_parity_dirt { row; _ } =
+  match row with
+  | Dirt.Row.Param dp ->
+      {
+        FreeParams.empty with
+        dirt_params =
+          FreeParams.DirtParams.add_positive dp FreeParams.DirtParams.empty;
+      }
+  | Dirt.Row.Empty -> FreeParams.empty
