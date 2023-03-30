@@ -1,5 +1,4 @@
-Eff
-===
+# Eff
 
 Eff is a functional programming language based on algebraic effects and
 their handlers.
@@ -35,9 +34,7 @@ For further information visit the [Eff page](http://www.eff-lang.org/)
 or contact the authors Andrej Bauer <Andrej.Bauer@andrej.com> and
 Matija Pretnar <matija@pretnar.info>.
 
-
-Installation & Usage
---------------------
+## Installation & Usage
 
 ### Prerequisites
 
@@ -52,9 +49,6 @@ To install Eff, you need a standard Unix-style build environment as well as
 3. its syntax extension `js_of_ocaml-ppx`,
 4. [Menhir](http://gitlab.inria.fr/fpottier/menhir) LR(1) parser generator,
 5. [OCamlFormat](https://github.com/ocaml-ppx/ocamlformat) auto-formatter for OCaml code.
-
-The easiest way to install them is by running:
-
 
 We do not require, but recommend a command-line editing wrapper such as
 [rlwrap](http://freecode.com/projects/rlwrap) or
@@ -103,8 +97,7 @@ See the file `etc/README.txt` for editor support.
 There are examples of Eff in `examples` subdirectory that should get you started. The Eff
 syntax is very close to that of OCaml. You can find further material about Eff on the [Eff page](http://www.eff-lang.org/).
 
-License
--------
+## License
 
 Eff is distributed under the abbreviated BSD License, see `LICENSE.txt` for
 licensing information.
