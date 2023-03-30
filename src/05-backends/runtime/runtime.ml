@@ -24,7 +24,7 @@ module Backend : Language.Backend.S = struct
     state
 
   let process_type_of state (_, c, _) =
-    Format.fprintf !Config.output_formatter "- : %t\n" (Type.print_dirty c.ty);
+    Format.fprintf !Config.output_formatter "- : %t@." (Type.print_dirty c.ty);
     state
 
   let process_def_effect state _ = state
