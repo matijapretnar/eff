@@ -18,5 +18,5 @@
   js_of_ocaml
   js_of_ocaml-ppx
   menhir
-  (ocaml (>= 4.08.1))
-  (ocamlformat (= 0.16.0))))
+  (ocaml (>= 4.14.1))
+  (ocamlformat (= 0.25.1))))
