@@ -10,9 +10,7 @@ module Symbol = Symbol
 module Symbols = Symbols
 
 type 'a located = { it : 'a; at : Location.t }
-
 type ('trm, 'ty) typed = { term : 'trm; ty : 'ty }
-
 type variance = Contravariant | Invariant | Covariant
 
 let inverse = function

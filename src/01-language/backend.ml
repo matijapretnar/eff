@@ -25,6 +25,5 @@ module type S = sig
     state -> Term.effect -> Primitives.primitive_effect -> state
 
   val process_tydef : state -> (TyName.t, Type.type_data) Utils.Assoc.t -> state
-
   val finalize : state -> unit
 end

@@ -4,80 +4,64 @@
   >   echo $f
   >   echo "----------------------------------------------------------------------"
   >   ../eff.exe --no-stdlib --compile-plain-ocaml --no-header $f | sed -E 's/_[0-9]+//g' > $f.ml
-  >   ocamlformat $f.ml
+  >   ocamlformat --enable-outside-detected-project $f.ml
   > done
   ======================================================================
   codegen/application_red.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( * ) 3)
   >>= fun _b -> _b 2
   ======================================================================
   codegen/break-split.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
   
   let _two = 2
-  
   let two = _two
-  
   let _three = 3
+  let three = _three;;
   
-  let three = _three
-  
-  ;;
   (handler
      {
        value_clause = (fun (_x : int) -> Value _x);
@@ -103,28 +87,22 @@
   codegen/capability_benchmarks.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -214,27 +192,22 @@
         >>= fun _b ->
         _b _s >>= fun _b ->
         (if _b then Value (_i, _j, _k)
-        else
-          Call
-            (TripleFail, (), fun (_y : empty) -> match _y with _ -> assert false))
+         else
+           Call
+             ( TripleFail,
+               (),
+               fun (_y : empty) -> match _y with _ -> assert false ))
         >>= fun _r -> Value (TripleCons (_r, TripleNil)) )
   
   let testTriple = _testTriple
-  
   let _handleTripleWrap ((_x, _y) : int * int) = _testTriple _x _y
-  
   let handleTripleWrap = _handleTripleWrap
   
   type queen = int * int
-  
   type queen_list = Nil | Cons of ((int * int) * queen_list)
-  
   type queen_list_list = QNil | QCons of (queen_list * queen_list_list)
-  
   type intlist = End | Lst of (int * intlist)
-  
   type option = Some of queen_list | None
-  
   type (_, _) eff_internal_effect += Select : (intlist, int) eff_internal_effect
   
   let rec _filter _x =
@@ -372,13 +345,10 @@
        _place (1, Nil))
   
   let find_solution = _find_solution
-  
   let _queens_all (_number_of_queens : int) = _find_solution _number_of_queens
-  
   let queens_all = _queens_all
   
   type (_, _) eff_internal_effect += CountPut : (int, unit) eff_internal_effect
-  
   type (_, _) eff_internal_effect += CountGet : (unit, int) eff_internal_effect
   
   let rec _count _x =
@@ -504,28 +474,22 @@
   codegen/compose.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -540,35 +504,28 @@
   codegen/constant_folding_match.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type a = Nil | Cons of (int * a)
   
   let _f (_x : int) = match _x with 1 -> Value 0 | _ -> Value 4
-  
   let f = _f
   
   let _g (_a : a) =
@@ -591,28 +548,22 @@
   codegen/handle_match.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -639,9 +590,8 @@
       | Cons (_, Cons (_y, Nil)) -> Value _y
       | Cons (_x, _) -> Value _x)
   
-  let f = _f
+  let f = _f;;
   
-  ;;
   (handler
      {
        value_clause =
@@ -660,34 +610,27 @@
   codegen/handle_rec.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type (_, _) eff_internal_effect += Eff : (unit, unit) eff_internal_effect
+  type (_, _) eff_internal_effect += Eff : (unit, unit) eff_internal_effect;;
   
-  ;;
   let rec _f _x =
     coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( = ) _x)
     >>= fun _b ->
@@ -721,8 +664,8 @@
      }
      (fun (_x : int) -> Value _x))
     (_f 5)
-  
   ;;
+  
   let rec _g _x =
     coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( = ) _x)
     >>= fun _b ->
@@ -754,34 +697,27 @@
   codegen/handler_beta_reduction.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type (_, _) eff_internal_effect += Eff : (int, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Eff : (int, int) eff_internal_effect;;
   
-  ;;
   (handler
      {
        value_clause =
@@ -810,59 +746,47 @@
   codegen/ifthenelse.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   ()
   ======================================================================
   codegen/interp.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -958,7 +882,7 @@
            (fun (type a b) (eff : (a, b) eff_internal_effect) :
                 (a -> (b -> _) -> _) ->
              match eff with
-             | DivByZero -> fun (() : unit) _k -> Value ~-1
+             | DivByZero -> fun (() : unit) _k -> Value (( ~- ) 1)
              | eff' -> fun arg k -> Call (eff', arg, k));
        }
        (fun (_x : int) -> Value _x))
@@ -1030,7 +954,7 @@
                    (fun (type a b) (eff : (a, b) eff_internal_effect) :
                         (a -> (b -> _) -> _) ->
                      match eff with
-                     | DivByZero -> fun (() : unit) _k -> Value ~-1
+                     | DivByZero -> fun (() : unit) _k -> Value (( ~- ) 1)
                      | eff' -> fun arg k -> Call (eff', arg, k));
                }
                (fun (_x : int) -> Value _x))
@@ -1043,7 +967,6 @@
   let bigTestLoop = _bigTestLoop
   
   type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
-  
   type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
   
   let _testState (_n : int) =
@@ -1240,36 +1163,28 @@
   codegen/is_relatively_pure.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Op1 : (int, unit) eff_internal_effect
+  type (_, _) eff_internal_effect += Op2 : (int, unit) eff_internal_effect;;
   
-  type (_, _) eff_internal_effect += Op2 : (int, unit) eff_internal_effect
-  
-  ;;
   (handler
      {
        value_clause = (fun (_x : unit) -> Value _x);
@@ -1285,60 +1200,48 @@
   codegen/let_list_to_bind.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( + ) 2)
   >>= fun _b -> _b 1
   ======================================================================
   codegen/loop.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -1353,9 +1256,7 @@
       _b 1 >>= fun _b -> _loop_pure _b
   
   let loop_pure = _loop_pure
-  
   let _test_pure (_n : int) = _loop_pure _n
-  
   let test_pure = _test_pure
   
   type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
@@ -1379,9 +1280,7 @@
         _b 1 >>= fun _b -> _loop_latent _b
   
   let loop_latent = _loop_latent
-  
   let _test_latent (_n : int) = _loop_latent _n
-  
   let test_latent = _test_latent
   
   type (_, _) eff_internal_effect += Incr : (unit, unit) eff_internal_effect
@@ -1478,7 +1377,6 @@
   let test_incr' = _test_incr'
   
   type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
-  
   type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
   
   let rec _loop_state _x =
@@ -1537,28 +1435,22 @@
   codegen/map.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -1581,66 +1473,52 @@
   codegen/match_red.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   Value 1
   ======================================================================
   codegen/nested_handlers.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
-  
   type (_, _) eff_internal_effect += Fail : (unit, unit) eff_internal_effect
-  
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
   
   let _test_nested (_m : int) =
@@ -1724,66 +1602,52 @@
   codegen/norec.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   let _f (_x : 'ty4) = ()
-  
   let f = _f
   ======================================================================
   codegen/not-found.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type (_, _) eff_internal_effect += Op1 : (int, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Op1 : (int, int) eff_internal_effect;;
   
-  ;;
   (handler
      {
        value_clause = (fun (_x : int) -> Value _x);
@@ -1799,34 +1663,27 @@
   codegen/one_input.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
+  type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect;;
   
-  ;;
   (handler
      {
        value_clause = (fun (_x : int) -> Value _x);
@@ -1849,28 +1706,22 @@
   codegen/optimize_pattern_match.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -1900,64 +1751,51 @@
   codegen/optimize_short_circuit.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   let _a (_b : bool) (_c : bool) = if _b then Value _c else Value false
-  
   let a = _a
   ======================================================================
   codegen/original.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   let rec _loop _x =
     coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( = ) _x)
     >>= fun _b ->
@@ -1973,34 +1811,27 @@
   codegen/other-effect.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type (_, _) eff_internal_effect += WriteInt : (int, unit) eff_internal_effect
+  type (_, _) eff_internal_effect += WriteInt : (int, unit) eff_internal_effect;;
   
-  ;;
   (handler
      {
        value_clause = (fun (_x : unit) -> Value 0);
@@ -2040,28 +1871,22 @@
   codegen/parser.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -2085,9 +1910,7 @@
   let _op (* @ *) = _op (* @ *)
   
   type (_, _) eff_internal_effect += Symbol : (string, string) eff_internal_effect
-  
   type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
-  
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
   
   let _fail (() : unit) =
@@ -2227,9 +2050,7 @@
         | _ -> _fail ())
   
   let parseNum = _parseNum
-  
   let rec _toNum _x = _parseNum (_x, 0)
-  
   let toNum = _toNum
   
   let _digit (() : unit) =
@@ -2255,10 +2076,10 @@
         fun (_y : bool) ->
           coer_computation (coer_list _tycoer)
             (if _y then
-             coer_computation (coer_list _tycoer)
-               (coer_computation (coer_list _tycoer)
-                  (coer_computation (coer_list _tycoer) (_x ())))
-            else coer_return (coer_list _tycoer) []) )
+               coer_computation (coer_list _tycoer)
+                 (coer_computation (coer_list _tycoer)
+                    (coer_computation (coer_list _tycoer) (_x ())))
+             else coer_return (coer_list _tycoer) []) )
   
   let many = _many
   
@@ -2266,7 +2087,7 @@
     _digit () >>= fun _x ->
     _many coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _many1
     >>= fun _xs ->
-    _op (* @ *) coer_refl_ty coer_refl_ty [ _x ] >>= fun _b -> _b _xs
+    _op (* @ *) coer_refl_ty coer_refl_ty (_x :: []) >>= fun _b -> _b _xs
   
   let many1 = _many1
   
@@ -2331,52 +2152,40 @@
       >>= fun _b -> _b [ "4"; "3"; "*"; "("; "3"; "+"; "3"; ")" ] )
   
   let parseTest = _parseTest
-  
   let _x = _parseTest ()
-  
   let x = _x
   ======================================================================
   codegen/pm-1_fails.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
   
   let _two = 2
-  
   let two = _two
-  
   let _three = 3
-  
   let three = _three
   
-  type intlist = IntNil | IntCons of (int * intlist)
+  type intlist = IntNil | IntCons of (int * intlist);;
   
-  ;;
   (let rec _concat _x =
      match _x with
      | IntNil ->
@@ -2411,44 +2220,34 @@
   codegen/pm-2_passes.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
   
   let _two = 2
-  
   let two = _two
-  
   let _three = 3
-  
   let three = _three
   
-  type intlist = IntNil | IntCons of (int * intlist)
+  type intlist = IntNil | IntCons of (int * intlist);;
   
-  ;;
   let rec _concat _x =
     match _x with
     | IntNil ->
@@ -2483,36 +2282,28 @@
   codegen/pm-3_passes.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
+  type intlist = IntNil | IntCons of (int * intlist);;
   
-  type intlist = IntNil | IntCons of (int * intlist)
-  
-  ;;
   let rec _concat _x =
     match _x with
     | IntNil ->
@@ -2557,28 +2348,22 @@
   codegen/poly_bind.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -2600,45 +2385,32 @@
   codegen/queens.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
-  
   type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
-  
   type queen = int * int
-  
   type rows = RowsEmpty | RowsCons of (int * rows)
-  
   type solution = SolutionEmpty | SolutionPlace of ((int * int) * solution)
-  
   type solutions = SolutionsNil | SolutionsCons of (solution * solutions)
-  
   type optional_solution = None | Some of solution
-  
   type void = Void
   
   let _absurd _tycoer (_void : 'ty4) =
@@ -2832,33 +2604,26 @@
   codegen/range.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Fetch : (unit, int) eff_internal_effect
-  
   type int_list = Nil | Cons of (int * int_list)
   
   let _test (_n : int) =
@@ -2976,91 +2741,73 @@
   codegen/rec1.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   let rec _f _x = Value () in
   _f 1
   ======================================================================
   codegen/rec2.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   fun _tycoer -> 10
   ======================================================================
   codegen/redefine_local.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -3101,28 +2848,22 @@
   codegen/reuse_toplevel_handler.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -3140,12 +2881,10 @@
       (fun (_x : 'ty4) -> coer_return _tycoer (_tycoer _x))
       _cmd
   
-  let h = _h
+  let h = _h;;
   
-  ;;
-  _h coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty (Value 1)
+  _h coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty (Value 1);;
   
-  ;;
   _h
     (coer_tuple (coer_refl_ty, coer_refl_ty))
     coer_refl_ty
@@ -3157,64 +2896,51 @@
   codegen/substitution.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   let _decide_func (_bl : bool) = if _bl then Value 10 else Value 20
-  
   let decide_func = _decide_func
   ======================================================================
   codegen/test-handle_effect_skip.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   (handler
      {
        value_clause = (fun (_x : unit) -> Value 42);
@@ -3228,28 +2954,22 @@
   codegen/test1.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -3258,28 +2978,22 @@
   codegen/test10.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -3288,68 +3002,53 @@
   codegen/test11.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Op1 : (int, int) eff_internal_effect
-  
   type (_, _) eff_internal_effect += Op2 : (int, int) eff_internal_effect
   ======================================================================
   codegen/test12.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Op1 : (int, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Op2 : (int, int) eff_internal_effect;;
   
-  type (_, _) eff_internal_effect += Op2 : (int, int) eff_internal_effect
-  
-  ;;
   handler
     {
       value_clause = (fun (_x : int) -> Value _x);
@@ -3365,36 +3064,28 @@
   codegen/test13.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Op1 : (int, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Op2 : (int, int) eff_internal_effect;;
   
-  type (_, _) eff_internal_effect += Op2 : (int, int) eff_internal_effect
-  
-  ;;
   (handler
      {
        value_clause = (fun (_x : int) -> Value _x);
@@ -3411,36 +3102,28 @@
   codegen/test14.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type integer = int
+  type (_, _) eff_internal_effect += Op : (unit, int) eff_internal_effect;;
   
-  type (_, _) eff_internal_effect += Op : (unit, int) eff_internal_effect
-  
-  ;;
   Value
     (fun (_y : int) ->
       Call
@@ -3455,42 +3138,32 @@
   codegen/test15.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type foo = A | B of bar
-  
   and bar = { x : foo }
   
   type (_, _) eff_internal_effect += Op1 : (int, bar) eff_internal_effect
-  
   type (_, _) eff_internal_effect += Op2 : (bar, foo) eff_internal_effect
+  type (_, _) eff_internal_effect += Op3 : (foo, int) eff_internal_effect;;
   
-  type (_, _) eff_internal_effect += Op3 : (foo, int) eff_internal_effect
-  
-  ;;
   Value
     (fun (_a : int) ->
       Call
@@ -3513,36 +3186,28 @@
   codegen/test16.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect;;
   
-  type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
-  
-  ;;
   (let rec _loop _x =
      coer_return (coer_arrow coer_refl_ty (coer_return coer_refl_ty)) (( < ) 0)
      >>= fun _b ->
@@ -3594,67 +3259,53 @@
   codegen/test17.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type my_ty = Cons of my_ty
+  type my_ty = Cons of my_ty;;
   
-  ;;
   fun (Cons _argmnt : my_ty) -> Value (Cons _argmnt)
   ======================================================================
   codegen/test18.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type nat = Zero | Succ of nat
+  type nat = Zero | Succ of nat;;
   
-  ;;
   let rec _add _x =
     Value
       (fun (_x : nat) ->
@@ -3669,34 +3320,27 @@
   codegen/test19.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type nat = Zero | Succ of nat
+  type nat = Zero | Succ of nat;;
   
-  ;;
   Value
     (coer_arrow coer_refl_ty (coer_return coer_refl_ty)
        (fun ((_w, _k, _num) : nat * nat * int) (_x : nat * nat * int) ->
@@ -3709,28 +3353,22 @@
   codegen/test2.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -3739,28 +3377,22 @@
   codegen/test20.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
@@ -3789,63 +3421,51 @@
   codegen/test21.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   Value (1, true)
   ======================================================================
   codegen/test3.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   fun _tycoer _tycoer _tycoer _tycoer _tycoer ->
     handler
       {
@@ -3862,32 +3482,26 @@
   codegen/test4.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
-  
   ;;
+  
   (handler
      {
        value_clause = (fun (_x : int) -> Value _x);
@@ -3901,34 +3515,27 @@
   codegen/test5.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect;;
   
-  ;;
   handler
     {
       value_clause = (fun (_id : int) -> Value _id);
@@ -3943,34 +3550,27 @@
   codegen/test6.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect;;
   
-  ;;
   (handler
      {
        value_clause = (fun (_x : int) -> Value _x);
@@ -3986,34 +3586,27 @@
   codegen/test7.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect;;
   
-  ;;
   (handler
      {
        value_clause = (fun (_x : int) -> Value _x);
@@ -4029,34 +3622,27 @@
   codegen/test8.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect;;
   
-  ;;
   (handler
      {
        value_clause = (fun (_x : int) -> Value _x);
@@ -4072,34 +3658,27 @@
   codegen/test9.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect;;
   
-  ;;
   (handler
      {
        value_clause = (fun (_x : int) -> Value _x);
@@ -4115,33 +3694,26 @@
   codegen/top-letrec_fails.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
-  
   type intlist = IntNil | IntCons of (int * intlist)
   
   let rec _concat _x =
@@ -4156,9 +3728,8 @@
             _concat _zs >>= fun _b ->
             _b _ys >>= fun _b -> Value (IntCons (_z, _b)))
   
-  let concat = _concat
+  let concat = _concat;;
   
-  ;;
   (handler
      {
        value_clause = (fun (_x : int) -> Value IntNil);
@@ -4172,33 +3743,26 @@
   codegen/tree.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type tree = Empty | Node of (tree * int * tree)
-  
   type (_, _) eff_internal_effect += Choose : (unit, bool) eff_internal_effect
   
   let _tester (_k : int) =
@@ -4292,9 +3856,7 @@
       (_find_max _t)
   
   let effect_max = _effect_max
-  
   let _test_max (_m : int) = _effect_max _m
-  
   let test_max = _test_max
   
   let _op (_x : int) (_y : int) =
@@ -4354,7 +3916,7 @@
               (),
               fun (_y : bool) ->
                 (if _y then _explore _left >>= fun _b -> _op _x _b
-                else _explore _right >>= fun _b -> _op _x _b)
+                 else _explore _right >>= fun _b -> _op _x _b)
                 >>= fun _next -> Value _next )
     in
     _maxl 0 >>= fun _b ->
@@ -4400,7 +3962,7 @@
               (),
               fun (_y : bool) ->
                 (if _y then _explore _left >>= fun _b -> _op _x _b
-                else _explore _right >>= fun _b -> _op _x _b)
+                 else _explore _right >>= fun _b -> _op _x _b)
                 >>= fun _next -> Value _next )
     in
     let rec _looper _x =
@@ -4736,7 +4298,7 @@
           (fun (_x : intlist) -> Value _x))
          (_explore _t))
     >>= fun _b ->
-    _b ~-1 >>= fun _b -> _b _b
+    _b (( ~- ) 1) >>= fun _b -> _b _b
   
   let test_leaf_state_update = _test_leaf_state_update
   
@@ -4831,7 +4393,7 @@
                   (fun (_x : intlist) -> Value _x))
                  (_explore ____t))
             >>= fun _b ->
-            _b ~-1 >>= fun _b ->
+            _b (( ~- ) 1) >>= fun _b ->
             _b _b >>= fun _b ->
             _b _b >>= fun _b -> _b _b)
     in
@@ -4904,7 +4466,7 @@
        (fun (_x : int -> intlist computation) -> Value _x))
       (_explore _t)
     >>= fun _b ->
-    _b ~-1 >>= fun _b -> _b _b
+    _b (( ~- ) 1) >>= fun _b -> _b _b
   
   let test_leaf_state_update_merged_handler =
     _test_leaf_state_update_merged_handler
@@ -4994,7 +4556,7 @@
                (fun (_x : int -> intlist computation) -> Value _x))
               (_explore ____t)
             >>= fun _b ->
-            _b ~-1 >>= fun _b ->
+            _b (( ~- ) 1) >>= fun _b ->
             _b _b >>= fun _b ->
             _b _b >>= fun _b -> _b _b)
     in
@@ -5006,36 +4568,28 @@
   codegen/two_inputs.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | RandomFloat : (float, float) eff_internal_effect
   
   (* primitive effect *)
-  
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
+  type int_list = Nil | Cons of (int * int_list);;
   
-  type int_list = Nil | Cons of (int * int_list)
-  
-  ;;
   let rec _op (* @ *) _x =
     Value
       (fun (_ys : int_list) ->

@@ -12,7 +12,6 @@ end
 
 module type PARAMETER = sig
   val ascii_symbol : string
-
   val utf8_symbol : string
 end
 
@@ -48,19 +47,13 @@ end
 
 module type S = sig
   type annot
-
   type t
 
   val compare : t -> t -> int
-
   val fresh : annot -> t
-
   val new_fresh : unit -> annot -> t
-
   val refresh : t -> t
-
   val print : ?safe:bool -> t -> Format.formatter -> unit
-
   val fold : (annot -> int -> 'a) -> t -> 'a
 
   module Set : sig
@@ -73,11 +66,8 @@ module type S = sig
     include Map.S with type key = t
 
     val of_bindings : (key * 'a) list -> 'a t
-
     val compatible_union : 'a t -> 'a t -> 'a t
-
     val keys : 'a t -> key list
-
     val values : 'a t -> 'a list
 
     val print :
@@ -87,7 +77,6 @@ end
 
 module Make (Annot : Annotation) : S with type annot = Annot.t = struct
   type annot = Annot.t
-
   type t = int * annot
 
   let compare (n1, _) (n2, _) = Stdlib.compare n1 n2
@@ -101,11 +90,8 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
     fresh
 
   let fresh = new_fresh ()
-
   let refresh (_, ann) = fresh ann
-
   let print ?(safe = false) (n, ann) ppf = Annot.print safe ann n ppf
-
   let fold f (n, ann) = f ann n
 
   module Ord = struct
@@ -134,7 +120,6 @@ module Make (Annot : Annotation) : S with type annot = Annot.t = struct
         m1 m2
 
     let keys m = List.map fst (bindings m)
-
     let values m = List.map snd (bindings m)
 
     let print pp m =

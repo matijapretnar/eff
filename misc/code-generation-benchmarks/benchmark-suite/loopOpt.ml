@@ -1,11 +1,8 @@
 open OcamlHeader
 
 let rec _loop_pure_42 _x_48 = if _x_48 = 0 then () else _loop_pure_42 (_x_48 - 1)
-
 let loop_pure = _loop_pure_42
-
 let _test_pure_54 (_n_55 : int) = _loop_pure_42 _n_55
-
 let test_pure = _test_pure_54
 
 type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
@@ -20,9 +17,7 @@ let rec _loop_latent_56 _x_67 =
   else _loop_latent_56 (_x_67 - 1)
 
 let loop_latent = _loop_latent_56
-
 let _test_latent_79 (_n_80 : int) = _loop_latent_56 _n_80
-
 let test_latent = _test_latent_79
 
 type (_, _) eff_internal_effect += Incr : (unit, unit) eff_internal_effect
@@ -63,7 +58,6 @@ let _test_incr'_165 (_n_166 : int) =
 let test_incr' = _test_incr'_165
 
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
-
 type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
 
 let rec _loop_state_281 _x_294 =

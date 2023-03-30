@@ -6,7 +6,6 @@ let usage = "Usage: eff [option] ... [file] ..."
 type use_file = Run of string | Load of string
 
 let file_queue = ref []
-
 let enqueue_file filename = file_queue := filename :: !file_queue
 
 let optimizator_bitmask_config : int Config.optimizator_base_config =
@@ -175,13 +174,14 @@ let main =
   Sys.catch_break true;
   (* Attemp to wrap yourself with a line-editing wrapper. *)
   (if !Config.interactive_shell then
-   match !Config.wrapper with
-   | None -> ()
-   | Some lst ->
-       List.iter
-         (fun wrapper ->
-           try run_under_wrapper wrapper Sys.argv with Unix.Unix_error _ -> ())
-         lst);
+     match !Config.wrapper with
+     | None -> ()
+     | Some lst ->
+         List.iter
+           (fun wrapper ->
+             try run_under_wrapper wrapper Sys.argv
+             with Unix.Unix_error _ -> ())
+           lst);
   (* Files were listed in the wrong order, so we reverse them *)
   file_queue := List.rev !file_queue;
   try

@@ -7,15 +7,10 @@ type variable = string
 (** Terms *)
 
 type effect = string
-
 type label = string
-
 type field = string
-
 type tyname = string
-
 type typaram = string
-
 type dirtparam = int
 
 type ty = plain_ty located
@@ -87,7 +82,6 @@ and match_case =
   | Eff_match of (effect * abstraction2)
 
 and abstraction = pattern * term
-
 and abstraction2 = pattern * pattern * term
 
 type dirt = DirtParam of dirtparam

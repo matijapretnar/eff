@@ -1,11 +1,8 @@
 open Language
 
 type variable = Term.Variable.t
-
 type effect = Effect.t
-
 type label = Type.Label.t
-
 type field = Type.Field.t
 
 (** Types used by MulticoreOcaml. *)

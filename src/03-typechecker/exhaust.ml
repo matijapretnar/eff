@@ -315,5 +315,4 @@ and check_expression tctx { it = e; _ } =
       Assoc.iter (fun (_, a) -> check_abstraction2 tctx a) ops
 
 and check_abstraction tctx (_, c) = check_computation tctx c
-
 and check_abstraction2 tctx (_, _, c) = check_computation tctx c

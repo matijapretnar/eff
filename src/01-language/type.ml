@@ -11,39 +11,29 @@ module TyParam = TyParam.TyParam
 let nil_annot = "$0nil"
 
 let nil = Label.fresh nil_annot
-
 let cons_annot = "$1cons"
-
 let cons = Label.fresh cons_annot
 
 module Field = Symbol.Make (Symbol.String)
 (** record fields *)
 
 let bool_tyname = TyName.fresh "bool"
-
 let int_tyname = TyName.fresh "int"
-
 let unit_tyname = TyName.fresh "unit"
-
 let string_tyname = TyName.fresh "string"
-
 let float_tyname = TyName.fresh "float"
-
 let list_tyname = TyName.fresh "list"
-
 let empty_tyname = TyName.fresh "empty"
 
 (** type coercion parameters *)
 module TyCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "tycoer"
-
   let utf8_symbol = "ω"
 end))
 
 (** dirt coercion parameters *)
 module DirtCoercionParam = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "dirtcoer"
-
   let utf8_symbol = "ϖ"
 end))
 
@@ -59,7 +49,6 @@ and ty' =
   | TyBasic of Const.ty
 
 and dirty = ty * Dirt.t
-
 and abs_ty = ty * dirty
 
 let rec print_ty ?max_level ty ppf =
@@ -71,8 +60,8 @@ let rec print_ty ?max_level ty ppf =
       print ~at_level:3 "%t → %t" (print_ty ~max_level:2 t1)
         (print_ty ~max_level:3 t2)
   | Arrow (t1, (t2, drt)) ->
-      print ~at_level:3 "%t -%t→ %t" (print_ty ~max_level:2 t1)
-        (Dirt.print drt) (print_ty ~max_level:3 t2)
+      print ~at_level:3 "%t -%t→ %t" (print_ty ~max_level:2 t1) (Dirt.print drt)
+        (print_ty ~max_level:3 t2)
   | Apply { ty_name; ty_args } -> (
       match TyParam.Map.bindings ty_args with
       | [] -> print "%t" (TyName.print ty_name)
@@ -99,15 +88,11 @@ and print_dirty ?max_level (t1, drt1) ppf =
     (Dirt.print ~max_level:0 drt1)
 
 type ct_ty = ty * ty
-
 and ct_dirt = Dirt.t * Dirt.t
-
 and ct_dirty = dirty * dirty
 
 let skeleton_of_ty ty = ty.ty
-
 let skeleton_of_dirty (ty, _) = skeleton_of_ty ty
-
 let tyParam t skel = { term = TyParam t; ty = skel }
 
 let arrow (ty1, drty2) =
@@ -141,19 +126,13 @@ let handler (drty1, drty2) =
   }
 
 let tyBasic pt = { term = TyBasic pt; ty = Skeleton.Basic pt }
-
 let unit_ty = tuple []
-
 let empty_ty = apply (empty_tyname, TyParam.Map.empty)
-
 let int_ty = tyBasic Const.IntegerTy
-
 let float_ty = tyBasic Const.FloatTy
-
 let bool_ty = tyBasic Const.BooleanTy
 
 let string_ty = tyBasic Const.StringTy
-
 and skeleton_of_dirty (ty, _) = skeleton_of_ty ty
 
 module Params = struct
@@ -326,7 +305,6 @@ and equal_dirt d1 d2 =
   Effect.Set.equal d1.effect_set d2.effect_set && d1.row = d2.row
 
 let make_dirty ty = (ty, Dirt.fresh ())
-
 let pure_ty ty = (ty, Dirt.empty)
 
 let fresh_skel () =
@@ -346,7 +324,6 @@ let fresh_dirty_param_with_skel skel =
   make_dirty ty
 
 let fresh_ty_with_fresh_skel () = fresh_ty_with_skel (fresh_skel ())
-
 let fresh_dirty_with_fresh_skel () = fresh_dirty_param_with_skel (fresh_skel ())
 
 let fresh_ty_with_skel type_definitions skel =
@@ -428,5 +405,4 @@ let rec print_pretty_skel ?max_level free params skel ppf =
   | Skeleton.Basic p -> print "%t" (Const.print_ty p)
 
 let print_pretty free = print_pretty_skel free (ref Assoc.empty)
-
 let list_ty_param, list_skel = fresh_ty_param ()

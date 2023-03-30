@@ -16,9 +16,7 @@ let message ~verbosity ?loc ~header fmt =
   else Format.ifprintf !Config.error_formatter fmt
 
 let error ?loc err_kind fmt = message ~verbosity:1 ?loc ~header:err_kind fmt
-
 let check ?loc fmt = message ~verbosity:2 ?loc ~header:"Check" fmt
-
 let warning ?loc fmt = message ~verbosity:3 ?loc ~header:"Warning" fmt
 
 let print ?(at_level = min_int) ?(max_level = max_int) ppf =
@@ -52,7 +50,6 @@ let record fpp vpp lst ppf =
   print ppf "{@[<hov>%t@]}" (sequence "; " (field fpp vpp) lst)
 
 let debug_stack = ref []
-
 let debug_depth = ref 0
 
 let debug ?loc fmt =

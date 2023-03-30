@@ -12,11 +12,9 @@ type value =
   | Handler of (result -> result)
 
 and result = Value of value | Call of Effect.t * value * closure
-
 and closure = value -> result
 
 let unit_value = Tuple []
-
 let unit_result = Value unit_value
 
 let to_bool = function

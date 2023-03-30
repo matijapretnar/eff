@@ -2,7 +2,6 @@ type ('key, 'value) t = ('key * 'value) list
 (** Association lists *)
 
 let empty = []
-
 let is_empty = function [] -> true | _ :: _ -> false
 
 (* Finding elements. *)
@@ -49,7 +48,6 @@ let rec map_of_list f = function
       (k, v) :: tl'
 
 let fold_left = List.fold
-
 let fold_right = List.fold_right
 
 let fold_map f st assoc =
@@ -70,16 +68,11 @@ let kfold_map f st xs =
 
 (* Other useful stuff. *)
 let length assoc = List.length assoc
-
 let rec values_of = function [] -> [] | (_k, v) :: tl -> v :: values_of tl
-
 let rec keys_of = function [] -> [] | (k, _v) :: tl -> k :: keys_of tl
-
 let rev = List.rev
-
 let concat assoc1 assoc2 = assoc1 @ assoc2
 
 (* Type casting *)
 let of_list lst = lst
-
 let to_list assoc = assoc

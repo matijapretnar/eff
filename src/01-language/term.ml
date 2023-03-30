@@ -5,13 +5,11 @@ module Variable = Symbol.Make (Symbol.String)
 (** variable symbols *)
 
 type variable = Variable.t
-
 type poly_variable = (Variable.t, TyScheme.t) typed
 
 module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
 
 type effect_fingerprint = EffectFingerprint.t
-
 type effect = (Effect.t, Type.ty * Type.ty) typed
 
 type pattern = (pattern', Type.ty) typed
@@ -26,11 +24,8 @@ and pattern' =
   | PNonbinding
 
 let pVar p ty = { term = PVar p; ty }
-
 let pAs (p, x) = { term = PAs (p, x); ty = p.ty }
-
 let pNonbinding ty = { term = PNonbinding; ty }
-
 let pConst c = { term = PConst c; ty = Type.type_const c }
 
 let pTuple ps =
@@ -140,7 +135,6 @@ let record ty flds : expression =
   { term = Record flds; ty }
 
 let variant (lbl, e) ty = { term = Variant (lbl, e); ty }
-
 let lambda abs = { term = Lambda abs; ty = Type.arrow abs.ty }
 
 let handled_effects effect_part =
@@ -220,7 +214,6 @@ let letVal (exp, abs) =
   { term = LetVal (exp, abs); ty = drty2 }
 
 let letRec (defs, comp) = { term = LetRec (defs, comp); ty = comp.ty }
-
 let match_ (e, cases) drty = { term = Match (e, cases); ty = drty }
 
 let apply (exp1, exp2) =
@@ -267,7 +260,6 @@ let abstraction2 (p1, p2, c) : abstraction2 =
   { term = (p1, p2, c); ty = (p1.ty, p2.ty, c.ty) }
 
 let print_effect eff ppf = Print.print ppf "%t" (Effect.print eff.term)
-
 let print_variable x = Variable.print ~safe:true x
 
 let rec print_pattern ?max_level p ppf =
@@ -494,11 +486,8 @@ and apply_sub_handler sub h =
   }
 
 let apply_substitutions_to_computation = apply_sub_comp
-
 let apply_substitutions_to_expression = apply_sub_exp
-
 let apply_substitutions_to_abstraction = apply_sub_abs
-
 let refresh_variable x = Variable.refresh x
 
 let rec refresh_pattern sbst pat =

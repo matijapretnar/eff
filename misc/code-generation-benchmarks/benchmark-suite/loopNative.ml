@@ -1,5 +1,4 @@
 let rec loop_pure n = if n = 0 then () else loop_pure (n - 1)
-
 let test_pure n = loop_pure n
 
 (******************************************************************************)

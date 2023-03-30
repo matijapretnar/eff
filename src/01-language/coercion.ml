@@ -34,9 +34,7 @@ let is_trivial_dirty_coercion omega =
   Type.equal_dirty drty1 drty2
 
 let reflTy ty = { term = ReflTy; ty = (ty, ty) }
-
 let tyCoercionVar omega ct = { term = TyCoercionVar omega; ty = ct }
-
 let dirtCoercionVar omega cd = { term = DirtCoercionVar omega; ty = cd }
 
 let arrowCoercion (tcoer1, dtcoer2) =
@@ -78,9 +76,7 @@ let bangCoercion ((ty_coer : ty_coercion), (drt_coer : dirt_coercion)) =
   { term = (ty_coer, drt_coer); ty = ((ty, drt), (ty', drt')) }
 
 let reflDirt drt = { term = ReflDirt; ty = (drt, drt) }
-
 let reflDirty (ty, drt) = bangCoercion (reflTy ty, reflDirt drt)
-
 let empty drt = { term = Empty; ty = (Dirt.empty, drt) }
 
 let unionDirt (effs, dcoer) =
@@ -177,8 +173,7 @@ and print_dirt_coercion ?max_level c ppf =
   match c.term with
   | ReflDirt -> print "⟨%t⟩" (Dirt.print (fst c.ty))
   | DirtCoercionVar tcp -> print "%t" (Type.DirtCoercionParam.print tcp)
-  | Empty ->
-      print ~at_level:1 "∅↪︎%t" (Dirt.print ~max_level:0 (snd c.ty))
+  | Empty -> print ~at_level:1 "∅↪︎%t" (Dirt.print ~max_level:0 (snd c.ty))
   | UnionDirt (eset, dc) ->
       print ~at_level:2 "{%t}∪%t" (Effect.Set.print eset)
         (print_dirt_coercion ~max_level:2 dc)

@@ -116,7 +116,6 @@ let _bigTestLoop_171 (_num_172 : int) =
 let bigTestLoop = _bigTestLoop_171
 
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
-
 type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
 
 let _testState_304 (_n_305 : int) =

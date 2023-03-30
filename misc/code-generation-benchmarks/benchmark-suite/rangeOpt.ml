@@ -1,7 +1,6 @@
 open OcamlHeader
 
 type (_, _) eff_internal_effect += Fetch : (unit, int) eff_internal_effect
-
 type int_list = Nil | Cons of (int * int_list)
 
 let _test_42 (_n_43 : int) =

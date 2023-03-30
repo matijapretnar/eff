@@ -140,9 +140,7 @@ and apply_sub_dirtycoer (sub : t) { term = ty_coer, dirt_coer; _ } :
   Coercion.bangCoercion (ty_coer', dirt_coer')
 
 let apply_substitutions_to_type = apply_sub_ty
-
 let apply_substitutions_to_dirt = apply_sub_dirt
-
 let apply_substitutions_to_skeleton = apply_sub_skel
 
 (* Other type information *)

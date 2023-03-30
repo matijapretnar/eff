@@ -1,7 +1,6 @@
 open OcamlHeader
 
 type tree = Empty | Node of (tree * int * tree)
-
 type (_, _) eff_internal_effect += Choose : (unit, bool) eff_internal_effect
 
 let _tester_42 (_k_43 : int) =
@@ -23,9 +22,7 @@ let _tester_42 (_k_43 : int) =
        (_leaf_44 10))
 
 let tester = _tester_42
-
 let _max_88 (_a_89 : int) (_b_90 : int) = if _a_89 > _b_90 then _a_89 else _b_90
-
 let max = _max_88
 
 let _effect_max_93 (_m_94 : int) =
@@ -47,13 +44,9 @@ let _effect_max_93 (_m_94 : int) =
   _find_max_141 (_tester_42 _m_94, fun (_x_110 : int) -> _x_110)
 
 let effect_max = _effect_max_93
-
 let _test_max_160 (_m_161 : int) = _effect_max_93 _m_161
-
 let test_max = _test_max_160
-
 let _op_162 (_x_163 : int) (_y_164 : int) = _x_163 - (3 * _y_164)
-
 let op = _op_162
 
 let _max_168 (_a_169 : int) (_b_170 : int) =
@@ -138,7 +131,6 @@ let test_general_loop = _test_general_loop_285
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
 
 let _absurd_420 (_void_421 : float) = match _void_421 with _ -> assert false
-
 let absurd = _absurd_420
 
 let _test_leaf_state_422 (_m_423 : int) =

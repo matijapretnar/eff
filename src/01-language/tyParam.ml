@@ -3,7 +3,6 @@ open Utils
 module TyParam = struct
   include Symbol.Make (Symbol.Parameter (struct
     let ascii_symbol = "ty"
-
     let utf8_symbol = "\207\132"
   end))
 

@@ -1,38 +1,38 @@
 (***********************************
-*********** The Parser *************
-***********************************)
+  *********** The Parser *************
+  ***********************************)
 
 exception Fail
 
 (********************************
-* Handlers
-********************************)
+  * Handlers
+  ********************************)
 
 (* let parse = handler
-    | val y -> (fun s ->
-        begin match s with
-        | [] -> y
-        | _ -> absurd (#Fail ())
-        end
-    )
-    | #Symbol c k ->
-        fun s ->
-        (begin match s with
-            | [] -> k (fun () -> (absurd (#Fail ()))) []
-            | (x :: xs) -> if (c = x) then k (fun () -> x) xs else k (fun () -> (absurd (#Fail ()))) s
-        end
-        )
-;;
+       | val y -> (fun s ->
+           begin match s with
+           | [] -> y
+           | _ -> absurd (#Fail ())
+           end
+       )
+       | #Symbol c k ->
+           fun s ->
+           (begin match s with
+               | [] -> k (fun () -> (absurd (#Fail ()))) []
+               | (x :: xs) -> if (c = x) then k (fun () -> x) xs else k (fun () -> (absurd (#Fail ()))) s
+           end
+           )
+   ;;
 
-let allsols = handler
-  | val x -> [x]
-  | #Decide _ k -> k true @ k false
-  | #Fail _ _ -> []
-;;
- *)
+   let allsols = handler
+     | val x -> [x]
+     | #Decide _ k -> k true @ k false
+     | #Fail _ _ -> []
+   ;;
+*)
 (********************************
-* Parser :: string list to int
-********************************)
+  * Parser :: string list to int
+  ********************************)
 
 let createNumber (prev, num) = (prev * 10) + num
 
@@ -55,36 +55,36 @@ let rec parseNum (l, v) =
 let rec toNum l = parseNum (l, 0)
 
 (********************************
-* Parser :: FAIL
-********************************)
+  * Parser :: FAIL
+  ********************************)
 
 (* | [] -> raise Fail
-| y :: ys ->
-    begin try place (x + 1) ((x, y) :: qs) with
-    | Fail -> choose ys
-    end
+   | y :: ys ->
+       begin try place (x + 1) ((x, y) :: qs) with
+       | Fail -> choose ys
+       end
 
-let digit d =
-let nums = ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] in
-let rec checkNums n =
-    begin match n with
-    | [] -> raise Fail
-    | (x :: xs) ->
-        begin try get_symbol x d with
-        | Fail -> checkNums xs
-        end
-        let (c, d2) = get_symbol x d in
-        begin match (c) with
-          | Some qs -> (c, d2)
-          | None -> checkNums xs
-        end
-    end in
-checkNums nums
-;; *)
+   let digit d =
+   let nums = ["0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9"] in
+   let rec checkNums n =
+       begin match n with
+       | [] -> raise Fail
+       | (x :: xs) ->
+           begin try get_symbol x d with
+           | Fail -> checkNums xs
+           end
+           let (c, d2) = get_symbol x d in
+           begin match (c) with
+             | Some qs -> (c, d2)
+             | None -> checkNums xs
+           end
+       end in
+   checkNums nums
+   ;; *)
 
 (********************************
-* Parser :: OPTION
-********************************)
+  * Parser :: OPTION
+  ********************************)
 
 let get_symbol c d =
   match d with
@@ -176,9 +176,9 @@ let rec expr d =
                   | (a2, b2) :: xs -> [ (a1 + a2, b2) ]))))
 
 (********************************
-* Example
-********************************)
+  * Example
+  ********************************)
 
 (* expr ["2"; "+"; "4"; "3"; "*"; "("; "3"; "+"; "3"; ")"];;
-expr ["4"; "5"; "+"];; *)
+   expr ["4"; "5"; "+"];; *)
 let parseTest () = expr [ "4"; "3"; "*"; "("; "3"; "+"; "3"; ")" ]

@@ -30,7 +30,6 @@ type n_coercion =
   | NCoerTuple of n_coercion list
 
 type variable = Variable.t
-
 type n_effect = Effect.t * (n_type * n_type)
 
 type n_pattern =
@@ -80,11 +79,8 @@ and n_handler = {
 }
 
 and n_abstraction = n_pattern * n_term
-
 and n_abstraction_with_param_ty = n_pattern * n_type * n_term
-
 and n_abstraction_2_args = n_pattern * n_pattern * n_term
-
 and n_rec_definitions = (variable, n_abstraction) Assoc.t
 
 type n_top_rec_definitions =
@@ -276,7 +272,6 @@ and free_vars_handler h =
       |> List.map free_vars_abs2 |> concat_vars)
 
 and free_vars_abs (p, c) = free_vars c --- pattern_vars p
-
 and free_vars_abs_with_ty (p, _ty, c) = free_vars_abs (p, c)
 
 and free_vars_abs2 (p1, p2, c) =

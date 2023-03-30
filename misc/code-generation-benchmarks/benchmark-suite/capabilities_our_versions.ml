@@ -256,10 +256,10 @@ let test_leaf_state m =
   in
   looper 100 0
 
-(* 
+(*
 
-# test_leaf_state 100;;
-- : int = 18792433100
+   # test_leaf_state 100;;
+   - : int = 18792433100
 *)
 
 (* leaf update *)

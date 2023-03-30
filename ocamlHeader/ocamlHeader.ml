@@ -1,5 +1,4 @@
 type empty
-
 type ('eff_arg, 'eff_res) eff_internal_effect = ..
 
 type 'a computation =
@@ -52,13 +51,9 @@ let ( ** ) =
   pow
 
 let string_length _ = assert false
-
 let to_string _ = assert false
-
 let lift_unary f x = Value (f x)
-
 let lift_binary f x = Value (fun y -> Value (f x y))
-
 let coer_refl_ty term = term
 
 let rec coer_computation coer comp =
@@ -79,9 +74,7 @@ let force_unsafe = function
 (* Manual tuple coercions, one way to do this a bit better is to use GADT and map over them *)
 
 let coer_tuple_2 (c1, c2) (a1, a2) = (c1 a1, c2 a2)
-
 let coer_tuple_3 (c1, c2, c3) (a1, a2, a3) = (c1 a1, c2 a2, c3 a3)
-
 let coer_tuple_4 (c1, c2, c3, c4) (a1, a2, a3, a4) = (c1 a1, c2 a2, c3 a3, c4 a4)
 
 let coer_tuple_5 (c1, c2, c3, c4, c5) (a1, a2, a3, a4, a5) =
@@ -90,9 +83,7 @@ let coer_tuple_5 (c1, c2, c3, c4, c5) (a1, a2, a3, a4, a5) =
 (* This should be enough *)
 
 let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
-
 let coer_handler coer1 coer2 h x = coer2 (h (coer1 x))
-
 let coer_hand_to_fun coer1 coer2 h x = coer2 (h (Value (coer1 x)))
 
 let rec coer_fun_to_hand coer1 coer2 f comp =

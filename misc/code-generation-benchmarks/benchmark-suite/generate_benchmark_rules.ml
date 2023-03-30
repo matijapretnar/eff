@@ -2,9 +2,7 @@ let names =
   [ "loop"; "queens"; "interp"; "range"; "tree"; "capability_benchmarks" ]
 
 let invalid = [] (*  ("loop", "NoOptImpure") ] *)
-
 let default_args = "--no-stdlib --compile-plain-ocaml"
-
 let modes = [ ("", "Opt") ]
 
 let benchmark_case_stanza in_filename args out_filename =

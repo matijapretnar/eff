@@ -4,7 +4,6 @@ module TyParam = TyParam.TyParam
 (** skeleton parameters *)
 module Param = Symbol.Make (Symbol.Parameter (struct
   let ascii_symbol = "skl"
-
   let utf8_symbol = "ς"
 end))
 

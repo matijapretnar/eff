@@ -2,7 +2,6 @@ module MakeEdges (Vertex : Symbol.S) = struct
   type 'a t = 'a Vertex.Map.t
 
   let empty = Vertex.Map.empty
-
   let get_edge t edges = Vertex.Map.find_opt t edges
 
   let add_edge t w edges =
@@ -25,7 +24,6 @@ struct
   type t = Edge.t Edges.t Vertex.Map.t
 
   let empty = Vertex.Map.empty
-
   let is_empty = Vertex.Map.is_empty
 
   let get_edges t graph =

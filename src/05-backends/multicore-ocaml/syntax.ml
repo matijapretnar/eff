@@ -6,9 +6,7 @@ type variable = Term.Variable.t
 (** Syntax of the core language. *)
 
 type effect = Effect.t
-
 type label = Type.Label.t
-
 type field = Type.Field.t
 
 (** Types used by MulticoreOcaml. *)
@@ -197,7 +195,6 @@ and print_def_effect (eff, (ty1, ty2)) ppf =
     (print_type ty1) (print_type ty2)
 
 and print_top_let defs ppf = print ppf "@[<hv>%t@]@." (print_let defs)
-
 and print_top_let_rec defs ppf = print ppf "@[<hv>%t@]@." (print_let_rec defs)
 
 and print_tydefs tydefs ppf =

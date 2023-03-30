@@ -4,9 +4,7 @@ open Language
 type state = (TyName.t, Type.type_data) Assoc.t
 
 val initial_state : state
-
 val extend_type_definitions : Type.type_data Type.Field.Map.t -> state -> state
-
 val infer_variant : Type.Label.t -> state -> Type.ty option * Type.ty
 
 val infer_field :

@@ -7,7 +7,6 @@ type 'a benchmark_set = {
 }
 
 let extract_value f x = OcamlHeader.run (f x)
-
 let ignore_value f x = ignore (Sys.opaque_identity (f x))
 
 type test_suite = {

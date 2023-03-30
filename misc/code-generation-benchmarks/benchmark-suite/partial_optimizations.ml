@@ -1,29 +1,19 @@
 open OcamlHeader
 
 let return x = Value x
-
 let binary_fun f x = return (fun y -> return (f x y))
-
 let plus = binary_fun ( + )
-
 let minus = binary_fun ( - )
-
 let equal = binary_fun ( = )
 
 type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect
-
 type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
-
 type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
-
 type (_, _) eff_internal_effect += Incr : (unit, unit) eff_internal_effect
 
 let get s = Call (Get, s, fun s -> Value s)
-
 let put s = Call (Put, s, fun s -> Value s)
-
 let fail s = Call (Fail, s, fun _y_52 -> Value _y_52)
-
 let incr s = Call (Incr, s, fun _y_52 -> Value _y_52)
 
 (* Generated and hand fixed coe for partially optimized versions *)

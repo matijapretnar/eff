@@ -7,15 +7,10 @@ module type Shell = sig
   type state
 
   val initialize : unit -> state
-
   val execute_file : string -> state -> state
-
   val load_file : string -> state -> state
-
   val execute_source : string -> state -> state
-
   val load_source : string -> state -> state
-
   val finalize : state -> unit
 end
 
@@ -222,8 +217,6 @@ module Make (Backend : Language.Backend.S) = struct
     Lexer.read_file parse filename |> load_cmds state
 
   and execute_source str state = Lexer.read_string parse str |> exec_cmds state
-
   and load_source str state = Lexer.read_string parse str |> load_cmds state
-
   and finalize state = Backend.finalize state.backend_state
 end

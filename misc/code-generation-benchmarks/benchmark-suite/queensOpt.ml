@@ -1,23 +1,15 @@
 open OcamlHeader
 
 type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
-
 type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
-
 type queen = int * int
-
 type rows = RowsEmpty | RowsCons of (int * rows)
-
 type solution = SolutionEmpty | SolutionPlace of (queen * solution)
-
 type solutions = SolutionsNil | SolutionsCons of (solution * solutions)
-
 type optional_solution = None | Some of solution
-
 type void = Void
 
 let _absurd_42 (_void_43 : float) = match _void_43 with _ -> assert false
-
 let absurd = _absurd_42
 
 let rec _op_44 (* @ *) _x_51 (_ys_53 : solutions) =

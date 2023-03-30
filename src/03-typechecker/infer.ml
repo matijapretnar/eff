@@ -72,7 +72,6 @@ let extend_poly_var x ty_scheme state =
   { state with variables = Term.Variable.Map.add x ty_scheme state.variables }
 
 let extend_var x ty state = extend_poly_var x (TyScheme.monotype ty) state
-
 let extend_vars vars state = Term.Variable.Map.fold extend_var vars state
 
 (* Initial type inference state: everything is empty *)

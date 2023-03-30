@@ -1,6 +1,6 @@
 (* #directory "_delimcc";;
-#load "delimcc.cma";;
-#use "delimcc.ml";; *)
+   #load "delimcc.cma";;
+   #use "delimcc.ml";; *)
 open Delimcc
 
 (***********************)
@@ -17,9 +17,7 @@ type ('a, 'w) nondet =
    See the inferred types.
 *)
 let choose p arg = Delimcc.shift0 p (fun k -> Choose (arg, k))
-
 let fail p arg = Delimcc.shift0 p (fun k -> Fail (arg, k))
-
 let cow p arg = Delimcc.shift0 p (fun k -> Cow (arg, k))
 
 type 'eff result = Done | Eff of 'eff
@@ -30,11 +28,8 @@ type 'a nondet2 =
   | Cow of 'a * ('a -> 'a nondet2 result)
 
 let choose p arg = Delimcc.shift0 p (fun k -> Eff (Choose (arg, k)))
-
 let fail p arg = Delimcc.shift0 p (fun k -> Eff (Fail (arg, k)))
-
 let cow p arg = Delimcc.shift0 p (fun k -> Eff (Cow (arg, k)))
-
 let r = Delimcc.new_prompt ()
 
 let f () =

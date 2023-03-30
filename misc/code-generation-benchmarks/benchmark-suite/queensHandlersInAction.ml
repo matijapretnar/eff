@@ -11,28 +11,20 @@
   using a more involved representation.
 *)
 (* #directory "_delimcc";;
-#load "delimcc.cma";;
-#use "delimcc.ml";; *)
+   #load "delimcc.cma";;
+   #use "delimcc.ml";; *)
 
 module type EFF = sig
   type 'a clause
-
   type ('p, 'r) op = 'p -> 'r
-
   type ('a, 'b) return_clause = 'a -> 'b
-
   type ('a, 'b) handler = 'b clause list * ('a, 'b) return_clause
 
   val new_op : unit -> ('p, 'r) op
-
   val ( |-> ) : ('p, 'r) op -> ('p -> ('r -> 'a) -> 'a) -> 'a clause
-
   val shallow : ('p, 'r) op -> ('p -> ('r -> 'a) -> 'a) -> 'a clause
-
   val local : ('p, 'r) op -> ('p -> 'r) -> 'a clause
-
   val escape : ('p, 'r) op -> ('p -> 'a) -> 'a clause
-
   val handle : (unit -> 'a) -> ('a, 'b) handler -> 'b
 
   (*  val stack_size : unit -> int *)
@@ -57,7 +49,6 @@ module Eff : EFF = struct
   }
 
   type ('a, 'b) return_clause = 'a -> 'b
-
   type ('a, 'b) handler = 'b clause list * ('a, 'b) return_clause
 
   (* the stack of effectors represents the stack of handlers *)
@@ -221,7 +212,6 @@ let available (number_of_queens, x, qs) =
 (******************************************************************************)
 
 let decide : (unit, bool) op = new_op ()
-
 let fail : (unit, 'a) op = new_op ()
 
 type 'a option = None | Some of 'a

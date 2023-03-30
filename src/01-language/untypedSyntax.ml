@@ -3,11 +3,8 @@ open Utils
 (** Syntax of the core language. *)
 
 type variable = Term.Variable.t
-
 type effect = Effect.t
-
 type label = Type.Label.t
-
 type field = Type.Field.t
 
 type pattern = plain_pattern located

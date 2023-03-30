@@ -35,7 +35,6 @@ let pp_tuple pp lst ppf =
   | lst -> print ppf "(@[<hov>%t@])" (pp_sequence ", " pp lst)
 
 let pp_label label ppf = Type.Label.print label ppf
-
 let pp_tyname ty_name ppf = Language.TyName.print ty_name ppf
 
 let pp_typaram ty_param ppf =

@@ -9,7 +9,6 @@ module ExEff = Term
 module Sub = Language.Substitution
 
 type optimization_config = { purity_aware_translation : bool }
-
 type state = { config : optimization_config }
 
 let initial_state optimization_config = { config = optimization_config }

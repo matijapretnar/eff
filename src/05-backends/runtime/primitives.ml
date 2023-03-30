@@ -3,23 +3,14 @@ open Language
 module V = Value
 
 let from_bool b = V.Const (Const.of_boolean b)
-
 let from_int n = V.Const (Const.of_integer n)
-
 let from_str s = V.Const (Const.of_string s)
-
 let from_float f = V.Const (Const.of_float f)
-
 let from_fun f = V.Closure f
-
 let value_bool b = V.Value (from_bool b)
-
 let value_int n = V.Value (from_int n)
-
 let value_str s = V.Value (from_str s)
-
 let value_float f = V.Value (from_float f)
-
 let value_fun f = V.Value (from_fun f)
 
 (** [binary_closure f] converts a function [f] that takes two values into two
@@ -149,9 +140,7 @@ let less_than v1 v2 =
   | Invalid -> Error.runtime "invalid comparison with <"
 
 let greater_than v1 v2 = less_than v2 v1
-
 let greater_than_or_equal v1 v2 = greater_than v1 v2 || equal v1 v2
-
 let less_than_or_equal v1 v2 = less_than v1 v2 || equal v1 v2
 
 let rec pow a = function

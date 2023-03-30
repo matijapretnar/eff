@@ -21,15 +21,12 @@ let triple n s =
   loop1 n []
 
 let handledTriple n s = triple n s
-
 let handleTripleWrap (x, y) = handledTriple x y
 
 (* Queens *)
 
 let null = function [] -> true | x :: xs -> false
-
 let isNothing = function None -> true | Some x -> false
-
 let fromJust = function None -> failwith "fromJust: None" | Some x -> x
 
 let rec filter p = function

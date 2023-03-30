@@ -3,13 +3,9 @@ module Type = Language.Type
 open Type
 
 let pure_arrow t1 t2 = Type.arrow (t1, pure_ty t2)
-
 let binary_op_ty t1 t2 ty = Type.arrow (t1, pure_ty (pure_arrow t2 ty))
-
 let unary_integer_op_ty = TyScheme.monotype (pure_arrow int_ty int_ty)
-
 let binary_integer_op_ty = TyScheme.monotype (binary_op_ty int_ty int_ty int_ty)
-
 let unary_float_op_ty = TyScheme.monotype (pure_arrow float_ty float_ty)
 
 let binary_float_op_ty =

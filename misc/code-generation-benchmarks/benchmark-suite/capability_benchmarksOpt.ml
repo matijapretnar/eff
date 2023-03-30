@@ -60,15 +60,10 @@ let _handleTripleWrap_723 ((_x_724, _y_725) : int * int) =
 let handleTripleWrap = _handleTripleWrap_723
 
 type queen = int * int
-
 type queen_list = Nil | Cons of (queen * queen_list)
-
 type queen_list_list = QNil | QCons of (queen_list * queen_list_list)
-
 type intlist = End | Lst of (int * intlist)
-
 type option = Some of queen_list | None
-
 type (_, _) eff_internal_effect += Select : (intlist, int) eff_internal_effect
 
 let rec _filter_727 _x_736 (_x_738 : intlist) =
@@ -133,7 +128,6 @@ let _queens_all_1085 (_number_of_queens_1086 : int) =
 let queens_all = _queens_all_1085
 
 type (_, _) eff_internal_effect += CountPut : (int, unit) eff_internal_effect
-
 type (_, _) eff_internal_effect += CountGet : (unit, int) eff_internal_effect
 
 let rec _count_1087 _x_1097 =
