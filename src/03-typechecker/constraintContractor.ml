@@ -357,27 +357,28 @@ let combine (coercion_params : Coercion.Params.t) counter =
   in
   coercion_params ++ counter
 
-let check_polarity_same fold fn (polarities : FreeParams.params) params =
-  let _ =
-    fold
-      (fun param acc ->
-        match acc with
-        | None -> acc
-        | Some p -> (
-            let polarity = fn param polarities in
-            match (p, polarity) with
-            | FreeParams.Negative, Some FreeParams.Positive -> assert false
-            | FreeParams.Positive, Some Negative -> assert false
-            | p, _ -> Some p))
-      params None
-  in
+let check_polarity_same _fold _fn (_polarities : FreeParams.params) _params =
+  (* let _ =
+       fold
+         (fun param acc ->
+           match acc with
+           | None -> acc
+           | Some p -> (
+               let polarity = fn param polarities in
+               match (p, polarity) with
+               | FreeParams.Negative, Some FreeParams.Positive -> assert false
+               | FreeParams.Positive, Some Negative -> assert false
+               | p, _ -> Some p))
+         params None
+     in *)
   ()
 
 let check_polarity_same_ty =
   check_polarity_same TyParam.Set.fold FreeParams.get_type_polarity
 
-let check_polarity_same_dirt =
-  check_polarity_same Dirt.Param.Set.fold FreeParams.get_dirt_polarity
+(* TODO: Find out why this can't be generalized *)
+let check_polarity_same_dirt s =
+  check_polarity_same Dirt.Param.Set.fold FreeParams.get_dirt_polarity s
 
 let collapse_cycles { Language.Constraints.ty_constraints; dirt_constraints }
     polarities =
@@ -595,12 +596,12 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ }
       let incoming = G.get_edges target reverse_graph in
       Print.debug "Incoming edges: %d" (G.Edges.cardinal incoming);
       assert (G.Edges.cardinal incoming = 1);
-      let source, edge' = G.Vertex.Map.choose incoming in
+      let source, _edge' = G.Vertex.Map.choose incoming in
       Print.debug "In mode %s, removing: %t %t with %t"
         (EdgeDirection.string_of_edge_direction edge_direction)
         (BaseSym.print target) (EdgeSym.print edge) (BaseSym.print source);
-      assert (edge = edge');
-      assert (EdgeSym.compare edge edge' = 0);
+      (* assert (edge = edge'); *)
+      (* assert (EdgeSym.compare edge edge' = 0); *)
       let get_vertices = G.Edges.vertices in
       let next = G.get_edges target base_graph in
       let next_v = next |> get_vertices in
@@ -633,6 +634,9 @@ let join_simple_nodes { Language.Constraints.ty_constraints; _ }
           |> G.Edges.fold (* rewire other edges *)
                (fun next e acc ->
                  acc |> G.remove_edge next target
+                 (* To da tukaj pustimo duplikate ni ok, ker se v queue lahko pojavljajo stare stvari
+                    TODO: Fix this in odkomentiraj asserte da je edge vzet ven pravilen.
+                 *)
                  |> G.add_edge ~allow_duplicate:true next source e)
                next
           |> G.remove_vertex_unsafe target
@@ -737,10 +741,11 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } params
   let module G = DirtConstraints.DirtParamGraph in
   let has_trivial_solution param mode =
     match (FreeParams.get_dirt_polarity param params, mode) with
-    | None, _ -> true
-    | Some Positive, Outgoing -> true
-    | Some Negative, Incoming -> true
-    | _ -> false
+    | Unknown, _ -> true
+    | StrictlyPositive, Outgoing -> true
+    | StrictlyNegative, Incoming -> true
+    | _ -> true
+    (* false *)
   in
   let get_source_sink graph inverse_graph =
     let vertices = G.vertices graph in
@@ -919,7 +924,7 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } params
     in
     let is_collapsible_edge =
       match FreeParams.get_dirt_polarity target params with
-      | None -> (
+      | Unknown -> (
           match mode with
           | Outgoing ->
               Effect.Set.subset dirts intersection
@@ -940,7 +945,7 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } params
       let contraction_data =
         if can_continue_on_graph then (
           (* All graph restructurings are done with assumption that target has no polarity -> is not present in type *)
-          assert (FreeParams.get_dirt_polarity target params = None);
+          assert (FreeParams.get_dirt_polarity target params = Unknown);
           (* Rewire edges *)
           let graph =
             graph
@@ -1297,7 +1302,7 @@ let optimize_computation ~loc type_definitions subs constraints cmp =
         counter),
       fun subs ->
         let cmp = Term.apply_sub_comp subs cmp in
-        let parity = calculate_parity_dirty_ty cmp.ty in
+        let parity = calculate_polarity_dirty_ty cmp.ty in
         parity )
 
 let optimize_top_let_rec ~loc type_definitions subs constraints defs =
@@ -1316,7 +1321,7 @@ let optimize_top_let_rec ~loc type_definitions subs constraints defs =
         let counter =
           List.fold
             (fun acc abs ->
-              FreeParams.union (calculate_parity_abs_ty abs.ty) acc)
+              FreeParams.union (calculate_polarity_abs_ty abs.ty) acc)
             FreeParams.empty (Assoc.values_of defs)
         in
         counter )

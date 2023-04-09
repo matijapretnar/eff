@@ -178,20 +178,18 @@ let print_dot ?(param_polarity : FreeParams.params option) c ppf =
   let additional_label_ty =
     match param_polarity with
     | None -> fun _ -> ""
-    | Some param_polarity -> (
+    | Some param_polarity ->
         fun ty ->
-          match Type.FreeParams.get_type_polarity ty param_polarity with
-          | None -> "X"
-          | Some polarity -> FreeParams.string_of_polarity polarity)
+          Type.FreeParams.get_type_polarity ty param_polarity
+          |> FreeParams.string_of_polarity
   in
   let additional_label_dirt =
     match param_polarity with
     | None -> fun _ -> ""
-    | Some param_polarity -> (
+    | Some param_polarity ->
         fun drt ->
-          match Type.FreeParams.get_dirt_polarity drt param_polarity with
-          | None -> "X"
-          | Some polarity -> FreeParams.string_of_polarity polarity)
+          Type.FreeParams.get_dirt_polarity drt param_polarity
+          |> FreeParams.string_of_polarity
   in
   Print.print ppf
     "digraph {\n\

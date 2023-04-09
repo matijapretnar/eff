@@ -94,14 +94,14 @@ module Backend : Language.Backend.S = struct
     }
 
   let process_top_let state defs =
-    let (constraints, parity), defs' =
+    let (constraints, polarity), defs' =
       List.fold_map
-        (fun (constraints, parity) (pat, _params, cnstrs, comp) ->
-          let parity =
-            Type.calculate_parity_dirty_ty comp.ty
-            |> Type.FreeParams.union parity
+        (fun (constraints, polarity) (pat, _params, cnstrs, comp) ->
+          let polarity =
+            Type.calculate_polarity_dirty_ty comp.ty
+            |> Type.FreeParams.union polarity
           in
-          ( (cnstrs :: constraints, parity),
+          ( (cnstrs :: constraints, polarity),
             ( TranslateExEff2NoEff.elab_pattern translate_exeff_config pat,
               TranslateExEff2NoEff.elab_constraints cnstrs,
               optimize_term state
@@ -112,18 +112,19 @@ module Backend : Language.Backend.S = struct
     in
     {
       state with
-      prog = (SyntaxNoEff.TopLet defs', parity, constraints) :: state.prog;
+      prog = (SyntaxNoEff.TopLet defs', polarity, constraints) :: state.prog;
     }
 
   let process_top_let_rec state defs =
     let constraints =
       defs |> Assoc.values_of |> List.map (fun (_, c, _) -> c)
     in
-    let parity =
+    let polarity =
       defs |> Assoc.values_of
       |> List.fold
-           (fun parity (_, _, abs) ->
-             Type.calculate_parity_abs_ty abs.ty |> Type.FreeParams.union parity)
+           (fun polarity (_, _, abs) ->
+             Type.calculate_polarity_abs_ty abs.ty
+             |> Type.FreeParams.union polarity)
            Type.FreeParams.empty
     in
     let defs' =
@@ -133,7 +134,7 @@ module Backend : Language.Backend.S = struct
     in
     {
       state with
-      prog = (SyntaxNoEff.TopLetRec defs', parity, constraints) :: state.prog;
+      prog = (SyntaxNoEff.TopLetRec defs', polarity, constraints) :: state.prog;
     }
 
   let load_primitive_value state x prim =
@@ -168,7 +169,7 @@ module Backend : Language.Backend.S = struct
           (TranslateNoEff2Ocaml.pp_def_effect eff'))
       (List.rev state.primitive_effects);
     List.iter
-      (fun (cmd, parity, constraints) ->
+      (fun (cmd, polarity, constraints) ->
         Format.fprintf !Config.output_formatter "%t\n"
           (TranslateNoEff2Ocaml.pp_cmd pp_state cmd);
         match constraints with
@@ -177,7 +178,7 @@ module Backend : Language.Backend.S = struct
               (fun c ->
                 Format.fprintf !Config.output_formatter
                   "(* Constraints graph:\n %t \n*)"
-                  (Language.Constraints.print_dot ~param_polarity:parity c))
+                  (Language.Constraints.print_dot ~param_polarity:polarity c))
               constraints
         | _ -> ())
       (List.rev state.prog)
