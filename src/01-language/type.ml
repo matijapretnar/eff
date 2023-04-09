@@ -324,7 +324,6 @@ let fresh_dirty_param_with_skel skel =
   make_dirty ty
 
 let fresh_ty_with_fresh_skel () = fresh_ty_param_with_skel (fresh_skel ())
-
 let fresh_dirty_with_fresh_skel () = fresh_dirty_param_with_skel (fresh_skel ())
 
 let rec fresh_ty_with_skel type_definitions skel =
@@ -432,7 +431,6 @@ module FreeParams = struct
       p2 |> adder add_positive p1.positive |> adder add_negative p1.negative
 
     let can_be_positive p params = not (S.Set.mem p params.negative)
-
     let can_be_negative p params = not (S.Set.mem p params.positive)
 
     let switch params =

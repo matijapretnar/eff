@@ -11,7 +11,6 @@ type counter = {
 type contraction_mode = Incoming | Outgoing
 
 let string_of_mode = function Incoming -> "incoming" | Outgoing -> "outgoing"
-
 let reverse_mode = function Incoming -> Outgoing | Outgoing -> Incoming
 
 type dirt_reduction_candidates = {
@@ -128,16 +127,16 @@ let recalculate_dirt_reduction_candidates
           {
             incoming =
               (if outdeg = 1 then add candidates.incoming
-              else remove candidates.incoming);
+               else remove candidates.incoming);
             outgoing =
               (if indeg = 1 then add candidates.outgoing
-              else remove candidates.outgoing);
+               else remove candidates.outgoing);
             sources =
               (if indeg = 0 then add candidates.sources
-              else remove candidates.sources);
+               else remove candidates.sources);
             sinks =
               (if outdeg = 0 then add candidates.sinks
-              else remove candidates.sinks);
+               else remove candidates.sinks);
           })
         new_candidates candidates
       |> remove_candidates visited unavailable contraction_touched;
@@ -185,9 +184,7 @@ module ReductionQueue (Node : Symbol.S) (Edge : Symbol.S) = struct
   let uid = ref 0
 
   type key = float * int
-
   type elt = (Node.t, Edge.t) reduction_candidate
-
   type e_dir = Edge.t * edge_direction
 
   module EdgeDirectionMap = Map.Make (struct
@@ -736,6 +733,7 @@ let add_empty_constraint p1 =
 
 let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } params
     _level bad contract =
+  let _ = assert false in
   let open Language.Constraints in
   let module BaseSym = Dirt.Param in
   let module G = DirtConstraints.DirtParamGraph in
@@ -755,13 +753,13 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ } params
           ( sources
             |> BaseSym.Set.union
                  (if G.get_edges v inverse_graph |> BaseSym.Map.is_empty then
-                  BaseSym.Set.singleton v
-                 else BaseSym.Set.empty),
+                    BaseSym.Set.singleton v
+                  else BaseSym.Set.empty),
             sinks
             |> BaseSym.Set.union
                  (if G.get_edges v graph |> BaseSym.Map.is_empty then
-                  BaseSym.Set.singleton v
-                 else BaseSym.Set.empty) ))
+                    BaseSym.Set.singleton v
+                  else BaseSym.Set.empty) ))
         vertices
         (BaseSym.Set.empty, BaseSym.Set.empty)
     in
@@ -1237,7 +1235,7 @@ let optimize_constraints ~loc type_definitions subs constraints
       (subs'', simple_one_constraints')
     else (subs', cycle_constraints')
   in
-  let rec runner level subs_state cons_state =
+  let rec _runner level subs_state cons_state =
     Print.debug "Contracting dirts on %d\n" level;
     Print.debug "(* Constraints graph before :\n %t \n*)"
       (Language.Constraints.print_dot ~param_polarity:(get_params subs_state)
@@ -1251,16 +1249,19 @@ let optimize_constraints ~loc type_definitions subs constraints
     Print.debug "(* Constraints graph after :\n %t \n*)"
       (Language.Constraints.print_dot cons_state');
     let cons_state' = Constraints.clean cons_state' in
-    if level >= 50 || Dirt.Param.Set.is_empty contraction_state.changed then
+    if level >= 0 || Dirt.Param.Set.is_empty contraction_state.changed then
       (subs_state', cons_state')
-    else runner (level + 1) subs_state' cons_state'
+    else _runner (level + 1) subs_state' cons_state'
   in
-  let subs', constraints = runner 0 subs' constraints in
+  let subs', constraints =
+    (subs', constraints (* _runner 0 subs' constraints *))
+  in
   Print.debug "(* Constraints graph before true :\n %t \n*)"
     (Language.Constraints.print_dot ~param_polarity:(get_params subs')
        constraints);
   let new_cons, _ =
-    join_simple_dirt_nodes constraints (get_params subs') 1 bad false
+    (Constraint.empty, 1)
+    (* join_simple_dirt_nodes constraints (get_params subs') 1 bad false *)
     (* this produces to few constraints *)
   in
   let subs', constraints =

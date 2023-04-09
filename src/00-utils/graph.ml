@@ -19,11 +19,8 @@ module MakeEdges (Vertex : Symbol.S) = struct
       edges
 
   let fold f edges acc = Vertex.Map.fold f edges acc
-
   let cardinal g = Vertex.Map.cardinal g
-
   let vertices = Vertex.Map.keys
-
   let edges = Vertex.Map.values
 end
 
@@ -59,7 +56,6 @@ struct
     Vertex.Map.fold (fun v2 _ graph -> remove_edge v v2 graph) edges graph
 
   let remove_vertex_unsafe v graph = Vertex.Map.remove v graph
-
   let fold f graph acc = Vertex.Map.fold (fun v -> Edges.fold (f v)) graph acc
 
   let vertices graph =
