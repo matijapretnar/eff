@@ -444,6 +444,20 @@ module FreeParams = struct
       | false, true -> StrictlyNegative
       | true, true -> Zero
       | false, false -> Unknown
+
+    let combine_polarity p1 p2 params =
+      params
+      |> (match get_parameter_type p1 params with
+         | StrictlyPositive -> add_positive p2
+         | StrictlyNegative -> add_negative p2
+         | Zero -> add_zero p2
+         | Unknown -> fun x -> x)
+      |>
+      match get_parameter_type p2 params with
+      | StrictlyPositive -> add_positive p1
+      | StrictlyNegative -> add_negative p1
+      | Zero -> add_zero p1
+      | Unknown -> fun x -> x
   end
 
   module TypeParams = Params (TyParam)
