@@ -22,6 +22,7 @@ module MakeEdges (Vertex : Symbol.S) = struct
   let cardinal g = Vertex.Map.cardinal g
   let vertices = Vertex.Map.keys
   let edges = Vertex.Map.values
+  let bindings = Vertex.Map.bindings
 end
 
 module Make
