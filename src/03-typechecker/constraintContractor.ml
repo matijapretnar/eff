@@ -553,7 +553,6 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
       Print.debug "Direction: %s" (string_of_mode direction);
       Print.debug "%t" (BaseSym.print source_node);
       assert (n <> 0);
-      (* assert (BaseSym.Set.is_empty params.type_params.positive); *)
       if n = 1 then
         let sink_node, edge =
           G.get_edges source_node core_graph |> BaseSym.Map.bindings |> function
@@ -587,19 +586,9 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
                  rc )))
     in
     let process_part_general
-        (*
-           Source node -edge-> sink node
-           The source node has exactly one outgoing edge
-        *)
-          ({ source_node; sink_node; graph_direction; edge } :
-            (BaseSym.t, EdgeSym.t) reduction_candidate)
-        ({
-           base_graph;
-           reversed_graph;
-           coercion_queue;
-           collected_constraints;
-           _;
-         } as state) =
+        ({ source_node; sink_node; graph_direction; edge } :
+          (BaseSym.t, EdgeSym.t) reduction_candidate)
+        ({ base_graph; reversed_graph; coercion_queue; _ } as state) =
       (*
          Imagine a local part of graph of the form:
          (source)-[edge]->(sink)
@@ -611,7 +600,6 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
          Every node with an indegree 1 is also a node with an outdegree of 1 in the reversed graph.
          This is handeled by the graph_direction parameter.
       *)
-      (* Set the correct direction *)
       Print.debug "Removing %t-[%t]->%t %s"
         (BaseSym.print source_node)
         (EdgeSym.print edge) (BaseSym.print sink_node)
@@ -651,17 +639,10 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
 
       (* Sanity check for the constraint we are contracting *)
       let connecting_edge = G.get_edges source_node base_graph in
-      Print.debug "Connecting edges number: %d"
-        (G.Edges.cardinal connecting_edge);
       assert (G.Edges.cardinal connecting_edge = 1);
       let possible_sink, _edge' = G.Vertex.Map.choose connecting_edge in
       assert (BaseSym.compare possible_sink sink_node = 0);
       assert (possible_sink = sink_node);
-
-      Print.debug "In mode %s, removing: %t replacing with %t by removal of %t"
-        (string_of_mode graph_direction)
-        (BaseSym.print source_node)
-        (BaseSym.print sink_node) (EdgeSym.print edge);
 
       let get_vertices = G.Edges.vertices in
 
@@ -674,17 +655,8 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
       let previous = G.get_edges source_node reversed_graph in
       let previous_v = previous |> get_vertices in
 
-      if can_collapse then (
+      if can_collapse then
         (* We need to rewire previous from source to sink *)
-        (* We have to recalculaculate for 4 sets:
-           incoming/outgiong from source and incoming/outgoing from target
-            + joined source/target
-        *)
-        Print.debug "Graphs before:";
-        Print.debug "Direct graph: %t"
-          (base_graph |> graph_to_constraints skel |> Constraints.print_dot);
-        Print.debug "Reversed graph: %t"
-          (reversed_graph |> graph_to_constraints skel |> Constraints.print_dot);
         let base_graph =
           base_graph
           |> G.remove_edge source_node sink_node (* remove this edge *)
@@ -708,14 +680,6 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
                previous
           |> G.remove_vertex_unsafe source_node
         in
-
-        Print.debug "In direction %s" (string_of_mode graph_direction);
-        Print.debug "Graphs after:";
-        Print.debug "Direct graph: %t"
-          (base_graph |> graph_to_constraints skel |> Constraints.print_dot);
-        Print.debug "Reversed graph: %t"
-          (reversed_graph |> graph_to_constraints skel |> Constraints.print_dot);
-
         let update_queue base_graph vertices direction queue =
           List.fold
             (fun acc potential_v ->
@@ -724,10 +688,6 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
               in
               match edges with
               | [ (sink_node, potential_e) ] ->
-                  Print.debug "Adding potential edge %t-[%t]->%t %s"
-                    (BaseSym.print potential_v)
-                    (EdgeSym.print potential_e)
-                    (BaseSym.print sink_node) (string_of_mode direction);
                   acc
                   |> Q.insert_new
                        (* If the coercion is not present, we assign it the largest value *)
@@ -760,9 +720,9 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
           reversed_graph;
           coercion_queue = queue;
           collected_constraints =
-            add_constraint sink_node source_node collected_constraints;
+            add_constraint sink_node source_node state.collected_constraints;
           free_parameters = state.free_parameters;
-        })
+        }
       else
         (* If we can't make the coercion, just remove the edge from queue *)
         { state with coercion_queue = coercion_queue |> remove_current_edge }
