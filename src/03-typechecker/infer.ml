@@ -260,10 +260,17 @@ and infer_handler state { Untyped.value_clause; effect_clauses; finally_clause }
     Constraint.full_cast_abstraction finally_clause' ty_mid dirty_out
   in
 
+  let drt_in_param = Dirt.fresh () in
+  let w = Type.DirtCoercionParam.fresh () in
   let drt_in =
-    drt_out
+    drt_in_param
     |> Dirt.add_effects (Term.handled_effects (Assoc.of_list effect_clauses'))
   in
+  let in_out_cstr =
+    Constraint.empty
+    |> Constraint.add_dirt_inequality (w, (drt_in_param, drt_out))
+  in
+
   let handler =
     Term.handlerWithFinally
       (Term.handler_clauses value_clause''
@@ -277,6 +284,7 @@ and infer_handler state { Untyped.value_clause; effect_clauses; finally_clause }
       finally_clause_cnstrs;
       value_clause_cast_cnstrs;
       finally_clause_cast_cnstrs;
+      in_out_cstr;
     ]
     @ effect_clauses_cnstrs )
 
@@ -406,6 +414,7 @@ and infer_abstraction2 state (pat1, pat2, cmp) :
 (* ************************************************************************* *)
 
 let process_computation ~loc state comp =
+  Print.debug "HER There";
   let comp', cnstrs = infer_computation state comp in
   let sub, residuals =
     Unification.solve ~loc:comp.at state.type_definitions cnstrs
@@ -415,6 +424,9 @@ let process_computation ~loc state comp =
       residuals comp'
   in
   let cmp' = Term.apply_sub_comp sub comp' in
+
+  Print.debug "Inferred type: %t" (Type.print_dirty cmp'.ty);
+  Print.debug "Full comp: %t" (Term.print_computation cmp');
   let params =
     match comp.it with
     | Language.UntypedSyntax.Value _ ->
@@ -427,6 +439,7 @@ let process_computation ~loc state comp =
   (params, cmp', residuals)
 
 let process_top_let ~loc state defs =
+  Print.debug "TOPLET";
   let fold (pat, cmp) (state', defs) =
     let pat', cnstrs_pat = infer_pattern state pat in
     let cmp', cnstrs_cmp = infer_computation state cmp in
@@ -436,13 +449,18 @@ let process_top_let ~loc state defs =
            (pat'.ty, fst cmp'.ty)
            (Constraint.union cnstrs_pat cnstrs_cmp))
     in
+    Print.debug "Inferred type: %t" (Type.print_dirty cmp'.ty);
+    Print.debug "Full comp: %t" (Term.print_computation cmp');
     let sub, constraints =
       ConstraintContractor.optimize_computation ~loc state.type_definitions sub
         constraints cmp'
     in
+    Print.debug "After optimization";
     let pat'', cmp'' =
       (Term.apply_sub_pat sub pat', Term.apply_sub_comp sub cmp')
     in
+    Print.debug "Inferred type: %t" (Type.print_dirty cmp''.ty);
+    Print.debug "Full comp: %t" (Term.print_computation cmp'');
     let vars' =
       Term.Variable.Map.map
         (Substitution.apply_sub_ty sub)

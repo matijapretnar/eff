@@ -326,6 +326,10 @@ and elab_handler state h elabfc =
                             (NoEff.NCoerRefl, NoEff.NCoerUnsafe NoEff.NCoerRefl)
                         ))
                      elabcomp) ) )
+        | PNonbinding ->
+            ( eff',
+              (elab_pattern state p1, elab_pattern state p2, NReturn elabcomp)
+            )
         | _ -> failwith __LOC__
       in
       let p, ty, c = elabvc in
