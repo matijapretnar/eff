@@ -276,7 +276,7 @@ and elab_expression' state exp =
       in
       NoEff.NCast
         ( NoEff.NVar { variable = x.variable; coercions },
-          value_coercion_from_impure_dirt empty_dirt_params exp.ty )
+          value_coercion_from_impure_dirt empty_dirt_params x.original_ty )
   | ExEff.Const c -> NoEff.NConst c
   | ExEff.Tuple vs -> NoEff.NTuple (List.map (elab_expression state) vs)
   | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty state abs)

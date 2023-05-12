@@ -58,7 +58,11 @@ type expression = (expression', Type.ty) typed
 (** Pure expressions *)
 
 and expression' =
-  | Var of { variable : variable; instantiation : Substitution.t }
+  | Var of {
+      variable : variable;
+      original_ty : Type.ty;
+      instantiation : Substitution.t;
+    }
   | Const of Const.t
   | Tuple of expression list
   | Record of expression Type.Field.Map.t
@@ -112,12 +116,16 @@ type top_rec_definitions =
   (variable, Type.Params.t * Constraints.t * abstraction) Assoc.t
 
 let mono_var x ty =
-  { term = Var { variable = x; instantiation = Substitution.empty }; ty }
-
-let poly_var x instantiation ty =
   {
-    term = Var { variable = x; instantiation };
-    ty = Substitution.apply_sub_ty instantiation ty;
+    term =
+      Var { variable = x; original_ty = ty; instantiation = Substitution.empty };
+    ty;
+  }
+
+let poly_var x instantiation original_ty =
+  {
+    term = Var { variable = x; original_ty; instantiation };
+    ty = Substitution.apply_sub_ty instantiation original_ty;
   }
 
 let fresh_variable x ty =
