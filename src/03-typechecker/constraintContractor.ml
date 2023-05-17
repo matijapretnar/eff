@@ -785,39 +785,112 @@ let add_empty_constraint p1 =
 
 let contract_source_dirt_nodes { Language.Constraints.dirt_constraints; _ }
     (params : FreeParams.params) =
-  let rec contractor graph new_constraints =
-    let open Language.Constraints in
-    let module BaseSym = Dirt.Param in
-    let module G = DirtConstraints.DirtParamGraph in
-    let can_contract node =
-      if Type.FreeParams.DirtParams.can_be_positive node params.dirt_params then
-        true
-      else false
-    in
-    let reversed = G.reverse graph in
-    let empty_incoming =
-      G.vertices reversed
-      |> BaseSym.Set.filter (fun node ->
-             G.get_edges node reversed |> BaseSym.Map.cardinal = 0
-             && can_contract node)
-      |> BaseSym.Set.elements
-    in
-    let edges =
-      List.map (fun node -> (node, G.get_edges node graph)) empty_incoming
-    in
-    let graph, new_constraints =
-      List.fold
-        (fun (graph, new_constraints) (node, edges) ->
-          assert (can_contract node);
-          ( graph |> G.remove_edges node edges |> G.remove_vertex_unsafe node,
-            new_constraints
-            |> Constraint.add_dirt_equality (Dirt.no_effect node, Dirt.empty) ))
-        (graph, new_constraints) edges
-    in
-    if List.length edges = 0 then new_constraints
-    else contractor graph new_constraints
+  let open Language.Constraints in
+  let module BaseSym = Dirt.Param in
+  let module G = DirtConstraints.DirtParamGraph in
+  let components, quotient_graph, representatives =
+    Language.Constraints.DirtConstraints.DirtParamGraph.scc_tarjan
+      dirt_constraints
   in
-  contractor dirt_constraints Constraint.empty
+  List.iter
+    (fun dl ->
+      Print.debug "Component:";
+      Print.debug "%d %t\n reps:%t" (List.length dl)
+        (Print.sequence "," BaseSym.print dl)
+        (Print.sequence "," BaseSym.print
+           (List.map (fun x -> BaseSym.Map.find x representatives) dl)))
+    components;
+  let increment v m =
+    BaseSym.Map.update v (function None -> Some 1 | Some x -> Some (x + 1)) m
+  in
+  Print.debug "Representatives: %t"
+    (BaseSym.Map.print BaseSym.print representatives);
+  let indeg = BaseSym.Map.map (fun _ -> 0) quotient_graph in
+  let indegs =
+    BaseSym.Map.fold
+      (fun source edges indeg ->
+        BaseSym.Map.fold
+          (fun sink _ indeg ->
+            if BaseSym.compare source sink = 0 then indeg
+            else (* ignore self cycles *)
+              increment sink indeg)
+          edges indeg)
+      quotient_graph indeg
+  in
+
+  let can_contract_component component =
+    List.for_all
+      (fun node ->
+        if Type.FreeParams.DirtParams.can_be_positive node params.dirt_params
+        then true
+        else false)
+      component
+  in
+  let _, new_constraints =
+    List.fold_left
+      (fun (indegs, constraints) component ->
+        Print.debug "Indeg: %t"
+          (BaseSym.Map.print (fun n ppf -> Print.print ppf "%d" n) indegs);
+        let rep =
+          match component with
+          | [] -> assert false
+          | x :: _ -> BaseSym.Map.find x representatives
+        in
+        if can_contract_component component && BaseSym.Map.find rep indegs = 0
+        then (
+          Print.debug "Contracting component of %t: %t" (BaseSym.print rep)
+            (Print.sequence "," BaseSym.print component);
+          let outgoing = BaseSym.Map.find rep quotient_graph in
+          let indegs =
+            indegs
+            |> BaseSym.Map.fold
+                 (fun sink _ indegs ->
+                   indegs
+                   |> BaseSym.Map.update sink (function
+                        | Some x -> Some (x - 1)
+                        | None -> assert false))
+                 outgoing
+          in
+          ( indegs,
+            constraints
+            |> List.fold_right
+                 (fun node ->
+                   Constraint.add_dirt_equality (Dirt.no_effect node, Dirt.empty))
+                 component ))
+        else (indegs, constraints))
+      (indegs, Constraint.empty) components
+  in
+  new_constraints
+
+let contract_unreachable_dirt_nodes { Language.Constraints.dirt_constraints; _ }
+    (params : FreeParams.params) =
+  let open Language.Constraints in
+  let module BaseSym = Dirt.Param in
+  let module G = DirtConstraints.DirtParamGraph in
+  let sources =
+    BaseSym.Set.union params.dirt_params.positive params.dirt_params.negative
+  in
+
+  let vertices = G.vertices dirt_constraints in
+
+  let rec dfs node visited =
+    if BaseSym.Set.mem node visited then visited
+    else
+      let visited = BaseSym.Set.add node visited in
+      let edges = G.get_edges node dirt_constraints in
+      G.Edges.fold
+        (fun sink _ acc ->
+          if BaseSym.Set.mem sink visited then acc else dfs sink acc)
+        edges visited
+  in
+  let visited = BaseSym.Set.fold dfs sources BaseSym.Set.empty in
+
+  let constraints =
+    BaseSym.Set.fold add_empty_constraint
+      (BaseSym.Set.diff vertices visited)
+      Constraint.empty
+  in
+  constraints
 
 type dirt_graph = Language.Constraints.DirtConstraints.DirtParamGraph.t
 
