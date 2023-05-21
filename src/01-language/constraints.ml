@@ -1,6 +1,8 @@
 open Utils
 open Type
 
+type printer = unit -> string
+
 module DirtConstraints = struct
   module DirtParamGraph =
     Graph.Make
@@ -163,17 +165,18 @@ let print_skeleton_graph additional_label (skel_param, graph) ppf : unit =
   TyConstraints.TyParamGraph.print_dot additional_label graph
     (fun ppf -> Print.print ppf "cluster_%t" (Skeleton.Param.print skel_param))
     (fun ppf ->
-      Print.print ppf "label=\"Skeleton param: %t\""
+      Print.print ppf "        label=\"Skeleton param: %t\""
         (Skeleton.Param.print skel_param))
     ppf
 
 let print_dirt_graph additional_label graph ppf : unit =
   DirtConstraints.DirtParamGraph.print_dot additional_label graph
     (fun ppf -> Print.print ppf "cluster_dirt_graph")
-    (fun ppf -> Print.print ppf "label=\"Dirt constraints\"")
+    (fun ppf -> Print.print ppf "      label=\"Dirt constraints\"")
     ppf
 
-let print_dot ?(param_polarity : FreeParams.params option) c ppf =
+let print_dot ?(param_polarity : FreeParams.params option)
+    ?(header : printer option) ?(footer : printer option) c ppf =
   let skeleton_graphs = Skeleton.Param.Map.bindings c.ty_constraints in
   let additional_label_ty =
     match param_polarity with
@@ -183,6 +186,12 @@ let print_dot ?(param_polarity : FreeParams.params option) c ppf =
           Type.FreeParams.get_type_polarity ty param_polarity
           |> FreeParams.string_of_polarity
   in
+  let header =
+    match header with
+    | None -> fun () -> "digraph {\nlabelloc=b\nrankdir=BT\n"
+    | Some h -> h
+  in
+  let footer = match footer with None -> fun () -> "}\n" | Some h -> h in
   let additional_label_dirt =
     match param_polarity with
     | None -> fun _ -> ""
@@ -192,21 +201,19 @@ let print_dot ?(param_polarity : FreeParams.params option) c ppf =
           |> FreeParams.string_of_polarity
   in
   Print.print ppf
-    "digraph {\n\
-     labelloc=b\n\
-     rankdir=BT\n\
-     //Type params\n\
-    \  subgraph cluster_skeleton {\n\n\
-    \  label=\"Type constraints\";\n\
+    "%s\n\
+    \    // Type params\n\
+    \    subgraph cluster_skeleton {\n\
+    \    label=\"Type constraints\";\n\
+     %t    }\n\
+    \    // Dirt\n\
      %t\n\
-     }\n\
-     // Dirt\n\
-    \       %t\n\
-    \ }"
+    \ %s" (header ())
     (Print.sequence "\n"
        (print_skeleton_graph (Some additional_label_ty))
        skeleton_graphs)
     (print_dirt_graph (Some additional_label_dirt) c.dirt_constraints)
+    (footer ())
 
 let print c =
   let print_dirt_constraint w drt1 drt2 ppf =

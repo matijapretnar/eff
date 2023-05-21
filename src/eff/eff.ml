@@ -41,6 +41,10 @@ let options =
       ( "--compile-plain-ocaml",
         Arg.Unit (fun () -> Config.backend := Ocaml),
         " Compile the Eff code into plain OCaml (sent to standard output)" );
+      ( "--output-dot",
+        Arg.Unit (fun () -> Config.backend := Dot),
+        " Construct and output residual graphs for toplevel terms (sent to \
+         standard output in .dot format)" );
       ("--profile", Arg.Set Config.profiling, " Print out profiling information");
       ( "--no-opts",
         Arg.Clear Config.enable_optimization,
@@ -207,6 +211,7 @@ let main =
       | Config.Runtime -> (module Runtime.Backend)
       | Config.Multicore -> (module MulticoreOCaml.Backend)
       | Config.Ocaml -> (module PlainOCaml.Backend)
+      | Config.Dot -> (module Dot.Backend)
     in
     let (module Shell) =
       (module Loader.Shell.Make (Backend) : Loader.Shell.Shell)
@@ -222,7 +227,8 @@ let main =
       if !Config.use_stdlib then
         let stdlib =
           match !Config.backend with
-          | Config.Runtime | Config.Ocaml -> Loader.Stdlib_eff.source
+          | Config.Runtime | Config.Ocaml | Config.Dot ->
+              Loader.Stdlib_eff.source
           | Config.Multicore -> MulticoreOCaml.stdlib
         in
         Shell.load_source stdlib state

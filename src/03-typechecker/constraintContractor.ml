@@ -583,7 +583,8 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
     let process_part_general
         ({ source_node; sink_node; graph_direction; edge } :
           (BaseSym.t, EdgeSym.t) reduction_candidate)
-        ({ base_graph; reversed_graph; coercion_queue; _ } as state) =
+        ({ base_graph; reversed_graph; coercion_queue; free_parameters; _ } as
+        state) =
       (*
          Imagine a local part of graph of the form:
          (source)-[edge]->(sink)
@@ -614,22 +615,40 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
         | Direct -> fun (x, y) -> (x, y)
         | Reverse -> fun (x, y) -> (y, x)
       in
-      (* Update according to the direction *)
-      let base_graph, reversed_graph = reversal (base_graph, reversed_graph) in
       (* We can't contract edges between (+)->(-) nodes *)
       (* We need to take into the account possible reversal *)
       let can_collapse =
-        let source_node', sink_node' = reversal (source_node, sink_node) in
-        FreeParams.TypeParams.can_be_positive sink_node'
-          state.free_parameters.type_params
-        || FreeParams.TypeParams.can_be_negative source_node'
-             state.free_parameters.type_params
+        match graph_direction with
+        | Direct ->
+            FreeParams.TypeParams.can_be_negative source_node
+              free_parameters.type_params
+            || G.get_edges sink_node reversed_graph |> G.Edges.cardinal = 1
+               && FreeParams.TypeParams.can_be_positive sink_node
+                    free_parameters.type_params
+        | Reverse ->
+            FreeParams.TypeParams.can_be_positive source_node
+              free_parameters.type_params
+            || G.get_edges sink_node base_graph |> G.Edges.cardinal = 1
+               && FreeParams.TypeParams.can_be_negative sink_node
+                    free_parameters.type_params
+        (* match graph_direction with
+           | Direct -> G.get_edges source_node base_graph |> G.Edges.cardinal = 1
+           | Reverse ->
+               G.get_edges sink_node reversed_graph |> G.Edges.cardinal = 1 *)
+        (* FreeParams.TypeParams.can_be_positive sink_node' params.type_params *)
       in
 
+      (* Update according to the direction *)
+      let base_graph, reversed_graph = reversal (base_graph, reversed_graph) in
       let remove_current_edge q =
         q
-        |> Q.remove_non_strict (edge, Direct)
-        |> Q.remove_non_strict (edge, Reverse)
+        |> (match graph_direction with
+           | Direct -> Q.remove_non_strict (edge, Direct)
+           | _ -> fun x -> x)
+        |>
+        match graph_direction with
+        | Reverse -> Q.remove_non_strict (edge, Reverse)
+        | _ -> fun x -> x
       in
 
       (* Sanity check for the constraint we are contracting *)
@@ -709,7 +728,6 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
           |> update_queue reversed_graph potential Reverse
           |> update_queue base_graph potential Direct
         in
-
         {
           base_graph;
           reversed_graph;
@@ -718,7 +736,7 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
             add_constraint sink_node source_node state.collected_constraints;
           free_parameters =
             {
-              state.free_parameters with
+              free_parameters with
               type_params =
                 Type.FreeParams.TypeParams.combine_polarity sink_node
                   source_node state.free_parameters.type_params;
@@ -1179,117 +1197,6 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ }
   in
   join_dirt_component add_constraint dirt_constraints Constraint.empty
 
-let calculate_lower_bound { Language.Constraints.dirt_constraints; _ }
-    allow_contraction =
-  (* Ths is a bad implementation of toposort, but it should work from now, to see, how it goes
-     (at some point cycle detection should also sort it) *)
-  let open Language.Constraints in
-  let module BaseSym = Dirt.Param in
-  let module G = DirtConstraints.DirtParamGraph in
-  (* Toposort *)
-  let components = G.scc_tarjan dirt_constraints in
-  (* First combine multinodes *)
-  let node_effects, parents, _component_parent =
-    List.fold_left
-      (fun (node_w, parents, component_parent) component ->
-        match component with
-        | top :: _ ->
-            let effects, parents =
-              List.fold
-                (fun (effects, parents) start ->
-                  (* Add parent node *)
-                  let parents = BaseSym.Map.add start top parents in
-                  let edges = G.get_edges start dirt_constraints in
-                  (* loop over all outgoing in the same cycle *)
-                  let effects =
-                    List.fold
-                      (fun effects target ->
-                        let edge_effects =
-                          edges |> G.Edges.get_edge target
-                          |> Option.default_map Effect.Set.empty snd
-                        in
-                        Effect.Set.union effects edge_effects)
-                      effects component
-                  in
-                  (effects, parents))
-                (Effect.Set.empty, parents)
-                component
-            in
-            (* add cycle effects to all nodes in this scc *)
-            ( List.fold
-                (fun acc v -> BaseSym.Map.add v effects acc)
-                node_w component,
-              parents,
-              component_parent |> BaseSym.Map.add top component )
-        | [] -> assert false)
-      (BaseSym.Map.empty, BaseSym.Map.empty, BaseSym.Map.empty)
-      components
-  in
-  (* Calculate lower bound for all nodes *)
-  let lower_bounds = BaseSym.Map.empty in
-  (* Traverse in topological sort order, and push all  *)
-  let lower_bounds =
-    List.fold_left
-      (fun lower_bounds component ->
-        let parent = List.hd component in
-        let parent = BaseSym.Map.find parent parents in
-        let component_lower_bound =
-          match BaseSym.Map.find_opt parent lower_bounds with
-          | Some lb -> lb
-          | None -> Effect.Set.empty
-        in
-        let component_lower_bound =
-          Effect.Set.union component_lower_bound
-            (BaseSym.Map.find parent node_effects)
-        in
-        let lower_bounds =
-          List.fold
-            (fun lower_bounds v ->
-              let edges = G.get_edges v dirt_constraints in
-              let lower_bounds =
-                BaseSym.Map.fold
-                  (fun target (_, eff) lower_bounds ->
-                    let pushed = Effect.Set.union eff component_lower_bound in
-                    let target_parent = BaseSym.Map.find target parents in
-                    let lower_bounds =
-                      BaseSym.Map.update target_parent
-                        (function
-                          | None -> Some pushed
-                          | Some existing ->
-                              Some (Effect.Set.union existing pushed))
-                        lower_bounds
-                    in
-                    lower_bounds)
-                  edges lower_bounds
-              in
-              lower_bounds)
-            lower_bounds component
-        in
-        lower_bounds)
-      lower_bounds components
-  in
-  let constraints, change =
-    G.fold
-      (fun source target ((_, drt_set) as e) ((cons, _) as acc) ->
-        let target_parent = BaseSym.Map.find target parents in
-        let source_parent = BaseSym.Map.find source parents in
-        if BaseSym.compare source target_parent = 0 then acc
-        else if
-          Effect.Set.subset drt_set
-            (Option.value
-               (BaseSym.Map.find_opt source_parent lower_bounds)
-               ~default:Effect.Set.empty)
-          && allow_contraction e
-        then
-          ( Constraint.add_dirt_equality
-              (Dirt.no_effect source, Dirt.no_effect target)
-              cons,
-            true )
-        else acc)
-      dirt_constraints (Constraint.empty, false)
-  in
-  (constraints, change)
-
 let contract_constraints () = ()
 
 let rec score_expression e =
@@ -1414,12 +1321,10 @@ let optimize_constraints ~loc type_definitions subs constraints
   let subs, constraints =
     Unification.unify ~loc type_definitions (subs, constraints, Constraint.empty)
   in
-
   (* Optimize possible empty dirts  *)
   let new_constraints =
     contract_source_dirt_nodes constraints (get_params subs)
   in
-
   let subs, constraints =
     Unification.unify ~loc type_definitions (subs, constraints, new_constraints)
   in
@@ -1441,7 +1346,6 @@ let optimize_constraints ~loc type_definitions subs constraints
   let subs, constraints =
     Unification.unify ~loc type_definitions (subs, constraints, new_constraints)
   in
-
   (subs, constraints)
 
 let optimize_computation ~loc type_definitions subs constraints cmp =
