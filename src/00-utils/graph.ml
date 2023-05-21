@@ -90,15 +90,16 @@ struct
   let scc_tarjan graph =
     let rec strong_connect (v_index, v_lowlink, stack, on_stack, index) v =
       let v_index =
-        Vertex.Map.update v
-          (function None -> Some index | Some _ -> assert false)
-          v_index
+        v_index
+        |> Vertex.Map.update v (function
+             | None -> Some index
+             | Some _ -> assert false)
       in
-      let v_lowlink = Vertex.Map.add v index v_lowlink in
+      let v_lowlink = v_lowlink |> Vertex.Map.add v index in
 
       let index = index + 1 in
-      let on_stack = on_stack |> Vertex.Set.add v in
       let stack = v :: stack in
+      let on_stack = on_stack |> Vertex.Set.add v in
       (* Loop over all successors *)
       let v_index, v_lowlink, stack, on_stack, index, components =
         Edges.fold
@@ -109,22 +110,20 @@ struct
               in
               let components = components' @ components in
               let v_lowlink =
-                Vertex.Map.update to_
-                  (function
-                    | None -> assert false
-                    | Some lowlink ->
-                        Some (min lowlink (Vertex.Map.find v v_lowlink)))
-                  v_lowlink
+                v_lowlink
+                |> Vertex.Map.update v (function
+                     | None -> assert false
+                     | Some lowlink ->
+                         Some (min lowlink (Vertex.Map.find to_ v_lowlink)))
               in
               (v_index, v_lowlink, stack, on_stack, index, components)
             else if Vertex.Set.mem to_ on_stack then
               let v_lowlink =
-                Vertex.Map.update to_
-                  (function
-                    | None -> assert false
-                    | Some lowlink ->
-                        Some (min lowlink (Vertex.Map.find v v_lowlink)))
-                  v_lowlink
+                v_lowlink
+                |> Vertex.Map.update v (function
+                     | None -> assert false
+                     | Some lowlink ->
+                         Some (min lowlink (v_index |> Vertex.Map.find to_)))
               in
               (v_index, v_lowlink, stack, on_stack, index, components)
             else (v_index, v_lowlink, stack, on_stack, index, components))
@@ -154,6 +153,7 @@ struct
     let v_index = Vertex.Map.empty in
     let v_lowlink = v_index in
     let on_stack = Vertex.Set.empty in
+    let index = 0 in
     let _, _, stack, on_stack, index, components =
       Vertex.Set.fold
         (fun v ((v_index, v_lowlink, stack, on_stack, index, components) as acc) ->
@@ -170,7 +170,7 @@ struct
                 components' @ components )
           | Some _ -> acc)
         (vertices graph)
-        (v_index, v_lowlink, [], on_stack, 0, [])
+        (v_index, v_lowlink, [], on_stack, index, [])
     in
     assert (stack = []);
     assert (Vertex.Set.is_empty on_stack);
@@ -178,7 +178,51 @@ struct
     assert (
       components |> List.map List.length |> List.fold ( + ) 0
       = (graph |> vertices |> Vertex.Set.cardinal));
-    components
+    let (quotient_graph, representative)
+          : Edge.t list Vertex.Map.t Vertex.Map.t * Vertex.t Vertex.Map.t =
+      List.fold_right
+        (fun component (quotient_graph, representative) ->
+          let representative =
+            representative
+            |> Vertex.Map.add_seq
+                 (match component with
+                 | [] -> assert false
+                 | top :: _ ->
+                     List.map (fun v -> (v, top)) component |> List.to_seq)
+          in
+          let quotient_graph =
+            List.fold_left
+              (fun quotient_graph v ->
+                let rep = Vertex.Map.find v representative in
+                let quotient_graph =
+                  if not (Vertex.Map.mem rep quotient_graph) then
+                    quotient_graph |> Vertex.Map.add rep Vertex.Map.empty
+                  else quotient_graph
+                in
+                let outgoing = get_edges v graph in
+                let quotient_graph =
+                  Edges.fold
+                    (fun v' e quotient_graph ->
+                      (* We use reverse topological orderd, so this should always be defined  *)
+                      let rep' = Vertex.Map.find v' representative in
+                      let edges = Vertex.Map.find rep quotient_graph in
+                      let edges =
+                        edges
+                        |> Vertex.Map.update rep' (function
+                             | None -> Some [ e ]
+                             | Some es -> Some (e :: es))
+                      in
+                      quotient_graph |> Vertex.Map.add rep edges)
+                    outgoing quotient_graph
+                in
+                quotient_graph)
+              quotient_graph component
+          in
+
+          (quotient_graph, representative))
+        components (Vertex.Map.empty, empty)
+    in
+    (components, quotient_graph, representative)
 
   let scc graph =
     let reversed = reverse graph in
@@ -233,10 +277,11 @@ struct
   let print_node additonal_label node ppf =
     let vertex = Vertex.print node in
     let additional_label = additonal_label node in
-    Print.print ppf "node_%t[label=\"%t%s\"];" vertex vertex additional_label
+    Print.print ppf "      node_%t[label=\"%t%s\"];" vertex vertex
+      additional_label
 
   let print_edge (v1, edge, v2) ppf =
-    Print.print ppf "@[<h>node_%t -> node_%t [label=\"%t\"]@]" (Vertex.print v1)
+    Print.print ppf "      node_%t -> node_%t [label=\"%t\"]" (Vertex.print v1)
       (Vertex.print v2) (Edge.print edge)
 
   let print_node_component cluster_name additional_label (ind, cmp) ppf =
@@ -246,7 +291,7 @@ struct
       Print.print ppf
         "subgraph cluster_%t_%d {label=\"\"; graph[style=dotted]; \n %t \n}"
         cluster_name ind
-        (Print.sequence "\n"
+        (Print.sequence "//--k\n"
            (print_node additional_label)
            (Vertex.Set.elements cmp))
 
@@ -262,7 +307,8 @@ struct
         graph (Vertex.Set.empty, [])
     in
     let components = scc graph in
-    Print.print ppf "subgraph %t{\n%t\n//nodes\n%t\n\n//edges\n%t\n\n}\n"
+    Print.print ppf
+      "    subgraph %t {\n%t\n      // nodes\n%t\n      // edges\n%t\n      }\n"
       cluster_name header
       (Print.sequence "\n"
          (print_node_component cluster_name additional_label)
