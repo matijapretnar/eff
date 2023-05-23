@@ -728,23 +728,25 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
           |> update_queue reversed_graph potential Reverse
           |> update_queue base_graph potential Direct
         in
-        {
-          base_graph;
-          reversed_graph;
-          coercion_queue = queue;
-          collected_constraints =
-            add_constraint sink_node source_node state.collected_constraints;
-          free_parameters =
-            {
-              free_parameters with
-              type_params =
-                Type.FreeParams.TypeParams.combine_polarity sink_node
-                  source_node state.free_parameters.type_params;
-            };
-        }
+        ( {
+            base_graph;
+            reversed_graph;
+            coercion_queue = queue;
+            collected_constraints =
+              add_constraint sink_node source_node state.collected_constraints;
+            free_parameters =
+              {
+                free_parameters with
+                type_params =
+                  Type.FreeParams.TypeParams.combine_polarity sink_node
+                    source_node state.free_parameters.type_params;
+              };
+          },
+          can_collapse )
       else
         (* If we can't make the coercion, just remove the edge from queue *)
-        { state with coercion_queue = coercion_queue |> remove_current_edge }
+        ( { state with coercion_queue = coercion_queue |> remove_current_edge },
+          can_collapse )
     in
     let rec process (graph, reverse_graph) (queue : Q.t) params visited
         (constr : Constraint.t) =
@@ -761,7 +763,6 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
       in
       match find_next queue with
       | Some (m, queue) ->
-          let visited = EdgeSym.Set.add m.edge visited in
           let processing_state =
             {
               base_graph = graph;
@@ -771,7 +772,10 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
               collected_constraints = constr;
             }
           in
-          let state = process_part_general m processing_state in
+          let state, collapsed = process_part_general m processing_state in
+          let visited =
+            if collapsed then EdgeSym.Set.add m.edge visited else visited
+          in
           process
             (state.base_graph, state.reversed_graph)
             state.coercion_queue state.free_parameters visited
