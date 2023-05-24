@@ -1,0 +1,10 @@
+type 'a wrapped =
+| Wrapper of 'a
+
+effect Op : (unit -> unit) wrapped
+
+;;
+
+let wrapped_t = perform Op in
+match wrapped_t with
+| Wrapper t -> t ()

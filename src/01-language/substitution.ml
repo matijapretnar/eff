@@ -85,15 +85,18 @@ and apply_sub_ty' sub ty : ty =
 and apply_sub_dirty_ty sub (ty, drt) =
   (apply_sub_ty sub ty, apply_sub_dirt sub drt)
 
-and apply_sub_abs_ty sub (ty, drty) =
+let apply_sub_eff_ty sub (ty1, ty2) =
+  (apply_sub_ty sub ty1, apply_sub_ty sub ty2)
+
+let apply_sub_abs_ty sub (ty, drty) =
   (apply_sub_ty sub ty, apply_sub_dirty_ty sub drty)
 
-and apply_sub_abs2_ty sub (ty1, ty2, drty) =
+let apply_sub_abs2_ty sub (ty1, ty2, drty) =
   (apply_sub_ty sub ty1, apply_sub_ty sub ty2, apply_sub_dirty_ty sub drty)
 
-and apply_sub_ct_ty sub (ty1, ty2) = (apply_sub_ty sub ty1, apply_sub_ty sub ty2)
+let apply_sub_ct_ty sub (ty1, ty2) = (apply_sub_ty sub ty1, apply_sub_ty sub ty2)
 
-and apply_sub_ct_dirt sub (drt1, drt2) =
+let apply_sub_ct_dirt sub (drt1, drt2) =
   (apply_sub_dirt sub drt1, apply_sub_dirt sub drt2)
 
 let rec apply_sub_tycoer sub ty_coer =
