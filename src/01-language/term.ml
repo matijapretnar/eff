@@ -387,6 +387,9 @@ and print_let_rec_abstraction (f, abs) ppf =
     (Type.print_ty (Type.arrow abs.ty))
     (print_let_abstraction abs)
 
+let apply_sub_effect sub effect =
+  { term = effect.term; ty = Substitution.apply_sub_eff_ty sub effect.ty }
+
 let rec apply_sub_comp sub computation =
   {
     term = apply_sub_comp' sub computation.term;
@@ -404,7 +407,10 @@ and apply_sub_comp' sub computation =
   | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
   | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
   | Call (effect, e1, abs) ->
-      Call (effect, apply_sub_exp sub e1, apply_sub_abs sub abs)
+      Call
+        ( apply_sub_effect sub effect,
+          apply_sub_exp sub e1,
+          apply_sub_abs sub abs )
   | Bind (c1, a1) -> Bind (apply_sub_comp sub c1, apply_sub_abs sub a1)
   | CastComp (c1, dc1) ->
       CastComp (apply_sub_comp sub c1, Substitution.apply_sub_dirtycoer sub dc1)

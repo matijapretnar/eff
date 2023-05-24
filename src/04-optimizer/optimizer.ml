@@ -121,18 +121,20 @@ let recast_computation hnd comp =
   | _ -> None
 
 let rec optimize_expression state exp =
+  (* Print.debug "Optimizing expression: %t" (Term.print_expression exp); *)
   let exp' = optimize_expression' state exp in
-  (* if exp' <> exp'' then
-     Print.debug "%t ~> %t"
-       (Term.print_expression exp')
-       (Term.print_expression exp''); *)
+  (* if exp <> exp' then
+       Print.debug "Subterms optimized to: %t" (Term.print_expression exp')
+     else Print.debug "No subterms optimized"; *)
   assert (Type.equal_ty exp.ty exp'.ty);
   let exp'' = reduce_expression state exp' in
   (* if exp' <> exp'' then
-     Print.debug "%t ~> %t"
-       (Term.print_expression exp')
-       (Term.print_expression exp''); *)
+       Print.debug "Reduced to: %t" (Term.print_expression exp'')
+     else Print.debug "No reductions"; *)
   assert (Type.equal_ty exp'.ty exp''.ty);
+  (* Print.debug "Done optimizing expression: %t ~> %t"
+     (Term.print_expression exp)
+     (Term.print_expression exp''); *)
   exp''
 
 and optimize_expression' state exp =
@@ -153,18 +155,20 @@ and optimize_expression' state exp =
       Term.castExp (optimize_expression state exp, coer)
 
 and optimize_computation state cmp =
+  (* Print.debug "Optimizing computation: %t" (Term.print_computation cmp); *)
   let cmp' = optimize_computation' state cmp in
   (* if cmp <> cmp' then
-     Print.debug "%t ~> %t"
-       (Term.print_computation cmp)
-       (Term.print_computation cmp'); *)
+       Print.debug "Subterms optimized to: %t" (Term.print_computation cmp')
+     else Print.debug "No subterms optimized"; *)
   assert (Type.equal_dirty cmp.ty cmp'.ty);
   let cmp'' = reduce_computation state cmp' in
   (* if cmp' <> cmp'' then
-     Print.debug "%t ~> %t"
-       (Term.print_computation cmp')
-       (Term.print_computation cmp''); *)
+       Print.debug "Reduced to: %t" (Term.print_computation cmp'')
+     else Print.debug "No reductions"; *)
   assert (Type.equal_dirty cmp'.ty cmp''.ty);
+  (* Print.debug "Done optimizing computation: %t ~> %t"
+     (Term.print_computation cmp)
+     (Term.print_computation cmp''); *)
   cmp''
 
 and optimize_computation' state cmp =
