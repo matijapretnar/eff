@@ -95,8 +95,8 @@ let options =
       ("-V", Arg.Set_int Config.verbosity, "<n> Set printing verbosity to <n>");
       ( "-g",
         Arg.Set Config.print_graph,
-        "<n> Enable constraint graph printing <n>" );
-      ( "-gc",
+        " Enable constraint graph printing" );
+      ( "--no-simplify",
         Arg.Unit
           (fun () ->
             Config.garbage_collect :=
@@ -112,7 +112,7 @@ let options =
                     contract_simple_nodes = false;
                   };
               }),
-        "<n> Disable minimization of constraints <n>" );
+        " Disable simplification of coercions" );
     ]
 
 (* Treat anonymous arguments as files to be run. *)
