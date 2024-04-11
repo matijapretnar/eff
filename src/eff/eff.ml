@@ -93,9 +93,6 @@ let options =
         Arg.String (fun str -> enqueue_file (Load str)),
         "<file> Load <file> into the initial environment" );
       ("-V", Arg.Set_int Config.verbosity, "<n> Set printing verbosity to <n>");
-      ( "-g",
-        Arg.Set Config.print_graph,
-        " Enable constraint graph printing" );
       ( "--no-simplify",
         Arg.Unit
           (fun () ->

@@ -15,7 +15,6 @@ let output_formatter = ref Format.std_formatter
 let error_formatter = ref Format.err_formatter
 let enable_optimization = ref true
 let profiling = ref false
-let print_graph = ref false
 
 type type_contraction = { contract_cycles : bool; contract_simple_nodes : bool }
 

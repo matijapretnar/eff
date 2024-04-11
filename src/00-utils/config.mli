@@ -36,8 +36,6 @@ val error_formatter : Format.formatter ref
 val enable_optimization : bool ref
 (** Should compiled computations be optimized? *)
 
-val print_graph : bool ref
-
 type type_contraction = { contract_cycles : bool; contract_simple_nodes : bool }
 
 type dirt_contraction = {
