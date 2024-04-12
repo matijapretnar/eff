@@ -25,14 +25,14 @@ let print ?(at_level = min_int) ?(max_level = max_int) ppf =
 
 let sequence sep pp vs ppf =
   let i = String.length sep - 1 in
-  let space = i != -1 && sep.[i] = ' ' in
-  let sep = if space then String.sub sep 0 i else sep in
+  let sep_ends_with_space = sep <> "" && sep.[i] = ' ' in
+  let sep = if sep_ends_with_space then String.sub sep 0 i else sep in
   let rec aux vs ppf =
     match vs with
     | [] -> ()
     | [ v ] -> pp v ppf
-    | v :: vs when space -> Format.fprintf ppf "%t%s@ %t" (pp v) sep (aux vs)
-    | v :: vs -> Format.fprintf ppf "%t%s@ %t" (pp v) sep (aux vs)
+    | v :: vs when sep_ends_with_space -> Format.fprintf ppf "%t%s@ %t" (pp v) sep (aux vs)
+    | v :: vs -> Format.fprintf ppf "%t%s@,%t" (pp v) sep (aux vs)
   in
   aux vs ppf
 
