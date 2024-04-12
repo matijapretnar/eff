@@ -15,23 +15,7 @@ let output_formatter = ref Format.std_formatter
 let error_formatter = ref Format.err_formatter
 let enable_optimization = ref true
 let profiling = ref false
-
-type type_contraction = { contract_cycles : bool; contract_simple_nodes : bool }
-
-type dirt_contraction = {
-  contract_cycles : bool;
-  contract_source_nodes : bool;
-  contract_same_dirt_cycles : bool;
-  contract_sink_nodes : bool;
-  contract_simple_nodes : bool;
-}
-
-type constraint_contraction_config = {
-  type_contraction : type_contraction;
-  dirt_contraction : dirt_contraction;
-}
-
-let garbage_collect = ref true
+let simplify_coercions = ref true
 let optimization_fuel = ref 5
 
 type 'a optimizator_base_config = {

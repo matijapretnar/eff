@@ -94,7 +94,7 @@ let options =
         "<file> Load <file> into the initial environment" );
       ("-V", Arg.Set_int Config.verbosity, "<n> Set printing verbosity to <n>");
       ( "--no-simplify",
-        Arg.Clear Config.garbage_collect,
+        Arg.Clear Config.simplify_coercions,
         " Disable simplification of coercions" );
     ]
 
