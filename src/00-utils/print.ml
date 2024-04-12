@@ -31,7 +31,8 @@ let sequence sep pp vs ppf =
     match vs with
     | [] -> ()
     | [ v ] -> pp v ppf
-    | v :: vs when sep_ends_with_space -> Format.fprintf ppf "%t%s@ %t" (pp v) sep (aux vs)
+    | v :: vs when sep_ends_with_space ->
+        Format.fprintf ppf "%t%s@ %t" (pp v) sep (aux vs)
     | v :: vs -> Format.fprintf ppf "%t%s@,%t" (pp v) sep (aux vs)
   in
   aux vs ppf

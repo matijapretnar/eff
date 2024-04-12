@@ -87,9 +87,7 @@ module Make (Backend : Language.Backend.S) = struct
     match cmd with
     | Commands.Term t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
-        let c' =
-          TypeSystem.process_computation ~loc state.type_system_state c
-        in
+        let c' = TypeSystem.process_computation state.type_system_state c in
         let c'' = Optimizer.process_computation state.optimizer_state c' in
         let backend_state' =
           Backend.process_computation state.backend_state c''
@@ -98,7 +96,7 @@ module Make (Backend : Language.Backend.S) = struct
     | Commands.TypeOf t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let top_comp =
-          TypeSystem.process_computation ~loc state.type_system_state c
+          TypeSystem.process_computation state.type_system_state c
         in
         let top_comp' =
           Optimizer.process_computation state.optimizer_state top_comp

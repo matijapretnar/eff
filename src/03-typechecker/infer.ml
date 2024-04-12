@@ -413,7 +413,7 @@ and infer_abstraction2 state (pat1, pat2, cmp) :
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
-let process_computation ~loc state comp =
+let process_computation state comp =
   Print.debug "HER There";
   let comp', cnstrs = infer_computation state comp in
   let sub, residuals =
@@ -421,8 +421,8 @@ let process_computation ~loc state comp =
   in
   let sub, residuals =
     if !Config.simplify_coercions then
-      ConstraintContractor.optimize_computation ~loc state.type_definitions sub
-        residuals comp'
+      ConstraintContractor.optimize_computation ~loc:comp.at
+        state.type_definitions sub residuals comp'
     else (sub, residuals)
   in
   let cmp' = Term.apply_sub_comp sub comp' in
