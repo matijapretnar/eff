@@ -25,7 +25,7 @@ let print ?(at_level = min_int) ?(max_level = max_int) ppf =
 
 let sequence sep pp vs ppf =
   let i = String.length sep - 1 in
-  let space = sep.[i] = ' ' in
+  let space = i != -1 && sep.[i] = ' ' in
   let sep = if space then String.sub sep 0 i else sep in
   let rec aux vs ppf =
     match vs with

@@ -420,8 +420,10 @@ let process_computation ~loc state comp =
     Unification.solve ~loc:comp.at state.type_definitions cnstrs
   in
   let sub, residuals =
-    ConstraintContractor.optimize_computation ~loc state.type_definitions sub
-      residuals comp'
+    if !Config.garbage_collect then
+      ConstraintContractor.optimize_computation ~loc state.type_definitions sub
+        residuals comp'
+    else (sub, residuals)
   in
   let cmp' = Term.apply_sub_comp sub comp' in
 
@@ -452,8 +454,10 @@ let process_top_let ~loc state defs =
     Print.debug "Inferred type: %t" (Type.print_dirty cmp'.ty);
     Print.debug "Full comp: %t" (Term.print_computation cmp');
     let sub, constraints =
-      ConstraintContractor.optimize_computation ~loc state.type_definitions sub
-        constraints cmp'
+      if !Config.garbage_collect then
+        ConstraintContractor.optimize_computation ~loc state.type_definitions
+          sub constraints cmp'
+      else (sub, constraints)
     in
     Print.debug "After optimization";
     let pat'', cmp'' =
@@ -494,8 +498,10 @@ let process_top_let_rec ~loc state un_defs =
   let defs', cnstrs = infer_rec_definitions state (Assoc.to_list un_defs) in
   let sub, constraints = Unification.solve state.type_definitions ~loc cnstrs in
   let sub, constraints =
-    ConstraintContractor.optimize_top_let_rec ~loc state.type_definitions sub
-      constraints defs'
+    if !Config.garbage_collect then
+      ConstraintContractor.optimize_top_let_rec ~loc state.type_definitions sub
+        constraints defs'
+    else (sub, constraints)
   in
   let defs = Assoc.map (Term.apply_substitutions_to_abstraction sub) defs' in
   let defs_params = Term.free_params_definitions defs in
@@ -522,6 +528,8 @@ let process_top_let_rec ~loc state un_defs =
   let defs'' =
     List.map
       (fun (f, (params, constraints, abs)) ->
+        Print.debug "Inferred type: %t for %t" (Type.print_abs_ty abs.ty)
+          (Term.print_abstraction abs);
         (f, (params, constraints, Term.subst_abs subst abs)))
       defs'
   in
