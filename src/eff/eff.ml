@@ -94,21 +94,7 @@ let options =
         "<file> Load <file> into the initial environment" );
       ("-V", Arg.Set_int Config.verbosity, "<n> Set printing verbosity to <n>");
       ( "--no-simplify",
-        Arg.Unit
-          (fun () ->
-            Config.garbage_collect :=
-              {
-                type_contraction =
-                  { contract_cycles = false; contract_simple_nodes = false };
-                dirt_contraction =
-                  {
-                    contract_cycles = false;
-                    contract_same_dirt_cycles = false;
-                    contract_source_nodes = false;
-                    contract_sink_nodes = false;
-                    contract_simple_nodes = false;
-                  };
-              }),
+        Arg.Clear Config.garbage_collect,
         " Disable simplification of coercions" );
     ]
 

@@ -31,21 +31,7 @@ type constraint_contraction_config = {
   dirt_contraction : dirt_contraction;
 }
 
-let garbage_collect =
-  ref
-    {
-      type_contraction =
-        { contract_cycles = true; contract_simple_nodes = true };
-      dirt_contraction =
-        {
-          contract_cycles = true;
-          contract_same_dirt_cycles = true;
-          contract_source_nodes = true;
-          contract_sink_nodes = true;
-          contract_simple_nodes = true;
-        };
-    }
-
+let garbage_collect = ref true
 let optimization_fuel = ref 5
 
 type 'a optimizator_base_config = {

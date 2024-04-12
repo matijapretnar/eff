@@ -51,7 +51,7 @@ type constraint_contraction_config = {
   dirt_contraction : dirt_contraction;
 }
 
-val garbage_collect : constraint_contraction_config ref
+val garbage_collect : bool ref
 
 val profiling : bool ref
 (** Should profiling be enabled? *)

@@ -3,6 +3,15 @@ open Language
 open Type
 open Coercion
 
+(*
+Configuration for partial optimizations   
+*)
+
+let optimize_type_params = true
+let optimize_type_params_full = false
+let optimize_dirt_params = true
+let optimize_dirt_params_full = false
+
 type counter = {
   type_coercions : float TyCoercionParam.Map.t;
   dirt_coercions : float DirtCoercionParam.Map.t;
@@ -386,7 +395,7 @@ let check_polarity_same_ty a =
 let check_polarity_same_dirt s =
   check_polarity_same Dirt.Param.Set.fold FreeParams.get_dirt_polarity s
 
-let collapse_cycles { Language.Constraints.ty_constraints; dirt_constraints }
+let collapse_type_cycles { Language.Constraints.ty_constraints; _ }
     (initial_polarities : FreeParams.params) : Constraint.t * FreeParams.params
     =
   let open Language.Constraints in
@@ -428,71 +437,73 @@ let collapse_cycles { Language.Constraints.ty_constraints; dirt_constraints }
   in
 
   let ty_constraints, polarities =
-    if !Config.garbage_collect.type_contraction.contract_cycles then
-      Skeleton.Param.Map.fold garbage_collect_skeleton_component ty_constraints
-        (Constraint.empty, initial_polarities)
-    else (Constraint.empty, initial_polarities)
+    Skeleton.Param.Map.fold garbage_collect_skeleton_component ty_constraints
+      (Constraint.empty, initial_polarities)
   in
-  (* TODO: Dirt polarities are not yet updated *)
+  (ty_constraints, polarities)
+
+let collapse_dirt_cycles { Language.Constraints.dirt_constraints; _ }
+    (polarities : FreeParams.params) =
+  (* Beware, dirt polarities are not updated on the fly *)
   (* Dirt constraints *)
-  if !Config.garbage_collect.dirt_contraction.contract_cycles then
-    let components = DirtConstraints.DirtParamGraph.scc dirt_constraints in
-    let ty_constraints =
-      List.fold_left
-        (fun ty_constraints component ->
-          let edge_labels =
+  let open Language.Constraints in
+  let components = DirtConstraints.DirtParamGraph.scc dirt_constraints in
+  let ty_constraints =
+    List.fold_left
+      (fun ty_constraints component ->
+        let edge_labels =
+          Dirt.Param.Set.fold
+            (fun v acc ->
+              let outgoing =
+                DirtConstraints.DirtParamGraph.get_edges v dirt_constraints
+              in
+              let outgoing_in_component =
+                outgoing
+                |> Dirt.Param.Map.filter (fun k _ ->
+                       Dirt.Param.Set.mem k component)
+              in
+              let dirts =
+                outgoing_in_component |> Dirt.Param.Map.values |> List.map snd
+              in
+              dirts :: acc)
+            component []
+          |> List.flatten
+        in
+        let should_contract =
+          Dirt.Param.Set.cardinal component > 1
+          &&
+          match edge_labels with
+          | [] -> assert false
+          | x :: _ ->
+              Effect.Set.is_empty x
+              && List.for_all (fun y -> Effect.Set.equal x y) edge_labels
+        in
+        if should_contract then
+          (* Pick one and set all other to equal it *)
+          let representative = Dirt.Param.Set.choose component in
+          let ty_constraints =
             Dirt.Param.Set.fold
               (fun v acc ->
-                let outgoing =
-                  DirtConstraints.DirtParamGraph.get_edges v dirt_constraints
-                in
-                let outgoing_in_component =
-                  outgoing
-                  |> Dirt.Param.Map.filter (fun k _ ->
-                         Dirt.Param.Set.mem k component)
-                in
-                let dirts =
-                  outgoing_in_component |> Dirt.Param.Map.values |> List.map snd
-                in
-                dirts :: acc)
-              component []
-            |> List.flatten
+                if Dirt.Param.compare v representative != 0 then
+                  Constraint.add_dirt_equality
+                    (Dirt.no_effect v, Dirt.no_effect representative)
+                    acc
+                else acc)
+              component ty_constraints
           in
-          let should_contract =
-            Dirt.Param.Set.cardinal component > 1
-            &&
-            match edge_labels with
-            | [] -> assert false
-            | x :: _ ->
-                Effect.Set.is_empty x
-                && List.for_all (fun y -> Effect.Set.equal x y) edge_labels
-          in
-          if should_contract then
-            (* Pick one and set all other to equal it *)
-            let representative = Dirt.Param.Set.choose component in
-            let ty_constraints =
-              Dirt.Param.Set.fold
-                (fun v acc ->
-                  if Dirt.Param.compare v representative != 0 then
-                    Constraint.add_dirt_equality
-                      (Dirt.no_effect v, Dirt.no_effect representative)
-                      acc
-                  else acc)
-                component ty_constraints
-            in
-            ty_constraints
-          else ty_constraints)
-        ty_constraints components
-    in
-    (ty_constraints, polarities)
-  else (ty_constraints, polarities)
+          ty_constraints
+        else ty_constraints)
+      Constraint.empty components
+  in
+  (ty_constraints, polarities)
 
 let graph_to_constraints skel_param graph =
   let open Language.Constraints in
   let module BaseSym = TyParam in
   let module EdgeSym = TyCoercionParam in
   let module G = TyConstraints.TyParamGraph in
-  G.fold (add_ty_constraint skel_param) graph empty
+  let g = G.fold (add_ty_constraint skel_param) graph empty in
+  g
 
 type graph = Language.Constraints.TyConstraints.TyParamGraph.t
 
@@ -637,7 +648,9 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
                G.get_edges sink_node reversed_graph |> G.Edges.cardinal = 1 *)
         (* FreeParams.TypeParams.can_be_positive sink_node' params.type_params *)
       in
-
+      Print.debug "Can collapse: %b" can_collapse;
+      Print.debug "Graph: %t"
+        (Language.Constraints.print_dot (graph_to_constraints skel base_graph));
       (* Update according to the direction *)
       let base_graph, reversed_graph = reversal (base_graph, reversed_graph) in
       let remove_current_edge q =
@@ -755,10 +768,14 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
       let rec find_next (queue : Q.t) =
         match Q.find_min queue with
         | Some (_, min) ->
-            Print.debug "Trying: %t" (EdgeSym.print min.edge);
+            Print.debug "Trying: %t %s" (EdgeSym.print min.edge)
+              (string_of_mode min.graph_direction);
             let queue = queue |> Q.remove (min.edge, min.graph_direction) in
             if EdgeSym.Set.mem min.edge visited then find_next queue
-            else Some (min, queue)
+            else (
+              Print.debug "Selecting: %t %s" (EdgeSym.print min.edge)
+                (string_of_mode min.graph_direction);
+              Some (min, queue))
         | None -> None
       in
       match find_next queue with
@@ -780,7 +797,9 @@ let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
             (state.base_graph, state.reversed_graph)
             state.coercion_queue state.free_parameters visited
             state.collected_constraints
-      | None -> constr
+      | None ->
+          Print.debug "No more edges to process";
+          constr
     in
     process (graph, inverse_graph) reduction_heap params EdgeSym.Set.empty
       new_constr
@@ -1070,7 +1089,8 @@ let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ }
           || FreeParams.DirtParams.can_be_negative source_node'
                state.free_parameters.dirt_params
         in
-        polarity_condition && Effect.Set.is_empty edge_dirt
+        let is_self_loop = BaseSym.compare source_node' sink_node' = 0 in
+        polarity_condition && Effect.Set.is_empty edge_dirt && not is_self_loop
       in
 
       if can_collapse then
@@ -1273,10 +1293,10 @@ and score_computation c =
 
   combine cur (multiply 0.5 cong)
 
-let optimize_constraints ~loc type_definitions subs constraints
+let optimize_type_constraints ~loc type_definitions subs constraints
     (get_counter, get_params) =
   let cycle_constraints, _free_params =
-    collapse_cycles constraints (get_params subs)
+    collapse_type_cycles constraints (get_params subs)
   in
   Print.debug "Full constraints: %t"
     (Language.Constraints.print_dot ~param_polarity:(get_params subs)
@@ -1288,7 +1308,7 @@ let optimize_constraints ~loc type_definitions subs constraints
   in
   let constraints = Constraints.clean constraints in
   let subs, constraints =
-    if !Config.garbage_collect.type_contraction.contract_simple_nodes then
+    if optimize_type_params_full then
       let simple_one_constraints =
         join_simple_type_nodes constraints (get_counter subs) (get_params subs)
       in
@@ -1299,15 +1319,35 @@ let optimize_constraints ~loc type_definitions subs constraints
       (subs', simple_one_constraints')
     else (subs, constraints)
   in
-  (* Optimize possible empty dirts  *)
-  let new_constraints =
-    contract_source_dirt_nodes constraints (get_params subs)
+  (subs, constraints)
+
+let optimize_dirt_contraints ~loc type_definitions subs constraints
+    (get_counter, get_params) =
+  Print.debug "Full constraints: %t"
+    (Language.Constraints.print_dot ~param_polarity:(get_params subs)
+       constraints);
+  let new_constraints, _free_params =
+    collapse_dirt_cycles constraints (get_params subs)
   in
   let subs, constraints =
     Unification.unify ~loc type_definitions (subs, constraints, new_constraints)
   in
-
+  let subs, constraints =
+    if optimize_dirt_params_full then
+      let new_constraints =
+        contract_source_dirt_nodes constraints (get_params subs)
+      in
+      Unification.unify ~loc type_definitions
+        (subs, constraints, new_constraints)
+    else (subs, constraints)
+  in
+  Print.debug "Full constraints after source contraction: %t"
+    (Language.Constraints.print_dot ~param_polarity:(get_params subs)
+       constraints);
   let rec runner level subs_state cons_state =
+    Print.debug "Full constraints in runner %d: %t" level
+      (Language.Constraints.print_dot ~param_polarity:(get_params subs)
+         constraints);
     let new_constraints, touched =
       join_simple_dirt_nodes cons_state (get_counter subs_state)
         (get_params subs_state)
@@ -1317,10 +1357,15 @@ let optimize_constraints ~loc type_definitions subs constraints
         (subs_state, cons_state, new_constraints)
     in
     let cons_state = Constraints.clean cons_state in
+    Print.debug "Touched: %d %t" (List.length touched)
+      (Print.sequence "," Dirt.Param.print touched);
     if List.length touched > 0 then runner (level + 1) subs_state cons_state
     else (subs_state, cons_state)
   in
-  let subs, constraints = runner 0 subs constraints in
+  let subs, constraints =
+    if optimize_dirt_params_full then runner 0 subs constraints
+    else (subs, constraints)
+  in
 
   let subs, constraints =
     Unification.unify ~loc type_definitions (subs, constraints, Constraint.empty)
@@ -1349,6 +1394,22 @@ let optimize_constraints ~loc type_definitions subs constraints
   in
   let subs, constraints =
     Unification.unify ~loc type_definitions (subs, constraints, new_constraints)
+  in
+  (subs, constraints)
+
+let optimize_constraints ~loc type_definitions subs constraints
+    (get_counter, get_params) =
+  let subs, constraints =
+    if optimize_type_params then
+      optimize_type_constraints ~loc type_definitions subs constraints
+        (get_counter, get_params)
+    else (subs, constraints)
+  in
+  let subs, constraints =
+    if optimize_dirt_params then
+      optimize_dirt_contraints ~loc type_definitions subs constraints
+        (get_counter, get_params)
+    else (subs, constraints)
   in
   (subs, constraints)
 
@@ -1386,3 +1447,9 @@ let optimize_top_let_rec ~loc type_definitions subs constraints defs =
             FreeParams.empty (Assoc.values_of defs)
         in
         counter )
+
+let a f g h x =
+  if f x then
+    (* can be if true, but we remove it to prevent optimizations *)
+    (g x, h x)
+  else (h x, g x)
