@@ -22,7 +22,7 @@ module DirtConstraints = struct
 
   let empty = DirtParamGraph.empty
 
-  let clean (graph : t) : t =
+  let remove_loops (graph : t) : t =
     DirtParamGraph.fold
       (fun p1 p2 _e acc ->
         if p1 = p2 then DirtParamGraph.remove_edge p1 p2 acc else acc)
@@ -111,8 +111,11 @@ let empty =
     dirt_constraints = DirtConstraints.empty;
   }
 
-let clean g =
-  { g with dirt_constraints = g.dirt_constraints |> DirtConstraints.clean }
+let remove_loops g =
+  {
+    g with
+    dirt_constraints = g.dirt_constraints |> DirtConstraints.remove_loops;
+  }
 
 let is_empty constraints =
   TyConstraints.is_empty constraints.ty_constraints

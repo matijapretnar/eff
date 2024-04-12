@@ -421,7 +421,7 @@ let process_computation state comp =
   in
   let sub, residuals =
     if !Config.simplify_coercions then
-      ConstraintContractor.optimize_computation ~loc:comp.at
+      ConstraintSimplifier.simplify_computation ~loc:comp.at
         state.type_definitions sub residuals comp'
     else (sub, residuals)
   in
@@ -455,7 +455,7 @@ let process_top_let ~loc state defs =
     Print.debug "Full comp: %t" (Term.print_computation cmp');
     let sub, constraints =
       if !Config.simplify_coercions then
-        ConstraintContractor.optimize_computation ~loc state.type_definitions
+        ConstraintSimplifier.simplify_computation ~loc state.type_definitions
           sub constraints cmp'
       else (sub, constraints)
     in
@@ -499,7 +499,7 @@ let process_top_let_rec ~loc state un_defs =
   let sub, constraints = Unification.solve state.type_definitions ~loc cnstrs in
   let sub, constraints =
     if !Config.simplify_coercions then
-      ConstraintContractor.optimize_top_let_rec ~loc state.type_definitions sub
+      ConstraintSimplifier.simplify_top_let_rec ~loc state.type_definitions sub
         constraints defs'
     else (sub, constraints)
   in

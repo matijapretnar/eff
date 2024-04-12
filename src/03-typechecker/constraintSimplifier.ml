@@ -7,10 +7,10 @@ open Coercion
 Configuration for partial optimizations   
 *)
 
-let optimize_type_params = true
-let optimize_type_params_full = false
-let optimize_dirt_params = true
-let optimize_dirt_params_full = false
+let simplify_type_params = true
+let simplify_type_params_full = false
+let simplify_dirt_params = true
+let simplify_dirt_params_full = false
 
 type counter = {
   type_coercions : float TyCoercionParam.Map.t;
@@ -518,7 +518,7 @@ type simple_node_constraction_state = {
 }
 
 (* Joins simple type coercions to a reflexive coercion *)
-let join_simple_type_nodes { Language.Constraints.ty_constraints; _ }
+let remove_type_bridges { Language.Constraints.ty_constraints; _ }
     ({ type_coercions; _ } as cnt) (params : FreeParams.params) =
   Print.debug "Counter: %t" (print cnt);
   let open Language.Constraints in
@@ -945,7 +945,7 @@ type simple_dirt_node_constraction_state = {
   collected_constraints : Constraint.t;
 }
 
-let join_simple_dirt_nodes { Language.Constraints.dirt_constraints; _ }
+let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
     ({ dirt_coercions; _ } as cnt) (params : FreeParams.params) =
   Print.debug "Counter: %t" (print cnt);
   let open Language.Constraints in
@@ -1293,7 +1293,7 @@ and score_computation c =
 
   combine cur (multiply 0.5 cong)
 
-let optimize_type_constraints ~loc type_definitions subs constraints
+let simplify_type_constraints ~loc type_definitions subs constraints
     (get_counter, get_params) =
   let cycle_constraints, _free_params =
     collapse_type_cycles constraints (get_params subs)
@@ -1306,11 +1306,11 @@ let optimize_type_constraints ~loc type_definitions subs constraints
     Unification.unify ~loc type_definitions
       (subs, constraints, cycle_constraints)
   in
-  let constraints = Constraints.clean constraints in
+  let constraints = Constraints.remove_loops constraints in
   let subs, constraints =
-    if optimize_type_params_full then
+    if simplify_type_params_full then
       let simple_one_constraints =
-        join_simple_type_nodes constraints (get_counter subs) (get_params subs)
+        remove_type_bridges constraints (get_counter subs) (get_params subs)
       in
       let subs', simple_one_constraints' =
         Unification.unify ~loc type_definitions
@@ -1321,7 +1321,7 @@ let optimize_type_constraints ~loc type_definitions subs constraints
   in
   (subs, constraints)
 
-let optimize_dirt_contraints ~loc type_definitions subs constraints
+let simplify_dirt_contraints ~loc type_definitions subs constraints
     (get_counter, get_params) =
   Print.debug "Full constraints: %t"
     (Language.Constraints.print_dot ~param_polarity:(get_params subs)
@@ -1333,7 +1333,7 @@ let optimize_dirt_contraints ~loc type_definitions subs constraints
     Unification.unify ~loc type_definitions (subs, constraints, new_constraints)
   in
   let subs, constraints =
-    if optimize_dirt_params_full then
+    if simplify_dirt_params_full then
       let new_constraints =
         contract_source_dirt_nodes constraints (get_params subs)
       in
@@ -1349,21 +1349,21 @@ let optimize_dirt_contraints ~loc type_definitions subs constraints
       (Language.Constraints.print_dot ~param_polarity:(get_params subs)
          constraints);
     let new_constraints, touched =
-      join_simple_dirt_nodes cons_state (get_counter subs_state)
+      remove_dirt_bridges cons_state (get_counter subs_state)
         (get_params subs_state)
     in
     let subs_state, cons_state =
       Unification.unify ~loc type_definitions
         (subs_state, cons_state, new_constraints)
     in
-    let cons_state = Constraints.clean cons_state in
+    let cons_state = Constraints.remove_loops cons_state in
     Print.debug "Touched: %d %t" (List.length touched)
       (Print.sequence "," Dirt.Param.print touched);
     if List.length touched > 0 then runner (level + 1) subs_state cons_state
     else (subs_state, cons_state)
   in
   let subs, constraints =
-    if optimize_dirt_params_full then runner 0 subs constraints
+    if simplify_dirt_params_full then runner 0 subs constraints
     else (subs, constraints)
   in
 
@@ -1397,26 +1397,26 @@ let optimize_dirt_contraints ~loc type_definitions subs constraints
   in
   (subs, constraints)
 
-let optimize_constraints ~loc type_definitions subs constraints
+let simplify_constraints ~loc type_definitions subs constraints
     (get_counter, get_params) =
   let subs, constraints =
-    if optimize_type_params then
-      optimize_type_constraints ~loc type_definitions subs constraints
+    if simplify_type_params then
+      simplify_type_constraints ~loc type_definitions subs constraints
         (get_counter, get_params)
     else (subs, constraints)
   in
   let subs, constraints =
-    if optimize_dirt_params then
-      optimize_dirt_contraints ~loc type_definitions subs constraints
+    if simplify_dirt_params then
+      simplify_dirt_contraints ~loc type_definitions subs constraints
         (get_counter, get_params)
     else (subs, constraints)
   in
   (subs, constraints)
 
-let optimize_computation ~loc type_definitions subs constraints cmp =
+let simplify_computation ~loc type_definitions subs constraints cmp =
   Print.debug "cmp: %t" (Term.print_computation cmp);
 
-  optimize_constraints ~loc type_definitions subs constraints
+  simplify_constraints ~loc type_definitions subs constraints
     ( (fun subs ->
         let cmp = Term.apply_sub_comp subs cmp in
         let counter = score_computation cmp in
@@ -1427,8 +1427,8 @@ let optimize_computation ~loc type_definitions subs constraints cmp =
         let parity = calculate_polarity_dirty_ty cmp.ty in
         parity )
 
-let optimize_top_let_rec ~loc type_definitions subs constraints defs =
-  optimize_constraints ~loc type_definitions subs constraints
+let simplify_top_let_rec ~loc type_definitions subs constraints defs =
+  simplify_constraints ~loc type_definitions subs constraints
     ( (fun subs ->
         let defs = Assoc.map (Term.apply_sub_abs subs) defs in
         let counter =
