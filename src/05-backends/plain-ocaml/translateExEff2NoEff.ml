@@ -333,13 +333,14 @@ and elab_handler state h elabfc =
         | _ -> failwith __LOC__
       in
       let p, ty, c = elabvc in
+      let pf, tyf, cf = elabfc in
       NoEff.NHandler
         {
           return_clause = (p, ty, NoEff.NReturn c);
           effect_clauses =
             Assoc.map_of_list subst_cont_effect
               (Assoc.to_list h.term.effect_clauses.effect_part);
-          finally_clause = elabfc;
+          finally_clause = (pf, tyf, NoEff.NReturn cf);
         } (* Handler - Case 3 *)
     else
       let elab_effect_clause (eff, { term = p1, p2, comp; _ }) =
