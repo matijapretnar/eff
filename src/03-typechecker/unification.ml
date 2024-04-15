@@ -299,11 +299,17 @@ and dirt_omega_step ~loc sub resolved unresolved w dcons =
             row = Dirt.Row.Param d2';
           } )
       in
-      let sub' =
+      let sub_d =
         Substitution.add_dirt_substitution_e d2
           { effect_set = Effect.Set.diff ops1 ops2; row = Dirt.Row.Param d2' }
+      in
+      let sub' =
+        sub_d
         |> Substitution.add_dirt_var_coercion w
-             (Coercion.unionDirt (ops1, Coercion.dirtCoercionVar w' w_ty'))
+             (* In case d1 = d2, we need to replace d1 as well in order for the
+                substitution to be idempotent *)
+             (Substitution.apply_sub_dirtcoer sub_d
+                (Coercion.unionDirt (ops1, Coercion.dirtCoercionVar w' w_ty')))
       in
       apply_substitution sub' sub resolved
         (Constraint.add_dirt_inequality (w', w_ty') unresolved)
