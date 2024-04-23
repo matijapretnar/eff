@@ -396,8 +396,8 @@ let check_polarity_same_dirt s =
   check_polarity_same Dirt.Param.Set.fold FreeParams.get_dirt_polarity s
 
 let collapse_type_cycles { Language.Constraints.ty_constraints; _ }
-    (initial_polarities : FreeParams.params) : Constraint.t * FreeParams.params
-    =
+    (initial_polarities : FreeParams.params) :
+    UnresolvedConstraints.t * FreeParams.params =
   let open Language.Constraints in
   (* Remove type cycles *)
   let garbage_collect_skeleton_component skel graph (new_constr, polarities) =
@@ -418,8 +418,8 @@ let collapse_type_cycles { Language.Constraints.ty_constraints; _ }
               let new_constr, polarities =
                 List.fold
                   (fun ((new_constr, polarities) :
-                         Constraint.t * Type.FreeParams.params) param ->
-                    ( Constraint.add_ty_equality
+                         UnresolvedConstraints.t * Type.FreeParams.params) param ->
+                    ( UnresolvedConstraints.add_ty_equality
                         (pack top, pack param)
                         new_constr,
                       {
@@ -438,7 +438,7 @@ let collapse_type_cycles { Language.Constraints.ty_constraints; _ }
 
   let ty_constraints, polarities =
     Skeleton.Param.Map.fold garbage_collect_skeleton_component ty_constraints
-      (Constraint.empty, initial_polarities)
+      (UnresolvedConstraints.empty, initial_polarities)
   in
   (ty_constraints, polarities)
 
@@ -485,7 +485,7 @@ let collapse_dirt_cycles { Language.Constraints.dirt_constraints; _ }
             Dirt.Param.Set.fold
               (fun v acc ->
                 if Dirt.Param.compare v representative != 0 then
-                  Constraint.add_dirt_equality
+                  UnresolvedConstraints.add_dirt_equality
                     (Dirt.no_effect v, Dirt.no_effect representative)
                     acc
                 else acc)
@@ -493,7 +493,7 @@ let collapse_dirt_cycles { Language.Constraints.dirt_constraints; _ }
           in
           ty_constraints
         else ty_constraints)
-      Constraint.empty components
+      UnresolvedConstraints.empty components
   in
   (ty_constraints, polarities)
 
@@ -514,7 +514,7 @@ type simple_node_constraction_state = {
   reversed_graph : graph;
   free_parameters : Type.FreeParams.params;
   coercion_queue : Q.t;
-  collected_constraints : Constraint.t;
+  collected_constraints : UnresolvedConstraints.t;
 }
 
 (* Joins simple type coercions to a reflexive coercion *)
@@ -762,7 +762,7 @@ let remove_type_bridges { Language.Constraints.ty_constraints; _ }
           can_collapse )
     in
     let rec process (graph, reverse_graph) (queue : Q.t) params visited
-        (constr : Constraint.t) =
+        (constr : UnresolvedConstraints.t) =
       (* Choose next one *)
       Print.debug "Queue: %t" (Q.print queue);
       let rec find_next (queue : Q.t) =
@@ -811,18 +811,20 @@ let remove_type_bridges { Language.Constraints.ty_constraints; _ }
           { term = TyParam ty_param; ty = Skeleton.Param skel }
         in
         let add_constraint source target constraints =
-          Constraint.add_ty_equality (pack source, pack target) constraints
+          UnresolvedConstraints.add_ty_equality
+            (pack source, pack target)
+            constraints
         in
         join_skeleton_component skel add_constraint graph acc)
-      ty_constraints Constraint.empty
+      ty_constraints UnresolvedConstraints.empty
   in
   new_constr
 
 let add_constraint p1 p2 =
-  Constraint.add_dirt_equality (Dirt.no_effect p1, Dirt.no_effect p2)
+  UnresolvedConstraints.add_dirt_equality (Dirt.no_effect p1, Dirt.no_effect p2)
 
 let add_empty_constraint p1 =
-  Constraint.add_dirt_equality (Dirt.no_effect p1, Dirt.empty)
+  UnresolvedConstraints.add_dirt_equality (Dirt.no_effect p1, Dirt.empty)
 
 let contract_source_dirt_nodes { Language.Constraints.dirt_constraints; _ }
     (params : FreeParams.params) =
@@ -896,10 +898,12 @@ let contract_source_dirt_nodes { Language.Constraints.dirt_constraints; _ }
             constraints
             |> List.fold_right
                  (fun node ->
-                   Constraint.add_dirt_equality (Dirt.no_effect node, Dirt.empty))
+                   UnresolvedConstraints.add_dirt_equality
+                     (Dirt.no_effect node, Dirt.empty))
                  component ))
         else (indegs, constraints))
-      (indegs, Constraint.empty) components
+      (indegs, UnresolvedConstraints.empty)
+      components
   in
   new_constraints
 
@@ -929,7 +933,7 @@ let contract_unreachable_dirt_nodes { Language.Constraints.dirt_constraints; _ }
   let constraints =
     BaseSym.Set.fold add_empty_constraint
       (BaseSym.Set.diff vertices visited)
-      Constraint.empty
+      UnresolvedConstraints.empty
   in
   constraints
 
@@ -942,7 +946,7 @@ type simple_dirt_node_constraction_state = {
   reversed_graph : dirt_graph;
   free_parameters : Type.FreeParams.params;
   coercion_queue : QD.t;
-  collected_constraints : Constraint.t;
+  collected_constraints : UnresolvedConstraints.t;
 }
 
 let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
@@ -1175,7 +1179,7 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
           None )
     in
     let rec process (graph, reverse_graph) (queue : Q.t) params visited touched
-        (constr : Constraint.t) =
+        (constr : UnresolvedConstraints.t) =
       (* Choose next one *)
       Print.debug "Queue: %t" (Q.print queue);
       let rec find_next (queue : Q.t) =
@@ -1215,11 +1219,12 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
       new_constr
   in
   let add_constraint source target constraints =
-    Constraint.add_dirt_equality
+    UnresolvedConstraints.add_dirt_equality
       (Dirt.no_effect source, Dirt.no_effect target)
       constraints
   in
-  join_dirt_component add_constraint dirt_constraints Constraint.empty
+  join_dirt_component add_constraint dirt_constraints
+    UnresolvedConstraints.empty
 
 let contract_constraints () = ()
 
@@ -1368,7 +1373,8 @@ let simplify_dirt_contraints ~loc type_definitions subs constraints
   in
 
   let subs, constraints =
-    Unification.unify ~loc type_definitions (subs, constraints, Constraint.empty)
+    Unification.unify ~loc type_definitions
+      (subs, constraints, UnresolvedConstraints.empty)
   in
   (* Optimize possible empty dirts  *)
   let new_constraints =
@@ -1387,10 +1393,12 @@ let simplify_dirt_contraints ~loc type_definitions subs constraints
     Dirt.Param.Set.fold
       (fun p acc ->
         if not (Dirt.Param.Set.mem p present) then
-          acc |> Constraint.add_dirt_equality (Dirt.no_effect p, Dirt.empty)
+          acc
+          |> UnresolvedConstraints.add_dirt_equality
+               (Dirt.no_effect p, Dirt.empty)
         else acc)
       (Dirt.Param.Set.diff params.positive params.negative)
-      Constraint.empty
+      UnresolvedConstraints.empty
   in
   let subs, constraints =
     Unification.unify ~loc type_definitions (subs, constraints, new_constraints)
