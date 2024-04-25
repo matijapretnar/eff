@@ -53,7 +53,8 @@ let rec apply_sub_skel sub skeleton =
       Apply
         {
           ty_name;
-          skel_args = TyParam.Map.map (fun s -> apply_sub_skel sub s) skel_args;
+          skel_args =
+            Skeleton.Param.Map.map (fun s -> apply_sub_skel sub s) skel_args;
         }
   | Tuple skels -> Tuple (List.map (apply_sub_skel sub) skels)
 
@@ -69,9 +70,10 @@ and apply_sub_ty' sub ty : ty =
       | None -> { ty with ty = apply_sub_skel sub ty.ty })
   | Arrow (tty1, tty2) ->
       arrow (apply_sub_ty sub tty1, apply_sub_dirty_ty sub tty2)
-  | Apply { ty_name; ty_args } ->
+  | Apply { ty_name; skel_args; ty_args } ->
       Type.apply
         ( ty_name,
+          Skeleton.Param.Map.map (apply_sub_skel sub) skel_args,
           TyParam.Map.map
             (fun (ty, variance) -> (apply_sub_ty sub ty, variance))
             ty_args )
@@ -115,9 +117,10 @@ let rec apply_sub_tycoer sub ty_coer =
         (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
   | TupleCoercion tcl ->
       TyCoercion.tupleCoercion (List.map (fun x -> apply_sub_tycoer sub x) tcl)
-  | ApplyCoercion { ty_name; tcoers } ->
+  | ApplyCoercion { ty_name; skels; tcoers } ->
       TyCoercion.applyCoercion
         ( ty_name,
+          Skeleton.Param.Map.map (apply_sub_skel sub) skels,
           TyParam.Map.map
             (fun (x, variance) -> (apply_sub_tycoer sub x, variance))
             tcoers )

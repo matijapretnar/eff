@@ -55,11 +55,12 @@ let skel_eq_step ~loc unresolved sk1 sk2 =
   | ( Apply { ty_name = ty_name1; skel_args = sks1 },
       Apply { ty_name = ty_name2; skel_args = sks2 } )
     when ty_name1 = ty_name2
-         && TyParam.Map.cardinal sks1 = TyParam.Map.cardinal sks2 ->
+         && Skeleton.Param.Map.cardinal sks1 = Skeleton.Param.Map.cardinal sks2
+    ->
       List.fold_right2
         (fun sk1 sk2 -> UnresolvedConstraints.add_skeleton_equality (sk1, sk2))
-        (sks1 |> TyParam.Map.values)
-        (sks2 |> TyParam.Map.values)
+        (sks1 |> Skeleton.Param.Map.values)
+        (sks2 |> Skeleton.Param.Map.values)
         unresolved
   | Tuple sks1, Tuple sks2 when List.length sks1 = List.length sks2 ->
       List.fold_right2
@@ -98,10 +99,11 @@ and ty_eq_step unresolved ty1 ty2 =
       |> UnresolvedConstraints.add_ty_equality (tyb, tyd)
       |> UnresolvedConstraints.add_dirt_equality (drta, drtc)
       |> UnresolvedConstraints.add_dirt_equality (drtb, drtd)
-  | ( Apply { ty_name = ty_name1; ty_args = tys1 },
-      Apply { ty_name = ty_name2; ty_args = tys2 } )
+  | ( Apply { ty_name = ty_name1; skel_args = skels1; ty_args = tys1 },
+      Apply { ty_name = ty_name2; skel_args = skels2; ty_args = tys2 } )
     when ty_name1 = ty_name2
          && TyParam.Map.cardinal tys1 = TyParam.Map.cardinal tys2 ->
+      assert (Skeleton.Param.Map.equal Skeleton.equal skels1 skels2);
       List.fold_right2
         (fun (ty1, _) (ty2, _) ->
           UnresolvedConstraints.add_ty_equality (ty1, ty2))
@@ -155,10 +157,19 @@ and ty_omega_step type_definitions unresolved omega = function
         (Substitution.add_type_coercion k v)
         unresolved'
   (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
-  | ( { term = Type.Apply { ty_name = ty_name1; ty_args = tys1 }; _ },
-      { term = Type.Apply { ty_name = ty_name2; ty_args = tys2 }; _ } )
+  | ( {
+        term =
+          Type.Apply { ty_name = ty_name1; skel_args = skels1; ty_args = tys1 };
+        _;
+      },
+      {
+        term =
+          Type.Apply { ty_name = ty_name2; skel_args = skels2; ty_args = tys2 };
+        _;
+      } )
     when ty_name1 = ty_name2
          && TyParam.Map.cardinal tys1 = TyParam.Map.cardinal tys2 ->
+      assert (Skeleton.Param.Map.equal Skeleton.equal skels1 skels2);
       let coercions, unresolved' =
         List.fold_right2
           (fun (p1, (ty, v1)) (p2, (ty', v2)) (coercions, unresolved) ->
@@ -187,7 +198,8 @@ and ty_omega_step type_definitions unresolved omega = function
           ([], unresolved)
       in
       let v =
-        TyCoercion.applyCoercion (ty_name1, coercions |> TyParam.Map.of_bindings)
+        TyCoercion.applyCoercion
+          (ty_name1, skels1, coercions |> TyParam.Map.of_bindings)
       in
       UnresolvedConstraints.change_subst
         (Substitution.add_type_coercion omega v)

@@ -1,5 +1,4 @@
 open Utils
-module TyParam = TyParam.TyParam
 
 (** skeleton parameters *)
 module Param = Symbol.Make (Symbol.Parameter (struct
@@ -11,7 +10,7 @@ type t =
   | Param of Param.t
   | Basic of Const.ty
   | Arrow of t * t
-  | Apply of { ty_name : TyName.t; skel_args : t TyParam.Map.t }
+  | Apply of { ty_name : TyName.t; skel_args : t Param.Map.t }
   | Handler of t * t
   | Tuple of t list
 
@@ -22,7 +21,7 @@ let rec print ?max_level skel ppf =
   | Basic b -> print_at "%t" (Const.print_ty b)
   | Arrow (skel1, skel2) -> print_at "%t → %t" (print skel1) (print skel2)
   | Apply { ty_name; skel_args } -> (
-      match TyParam.Map.values skel_args with
+      match Param.Map.values skel_args with
       | [] -> print_at "%t" (TyName.print ty_name)
       | [ s ] ->
           print_at ~at_level:1 "%t %t" (print ~max_level:1 s)
@@ -46,7 +45,7 @@ let rec equal skel1 skel2 =
   | ( Apply { ty_name = ty_name1; skel_args = tys1 },
       Apply { ty_name = ty_name2; skel_args = tys2 } ) ->
       ty_name1 = ty_name2
-      && TyParam.Map.equal (fun t1 t2 -> equal t1 t2) tys1 tys2
+      && Param.Map.equal (fun t1 t2 -> equal t1 t2) tys1 tys2
   | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
       equal dirtya1 dirtyb1 && equal dirtya2 dirtyb2
   | Basic ptya, Basic ptyb -> ptya = ptyb

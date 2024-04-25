@@ -30,6 +30,7 @@ let initial_state =
                    a_ty;
                    apply
                      ( Type.list_tyname,
+                       Skeleton.Param.Map.singleton Type.list_skel a_ty.ty,
                        TyParam.Map.singleton Type.list_ty_param (a_ty, Covariant)
                      );
                  ]) )

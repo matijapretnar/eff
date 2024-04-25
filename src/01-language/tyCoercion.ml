@@ -52,6 +52,7 @@ and ty_coercion' =
   (* TODO: variance should be read from ty_name parameter *)
   | ApplyCoercion of {
       ty_name : TyName.t;
+      skels : Skeleton.t Skeleton.Param.Map.t;
       tcoers : (ty_coercion * variance) TyParam.Map.t;
     }
   | TupleCoercion of ty_coercion list
@@ -80,7 +81,7 @@ let tupleCoercion tcoers =
   let tys, tys' = tcoers |> List.map (fun tcoer -> tcoer.ty) |> List.split in
   { term = TupleCoercion tcoers; ty = (Type.tuple tys, Type.tuple tys') }
 
-let applyCoercion (ty_name, tcoers) =
+let applyCoercion (ty_name, skels, tcoers) =
   (* TODO add assert according to ty_name information *)
   let tys, tys' =
     TyParam.Map.bindings tcoers
@@ -90,10 +91,10 @@ let applyCoercion (ty_name, tcoers) =
     |> List.split
   in
   {
-    term = ApplyCoercion { ty_name; tcoers };
+    term = ApplyCoercion { ty_name; skels; tcoers };
     ty =
-      ( Type.apply (ty_name, tys |> TyParam.Map.of_bindings),
-        Type.apply (ty_name, tys' |> TyParam.Map.of_bindings) );
+      ( Type.apply (ty_name, skels, tys |> TyParam.Map.of_bindings),
+        Type.apply (ty_name, skels, tys' |> TyParam.Map.of_bindings) );
   }
 
 let handlerCoercion (dtcoer1, dtcoer2) =
@@ -120,15 +121,18 @@ let rec equal_ty_coercion tc1 tc2 =
   | HandlerCoercion (dc1, dc1'), HandlerCoercion (dc2, dc2') ->
       equal_dirty_coercion dc1 dc2 && equal_dirty_coercion dc1' dc2'
   | TupleCoercion tc1, TupleCoercion tc2 -> List.equal equal_ty_coercion tc1 tc2
-  | ( ApplyCoercion { ty_name = ty_name1; tcoers = tcoers1 },
-      ApplyCoercion { ty_name = ty_name2; tcoers = tcoers2 } ) ->
+  | ( ApplyCoercion { ty_name = ty_name1; skels = skels1; tcoers = tcoers1 },
+      ApplyCoercion { ty_name = ty_name2; skels = skels2; tcoers = tcoers2 } )
+    ->
       ty_name1 = ty_name2
-      && assert (TyParam.Map.keys tcoers1 = TyParam.Map.keys tcoers2) = ()
-      && TyParam.Map.equal
-           (fun (c1, v1) (c2, v2) ->
-             assert (v1 = v2);
-             v1 = v2 && equal_ty_coercion c1 c2)
-           tcoers1 tcoers2
+      &&
+      (assert (Skeleton.Param.Map.equal Skeleton.equal skels1 skels2);
+       assert (TyParam.Map.keys tcoers1 = TyParam.Map.keys tcoers2);
+       TyParam.Map.equal
+         (fun (c1, v1) (c2, v2) ->
+           assert (v1 = v2);
+           v1 = v2 && equal_ty_coercion c1 c2)
+         tcoers1 tcoers2)
   | TyCoercionVar tv1, TyCoercionVar tv2 -> tv1 = tv2
   | _ -> false
 
@@ -156,7 +160,7 @@ let rec print_ty_coercion ?max_level c ppf =
         (print_dirty_coercion ~max_level:2 dc1)
         (print_dirty_coercion ~max_level:2 dc2)
   | TyCoercionVar tcp -> print "%t" (Type.TyCoercionParam.print tcp)
-  | ApplyCoercion { ty_name; tcoers } -> (
+  | ApplyCoercion { ty_name; skels = _; tcoers } -> (
       match TyParam.Map.values tcoers with
       | [] -> print "%t" (TyName.print ty_name)
       | [ (c, _) ] ->

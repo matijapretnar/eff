@@ -42,7 +42,11 @@ type ty = (ty', Skeleton.t) typed
 and ty' =
   | TyParam of TyParam.t
   (* TODO: variance should be read from ty_name parameter *)
-  | Apply of { ty_name : TyName.t; ty_args : (ty * variance) TyParam.Map.t }
+  | Apply of {
+      ty_name : TyName.t;
+      skel_args : Skeleton.t Skeleton.Param.Map.t;
+      ty_args : (ty * variance) TyParam.Map.t;
+    }
   | Arrow of abs_ty
   | Tuple of ty list
   | Handler of dirty * dirty
@@ -62,7 +66,7 @@ let rec print_ty ?max_level ty ppf =
   | Arrow (t1, (t2, drt)) ->
       print ~at_level:3 "%t -%t→ %t" (print_ty ~max_level:2 t1) (Dirt.print drt)
         (print_ty ~max_level:3 t2)
-  | Apply { ty_name; ty_args } -> (
+  | Apply { ty_name; skel_args = _; ty_args } -> (
       match TyParam.Map.bindings ty_args with
       | [] -> print "%t" (TyName.print ty_name)
       | [ (_, (s, _)) ] ->
@@ -101,16 +105,10 @@ let arrow (ty1, drty2) =
     ty = Skeleton.Arrow (skeleton_of_ty ty1, skeleton_of_dirty drty2);
   }
 
-let apply (ty_name, ty_args) =
+let apply (ty_name, skel_args, ty_args) =
   {
-    term = Apply { ty_name; ty_args };
-    ty =
-      Skeleton.Apply
-        {
-          ty_name;
-          skel_args =
-            ty_args |> TyParam.Map.map (fun (ty, _) -> skeleton_of_ty ty);
-        };
+    term = Apply { ty_name; skel_args; ty_args };
+    ty = Skeleton.Apply { ty_name; skel_args };
   }
 
 let tuple tup =
@@ -127,7 +125,7 @@ let handler (drty1, drty2) =
 
 let tyBasic pt = { term = TyBasic pt; ty = Skeleton.Basic pt }
 let unit_ty = tuple []
-let empty_ty = apply (empty_tyname, TyParam.Map.empty)
+let empty_ty = apply (empty_tyname, Skeleton.Param.Map.empty, TyParam.Map.empty)
 let int_ty = tyBasic Const.IntegerTy
 let float_ty = tyBasic Const.FloatTy
 let bool_ty = tyBasic Const.BooleanTy
@@ -194,7 +192,7 @@ let rec free_params_skeleton = function
   | Skeleton.Param p -> Params.skel_singleton p
   | Skeleton.Basic _ -> Params.empty
   | Skeleton.Apply { skel_args; _ } ->
-      skel_args |> TyParam.Map.values
+      skel_args |> Skeleton.Param.Map.values
       |> Params.union_map (fun s -> free_params_skeleton s)
   | Skeleton.Arrow (sk1, sk2) ->
       Params.union (free_params_skeleton sk1) (free_params_skeleton sk2)
@@ -290,9 +288,10 @@ and equal_ty' ty1' ty2' =
       equal_ty ttya1 ttyb1 && equal_dirty dirtya1 dirtyb1
   | Tuple tys1, Tuple tys2 ->
       List.length tys1 = List.length tys2 && List.for_all2 equal_ty tys1 tys2
-  | ( Apply { ty_name = ty_name1; ty_args = tys1 },
-      Apply { ty_name = ty_name2; ty_args = tys2 } ) ->
+  | ( Apply { ty_name = ty_name1; skel_args = skels1; ty_args = tys1 },
+      Apply { ty_name = ty_name2; skel_args = skels2; ty_args = tys2 } ) ->
       ty_name1 = ty_name2
+      && Skeleton.Param.Map.equal Skeleton.equal skels1 skels2
       && TyParam.Map.equal (fun (ty1, _) (ty2, _) -> equal_ty ty1 ty2) tys1 tys2
   | Handler (dirtya1, dirtya2), Handler (dirtyb1, dirtyb2) ->
       equal_dirty dirtya1 dirtyb1 && equal_dirty dirtya2 dirtyb2
@@ -326,7 +325,7 @@ let fresh_dirty_param_with_skel skel =
 let fresh_ty_with_fresh_skel () = fresh_ty_with_skel (fresh_skel ())
 let fresh_dirty_with_fresh_skel () = fresh_dirty_param_with_skel (fresh_skel ())
 
-let fresh_ty_with_skel type_definitions skel =
+let fresh_ty_with_skel _type_definitions skel =
   match skel with
   (* α : ς *)
   | Skeleton.Param _ -> assert false
@@ -342,20 +341,20 @@ let fresh_ty_with_skel type_definitions skel =
       let tvars = List.map fresh_ty_with_skel sks in
       tuple tvars
   (* α : ty_name (τ₁, τ₂, ...) *)
-  | Skeleton.Apply { ty_name; skel_args } ->
-      let tvars =
-        match Assoc.lookup ty_name type_definitions with
-        | Some tydata ->
-            TyParam.Map.mapi
-              (fun ty_param s ->
-                ( fresh_ty_with_skel s,
-                  TyParam.Map.find ty_param tydata.params.type_params
-                  |> fun (_skel, variance) -> variance ))
-              skel_args
-        | None -> assert false
-        (* Type should be known *)
-      in
-      apply (ty_name, tvars)
+  | Skeleton.Apply _ -> failwith __LOC__
+  (* let tvars =
+       match Assoc.lookup ty_name type_definitions with
+       | Some tydata ->
+           TyParam.Map.mapi
+             (fun ty_param s ->
+               ( fresh_ty_with_skel s,
+                 TyParam.Map.find ty_param tydata.params.type_params
+                 |> fun (_skel, variance) -> variance ))
+             skel_args
+       | None -> assert false
+       (* Type should be known *)
+     in
+     apply (ty_name, tvars) *)
   (* α : τ₁ => τ₂ *)
   | Skeleton.Handler (sk1, sk2) ->
       let dtvar1 = fresh_dirty_param_with_skel sk1
@@ -382,7 +381,7 @@ let rec print_pretty_skel ?max_level free params skel ppf =
         (print_pretty_skel ~max_level:2 free params skel1)
         (print_pretty_skel ~max_level:3 free params skel2)
   | Skeleton.Apply { ty_name; skel_args } -> (
-      match TyParam.Map.values skel_args with
+      match Skeleton.Param.Map.values skel_args with
       | [] -> print "%t" (TyName.print ty_name)
       | [ s ] ->
           print ~at_level:1 "%t %t"

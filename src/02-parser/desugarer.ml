@@ -120,10 +120,9 @@ let desugar_type type_sbst state =
             else
               let state', tys' = List.fold_map desugar_type state tys in
               let type_info =
-                lst
-                |> List.map2
-                     (fun ty (param, variance) -> (param, (ty, variance)))
-                     tys'
+                List.map2
+                  (fun ty (param, variance) -> (param, (ty, variance)))
+                  tys' lst
               in
               (state', T.apply (t', Type.TyParam.Map.of_bindings type_info)))
     | Sugared.TyParam t -> (
