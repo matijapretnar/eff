@@ -161,26 +161,3 @@ let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
   let ty_coer, ty_cons = fresh_ty_coer (ty1, ty2)
   and drt_coer, drt_cons = fresh_dirt_coer (drt1, drt2) in
   (Coercion.bangCoercion (ty_coer, drt_coer), union ty_cons drt_cons)
-
-(* ************************************************************************* *)
-(*                        FREE PARAMETER COMPUTATION                         *)
-(* ************************************************************************* *)
-
-let cast_expression e ty =
-  let omega, cons = fresh_ty_coer (e.ty, ty) in
-  (Term.castExp (e, omega), cons)
-
-let cast_computation c dirty =
-  let omega, cnstrs = fresh_dirty_coer (c.ty, dirty) in
-  (Term.castComp (c, omega), cnstrs)
-
-let cast_abstraction { term = pat, cmp; _ } dirty =
-  let cmp', cnstrs = cast_computation cmp dirty in
-  (Term.abstraction (pat, cmp'), cnstrs)
-
-let full_cast_abstraction { term = pat, cmp; _ } ty_in dirty_out =
-  let x_pat, x_var = Term.fresh_variable "x" ty_in in
-  let exp', cnstrs1 = cast_expression x_var pat.ty in
-  let cmp', cnstrs2 = cast_computation cmp dirty_out in
-  ( Term.abstraction (x_pat, Term.letVal (exp', Term.abstraction (pat, cmp'))),
-    union cnstrs1 cnstrs2 )

@@ -1,8 +1,6 @@
 open Utils
 open Type
 
-type printer = unit -> string
-
 module DirtConstraints = struct
   module DirtParamGraph =
     Graph.Make
@@ -178,8 +176,7 @@ let print_dirt_graph additional_label graph ppf : unit =
     (fun ppf -> Print.print ppf "      label=\"Dirt constraints\"")
     ppf
 
-let print_dot ?(param_polarity : FreeParams.params option)
-    ?(header : printer option) ?(footer : printer option) c ppf =
+let print_dot ?param_polarity ?header ?footer c ppf =
   let skeleton_graphs = Skeleton.Param.Map.bindings c.ty_constraints in
   let additional_label_ty =
     match param_polarity with
