@@ -315,31 +315,31 @@ let fresh_ty_param () =
   let ty_param = TyParam.fresh () and skel = Skeleton.Param.fresh () in
   (ty_param, skel)
 
-let fresh_ty_param_with_skel skel =
+let fresh_ty_with_skel skel =
   let ty_var = TyParam.fresh () in
   tyParam ty_var skel
 
 let fresh_dirty_param_with_skel skel =
-  let ty = fresh_ty_param_with_skel skel in
+  let ty = fresh_ty_with_skel skel in
   make_dirty ty
 
-let fresh_ty_with_fresh_skel () = fresh_ty_param_with_skel (fresh_skel ())
+let fresh_ty_with_fresh_skel () = fresh_ty_with_skel (fresh_skel ())
 let fresh_dirty_with_fresh_skel () = fresh_dirty_param_with_skel (fresh_skel ())
 
-let rec fresh_ty_with_skel type_definitions skel =
+let fresh_ty_with_skel type_definitions skel =
   match skel with
   (* α : ς *)
-  | Skeleton.Param _ -> fresh_ty_param_with_skel skel
+  | Skeleton.Param _ -> assert false
   (* α : int *)
   | Skeleton.Basic ps -> tyBasic ps
   (* α : τ₁ -> τ₂ *)
   | Skeleton.Arrow (sk1, sk2) ->
-      let tvar1 = fresh_ty_with_skel type_definitions sk1
-      and dtvar2 = fresh_dirty_with_skel type_definitions sk2 in
+      let tvar1 = fresh_ty_with_skel sk1
+      and dtvar2 = fresh_dirty_param_with_skel sk2 in
       arrow (tvar1, dtvar2)
   (* α : τ₁ x τ₂ ... *)
   | Skeleton.Tuple sks ->
-      let tvars = List.map (fresh_ty_with_skel type_definitions) sks in
+      let tvars = List.map fresh_ty_with_skel sks in
       tuple tvars
   (* α : ty_name (τ₁, τ₂, ...) *)
   | Skeleton.Apply { ty_name; skel_args } ->
@@ -348,7 +348,7 @@ let rec fresh_ty_with_skel type_definitions skel =
         | Some tydata ->
             TyParam.Map.mapi
               (fun ty_param s ->
-                ( fresh_ty_with_skel type_definitions s,
+                ( fresh_ty_with_skel s,
                   TyParam.Map.find ty_param tydata.params.type_params
                   |> fun (_skel, variance) -> variance ))
               skel_args
@@ -358,12 +358,9 @@ let rec fresh_ty_with_skel type_definitions skel =
       apply (ty_name, tvars)
   (* α : τ₁ => τ₂ *)
   | Skeleton.Handler (sk1, sk2) ->
-      let dtvar1 = fresh_dirty_with_skel type_definitions sk1
-      and dtvar2 = fresh_dirty_with_skel type_definitions sk2 in
+      let dtvar1 = fresh_dirty_param_with_skel sk1
+      and dtvar2 = fresh_dirty_param_with_skel sk2 in
       handler (dtvar1, dtvar2)
-
-and fresh_dirty_with_skel type_definitions sk =
-  make_dirty (fresh_ty_with_skel type_definitions sk)
 
 let rec print_pretty_skel ?max_level free params skel ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
