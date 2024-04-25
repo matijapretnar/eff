@@ -278,15 +278,9 @@ and infer_handler state { Untyped.value_clause; effect_clauses; finally_clause }
     full_cast_abstraction finally_clause' ty_mid dirty_out
   in
 
-  let drt_in_param = Dirt.fresh () in
-  let w = Type.DirtCoercionParam.fresh () in
   let drt_in =
-    drt_in_param
+    drt_out
     |> Dirt.add_effects (Term.handled_effects (Assoc.of_list effect_clauses'))
-  in
-  let in_out_cstr =
-    UnresolvedConstraints.empty
-    |> UnresolvedConstraints.add_dirt_inequality (w, (drt_in_param, drt_out))
   in
 
   let handler =
@@ -302,7 +296,6 @@ and infer_handler state { Untyped.value_clause; effect_clauses; finally_clause }
       finally_clause_cnstrs;
       value_clause_cast_cnstrs;
       finally_clause_cast_cnstrs;
-      in_out_cstr;
     ]
     @ effect_clauses_cnstrs )
 
