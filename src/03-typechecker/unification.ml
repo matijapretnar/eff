@@ -168,7 +168,7 @@ and ty_omega_step type_definitions sub (paused : Constraints.t) cons rest_queue
   (* ω : A <= A *)
   | ty1, ty2 when Type.equal_ty ty1 ty2 ->
       let k = omega in
-      let v = Coercion.reflTy ty1 in
+      let v = TyCoercion.reflTy ty1 in
       (Substitution.add_type_coercion k v sub, paused, rest_queue)
   (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
   | { term = Type.Arrow (a1, dirty1); _ }, { term = Type.Arrow (a2, dirty2); _ }
@@ -180,7 +180,7 @@ and ty_omega_step type_definitions sub (paused : Constraints.t) cons rest_queue
       in
       let k = omega in
       let v =
-        Coercion.arrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
+        TyCoercion.arrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
       in
       ( Substitution.add_type_coercion k v sub,
         paused,
@@ -199,7 +199,7 @@ and ty_omega_step type_definitions sub (paused : Constraints.t) cons rest_queue
           ([], UnresolvedConstraints.empty)
       in
       let k = omega in
-      let v = Coercion.tupleCoercion coercions in
+      let v = TyCoercion.tupleCoercion coercions in
       ( Substitution.add_type_coercion k v sub,
         paused,
         UnresolvedConstraints.union conss rest_queue )
@@ -226,7 +226,7 @@ and ty_omega_step type_definitions sub (paused : Constraints.t) cons rest_queue
                   in
                   (coercion, ty_cons)
               | Invariant ->
-                  ( Coercion.reflTy ty,
+                  ( TyCoercion.reflTy ty,
                     UnresolvedConstraints.add_ty_equality (ty, ty')
                       UnresolvedConstraints.empty )
             in
@@ -237,7 +237,7 @@ and ty_omega_step type_definitions sub (paused : Constraints.t) cons rest_queue
           ([], UnresolvedConstraints.empty)
       in
       let v =
-        Coercion.applyCoercion (ty_name1, coercions |> TyParam.Map.of_bindings)
+        TyCoercion.applyCoercion (ty_name1, coercions |> TyParam.Map.of_bindings)
       in
       ( Substitution.add_type_coercion omega v sub,
         paused,
@@ -251,7 +251,7 @@ and ty_omega_step type_definitions sub (paused : Constraints.t) cons rest_queue
         UnresolvedConstraints.fresh_dirty_coer (drty12, drty22)
       in
       let k = omega in
-      let v = Coercion.handlerCoercion (drty_coer1, drty_coer2) in
+      let v = TyCoercion.handlerCoercion (drty_coer1, drty_coer2) in
       ( Substitution.add_type_coercion k v sub,
         paused,
         UnresolvedConstraints.list_union
@@ -272,7 +272,7 @@ and ty_omega_step type_definitions sub (paused : Constraints.t) cons rest_queue
           (sub, Constraints.add_ty_constraint s1 t1 t2 omega paused, rest_queue)
       | Some w ->
           ( Substitution.add_type_coercion omega
-              (Coercion.tyCoercionVar w (ty1, ty2))
+              (TyCoercion.tyCoercionVar w (ty1, ty2))
               sub,
             paused,
             rest_queue ))
@@ -302,7 +302,7 @@ and dirt_omega_step ~loc sub resolved unresolved w dcons =
             unresolved )
       | Some (d, _) ->
           ( Substitution.add_dirt_var_coercion w
-              { term = Coercion.DirtCoercionVar d; ty = (ty1, ty2) }
+              { term = DirtCoercion.DirtCoercionVar d; ty = (ty1, ty2) }
               sub,
             resolved,
             unresolved ))
@@ -328,21 +328,24 @@ and dirt_omega_step ~loc sub resolved unresolved w dcons =
              (* In case d1 = d2, we need to replace d1 as well in order for the
                 substitution to be idempotent *)
              (Substitution.apply_sub_dirtcoer sub_d
-                (Coercion.unionDirt (ops1, Coercion.dirtCoercionVar w' w_ty')))
+                (DirtCoercion.unionDirt
+                   (ops1, DirtCoercion.dirtCoercionVar w' w_ty')))
       in
       apply_substitution sub' sub resolved
         (UnresolvedConstraints.add_dirt_inequality (w', w_ty') unresolved)
   (* ω : Ø <= Δ₂ *)
   | { effect_set = ops1; row = Dirt.Row.Empty }, d when Effect.Set.is_empty ops1
     ->
-      let sub' = Substitution.add_dirt_var_coercion w (Coercion.empty d) sub in
+      let sub' =
+        Substitution.add_dirt_var_coercion w (DirtCoercion.empty d) sub
+      in
       (sub', resolved, unresolved)
   (* ω : δ₁ <= Ø *)
   | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
       { effect_set = ops2; row = Dirt.Row.Empty } )
     when Effect.Set.is_empty ops1 && Effect.Set.is_empty ops2 ->
       let sub' =
-        Substitution.add_dirt_var_coercion_e w (Coercion.empty Dirt.empty)
+        Substitution.add_dirt_var_coercion_e w (DirtCoercion.empty Dirt.empty)
         |> Substitution.add_dirt_substitution d1 Dirt.empty
       in
       apply_substitution sub' sub resolved unresolved
@@ -354,8 +357,8 @@ and dirt_omega_step ~loc sub resolved unresolved w dcons =
           (Effect.Set.print ops1) (Effect.Set.print ops2);
       let sub' =
         Substitution.add_dirt_var_coercion w
-          (Coercion.unionDirt
-             (ops2, Coercion.empty (Dirt.closed (Effect.Set.diff ops2 ops1))))
+          (DirtCoercion.unionDirt
+             (ops2, DirtCoercion.empty (Dirt.closed (Effect.Set.diff ops2 ops1))))
           sub
       in
       (sub', resolved, unresolved)
@@ -365,9 +368,9 @@ and dirt_omega_step ~loc sub resolved unresolved w dcons =
       let d2' = Dirt.Param.refresh d2 in
       let sub' =
         Substitution.add_dirt_var_coercion_e w
-          (Coercion.unionDirt
+          (DirtCoercion.unionDirt
              ( ops1,
-               Coercion.empty
+               DirtCoercion.empty
                  {
                    Dirt.effect_set = Effect.Set.diff ops2 ops1;
                    row = Dirt.Row.Param d2';

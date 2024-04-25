@@ -4,10 +4,9 @@ open Utils
 
 type t = {
   type_param_to_type_coercions :
-    Coercion.ty_coercion Type.TyCoercionParam.Map.t;
+    TyCoercion.ty_coercion Type.TyCoercionParam.Map.t;
   type_param_to_type_subs : Type.ty Type.TyParam.Map.t;
-  dirt_var_to_dirt_coercions :
-    Coercion.dirt_coercion Type.DirtCoercionParam.Map.t;
+  dirt_var_to_dirt_coercions : DirtCoercion.t Type.DirtCoercionParam.Map.t;
   dirt_var_to_dirt_subs : Dirt.t Dirt.Param.Map.t;
   skel_param_to_skel_subs : Skeleton.t Skeleton.Param.Map.t;
 }
@@ -101,23 +100,23 @@ let apply_sub_ct_dirt sub (drt1, drt2) =
 
 let rec apply_sub_tycoer sub ty_coer =
   match ty_coer.term with
-  | Coercion.TyCoercionVar p -> (
+  | TyCoercion.TyCoercionVar p -> (
       match
         Type.TyCoercionParam.Map.find_opt p sub.type_param_to_type_coercions
       with
       | Some t_coer -> t_coer
       | None -> { ty_coer with ty = apply_sub_ct_ty sub ty_coer.ty })
-  | Coercion.ReflTy -> Coercion.reflTy (apply_sub_ty sub (fst ty_coer.ty))
+  | ReflTy -> TyCoercion.reflTy (apply_sub_ty sub (fst ty_coer.ty))
   | ArrowCoercion (tycoer1, dirtycoer) ->
-      Coercion.arrowCoercion
+      TyCoercion.arrowCoercion
         (apply_sub_tycoer sub tycoer1, apply_sub_dirtycoer sub dirtycoer)
   | HandlerCoercion (dirtycoer1, dirtycoer2) ->
-      Coercion.handlerCoercion
+      TyCoercion.handlerCoercion
         (apply_sub_dirtycoer sub dirtycoer1, apply_sub_dirtycoer sub dirtycoer2)
   | TupleCoercion tcl ->
-      Coercion.tupleCoercion (List.map (fun x -> apply_sub_tycoer sub x) tcl)
+      TyCoercion.tupleCoercion (List.map (fun x -> apply_sub_tycoer sub x) tcl)
   | ApplyCoercion { ty_name; tcoers } ->
-      Coercion.applyCoercion
+      TyCoercion.applyCoercion
         ( ty_name,
           TyParam.Map.map
             (fun (x, variance) -> (apply_sub_tycoer sub x, variance))
@@ -125,22 +124,22 @@ let rec apply_sub_tycoer sub ty_coer =
 
 and apply_sub_dirtcoer sub drt_coer =
   match drt_coer.term with
-  | Coercion.ReflDirt | Empty ->
+  | DirtCoercion.ReflDirt | Empty ->
       { drt_coer with ty = apply_sub_ct_dirt sub drt_coer.ty }
-  | Coercion.DirtCoercionVar p -> (
+  | DirtCoercionVar p -> (
       match
         Type.DirtCoercionParam.Map.find_opt p sub.dirt_var_to_dirt_coercions
       with
       | Some dc -> dc
       | None -> { drt_coer with ty = apply_sub_ct_dirt sub drt_coer.ty })
   | UnionDirt (es, dirt_coer1) ->
-      Coercion.unionDirt (es, apply_sub_dirtcoer sub dirt_coer1)
+      DirtCoercion.unionDirt (es, apply_sub_dirtcoer sub dirt_coer1)
 
 and apply_sub_dirtycoer (sub : t) { term = ty_coer, dirt_coer; _ } :
-    Coercion.dirty_coercion =
+    TyCoercion.dirty_coercion =
   let ty_coer' = apply_sub_tycoer sub ty_coer
   and dirt_coer' = apply_sub_dirtcoer sub dirt_coer in
-  Coercion.bangCoercion (ty_coer', dirt_coer')
+  TyCoercion.bangCoercion (ty_coer', dirt_coer')
 
 let apply_substitutions_to_type = apply_sub_ty
 let apply_substitutions_to_dirt = apply_sub_dirt
@@ -153,11 +152,11 @@ let apply_substitutions_to_skeleton = apply_sub_skel
 let print subs =
   [
     subs.type_param_to_type_coercions
-    |> Type.TyCoercionParam.Map.print Coercion.print_ty_coercion;
+    |> Type.TyCoercionParam.Map.print TyCoercion.print_ty_coercion;
     subs.type_param_to_type_subs |> Type.TyParam.Map.print Type.print_ty;
     subs.dirt_var_to_dirt_subs |> Dirt.Param.Map.print Dirt.print;
     subs.dirt_var_to_dirt_coercions
-    |> Type.DirtCoercionParam.Map.print Coercion.print_dirt_coercion;
+    |> Type.DirtCoercionParam.Map.print TyCoercion.print_dirt_coercion;
     subs.skel_param_to_skel_subs |> Skeleton.Param.Map.print Skeleton.print;
   ]
   |> Print.printer_sequence ", "
@@ -309,7 +308,7 @@ let add_type_coercion_e parameter t_coercion =
 
 let add_type_coercion parameter t_coercion sub =
   assert (
-    Coercion.equal_ty_coercion t_coercion (apply_sub_tycoer sub t_coercion));
+    TyCoercion.equal_ty_coercion t_coercion (apply_sub_tycoer sub t_coercion));
   merge (add_type_coercion_e parameter t_coercion) sub
 
 let add_type_substitution_e parameter ty =

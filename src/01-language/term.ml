@@ -73,7 +73,7 @@ and expression' =
       handler_clauses : handler_clauses;
       finally_clause : abstraction;
     }
-  | CastExp of expression * Coercion.ty_coercion
+  | CastExp of expression * TyCoercion.ty_coercion
 
 and computation = (computation', Type.dirty) typed
 (** Impure computations *)
@@ -87,7 +87,7 @@ and computation' =
   | Handle of expression * computation
   | Call of effect * expression * abstraction
   | Bind of computation * abstraction
-  | CastComp of computation * Coercion.dirty_coercion
+  | CastComp of computation * TyCoercion.dirty_coercion
   | Check of Location.t * computation
 
 and handler_clauses = (handler_clauses', Type.dirty * Type.dirty) typed
@@ -208,10 +208,10 @@ let lambdaTyCoerVar (_ : Type.TyCoercionParam.t * expression) : expression =
 let lambdaDirtCoerVar (_ : Type.DirtCoercionParam.t * expression) : expression =
   failwith __LOC__
 
-let applyTyCoercion (_ : expression * Coercion.ty_coercion) : expression =
+let applyTyCoercion (_ : expression * TyCoercion.ty_coercion) : expression =
   failwith __LOC__
 
-let applyDirtCoercion (_ : expression * Coercion.dirt_coercion) : expression =
+let applyDirtCoercion (_ : expression * DirtCoercion.t) : expression =
   failwith __LOC__
 
 let value exp = { term = Value exp; ty = Type.pure_ty exp.ty }
@@ -322,7 +322,7 @@ and print_expression' ?max_level e ppf =
   | CastExp (e1, tc) ->
       print ~at_level:2 "%t ▷ %t"
         (print_expression ~max_level:0 e1)
-        (Coercion.print_ty_coercion ~max_level:0 tc)
+        (TyCoercion.print_ty_coercion ~max_level:0 tc)
 
 and print_computation ?max_level c ppf =
   let print ?at_level = Print.print ?max_level ?at_level ppf in
@@ -360,7 +360,7 @@ and print_computation' ?max_level c ppf =
   | CastComp (c1, dc) ->
       print ~at_level:2 "%t ▷ %t"
         (print_computation ~max_level:2 c1)
-        (Coercion.print_dirty_coercion ~max_level:0 dc)
+        (TyCoercion.print_dirty_coercion ~max_level:0 dc)
   | LetVal (e1, { term = p, c1; _ }) ->
       print ~at_level:3 "let %t = %t in %t" (print_pattern p)
         (print_expression e1) (print_computation c1)
@@ -824,7 +824,7 @@ and free_params_expression' e =
         (free_params_abstraction h.finally_clause)
   | CastExp (e, tc) ->
       Type.Params.union (free_params_expression e)
-        (Coercion.free_params_ty_coercion tc)
+        (TyCoercion.free_params_ty_coercion tc)
 
 and free_params_computation c =
   Type.Params.union
@@ -854,7 +854,7 @@ and free_params_computation' c =
   | CastComp (c, dc) ->
       Type.Params.union
         (free_params_computation c)
-        (Coercion.free_params_dirty_coercion dc)
+        (TyCoercion.free_params_dirty_coercion dc)
   | Check (_, c) -> free_params_computation c
 
 and free_params_handler_clauses h =

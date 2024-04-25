@@ -114,9 +114,11 @@ let recast_computation hnd comp =
             Dirt.row = drt_out.Dirt.row;
           }
         in
-        let ty_coer = Coercion.reflTy ty
-        and drt_coer = Coercion.unionDirt (effs, Coercion.empty drt_diff) in
-        Some (Term.castComp (comp, Coercion.bangCoercion (ty_coer, drt_coer)))
+        let ty_coer = TyCoercion.reflTy ty
+        and drt_coer =
+          DirtCoercion.unionDirt (effs, DirtCoercion.empty drt_diff)
+        in
+        Some (Term.castComp (comp, TyCoercion.bangCoercion (ty_coer, drt_coer)))
       else None
   | _ -> None
 
@@ -238,7 +240,7 @@ and optimize_rec_definitions state defs =
 and cast_expression state exp coer =
   match (exp.term, coer.term) with
   | _, _
-    when Coercion.is_trivial_ty_coercion coer
+    when TyCoercion.is_trivial_ty_coercion coer
          && state.config.eliminate_coercions ->
       exp
   | _, _ -> Term.castExp (exp, coer)
@@ -246,14 +248,14 @@ and cast_expression state exp coer =
 and cast_computation state comp coer =
   match (comp.term, coer.term) with
   | _, _
-    when Coercion.is_trivial_dirty_coercion coer
+    when TyCoercion.is_trivial_dirty_coercion coer
          && state.config.eliminate_coercions ->
       (* Elim-Co-Comp *)
       comp
   | Term.Bind (cmp, abs), (_, dcoer) when state.config.push_coercions ->
       (* Push-Co-Do *)
       let ty1, _ = cmp.ty in
-      let coer1 = Coercion.bangCoercion (Coercion.reflTy ty1, dcoer) in
+      let coer1 = TyCoercion.bangCoercion (TyCoercion.reflTy ty1, dcoer) in
       bind_computation state
         (cast_computation state cmp coer1)
         (cast_abstraction state abs coer)
@@ -332,7 +334,7 @@ and handle_computation state hnd comp =
       in
       handle_computation state hnd' cmp
   | CastComp (cmp, { term = tcoer, dcoer; _ })
-    when Coercion.is_trivial_ty_coercion tcoer ->
+    when TyCoercion.is_trivial_ty_coercion tcoer ->
       let hnd' = Term.handler_with_smaller_input_dirt hnd dcoer in
       handle_computation state hnd' cmp
   | CastComp (cmp, { term = tcoer, dcoer; _ }) ->
@@ -399,7 +401,7 @@ and reduce_computation' state comp =
       ( {
           term =
             Term.CastExp
-              (exp, { term = Coercion.ArrowCoercion (ty_coer, drty_coer); _ });
+              (exp, { term = TyCoercion.ArrowCoercion (ty_coer, drty_coer); _ });
           _;
         },
         e )
@@ -532,8 +534,10 @@ and reduce_computation' state comp =
           term =
             Term.CastExp
               ( exp,
-                { term = Coercion.HandlerCoercion (drty_coer1, drty_coer2); _ }
-              );
+                {
+                  term = TyCoercion.HandlerCoercion (drty_coer1, drty_coer2);
+                  _;
+                } );
           _;
         },
         cmp )

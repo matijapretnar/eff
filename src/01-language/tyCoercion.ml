@@ -1,4 +1,5 @@
 open Utils
+open DirtCoercion
 module TyParam = TyParam.TyParam
 
 module Params = struct
@@ -55,15 +56,7 @@ and ty_coercion' =
     }
   | TupleCoercion of ty_coercion list
 
-and dirt_coercion = (dirt_coercion', Type.ct_dirt) typed
-
-and dirt_coercion' =
-  | ReflDirt
-  | DirtCoercionVar of Type.DirtCoercionParam.t
-  | Empty
-  | UnionDirt of (Effect.Set.t * dirt_coercion)
-
-and dirty_coercion = (ty_coercion * dirt_coercion, Type.ct_dirty) typed
+and dirty_coercion = (ty_coercion * DirtCoercion.t, Type.ct_dirty) typed
 
 let is_trivial_ty_coercion omega =
   let ty1, ty2 = omega.ty in
@@ -75,7 +68,6 @@ let is_trivial_dirty_coercion omega =
 
 let reflTy ty = { term = ReflTy; ty = (ty, ty) }
 let tyCoercionVar omega ct = { term = TyCoercionVar omega; ty = ct }
-let dirtCoercionVar omega cd = { term = DirtCoercionVar omega; ty = cd }
 
 let arrowCoercion (tcoer1, dtcoer2) =
   let ty1, ty1' = tcoer1.ty and drty2, drty2' = dtcoer2.ty in
@@ -111,20 +103,11 @@ let handlerCoercion (dtcoer1, dtcoer2) =
     ty = (Type.handler (drty1', drty2), Type.handler (drty1, drty2'));
   }
 
-let bangCoercion ((ty_coer : ty_coercion), (drt_coer : dirt_coercion)) =
+let bangCoercion ((ty_coer : ty_coercion), (drt_coer : DirtCoercion.t)) =
   let ty, ty' = ty_coer.ty and drt, drt' = drt_coer.ty in
   { term = (ty_coer, drt_coer); ty = ((ty, drt), (ty', drt')) }
 
-let reflDirt drt = { term = ReflDirt; ty = (drt, drt) }
 let reflDirty (ty, drt) = bangCoercion (reflTy ty, reflDirt drt)
-let empty drt = { term = Empty; ty = (Dirt.empty, drt) }
-
-let unionDirt (effs, dcoer) =
-  let drt, drt' = dcoer.ty in
-  {
-    term = UnionDirt (effs, dcoer);
-    ty = (Dirt.add_effects effs drt, Dirt.add_effects effs drt');
-  }
 
 let rec equal_ty_coercion tc1 tc2 =
   let t1, t1' = tc1.ty and t2, t2' = tc2.ty in
@@ -154,18 +137,6 @@ and equal_dirty_coercion { term = tc1, dc1; ty = dt1, dt1' }
   Type.equal_dirty dt1 dt2 && Type.equal_dirty dt1' dt2'
   && equal_dirt_coercion dc1 dc2
   && equal_ty_coercion tc1 tc2
-
-and equal_dirt_coercion dc1 dc2 =
-  let d1, d1' = dc1.ty and d2, d2' = dc2.ty in
-  Type.equal_dirt d1 d2 && Type.equal_dirt d1' d2'
-  &&
-  match (dc1.term, dc2.term) with
-  | ReflDirt, ReflDirt -> true
-  | Empty, Empty -> true
-  | DirtCoercionVar dv1, DirtCoercionVar dv2 -> dv1 = dv2
-  | UnionDirt (es1, dc1), UnionDirt (es2, dc2) ->
-      Effect.Set.equal es1 es2 && equal_dirt_coercion dc1 dc2
-  | _ -> false
 
 (* ************************************************************************* *)
 (*                         COERCION VARIABLES OF                             *)

@@ -10,7 +10,8 @@ let identity_instantiation (params : Type.Params.t)
       type_param_to_type_coercions =
         Constraints.TyConstraints.fold_expanded
           (fun _s _t1 _t2 w ty1 ty2 ->
-            Type.TyCoercionParam.Map.add w (Coercion.tyCoercionVar w (ty1, ty2)))
+            Type.TyCoercionParam.Map.add w
+              (TyCoercion.tyCoercionVar w (ty1, ty2)))
           constraints.ty_constraints Type.TyCoercionParam.Map.empty;
       type_param_to_type_subs =
         params.ty_params |> Type.TyParam.Map.bindings
@@ -20,7 +21,7 @@ let identity_instantiation (params : Type.Params.t)
         Constraints.DirtConstraints.fold_expanded
           (fun _d1 _d2 w _effs drt1 drt2 ->
             Type.DirtCoercionParam.Map.add w
-              (Coercion.dirtCoercionVar w (drt1, drt2)))
+              (DirtCoercion.dirtCoercionVar w (drt1, drt2)))
           constraints.dirt_constraints Type.DirtCoercionParam.Map.empty;
       dirt_var_to_dirt_subs =
         params.dirt_params |> Dirt.Param.Set.elements
@@ -38,7 +39,7 @@ let fresh_instantiation (params : Type.Params.t) (constraints : Constraints.t) =
     let w' = Type.DirtCoercionParam.refresh w
     and drt1' = Substitution.apply_substitutions_to_dirt subst drt1
     and drt2' = Substitution.apply_substitutions_to_dirt subst drt2 in
-    let coer' = Coercion.dirtCoercionVar w' (drt1', drt2') in
+    let coer' = DirtCoercion.dirtCoercionVar w' (drt1', drt2') in
     let subst' = Substitution.add_dirt_var_coercion w coer' subst
     and constraints' =
       UnresolvedConstraints.add_dirt_inequality (w', (drt1', drt2')) constraints
@@ -49,7 +50,7 @@ let fresh_instantiation (params : Type.Params.t) (constraints : Constraints.t) =
     let w' = Type.TyCoercionParam.refresh w
     and ty1' = Substitution.apply_substitutions_to_type subst ty1
     and ty2' = Substitution.apply_substitutions_to_type subst ty2 in
-    let coer' = Coercion.tyCoercionVar w' (ty1', ty2') in
+    let coer' = TyCoercion.tyCoercionVar w' (ty1', ty2') in
     let subst' = Substitution.add_type_coercion w coer' subst
     and constraints' =
       UnresolvedConstraints.add_ty_inequality (w', (ty1', ty2')) constraints

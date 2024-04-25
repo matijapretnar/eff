@@ -149,15 +149,15 @@ let unresolve resolved = return_to_unresolved resolved empty
 
 let fresh_ty_coer cons =
   let param = Type.TyCoercionParam.fresh () in
-  ( { term = Coercion.TyCoercionVar param; ty = cons },
+  ( { term = TyCoercion.TyCoercionVar param; ty = cons },
     { empty with ty_inequalities = [ (param, cons) ] } )
 
 let fresh_dirt_coer cons =
   let param = Type.DirtCoercionParam.fresh () in
-  ( { term = Coercion.DirtCoercionVar param; ty = cons },
+  ( { term = DirtCoercion.DirtCoercionVar param; ty = cons },
     { empty with dirt_inequalities = [ (param, cons) ] } )
 
 let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
   let ty_coer, ty_cons = fresh_ty_coer (ty1, ty2)
   and drt_coer, drt_cons = fresh_dirt_coer (drt1, drt2) in
-  (Coercion.bangCoercion (ty_coer, drt_coer), union ty_cons drt_cons)
+  (TyCoercion.bangCoercion (ty_coer, drt_coer), union ty_cons drt_cons)

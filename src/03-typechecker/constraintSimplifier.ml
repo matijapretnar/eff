@@ -1,7 +1,7 @@
 open Utils
 open Language
 open Type
-open Coercion
+open TyCoercion
 
 (*
 Configuration for partial optimizations   
@@ -357,7 +357,7 @@ let multiply c coercions =
       DirtCoercionParam.Map.map (( *. ) c) coercions.dirt_coercions;
   }
 
-let combine (coercion_params : Coercion.Params.t) counter =
+let combine (coercion_params : TyCoercion.Params.t) counter =
   let coercion_params =
     {
       type_coercions =
@@ -1231,28 +1231,28 @@ let contract_constraints () = ()
 let rec score_expression e =
   let cur, cong =
     match e with
-    | { term = Term.Var _; _ } -> (Coercion.Params.empty, empty)
-    | { term = Term.Const _; _ } -> (Coercion.Params.empty, empty)
+    | { term = Term.Var _; _ } -> (TyCoercion.Params.empty, empty)
+    | { term = Term.Const _; _ } -> (TyCoercion.Params.empty, empty)
     | { term = Term.Tuple lst; _ } ->
-        ( Coercion.Params.empty,
+        ( TyCoercion.Params.empty,
           List.fold ( ++ ) empty (List.map score_expression lst) )
     | { term = Term.Record r; _ } ->
-        ( Coercion.Params.empty,
+        ( TyCoercion.Params.empty,
           List.fold ( ++ ) empty
             (List.map score_expression (Label.Map.values r)) )
     | { term = Term.Variant (_, e); _ } ->
-        (Coercion.Params.empty, Option.default_map empty score_expression e)
+        (TyCoercion.Params.empty, Option.default_map empty score_expression e)
     | { term = Term.Lambda abs; _ } ->
-        (Coercion.Params.empty, score_abstraction abs)
+        (TyCoercion.Params.empty, score_abstraction abs)
     | { term = Term.Handler hc; _ } ->
-        (Coercion.Params.empty, score_handler_clauses hc)
+        (TyCoercion.Params.empty, score_handler_clauses hc)
     | { term = Term.HandlerWithFinally { handler_clauses; finally_clause }; _ }
       ->
-        ( Coercion.Params.empty,
+        ( TyCoercion.Params.empty,
           score_handler_clauses handler_clauses
           ++ score_abstraction finally_clause )
     | { term = Term.CastExp (exp, coer); _ } ->
-        (Coercion.coercion_params_ty_coercion coer, score_expression exp)
+        (TyCoercion.coercion_params_ty_coercion coer, score_expression exp)
   in
   combine cur (multiply 0.5 cong)
 
@@ -1267,33 +1267,33 @@ and score_handler_clauses { term = { Term.value_clause; effect_clauses }; _ } =
 and score_computation c =
   let cur, cong =
     match c with
-    | { term = Term.Value e; _ } -> (Coercion.Params.empty, score_expression e)
+    | { term = Term.Value e; _ } -> (TyCoercion.Params.empty, score_expression e)
     | { term = Term.LetVal (e, abs); _ } ->
-        (Coercion.Params.empty, score_expression e ++ score_abstraction abs)
+        (TyCoercion.Params.empty, score_expression e ++ score_abstraction abs)
     | { term = Term.LetRec (lst, c); _ } ->
-        ( Coercion.Params.empty,
+        ( TyCoercion.Params.empty,
           Assoc.fold_left
             (fun acc (_, abs) -> acc ++ score_abstraction abs)
             empty lst
           ++ score_computation c )
     | { term = Term.Match (e, lst); _ } ->
-        ( Coercion.Params.empty,
+        ( TyCoercion.Params.empty,
           score_expression e
           ++ List.fold_left
                (fun acc abs -> acc ++ score_abstraction abs)
                empty lst )
     | { term = Term.Apply (e1, e2); _ } ->
-        (Coercion.Params.empty, score_expression e1 ++ score_expression e2)
+        (TyCoercion.Params.empty, score_expression e1 ++ score_expression e2)
     | { term = Term.Handle (e, c); _ } ->
-        (Coercion.Params.empty, score_expression e ++ score_computation c)
+        (TyCoercion.Params.empty, score_expression e ++ score_computation c)
     | { term = Term.Call (_, e, abs); _ } ->
-        (Coercion.Params.empty, score_expression e ++ score_abstraction abs)
+        (TyCoercion.Params.empty, score_expression e ++ score_abstraction abs)
     | { term = Term.Bind (c1, abs); _ } ->
-        (Coercion.Params.empty, score_computation c1 ++ score_abstraction abs)
+        (TyCoercion.Params.empty, score_computation c1 ++ score_abstraction abs)
     | { term = Term.CastComp (c, coer); _ } ->
-        (Coercion.coercion_params_dirty_coercion coer, score_computation c)
+        (TyCoercion.coercion_params_dirty_coercion coer, score_computation c)
     | { term = Term.Check (_, c); _ } ->
-        (Coercion.Params.empty, score_computation c)
+        (TyCoercion.Params.empty, score_computation c)
   in
 
   combine cur (multiply 0.5 cong)
