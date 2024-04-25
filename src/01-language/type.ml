@@ -410,7 +410,7 @@ let rec print_pretty_skel ?max_level free params skel ppf =
 let print_pretty free = print_pretty_skel free (ref Assoc.empty)
 let list_ty_param, list_skel = fresh_ty_param ()
 
-type parameter_type = StrictlyPositive | StrictlyNegative | Zero | Unknown
+type polarity = Positive | Negtive | Bipolar | Neutral
 
 module FreeParams = struct
   module Params (S : Symbol.S) = struct
@@ -424,7 +424,7 @@ module FreeParams = struct
     let add_negative p params =
       { params with negative = S.Set.add p params.negative }
 
-    let add_zero p params = params |> add_positive p |> add_negative p
+    let bipolar p params = params |> add_positive p |> add_negative p
 
     let union p1 p2 =
       let adder fn set params = S.Set.fold fn set params in
@@ -440,24 +440,24 @@ module FreeParams = struct
       let pos = S.Set.mem p params.positive in
       let neg = S.Set.mem p params.negative in
       match (pos, neg) with
-      | true, false -> StrictlyPositive
-      | false, true -> StrictlyNegative
-      | true, true -> Zero
-      | false, false -> Unknown
+      | true, false -> Positive
+      | false, true -> Negtive
+      | true, true -> Bipolar
+      | false, false -> Neutral
 
     let combine_polarity p1 p2 params =
       params
       |> (match get_parameter_type p1 params with
-         | StrictlyPositive -> add_positive p2
-         | StrictlyNegative -> add_negative p2
-         | Zero -> add_zero p2
-         | Unknown -> fun x -> x)
+         | Positive -> add_positive p2
+         | Negtive -> add_negative p2
+         | Bipolar -> bipolar p2
+         | Neutral -> fun x -> x)
       |>
       match get_parameter_type p2 params with
-      | StrictlyPositive -> add_positive p1
-      | StrictlyNegative -> add_negative p1
-      | Zero -> add_zero p1
-      | Unknown -> fun x -> x
+      | Positive -> add_positive p1
+      | Negtive -> add_negative p1
+      | Bipolar -> bipolar p1
+      | Neutral -> fun x -> x
   end
 
   module TypeParams = Params (TyParam)
@@ -476,10 +476,10 @@ module FreeParams = struct
 
   let string_of_polarity polarity =
     match polarity with
-    | StrictlyPositive -> "+"
-    | StrictlyNegative -> "-"
-    | Zero -> "0"
-    | Unknown -> "?"
+    | Positive -> "+"
+    | Negtive -> "-"
+    | Bipolar -> "0"
+    | Neutral -> "?"
 
   let empty = { type_params = TypeParams.empty; dirt_params = DirtParams.empty }
 
