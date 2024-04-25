@@ -139,29 +139,6 @@ let free_params constraints =
   in
   Params.union free_params_ty free_params_dirt
 
-let print_ty_param_vertex ty_param ppf : unit =
-  let vertex = TyParam.print ty_param in
-  Print.print ppf "node_%t[label=\"%t\"];" vertex vertex
-
-let print_dirt_param_vertex ty_param ppf : unit =
-  let vertex = Dirt.Param.print ty_param in
-  Print.print ppf "node_%t[label=\"%t\"];" vertex vertex
-
-let print_edge (source, edge, sink) ppf : unit =
-  Print.print ppf "node_%t -> node_%t [label=\"%t\"]" (TyParam.print source)
-    (TyParam.print sink)
-    (TyCoercionParam.print edge)
-
-let print_dirt_edge (source, (edge, effect_set), sink) ppf : unit =
-  let print_effect_set ppf =
-    if Effect.Set.is_empty effect_set then Print.print ppf ""
-    else Print.print ppf " U {%t}" (Effect.Set.print effect_set)
-  in
-  Print.print ppf "@[<h>node_%t -> node_%t [label=\"%t%t\"]@]"
-    (Dirt.Param.print source) (Dirt.Param.print sink)
-    (DirtCoercionParam.print edge)
-    print_effect_set
-
 let print_skeleton_graph additional_label (skel_param, graph) ppf : unit =
   TyConstraints.TyParamGraph.print_dot additional_label graph
     (fun ppf -> Print.print ppf "cluster_%t" (Skeleton.Param.print skel_param))
