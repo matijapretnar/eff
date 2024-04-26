@@ -287,6 +287,10 @@ and ty_omega_step type_definitions sub (paused : Constraints.t) cons rest_queue
 
 and dirt_omega_step ~loc sub resolved unresolved w dcons =
   match dcons with
+  (* ω : A <= A *)
+  | drt1, drt2 when Type.equal_dirt drt1 drt2 ->
+      let v = DirtCoercion.reflDirt drt1 in
+      (Substitution.add_dirt_var_coercion w v sub, resolved, unresolved)
   (* ω : δ₁ <= O₂ ∪ δ₂ *)
   | ( ({ Dirt.effect_set = ops1; row = Dirt.Row.Param d1 } as ty1),
       ({ Dirt.effect_set = ops2; row = Dirt.Row.Param d2 } as ty2) )
