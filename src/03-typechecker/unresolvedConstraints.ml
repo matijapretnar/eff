@@ -8,6 +8,7 @@ type t = {
   dirt_inequalities : (Type.DirtCoercionParam.t * Type.ct_dirt) list;
   ty_equalities : (Type.ty * Type.ty) list;
   ty_inequalities : (Type.TyCoercionParam.t * Type.ct_ty) list;
+  substitution : Substitution.t;
 }
 
 let empty =
@@ -17,6 +18,7 @@ let empty =
     dirt_inequalities = [];
     ty_equalities = [];
     ty_inequalities = [];
+    substitution = Substitution.empty;
   }
 
 let add_skeleton_equality con cons =
@@ -123,6 +125,7 @@ let apply_sub subs cons =
             ( Substitution.apply_substitutions_to_type subs ty1,
               Substitution.apply_substitutions_to_type subs ty2 ) ))
         cons.ty_inequalities;
+    substitution = Substitution.merge subs cons.substitution;
   }
 
 let return_to_unresolved (resolved : Constraints.t) queue =
