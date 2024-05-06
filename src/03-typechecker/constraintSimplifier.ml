@@ -1435,6 +1435,20 @@ let simplify_computation ~loc type_definitions subs constraints cmp =
         let parity = calculate_polarity_dirty_ty cmp.ty in
         parity )
 
+let simplify_expression ~loc type_definitions subs constraints exp =
+  Print.debug "exp: %t" (Term.print_expression exp);
+
+  simplify_constraints ~loc type_definitions subs constraints
+    ( (fun subs ->
+        let exp = Term.apply_sub_exp subs exp in
+        let counter = score_expression exp in
+        let counter = multiply (-1.0) counter in
+        counter),
+      fun subs ->
+        let exp = Term.apply_sub_exp subs exp in
+        let parity = calculate_polarity_type exp.ty in
+        parity )
+        
 let simplify_top_let_rec ~loc type_definitions subs constraints defs =
   simplify_constraints ~loc type_definitions subs constraints
     ( (fun subs ->
