@@ -12,11 +12,6 @@ let simplify_type_params_full = false
 let simplify_dirt_params = true
 let simplify_dirt_params_full = false
 
-type counter = {
-  type_coercions : float TyCoercionParam.Map.t;
-  dirt_coercions : float DirtCoercionParam.Map.t;
-}
-
 type contraction_mode = Direct | Reverse
 
 let string_of_mode = function Direct -> "Direct" | Reverse -> "Reverse"
@@ -157,12 +152,6 @@ let recalculate_dirt_reduction_candidates
       |> remove_candidates visited unavailable contraction_touched;
   }
 
-let empty =
-  {
-    type_coercions = TyCoercionParam.Map.empty;
-    dirt_coercions = DirtCoercionParam.Map.empty;
-  }
-
 module EdgeDirection = struct
   type edge_direction = Incoming | Outgoing
 
@@ -199,7 +188,8 @@ module ReductionQueue (Node : Symbol.S) (Edge : Symbol.S) = struct
 
   let uid = ref 0
 
-  type key = float * int
+  type uid = Uid of int
+  type key = uid
   type elt = (Node.t, Edge.t) reduction_candidate
   type e_dir = Edge.t * contraction_mode
 
@@ -213,93 +203,61 @@ module ReductionQueue (Node : Symbol.S) (Edge : Symbol.S) = struct
 
   module EdM = EdgeDirectionMap
 
-  module FloatPairMap = Map.Make (struct
+  module UidMap = Map.Make (struct
     type t = key
 
     let compare = compare
   end)
 
+  module EltSet = Set.Make (struct
+    type t = elt
+
+    let compare = compare
+  end)
+
   type t = {
-    queue : elt FloatPairMap.t;
+    queue : elt UidMap.t;
     keys : key EdM.t;
     endpoints : e_dir list Node.Map.t;
   }
 
   let empty =
-    { queue = FloatPairMap.empty; keys = EdM.empty; endpoints = Node.Map.empty }
+    { queue = UidMap.empty; keys = EdM.empty; endpoints = Node.Map.empty }
 
   let append_to_map edge = function
     | None -> Some [ edge ]
     | Some x -> Some (edge :: x)
 
-  let insert_new cost ({ edge; source_node; graph_direction; _ } as r_cand)
+  let insert_new ({ edge; source_node; graph_direction; _ } as r_cand)
       ({ queue; keys; endpoints } as pq) =
     let e_dir = (edge, graph_direction) in
     match EdM.find_opt e_dir keys with
-    (* Key should have the same cost *)
-    | Some ((cost', _) as key) ->
-        assert (cost = cost');
+    | Some key ->
         (* We might need to reinsert  *)
-        { pq with queue = FloatPairMap.add key r_cand queue }
+        { pq with queue = UidMap.add key r_cand queue }
     | None ->
         incr uid;
-        let key = (cost, !uid) in
+        let key = Uid !uid in
         {
-          queue = FloatPairMap.add key r_cand queue;
+          queue = UidMap.add key r_cand queue;
           keys = EdM.add e_dir key keys;
           endpoints =
             Node.Map.update source_node (append_to_map e_dir) endpoints;
         }
 
-  let of_list l =
-    List.fold (fun acc (cost, cand) -> insert_new cost cand acc) empty l
-
-  let find_min { queue; _ } = FloatPairMap.min_binding_opt queue
-
-  let replace_node_old old new_ ({ endpoints; _ } as q) =
-    (* Rethink how this works with e_dir *)
-    Print.debug "Replacing node %t with %t" (Node.print old) (Node.print new_);
-    let edges = Node.Map.find_opt old endpoints |> Option.value ~default:[] in
-    List.fold
-      (fun ({ endpoints; keys; _ } as acc) edge ->
-        let endpoints =
-          endpoints |> Node.Map.remove old
-          |> Node.Map.update new_ (append_to_map edge)
-        in
-        match EdM.find_opt edge keys with
-        | Some key ->
-            Print.debug "Replaced node %t with %t" (Node.print old)
-              (Node.print new_);
-            {
-              acc with
-              queue =
-                acc.queue
-                |> FloatPairMap.update key (function
-                     | None -> assert false
-                     | Some r_cand -> Some { r_cand with source_node = new_ });
-              endpoints;
-            }
-        | None -> acc)
-      q edges
+  let of_list l = List.fold (fun acc cand -> insert_new cand acc) empty l
+  let find_min { queue; _ } = UidMap.min_binding_opt queue
 
   let remove edge ({ queue; keys; _ } as q) =
     let key = EdM.find edge keys in
     (* assert (Edge.compare edge (Node.Map.find node endpoints) = 0); *)
-    {
-      q with
-      queue = FloatPairMap.remove key queue;
-      keys = EdM.remove edge keys;
-    }
+    { q with queue = UidMap.remove key queue; keys = EdM.remove edge keys }
 
   let remove_non_strict edge ({ queue; keys; _ } as q) =
     match EdM.find_opt edge keys with
     | Some key ->
         (* assert (Edge.compare edge (Node.Map.find node endpoints) = 0); *)
-        {
-          q with
-          queue = FloatPairMap.remove key queue;
-          keys = EdM.remove edge keys;
-        }
+        { q with queue = UidMap.remove key queue; keys = EdM.remove edge keys }
     | None -> q
 
   let remove_node node direction ({ endpoints; _ } as q) =
@@ -316,9 +274,9 @@ module ReductionQueue (Node : Symbol.S) (Edge : Symbol.S) = struct
   let print { queue; endpoints; _ } ppf =
     Format.fprintf ppf "{ %t;\n %t }"
       (Print.sequence ", "
-         (fun ((c, uid), rc) ppf ->
-           Format.fprintf ppf "(%f, %d) ↦ %t " c uid (print_rc rc))
-         (FloatPairMap.bindings queue))
+         (fun (Uid uid, rc) ppf ->
+           Format.fprintf ppf "(%d) ↦ %t " uid (print_rc rc))
+         (UidMap.bindings queue))
       (Node.Map.print
          (fun lst ppf ->
            Format.fprintf ppf "[ %t ]"
@@ -329,48 +287,8 @@ module ReductionQueue (Node : Symbol.S) (Edge : Symbol.S) = struct
                 lst))
          endpoints)
 
-  let iter fn { queue; _ } = FloatPairMap.iter fn queue
+  let iter fn { queue; _ } = UidMap.iter fn queue
 end
-
-let print counter ppf =
-  Format.fprintf ppf "{tycoerc: %t;\ndirtcoerc: %t}"
-    (TyCoercionParam.Map.print
-       (fun n ppf -> Print.print ppf "%f" n)
-       counter.type_coercions)
-    (DirtCoercionParam.Map.print
-       (fun n ppf -> Print.print ppf "%f" n)
-       counter.dirt_coercions)
-
-let ( ++ ) c1 c2 =
-  let combine _ a b = Some (a +. b) in
-  {
-    type_coercions =
-      TyCoercionParam.Map.union combine c1.type_coercions c2.type_coercions;
-    dirt_coercions =
-      DirtCoercionParam.Map.union combine c1.dirt_coercions c2.dirt_coercions;
-  }
-
-let multiply c coercions =
-  {
-    type_coercions = TyCoercionParam.Map.map (( *. ) c) coercions.type_coercions;
-    dirt_coercions =
-      DirtCoercionParam.Map.map (( *. ) c) coercions.dirt_coercions;
-  }
-
-let combine (coercion_params : TyCoercion.Params.t) counter =
-  let coercion_params =
-    {
-      type_coercions =
-        coercion_params.type_coercion_params |> TyCoercionParam.Set.elements
-        |> List.map (fun x -> (x, 1.0))
-        |> TyCoercionParam.Map.of_bindings;
-      dirt_coercions =
-        coercion_params.dirt_coercion_params |> DirtCoercionParam.Set.elements
-        |> List.map (fun x -> (x, 1.0))
-        |> DirtCoercionParam.Map.of_bindings;
-    }
-  in
-  coercion_params ++ counter
 
 let check_polarity_same _fold _fn (_polarities : FreeParams.params) _params =
   (* let _ =
@@ -519,8 +437,7 @@ type simple_node_constraction_state = {
 
 (* Joins simple type coercions to a reflexive coercion *)
 let remove_type_bridges { Language.Constraints.ty_constraints; _ }
-    ({ type_coercions; _ } as cnt) (params : FreeParams.params) =
-  Print.debug "Counter: %t" (print cnt);
+    (params : FreeParams.params) =
   let open Language.Constraints in
   let join_skeleton_component skel add_constraint graph new_constr =
     Print.debug "Joining simple nodes in %t" (Skeleton.Param.print skel);
@@ -583,13 +500,7 @@ let remove_type_bridges { Language.Constraints.ty_constraints; _ }
     let indeg_line = filter Reverse inverse_graph indeg in
     let outdeg_line = filter Direct graph outdeg in
     let reduction_heap =
-      Q.of_list
-        (indeg_line @ outdeg_line
-        |> List.map (fun rc ->
-               ( type_coercions
-                 |> EdgeSym.Map.find_opt rc.edge
-                 |> Option.value ~default:Float.infinity,
-                 rc )))
+      Q.of_list (indeg_line @ outdeg_line |> List.map (fun rc -> rc))
     in
     let process_part_general
         ({ source_node; sink_node; graph_direction; edge } :
@@ -718,8 +629,6 @@ let remove_type_bridges { Language.Constraints.ty_constraints; _ }
                   acc
                   |> Q.insert_new
                        (* If the coercion is not present, we assign it the largest value *)
-                       (EdgeSym.Map.find_opt potential_e type_coercions
-                       |> Option.value ~default:Float.infinity)
                        {
                          source_node = potential_v;
                          sink_node;
@@ -950,8 +859,7 @@ type simple_dirt_node_constraction_state = {
 }
 
 let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
-    ({ dirt_coercions; _ } as cnt) (params : FreeParams.params) =
-  Print.debug "Counter: %t" (print cnt);
+    (params : FreeParams.params) =
   let open Language.Constraints in
   let join_dirt_component add_constraint
       (graph :
@@ -1013,13 +921,7 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
     let indeg_line = filter Reverse inverse_graph indeg in
     let outdeg_line = filter Direct graph outdeg in
     let reduction_heap =
-      Q.of_list
-        (indeg_line @ outdeg_line
-        |> List.map (fun rc ->
-               ( dirt_coercions
-                 |> EdgeSym.Map.find_opt rc.edge
-                 |> Option.value ~default:Float.infinity,
-                 rc )))
+      Q.of_list (indeg_line @ outdeg_line |> List.map (fun rc -> rc))
     in
     let process_part_general
         ({ source_node; sink_node; graph_direction; edge } :
@@ -1135,8 +1037,6 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
                   acc
                   |> Q.insert_new
                        (* If the coercion is not present, we assign it the largest value *)
-                       (EdgeSym.Map.find_opt potential_e dirt_coercions
-                       |> Option.value ~default:Float.infinity)
                        {
                          source_node = potential_v;
                          sink_node;
@@ -1226,80 +1126,8 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
   join_dirt_component add_constraint dirt_constraints
     UnresolvedConstraints.empty
 
-let contract_constraints () = ()
-
-let rec score_expression e =
-  let cur, cong =
-    match e with
-    | { term = Term.Var _; _ } -> (TyCoercion.Params.empty, empty)
-    | { term = Term.Const _; _ } -> (TyCoercion.Params.empty, empty)
-    | { term = Term.Tuple lst; _ } ->
-        ( TyCoercion.Params.empty,
-          List.fold ( ++ ) empty (List.map score_expression lst) )
-    | { term = Term.Record r; _ } ->
-        ( TyCoercion.Params.empty,
-          List.fold ( ++ ) empty
-            (List.map score_expression (Label.Map.values r)) )
-    | { term = Term.Variant (_, e); _ } ->
-        (TyCoercion.Params.empty, Option.default_map empty score_expression e)
-    | { term = Term.Lambda abs; _ } ->
-        (TyCoercion.Params.empty, score_abstraction abs)
-    | { term = Term.Handler hc; _ } ->
-        (TyCoercion.Params.empty, score_handler_clauses hc)
-    | { term = Term.HandlerWithFinally { handler_clauses; finally_clause }; _ }
-      ->
-        ( TyCoercion.Params.empty,
-          score_handler_clauses handler_clauses
-          ++ score_abstraction finally_clause )
-    | { term = Term.CastExp (exp, coer); _ } ->
-        (TyCoercion.coercion_params_ty_coercion coer, score_expression exp)
-  in
-  combine cur (multiply 0.5 cong)
-
-and score_abstraction { term = _, c; _ } = score_computation c
-
-and score_handler_clauses { term = { Term.value_clause; effect_clauses }; _ } =
-  score_abstraction value_clause
-  ++ (Assoc.values_of effect_clauses.effect_part
-     |> List.map (fun { term = _, _, c; _ } -> score_computation c)
-     |> List.fold ( ++ ) empty)
-
-and score_computation c =
-  let cur, cong =
-    match c with
-    | { term = Term.Value e; _ } -> (TyCoercion.Params.empty, score_expression e)
-    | { term = Term.LetVal (e, abs); _ } ->
-        (TyCoercion.Params.empty, score_expression e ++ score_abstraction abs)
-    | { term = Term.LetRec (lst, c); _ } ->
-        ( TyCoercion.Params.empty,
-          Assoc.fold_left
-            (fun acc (_, abs) -> acc ++ score_abstraction abs)
-            empty lst
-          ++ score_computation c )
-    | { term = Term.Match (e, lst); _ } ->
-        ( TyCoercion.Params.empty,
-          score_expression e
-          ++ List.fold_left
-               (fun acc abs -> acc ++ score_abstraction abs)
-               empty lst )
-    | { term = Term.Apply (e1, e2); _ } ->
-        (TyCoercion.Params.empty, score_expression e1 ++ score_expression e2)
-    | { term = Term.Handle (e, c); _ } ->
-        (TyCoercion.Params.empty, score_expression e ++ score_computation c)
-    | { term = Term.Call (_, e, abs); _ } ->
-        (TyCoercion.Params.empty, score_expression e ++ score_abstraction abs)
-    | { term = Term.Bind (c1, abs); _ } ->
-        (TyCoercion.Params.empty, score_computation c1 ++ score_abstraction abs)
-    | { term = Term.CastComp (c, coer); _ } ->
-        (TyCoercion.coercion_params_dirty_coercion coer, score_computation c)
-    | { term = Term.Check (_, c); _ } ->
-        (TyCoercion.Params.empty, score_computation c)
-  in
-
-  combine cur (multiply 0.5 cong)
-
-let simplify_type_constraints ~loc type_definitions subs constraints
-    (get_counter, get_params) =
+let simplify_type_constraints ~loc type_definitions subs constraints get_params
+    =
   let cycle_constraints, _free_params =
     collapse_type_cycles constraints (get_params subs)
   in
@@ -1315,7 +1143,7 @@ let simplify_type_constraints ~loc type_definitions subs constraints
   let subs, constraints =
     if simplify_type_params_full then
       let simple_one_constraints =
-        remove_type_bridges constraints (get_counter subs) (get_params subs)
+        remove_type_bridges constraints (get_params subs)
       in
       let subs', simple_one_constraints' =
         Unification.unify ~loc type_definitions
@@ -1326,8 +1154,7 @@ let simplify_type_constraints ~loc type_definitions subs constraints
   in
   (subs, constraints)
 
-let simplify_dirt_contraints ~loc type_definitions subs constraints
-    (get_counter, get_params) =
+let simplify_dirt_contraints ~loc type_definitions subs constraints get_params =
   Print.debug "Full constraints: %t"
     (Language.Constraints.print_dot ~param_polarity:(get_params subs)
        constraints);
@@ -1354,8 +1181,7 @@ let simplify_dirt_contraints ~loc type_definitions subs constraints
       (Language.Constraints.print_dot ~param_polarity:(get_params subs)
          constraints);
     let new_constraints, touched =
-      remove_dirt_bridges cons_state (get_counter subs_state)
-        (get_params subs_state)
+      remove_dirt_bridges cons_state (get_params subs_state)
     in
     let subs_state, cons_state =
       Unification.unify ~loc type_definitions
@@ -1405,73 +1231,45 @@ let simplify_dirt_contraints ~loc type_definitions subs constraints
   in
   (subs, constraints)
 
-let simplify_constraints ~loc type_definitions subs constraints
-    (get_counter, get_params) =
+let simplify_constraints ~loc type_definitions subs constraints get_params =
   let subs, constraints =
     if simplify_type_params then
       simplify_type_constraints ~loc type_definitions subs constraints
-        (get_counter, get_params)
+        get_params
     else (subs, constraints)
   in
   let subs, constraints =
     if simplify_dirt_params then
-      simplify_dirt_contraints ~loc type_definitions subs constraints
-        (get_counter, get_params)
+      simplify_dirt_contraints ~loc type_definitions subs constraints get_params
     else (subs, constraints)
   in
   (subs, constraints)
 
 let simplify_computation ~loc type_definitions subs constraints cmp =
   Print.debug "cmp: %t" (Term.print_computation cmp);
-
-  simplify_constraints ~loc type_definitions subs constraints
-    ( (fun subs ->
-        let cmp = Term.apply_sub_comp subs cmp in
-        let counter = score_computation cmp in
-        let counter = multiply (-1.0) counter in
-        counter),
-      fun subs ->
-        let cmp = Term.apply_sub_comp subs cmp in
-        let parity = calculate_polarity_dirty_ty cmp.ty in
-        parity )
+  let typ = cmp.ty in
+  simplify_constraints ~loc type_definitions subs constraints (fun subs ->
+      let polarity =
+        calculate_polarity_dirty_ty (Substitution.apply_sub_dirty_ty subs typ)
+      in
+      polarity)
 
 let simplify_expression ~loc type_definitions subs constraints exp =
   Print.debug "exp: %t" (Term.print_expression exp);
+  let typ = exp.ty in
+  simplify_constraints ~loc type_definitions subs constraints (fun subs ->
+      let polarity =
+        calculate_polarity_type (Substitution.apply_sub_ty subs typ)
+      in
+      polarity)
 
-  simplify_constraints ~loc type_definitions subs constraints
-    ( (fun subs ->
-        let exp = Term.apply_sub_exp subs exp in
-        let counter = score_expression exp in
-        let counter = multiply (-1.0) counter in
-        counter),
-      fun subs ->
-        let exp = Term.apply_sub_exp subs exp in
-        let parity = calculate_polarity_type exp.ty in
-        parity )
-        
 let simplify_top_let_rec ~loc type_definitions subs constraints defs =
-  simplify_constraints ~loc type_definitions subs constraints
-    ( (fun subs ->
-        let defs = Assoc.map (Term.apply_sub_abs subs) defs in
-        let counter =
-          List.fold
-            (fun acc abs -> score_abstraction abs ++ acc)
-            empty (Assoc.values_of defs)
-        in
-        let counter = multiply (-1.0) counter in
-        counter),
-      fun subs ->
-        let defs = Assoc.map (Term.apply_sub_abs subs) defs in
-        let counter =
-          List.fold
-            (fun acc abs ->
-              FreeParams.union (calculate_polarity_abs_ty abs.ty) acc)
-            FreeParams.empty (Assoc.values_of defs)
-        in
-        counter )
-
-let a f g h x =
-  if f x then
-    (* can be if true, but we remove it to prevent optimizations *)
-    (g x, h x)
-  else (h x, g x)
+  simplify_constraints ~loc type_definitions subs constraints (fun subs ->
+      let defs = Assoc.map (Term.apply_sub_abs subs) defs in
+      let params =
+        List.fold
+          (fun acc abs ->
+            FreeParams.union (calculate_polarity_abs_ty abs.ty) acc)
+          FreeParams.empty (Assoc.values_of defs)
+      in
+      params)
