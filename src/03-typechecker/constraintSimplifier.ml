@@ -15,160 +15,6 @@ let simplify_dirt_params_full = false
 type contraction_mode = Direct | Reverse
 
 let string_of_mode = function Direct -> "Direct" | Reverse -> "Reverse"
-let reverse_mode = function Direct -> Reverse | Reverse -> Direct
-
-let compare_mode d1 d2 =
-  match (d1, d2) with
-  | Direct, Direct | Reverse, Reverse -> 0
-  | Direct, Reverse -> -1
-  | Reverse, Direct -> 1
-
-type dirt_reduction_candidates = {
-  incoming : Dirt.Param.Set.t;
-  outgoing : Dirt.Param.Set.t;
-  sources : Dirt.Param.Set.t;
-  sinks : Dirt.Param.Set.t;
-}
-
-let empty_candidates =
-  {
-    incoming = Dirt.Param.Set.empty;
-    outgoing = Dirt.Param.Set.empty;
-    sources = Dirt.Param.Set.empty;
-    sinks = Dirt.Param.Set.empty;
-  }
-
-type dirt_contraction_state = {
-  graph : Constraints.DirtConstraints.DirtParamGraph.t;
-  inverse_graph : Constraints.DirtConstraints.DirtParamGraph.t;
-  visited : Dirt.Param.Set.t;
-  unavailable : Dirt.Param.Set.t;
-  contraction_touched : Dirt.Param.Set.t;
-  candidates : dirt_reduction_candidates;
-  changed : Dirt.Param.Set.t;
-}
-
-let invert_candidates dirt_reduction_candidates =
-  {
-    incoming = dirt_reduction_candidates.outgoing;
-    outgoing = dirt_reduction_candidates.incoming;
-    sources = dirt_reduction_candidates.sinks;
-    sinks = dirt_reduction_candidates.sources;
-  }
-
-let union c1 c2 =
-  {
-    incoming = Dirt.Param.Set.union c1.incoming c2.incoming;
-    outgoing = Dirt.Param.Set.union c1.outgoing c2.outgoing;
-    sources = Dirt.Param.Set.union c1.sources c2.sources;
-    sinks = Dirt.Param.Set.union c1.sinks c2.sinks;
-  }
-
-let remove_candidates visited unavailable contraction_touched candidates =
-  {
-    incoming =
-      Dirt.Param.Set.diff
-        (Dirt.Param.Set.diff candidates.incoming visited)
-        contraction_touched;
-    outgoing =
-      Dirt.Param.Set.diff
-        (Dirt.Param.Set.diff candidates.outgoing visited)
-        contraction_touched;
-    sources =
-      Dirt.Param.Set.diff
-        (Dirt.Param.Set.diff candidates.sources visited)
-        unavailable;
-    sinks =
-      Dirt.Param.Set.diff
-        (Dirt.Param.Set.diff candidates.sinks visited)
-        unavailable;
-  }
-
-let invert ({ graph; inverse_graph; candidates; _ } as data) =
-  {
-    data with
-    graph = inverse_graph;
-    inverse_graph = graph;
-    candidates = invert_candidates candidates;
-  }
-
-let invert_with_dir data = function Direct -> data | Reverse -> invert data
-
-let source_sink_candidate { candidates = { sources; sinks; _ }; _ } =
-  match Dirt.Param.Set.choose_opt sources with
-  | Some s -> Some (s, Reverse)
-  | None -> (
-      match Dirt.Param.Set.choose_opt sinks with
-      | Some s -> Some (s, Direct)
-      | None -> None)
-
-let incoming_outgoing_candidate { candidates = { incoming; outgoing; _ }; _ } =
-  match Dirt.Param.Set.choose_opt outgoing with
-  | Some s -> Some (s, Reverse)
-  | None -> (
-      match Dirt.Param.Set.choose_opt incoming with
-      | Some s -> Some (s, Direct)
-      | None -> None)
-
-let recalculate_dirt_reduction_candidates
-    ({
-       graph;
-       inverse_graph;
-       visited;
-       candidates;
-       unavailable;
-       contraction_touched;
-       _;
-     } as data) new_candidates =
-  let module BaseSym = Dirt.Param in
-  let module G = Constraints.DirtConstraints.DirtParamGraph in
-  (* Calculate sinks and sources *)
-  {
-    data with
-    candidates =
-      List.fold_right
-        (fun candidate candidates ->
-          let outdeg = graph |> G.get_edges candidate |> BaseSym.Map.cardinal in
-          let indeg =
-            inverse_graph |> G.get_edges candidate |> BaseSym.Map.cardinal
-          in
-          let add s = BaseSym.Set.add candidate s in
-          let remove s = BaseSym.Set.remove candidate s in
-          {
-            incoming =
-              (if outdeg = 1 then add candidates.incoming
-               else remove candidates.incoming);
-            outgoing =
-              (if indeg = 1 then add candidates.outgoing
-               else remove candidates.outgoing);
-            sources =
-              (if indeg = 0 then add candidates.sources
-               else remove candidates.sources);
-            sinks =
-              (if outdeg = 0 then add candidates.sinks
-               else remove candidates.sinks);
-          })
-        new_candidates candidates
-      |> remove_candidates visited unavailable contraction_touched;
-  }
-
-module EdgeDirection = struct
-  type edge_direction = Incoming | Outgoing
-
-  let compare_direction d1 d2 =
-    match (d1, d2) with
-    | Incoming, Incoming | Outgoing, Outgoing -> 0
-    | Incoming, Outgoing -> -1
-    | Outgoing, Incoming -> 1
-
-  let reverse_edge_direction = function
-    | Incoming -> Outgoing
-    | Outgoing -> Incoming
-
-  let string_of_edge_direction = function
-    | Incoming -> "Incoming"
-    | Outgoing -> "Outgoing"
-end
 
 type ('a, 'b) reduction_candidate = {
   source_node : 'a;
@@ -182,113 +28,6 @@ let print_reduction_candidate pn pe
   Format.fprintf ppf "{ %t-[%t]->%t; %s }" (pn source_node) (pe edge)
     (pn sink_node)
     (string_of_mode graph_direction)
-
-module ReductionQueue (Node : Symbol.S) (Edge : Symbol.S) = struct
-  (* Bad immutabble priority queue *)
-
-  let uid = ref 0
-
-  type uid = Uid of int
-  type key = uid
-  type elt = (Node.t, Edge.t) reduction_candidate
-  type e_dir = Edge.t * contraction_mode
-
-  module EdgeDirectionMap = Map.Make (struct
-    type t = e_dir
-
-    let compare (e1, d1) (e2, d2) =
-      let c = Edge.compare e1 e2 in
-      if c = 0 then compare_mode d1 d2 else c
-  end)
-
-  module EdM = EdgeDirectionMap
-
-  module UidMap = Map.Make (struct
-    type t = key
-
-    let compare = compare
-  end)
-
-  module EltSet = Set.Make (struct
-    type t = elt
-
-    let compare = compare
-  end)
-
-  type t = {
-    queue : elt UidMap.t;
-    keys : key EdM.t;
-    endpoints : e_dir list Node.Map.t;
-  }
-
-  let empty =
-    { queue = UidMap.empty; keys = EdM.empty; endpoints = Node.Map.empty }
-
-  let append_to_map edge = function
-    | None -> Some [ edge ]
-    | Some x -> Some (edge :: x)
-
-  let insert_new ({ edge; source_node; graph_direction; _ } as r_cand)
-      ({ queue; keys; endpoints } as pq) =
-    let e_dir = (edge, graph_direction) in
-    match EdM.find_opt e_dir keys with
-    | Some key ->
-        (* We might need to reinsert  *)
-        { pq with queue = UidMap.add key r_cand queue }
-    | None ->
-        incr uid;
-        let key = Uid !uid in
-        {
-          queue = UidMap.add key r_cand queue;
-          keys = EdM.add e_dir key keys;
-          endpoints =
-            Node.Map.update source_node (append_to_map e_dir) endpoints;
-        }
-
-  let of_list l = List.fold (fun acc cand -> insert_new cand acc) empty l
-  let find_min { queue; _ } = UidMap.min_binding_opt queue
-
-  let remove edge ({ queue; keys; _ } as q) =
-    let key = EdM.find edge keys in
-    (* assert (Edge.compare edge (Node.Map.find node endpoints) = 0); *)
-    { q with queue = UidMap.remove key queue; keys = EdM.remove edge keys }
-
-  let remove_non_strict edge ({ queue; keys; _ } as q) =
-    match EdM.find_opt edge keys with
-    | Some key ->
-        (* assert (Edge.compare edge (Node.Map.find node endpoints) = 0); *)
-        { q with queue = UidMap.remove key queue; keys = EdM.remove edge keys }
-    | None -> q
-
-  let remove_node node direction ({ endpoints; _ } as q) =
-    Print.debug "Removing node %t" (Node.print node);
-    let edges =
-      Node.Map.find_opt node endpoints
-      |> Option.value ~default:[]
-      |> List.filter (fun (_, d) -> d = direction)
-    in
-    List.fold (fun q edge -> remove_non_strict edge q) q edges
-
-  let print_rc = print_reduction_candidate Node.print Edge.print
-
-  let print { queue; endpoints; _ } ppf =
-    Format.fprintf ppf "{ %t;\n %t }"
-      (Print.sequence ", "
-         (fun (Uid uid, rc) ppf ->
-           Format.fprintf ppf "(%d) ↦ %t " uid (print_rc rc))
-         (UidMap.bindings queue))
-      (Node.Map.print
-         (fun lst ppf ->
-           Format.fprintf ppf "[ %t ]"
-             (Print.sequence ", "
-                (fun (e, dir) ppf ->
-                  Format.fprintf ppf "(%t, %s)" (Edge.print e)
-                    (string_of_mode dir))
-                lst))
-         endpoints)
-
-  let iter fn { queue; _ } = UidMap.iter fn queue
-end
 
 let check_polarity_same _fold _fn (_polarities : FreeParams.params) _params =
   (* let _ =
@@ -425,13 +164,10 @@ let graph_to_constraints skel_param graph =
 
 type graph = Language.Constraints.TyConstraints.TyParamGraph.t
 
-module Q = ReductionQueue (TyParam) (TyCoercionParam)
-
 type simple_node_constraction_state = {
   base_graph : graph;
   reversed_graph : graph;
   free_parameters : Type.FreeParams.params;
-  coercion_queue : Q.t;
   collected_constraints : UnresolvedConstraints.t;
 }
 
@@ -446,92 +182,27 @@ let remove_type_bridges { Language.Constraints.ty_constraints; _ }
     let module BaseSym = TyParam in
     let module EdgeSym = TyCoercionParam in
     let module G = TyConstraints.TyParamGraph in
-    let module Q = ReductionQueue (BaseSym) (EdgeSym) in
     (* We can assume that the graph is a DAG *)
     let inverse_graph = G.reverse graph in
-    let increment v m =
-      BaseSym.Map.update v
-        (function None -> Some 1 | Some x -> Some (x + 1))
-        m
-    in
-    let indeg, outdeg =
-      G.fold
-        (fun source sink _edge (indeg, outdeg) ->
-          (increment sink indeg, increment source outdeg))
-        graph
-        (BaseSym.Map.empty, BaseSym.Map.empty)
-    in
-    (* Sanity check *)
-    let assert_degrees grph line =
-      BaseSym.Map.iter
-        (fun p n ->
-          let sz = G.get_edges p grph |> G.Edges.cardinal in
-          assert (n = sz))
-        line
-    in
-    assert_degrees inverse_graph indeg;
-    assert_degrees graph outdeg;
-    (* Find the node with the least indegree *)
-    let get_ones direction core_graph (source_node, n) =
-      Print.debug "Direction: %s" (string_of_mode direction);
-      Print.debug "%t" (BaseSym.print source_node);
-      assert (n <> 0);
-      if n = 1 then
-        let sink_node, edge =
-          G.get_edges source_node core_graph |> BaseSym.Map.bindings |> function
-          | [ ((n, e) : BaseSym.t * EdgeSym.t) ] -> (n, e)
-          | [] -> assert false
-          | _ -> assert false
-        in
-        Some { graph_direction = direction; sink_node; edge; source_node }
-      else None
-    in
-    let filter direction core_graph line =
-      line |> BaseSym.Map.bindings
-      |> List.filter_map (get_ones direction core_graph)
-    in
-    let lst = indeg |> BaseSym.Map.bindings in
-    Print.debug "Line: bindings indeg: %t"
-      (Print.sequence "," (fun (s, _) -> BaseSym.print s) lst);
-    Print.debug "Line: bindings outdeg: %t"
-      (Print.sequence ","
-         (fun (s, _) -> BaseSym.print s)
-         (outdeg |> BaseSym.Map.bindings));
-    let indeg_line = filter Reverse inverse_graph indeg in
-    let outdeg_line = filter Direct graph outdeg in
-    let reduction_heap =
-      Q.of_list (indeg_line @ outdeg_line |> List.map (fun rc -> rc))
-    in
     let process_part_general
         ({ source_node; sink_node; graph_direction; edge } :
           (BaseSym.t, EdgeSym.t) reduction_candidate)
-        ({ base_graph; reversed_graph; coercion_queue; free_parameters; _ } as
-        state) =
+        ({ base_graph; reversed_graph; free_parameters; _ } as state) =
       (*
-         Imagine a local part of graph of the form:
-         (source)-[edge]->(sink)
-         where the the source has an outdegree of 1.
-         We exiplicitly make the edge reflexive and remove the source node (as it needs fewer rewirings)
-         In essence, this methods contracts reduction candidate under the assumption, 
-         that is has an outdegree of 1 in base_graph. 
+     Imagine a local part of graph of the form:
+     (source)-[edge]->(sink)
+     where the the source has an outdegree of 1.
+     We exiplicitly make the edge reflexive and remove the source node (as it needs fewer rewirings)
+     In essence, this methods contracts reduction candidate under the assumption, 
+     that is has an outdegree of 1 in base_graph. 
 
-         Every node with an indegree 1 is also a node with an outdegree of 1 in the reversed graph.
-         This is handeled by the graph_direction parameter.
-      *)
+     Every node with an indegree 1 is also a node with an outdegree of 1 in the reversed graph.
+     This is handeled by the graph_direction parameter.
+  *)
       Print.debug "Removing %t-[%t]->%t %s"
         (BaseSym.print source_node)
         (EdgeSym.print edge) (BaseSym.print sink_node)
         (string_of_mode graph_direction);
-      (* Sanity check that the contraction still makes sense *)
-      Q.iter
-        (fun _ { source_node; graph_direction = ed; _ } ->
-          (* graphs are not yet reversed here *)
-          let g, rg = (base_graph, reversed_graph) in
-          match ed with
-          | Direct -> assert (G.get_edges source_node g |> G.Edges.cardinal = 1)
-          | Reverse ->
-              assert (G.get_edges source_node rg |> G.Edges.cardinal = 1))
-        coercion_queue;
       let reversal =
         match graph_direction with
         | Direct -> fun (x, y) -> (x, y)
@@ -564,17 +235,6 @@ let remove_type_bridges { Language.Constraints.ty_constraints; _ }
         (Language.Constraints.print_dot (graph_to_constraints skel base_graph));
       (* Update according to the direction *)
       let base_graph, reversed_graph = reversal (base_graph, reversed_graph) in
-      let remove_current_edge q =
-        q
-        |> (match graph_direction with
-           | Direct -> Q.remove_non_strict (edge, Direct)
-           | _ -> fun x -> x)
-        |>
-        match graph_direction with
-        | Reverse -> Q.remove_non_strict (edge, Reverse)
-        | _ -> fun x -> x
-      in
-
       (* Sanity check for the constraint we are contracting *)
       let connecting_edge = G.get_edges source_node base_graph in
       assert (G.Edges.cardinal connecting_edge = 1);
@@ -582,16 +242,7 @@ let remove_type_bridges { Language.Constraints.ty_constraints; _ }
       assert (BaseSym.compare possible_sink sink_node = 0);
       assert (possible_sink = sink_node);
 
-      let get_vertices = G.Edges.vertices in
-
-      let next = G.get_edges sink_node base_graph in
-      let next_v = next |> get_vertices in
-
-      let uncle = G.get_edges sink_node reversed_graph in
-      let uncle_v = uncle |> get_vertices in
-
       let previous = G.get_edges source_node reversed_graph in
-      let previous_v = previous |> get_vertices in
 
       if can_collapse then
         (* We need to rewire previous from source to sink *)
@@ -618,42 +269,12 @@ let remove_type_bridges { Language.Constraints.ty_constraints; _ }
                previous
           |> G.remove_vertex_unsafe source_node
         in
-        let update_queue base_graph vertices direction queue =
-          List.fold
-            (fun acc potential_v ->
-              let edges =
-                base_graph |> G.get_edges potential_v |> G.Edges.bindings
-              in
-              match edges with
-              | [ (sink_node, potential_e) ] ->
-                  acc
-                  |> Q.insert_new
-                       (* If the coercion is not present, we assign it the largest value *)
-                       {
-                         source_node = potential_v;
-                         sink_node;
-                         edge = potential_e;
-                         graph_direction = direction;
-                       }
-              | _ -> acc |> Q.remove_node potential_v direction)
-            queue vertices
-        in
-
-        let potential =
-          [ sink_node; source_node ] @ previous_v @ uncle_v @ next_v
-        in
         let base_graph, reversed_graph =
           reversal (base_graph, reversed_graph)
-        in
-        let queue =
-          coercion_queue |> remove_current_edge
-          |> update_queue reversed_graph potential Reverse
-          |> update_queue base_graph potential Direct
         in
         ( {
             base_graph;
             reversed_graph;
-            coercion_queue = queue;
             collected_constraints =
               add_constraint sink_node source_node state.collected_constraints;
             free_parameters =
@@ -665,53 +286,100 @@ let remove_type_bridges { Language.Constraints.ty_constraints; _ }
               };
           },
           can_collapse )
-      else
-        (* If we can't make the coercion, just remove the edge from queue *)
-        ( { state with coercion_queue = coercion_queue |> remove_current_edge },
-          can_collapse )
+      else (state, can_collapse)
     in
-    let rec process (graph, reverse_graph) (queue : Q.t) params visited
+    let increment v m =
+      BaseSym.Map.update v
+        (function None -> Some 1 | Some x -> Some (x + 1))
+        m
+    in
+    let indeg, outdeg =
+      G.fold
+        (fun source sink _edge (indeg, outdeg) ->
+          (increment sink indeg, increment source outdeg))
+        graph
+        (BaseSym.Map.empty, BaseSym.Map.empty)
+    in
+    (* Sanity check *)
+    let assert_degrees grph line =
+      BaseSym.Map.iter
+        (fun p n ->
+          let sz = G.get_edges p grph |> G.Edges.cardinal in
+          assert (n = sz))
+        line
+    in
+    assert_degrees inverse_graph indeg;
+    assert_degrees graph outdeg;
+    let lst = indeg |> BaseSym.Map.bindings in
+    Print.debug "Line: bindings indeg: %t"
+      (Print.sequence "," (fun (s, _) -> BaseSym.print s) lst);
+    Print.debug "Line: bindings outdeg: %t"
+      (Print.sequence ","
+         (fun (s, _) -> BaseSym.print s)
+         (outdeg |> BaseSym.Map.bindings));
+
+    let rec process (graph, reverse_graph) params visited
         (constr : UnresolvedConstraints.t) =
       (* Choose next one *)
-      Print.debug "Queue: %t" (Q.print queue);
-      let rec find_next (queue : Q.t) =
-        match Q.find_min queue with
-        | Some (_, min) ->
-            Print.debug "Trying: %t %s" (EdgeSym.print min.edge)
-              (string_of_mode min.graph_direction);
-            let queue = queue |> Q.remove (min.edge, min.graph_direction) in
-            if EdgeSym.Set.mem min.edge visited then find_next queue
-            else (
-              Print.debug "Selecting: %t %s" (EdgeSym.print min.edge)
-                (string_of_mode min.graph_direction);
-              Some (min, queue))
-        | None -> None
+
+      (* Select the next one that can be removed *)
+      let get_ones direction core_graph (source_node, n) =
+        Print.debug "Direction: %s" (string_of_mode direction);
+        Print.debug "%t" (BaseSym.print source_node);
+        assert (n <> 0);
+        if n = 1 then
+          let sink_node, edge =
+            G.get_edges source_node core_graph |> BaseSym.Map.bindings
+            |> function
+            | [ ((n, e) : BaseSym.t * EdgeSym.t) ] -> (n, e)
+            | [] -> assert false
+            | _ -> assert false
+          in
+          Some { graph_direction = direction; sink_node; edge; source_node }
+        else None
       in
-      match find_next queue with
-      | Some (m, queue) ->
+      let filter direction core_graph line =
+        line |> BaseSym.Map.bindings
+        |> List.filter_map (get_ones direction core_graph)
+      in
+      let lst = indeg |> BaseSym.Map.bindings in
+      Print.debug "Line: bindings indeg: %t"
+        (Print.sequence "," (fun (s, _) -> BaseSym.print s) lst);
+      Print.debug "Line: bindings outdeg: %t"
+        (Print.sequence ","
+           (fun (s, _) -> BaseSym.print s)
+           (outdeg |> BaseSym.Map.bindings));
+      let indeg_line = filter Reverse inverse_graph indeg in
+      let outdeg_line = filter Direct graph outdeg in
+      let candidates =
+        indeg_line @ outdeg_line
+        |> List.filter (fun c -> not (EdgeSym.Set.mem c.edge visited))
+      in
+      match candidates with
+      | top :: _ ->
+          Print.debug "Trying: %t %s" (EdgeSym.print top.edge)
+            (string_of_mode top.graph_direction);
+          Print.debug "Selecting: %t %s" (EdgeSym.print top.edge)
+            (string_of_mode top.graph_direction);
           let processing_state =
             {
               base_graph = graph;
               reversed_graph = reverse_graph;
               free_parameters = params;
-              coercion_queue = queue;
               collected_constraints = constr;
             }
           in
-          let state, collapsed = process_part_general m processing_state in
+          let state, collapsed = process_part_general top processing_state in
           let visited =
-            if collapsed then EdgeSym.Set.add m.edge visited else visited
+            if collapsed then EdgeSym.Set.add top.edge visited else visited
           in
           process
             (state.base_graph, state.reversed_graph)
-            state.coercion_queue state.free_parameters visited
-            state.collected_constraints
-      | None ->
-          Print.debug "No more edges to process";
-          constr
+            state.free_parameters visited state.collected_constraints
+      | _ -> constr
     in
-    process (graph, inverse_graph) reduction_heap params EdgeSym.Set.empty
-      new_constr
+
+    process (graph, inverse_graph) params EdgeSym.Set.empty new_constr
   in
   let new_constr =
     Skeleton.Param.Map.fold
@@ -848,13 +516,10 @@ let contract_unreachable_dirt_nodes { Language.Constraints.dirt_constraints; _ }
 
 type dirt_graph = Language.Constraints.DirtConstraints.DirtParamGraph.t
 
-module QD = ReductionQueue (Dirt.Param) (DirtCoercionParam)
-
 type simple_dirt_node_constraction_state = {
   base_graph : dirt_graph;
   reversed_graph : dirt_graph;
   free_parameters : Type.FreeParams.params;
-  coercion_queue : QD.t;
   collected_constraints : UnresolvedConstraints.t;
 }
 
@@ -869,7 +534,6 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
     let module EdgeSym = DirtCoercionParam in
     let module D = Label.Set in
     let module G = DirtConstraints.DirtParamGraph in
-    let module Q = QD in
     (* We can assume that the graph is a DAG *)
     let inverse_graph = G.reverse graph in
     let increment v m =
@@ -884,33 +548,6 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
         graph
         (BaseSym.Map.empty, BaseSym.Map.empty)
     in
-    (* Sanity check *)
-    let assert_degrees grph line =
-      BaseSym.Map.iter
-        (fun p n ->
-          let sz = G.get_edges p grph |> G.Edges.cardinal in
-          assert (n = sz))
-        line
-    in
-    assert_degrees inverse_graph indeg;
-    assert_degrees graph outdeg;
-    (* Find the node with the least indegree *)
-    let get_ones direction core_graph (source_node, n) =
-      assert (n <> 0);
-      if n = 1 then
-        let sink_node, edge =
-          G.get_edges source_node core_graph |> BaseSym.Map.bindings |> function
-          | [ ((n, (e, _)) : BaseSym.t * (EdgeSym.t * D.t)) ] -> (n, e)
-          | [] -> assert false
-          | _ -> assert false
-        in
-        Some { graph_direction = direction; sink_node; edge; source_node }
-      else None
-    in
-    let filter direction core_graph line =
-      line |> BaseSym.Map.bindings
-      |> List.filter_map (get_ones direction core_graph)
-    in
     let lst = indeg |> BaseSym.Map.bindings in
     Print.debug "Line: bindings indeg: %t"
       (Print.sequence "," (fun (s, _) -> BaseSym.print s) lst);
@@ -918,15 +555,11 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
       (Print.sequence ","
          (fun (s, _) -> BaseSym.print s)
          (outdeg |> BaseSym.Map.bindings));
-    let indeg_line = filter Reverse inverse_graph indeg in
-    let outdeg_line = filter Direct graph outdeg in
-    let reduction_heap =
-      Q.of_list (indeg_line @ outdeg_line |> List.map (fun rc -> rc))
-    in
+
     let process_part_general
         ({ source_node; sink_node; graph_direction; edge } :
           (BaseSym.t, EdgeSym.t) reduction_candidate)
-        ({ base_graph; reversed_graph; coercion_queue; _ } as state :
+        ({ base_graph; reversed_graph; _ } as state :
           simple_dirt_node_constraction_state) =
       (*
      Imagine a local part of graph of the form:
@@ -944,16 +577,6 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
         (EdgeSym.print edge) (BaseSym.print sink_node)
         (string_of_mode graph_direction);
 
-      (* Sanity check that the contraction still makes sense *)
-      Q.iter
-        (fun _ { source_node; graph_direction = ed; _ } ->
-          (* graphs are not yet reversed here *)
-          let g, rg = (base_graph, reversed_graph) in
-          match ed with
-          | Direct -> assert (G.get_edges source_node g |> G.Edges.cardinal = 1)
-          | Reverse ->
-              assert (G.get_edges source_node rg |> G.Edges.cardinal = 1))
-        coercion_queue;
       let reversal =
         match graph_direction with
         | Direct -> fun (x, y) -> (x, y)
@@ -961,11 +584,6 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
       in
       (* Update according to the direction *)
       let base_graph, reversed_graph = reversal (base_graph, reversed_graph) in
-      let remove_current_edge q =
-        q
-        |> Q.remove_non_strict (edge, Direct)
-        |> Q.remove_non_strict (edge, Reverse)
-      in
 
       (* Sanity check for the constraint we are contracting *)
       let connecting_edge = G.get_edges source_node base_graph in
@@ -974,16 +592,7 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
       assert (BaseSym.compare possible_sink sink_node = 0);
       assert (possible_sink = sink_node);
 
-      let get_vertices = G.Edges.vertices in
-
-      let next = G.get_edges sink_node base_graph in
-      let next_v = next |> get_vertices in
-
-      let uncle = G.get_edges sink_node reversed_graph in
-      let uncle_v = uncle |> get_vertices in
-
       let previous = G.get_edges source_node reversed_graph in
-      let previous_v = previous |> get_vertices in
 
       (* We can't contract edges between (+)->(-) nodes *)
       (* We need to take into the account possible reversal *)
@@ -1024,44 +633,12 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
                previous
           |> G.remove_vertex_unsafe source_node
         in
-        let update_queue
-            (base_graph : (EdgeSym.t * D.t) BaseSym.Map.t BaseSym.Map.t)
-            vertices direction queue =
-          List.fold
-            (fun acc potential_v ->
-              let edges =
-                base_graph |> G.get_edges potential_v |> G.Edges.bindings
-              in
-              match edges with
-              | [ (sink_node, (potential_e, _)) ] ->
-                  acc
-                  |> Q.insert_new
-                       (* If the coercion is not present, we assign it the largest value *)
-                       {
-                         source_node = potential_v;
-                         sink_node;
-                         edge = potential_e;
-                         graph_direction = direction;
-                       }
-              | _ -> acc |> Q.remove_node potential_v direction)
-            queue vertices
-        in
-        let potential =
-          [ sink_node; source_node ] @ previous_v @ uncle_v @ next_v
-        in
         let base_graph, reversed_graph =
           reversal (base_graph, reversed_graph)
         in
-        let queue =
-          coercion_queue |> remove_current_edge
-          |> update_queue reversed_graph potential Reverse
-          |> update_queue base_graph potential Direct
-        in
-
         ( {
             base_graph;
             reversed_graph;
-            coercion_queue = queue;
             collected_constraints =
               add_constraint sink_node source_node state.collected_constraints;
             free_parameters =
@@ -1073,33 +650,49 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
               };
           },
           Some source_node )
-      else
-        (* If we can't make the coercion, just remove the edge from queue *)
-        ( { state with coercion_queue = coercion_queue |> remove_current_edge },
-          None )
+      else (state, None)
     in
-    let rec process (graph, reverse_graph) (queue : Q.t) params visited touched
+    let rec process (graph, reverse_graph) params visited touched
         (constr : UnresolvedConstraints.t) =
       (* Choose next one *)
-      Print.debug "Queue: %t" (Q.print queue);
-      let rec find_next (queue : Q.t) =
-        match Q.find_min queue with
-        | Some (_, min) ->
-            Print.debug "Trying: %t" (EdgeSym.print min.edge);
-            let queue = queue |> Q.remove (min.edge, min.graph_direction) in
-            if EdgeSym.Set.mem min.edge visited then find_next queue
-            else Some (min, queue)
-        | None -> None
+      let get_ones direction core_graph (source_node, n) =
+        assert (n <> 0);
+        if n = 1 then
+          let sink_node, edge =
+            G.get_edges source_node core_graph |> BaseSym.Map.bindings
+            |> function
+            | [ ((n, (e, _)) : BaseSym.t * (EdgeSym.t * D.t)) ] -> (n, e)
+            | [] -> assert false
+            | _ -> assert false
+          in
+          Some { graph_direction = direction; sink_node; edge; source_node }
+        else None
       in
-      match find_next queue with
-      | Some (m, queue) ->
+      let filter direction core_graph line =
+        line |> BaseSym.Map.bindings
+        |> List.filter_map (get_ones direction core_graph)
+      in
+      let lst = indeg |> BaseSym.Map.bindings in
+      Print.debug "Line: bindings indeg: %t"
+        (Print.sequence "," (fun (s, _) -> BaseSym.print s) lst);
+      Print.debug "Line: bindings outdeg: %t"
+        (Print.sequence ","
+           (fun (s, _) -> BaseSym.print s)
+           (outdeg |> BaseSym.Map.bindings));
+      let indeg_line = filter Reverse inverse_graph indeg in
+      let outdeg_line = filter Direct graph outdeg in
+      let candidates =
+        indeg_line @ outdeg_line
+        |> List.filter (fun c -> not (EdgeSym.Set.mem c.edge visited))
+      in
+      match candidates with
+      | m :: _ ->
           let visited = EdgeSym.Set.add m.edge visited in
           let processing_state =
             {
               base_graph = graph;
               reversed_graph = reverse_graph;
               free_parameters = params;
-              coercion_queue = queue;
               collected_constraints = constr;
             }
           in
@@ -1111,12 +704,10 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
           in
           process
             (state.base_graph, state.reversed_graph)
-            state.coercion_queue state.free_parameters visited touched
-            state.collected_constraints
-      | None -> (constr, touched)
+            state.free_parameters visited touched state.collected_constraints
+      | [] -> (constr, touched)
     in
-    process (graph, inverse_graph) reduction_heap params EdgeSym.Set.empty []
-      new_constr
+    process (graph, inverse_graph) params EdgeSym.Set.empty [] new_constr
   in
   let add_constraint source target constraints =
     UnresolvedConstraints.add_dirt_equality
