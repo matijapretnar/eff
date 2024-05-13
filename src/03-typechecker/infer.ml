@@ -435,7 +435,7 @@ let process_computation state comp =
   let sub, residuals =
     if !Config.simplify_coercions then
       ConstraintSimplifier.simplify_computation ~loc:comp.at
-        state.type_definitions sub residuals comp'
+        state.type_definitions sub residuals comp'.ty
     else (sub, residuals)
   in
   let cmp' = Term.apply_sub_comp sub comp' in
@@ -469,7 +469,7 @@ let process_top_let ~loc state defs =
     let sub, constraints =
       if !Config.simplify_coercions then
         ConstraintSimplifier.simplify_computation ~loc state.type_definitions
-          sub constraints cmp'
+          sub constraints cmp'.ty
       else (sub, constraints)
     in
     Print.debug "After optimization";
@@ -513,7 +513,8 @@ let process_top_let_rec ~loc state un_defs =
   let sub, constraints =
     if !Config.simplify_coercions then
       ConstraintSimplifier.simplify_top_let_rec ~loc state.type_definitions sub
-        constraints defs'
+        constraints
+        (defs' |> Assoc.values_of |> List.map (fun abs -> abs.ty))
     else (sub, constraints)
   in
   let defs = Assoc.map (Term.apply_substitutions_to_abstraction sub) defs' in

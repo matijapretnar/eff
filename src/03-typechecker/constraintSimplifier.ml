@@ -836,31 +836,26 @@ let simplify_constraints ~loc type_definitions subs constraints get_params =
   in
   (subs, constraints)
 
-let simplify_computation ~loc type_definitions subs constraints cmp =
-  Print.debug "cmp: %t" (Term.print_computation cmp);
-  let typ = cmp.ty in
+let simplify_computation ~loc type_definitions subs constraints typ =
   simplify_constraints ~loc type_definitions subs constraints (fun subs ->
       let polarity =
         calculate_polarity_dirty_ty (Substitution.apply_sub_dirty_ty subs typ)
       in
       polarity)
 
-let simplify_expression ~loc type_definitions subs constraints exp =
-  Print.debug "exp: %t" (Term.print_expression exp);
-  let typ = exp.ty in
+let simplify_expression ~loc type_definitions subs constraints typ =
   simplify_constraints ~loc type_definitions subs constraints (fun subs ->
       let polarity =
         calculate_polarity_type (Substitution.apply_sub_ty subs typ)
       in
       polarity)
 
-let simplify_top_let_rec ~loc type_definitions subs constraints defs =
+let simplify_top_let_rec ~loc type_definitions subs constraints tys =
   simplify_constraints ~loc type_definitions subs constraints (fun subs ->
-      let defs = Assoc.map (Term.apply_sub_abs subs) defs in
+      let tys = List.map (Substitution.apply_sub_abs_ty subs) tys in
       let params =
         List.fold
-          (fun acc abs ->
-            FreeParams.union (calculate_polarity_abs_ty abs.ty) acc)
-          FreeParams.empty (Assoc.values_of defs)
+          (fun acc ty -> FreeParams.union (calculate_polarity_abs_ty ty) acc)
+          FreeParams.empty tys
       in
       params)
