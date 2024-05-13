@@ -34,17 +34,6 @@ let add_ty_equality con cons =
 let add_ty_inequality con cons =
   { cons with ty_inequalities = con :: cons.ty_inequalities }
 
-let union cons1 cons2 =
-  {
-    skeleton_equalities = cons1.skeleton_equalities @ cons2.skeleton_equalities;
-    dirt_equalities = cons1.dirt_equalities @ cons2.dirt_equalities;
-    dirt_inequalities = cons1.dirt_inequalities @ cons2.dirt_inequalities;
-    ty_equalities = cons1.ty_equalities @ cons2.ty_equalities;
-    ty_inequalities = cons1.ty_inequalities @ cons2.ty_inequalities;
-  }
-
-let list_union conss = List.fold_left union empty conss
-
 let print c =
   let print_skeleton_equality (sk1, sk2) ppf =
     Print.print ppf "%t = %t" (Skeleton.print sk1) (Skeleton.print sk2)
@@ -147,17 +136,17 @@ let return_to_unresolved (resolved : Constraints.t) queue =
 
 let unresolve resolved = return_to_unresolved resolved empty
 
-let fresh_ty_coer cons =
+let fresh_ty_coer cnstrs cons =
   let param = Type.TyCoercionParam.fresh () in
   ( { term = TyCoercion.TyCoercionVar param; ty = cons },
-    { empty with ty_inequalities = [ (param, cons) ] } )
+    add_ty_inequality (param, cons) cnstrs )
 
-let fresh_dirt_coer cons =
+let fresh_dirt_coer cnstrs cons =
   let param = Type.DirtCoercionParam.fresh () in
   ( { term = DirtCoercion.DirtCoercionVar param; ty = cons },
-    { empty with dirt_inequalities = [ (param, cons) ] } )
+    add_dirt_inequality (param, cons) cnstrs )
 
-let fresh_dirty_coer ((ty1, drt1), (ty2, drt2)) =
-  let ty_coer, ty_cons = fresh_ty_coer (ty1, ty2)
-  and drt_coer, drt_cons = fresh_dirt_coer (drt1, drt2) in
-  (TyCoercion.bangCoercion (ty_coer, drt_coer), union ty_cons drt_cons)
+let fresh_dirty_coer cnstrs ((ty1, drt1), (ty2, drt2)) =
+  let ty_coer, cnstrs' = fresh_ty_coer cnstrs (ty1, ty2) in
+  let drt_coer, cnstrs'' = fresh_dirt_coer cnstrs' (drt1, drt2) in
+  (TyCoercion.bangCoercion (ty_coer, drt_coer), cnstrs'')

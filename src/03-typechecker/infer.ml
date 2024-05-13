@@ -33,7 +33,8 @@ let identity_instantiation (params : Type.Params.t)
         |> Language.Skeleton.Param.Map.of_bindings;
     }
 
-let fresh_instantiation (params : Type.Params.t) (constraints : Constraints.t) =
+let fresh_instantiation cnstrs (params : Type.Params.t)
+    (constraints : Constraints.t) =
   let _, subst = Substitution.of_parameters params in
   let add_dirt_constraint _d1 _d2 w _effs drt1 drt2 (subst, constraints) =
     let w' = Type.DirtCoercionParam.refresh w
@@ -57,7 +58,7 @@ let fresh_instantiation (params : Type.Params.t) (constraints : Constraints.t) =
     in
     (subst', constraints')
   in
-  (subst, UnresolvedConstraints.empty)
+  (subst, cnstrs)
   |> Constraints.TyConstraints.fold_expanded add_ty_constraint
        constraints.ty_constraints
   |> Constraints.DirtConstraints.fold_expanded add_dirt_constraint
@@ -84,57 +85,56 @@ let initial_state : state =
   }
 
 (* Typecheck a list of things *)
-let infer_many infer xs =
+let infer_many infer cnstrs xs =
   List.fold_right
-    (fun x (xs', css) ->
-      let x', cs = infer x in
-      (x' :: xs', cs :: css))
-    xs ([], [])
+    (fun x (xs', cnstrs) ->
+      let x', cnstrs' = infer cnstrs x in
+      (x' :: xs', cnstrs'))
+    xs ([], cnstrs)
 
 (* ************************************************************************* *)
 (*                            PATTERN TYPING                                 *)
 (* ************************************************************************* *)
 
-let rec infer_pattern state pat =
-  let pat', cnstrs = infer_pattern' ~loc:pat.at state pat.it in
+let rec infer_pattern state cnstrs pat =
+  let pat', cnstrs = infer_pattern' ~loc:pat.at state cnstrs pat.it in
   (pat', cnstrs)
 
-and infer_pattern' ~loc state = function
+and infer_pattern' ~loc state cnstrs = function
   | Untyped.PVar x ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
-      (Term.pVar x alpha, UnresolvedConstraints.empty)
+      (Term.pVar x alpha, cnstrs)
   | Untyped.PAnnotated (p, ty) ->
-      let p', cnstrs = infer_pattern state p in
-      ({ p' with ty }, UnresolvedConstraints.add_ty_equality (ty, p'.ty) cnstrs)
+      let p', cnstrs' = infer_pattern state cnstrs p in
+      ({ p' with ty }, UnresolvedConstraints.add_ty_equality (ty, p'.ty) cnstrs')
   | Untyped.PNonbinding ->
       let alpha = Type.fresh_ty_with_fresh_skel () in
-      (Term.pNonbinding alpha, UnresolvedConstraints.empty)
-  | Untyped.PConst c -> (Term.pConst c, UnresolvedConstraints.empty)
+      (Term.pNonbinding alpha, cnstrs)
+  | Untyped.PConst c -> (Term.pConst c, cnstrs)
   | Untyped.PTuple ps ->
-      let ps', cnstrs = infer_many (infer_pattern state) ps in
+      let ps', cnstrs' = infer_many (infer_pattern state) cnstrs ps in
       let p = Term.pTuple ps' in
-      (p, UnresolvedConstraints.list_union cnstrs)
+      (p, cnstrs')
   | Untyped.PVariant (lbl, p) -> (
       match
         (p, TypeDefinitionContext.infer_variant lbl state.type_definitions)
       with
-      | None, (None, out_ty) ->
-          (Term.pVariant (lbl, None) out_ty, UnresolvedConstraints.empty)
+      | None, (None, out_ty) -> (Term.pVariant (lbl, None) out_ty, cnstrs)
       | Some p, (Some in_ty, out_ty) ->
-          let p', cnstrs = infer_pattern state p in
+          let p', cnstrs' = infer_pattern state cnstrs p in
           ( Term.pVariant (lbl, Some p') out_ty,
-            UnresolvedConstraints.add_ty_equality (in_ty, p'.ty) cnstrs )
+            UnresolvedConstraints.add_ty_equality (in_ty, p'.ty) cnstrs' )
       | _ -> assert false)
   | Untyped.PAs (p, x) ->
-      let p', cnstrs = infer_pattern state p in
-      (Term.pAs (p', x), cnstrs)
+      let p', cnstrs' = infer_pattern state cnstrs p in
+      (Term.pAs (p', x), cnstrs')
   | Untyped.PRecord flds ->
       let hd_fld, _ = List.hd (Type.Field.Map.bindings flds) in
       let out_ty, (ty_name, fld_tys) =
         TypeDefinitionContext.infer_field hd_fld state.type_definitions
       in
-      let infer_field (fld, p) =
-        let p', cnstrs' = infer_pattern state p in
+      let infer_field cnstrs (fld, p) =
+        let p', cnstrs' = infer_pattern state cnstrs p in
         match Type.Field.Map.find_opt fld fld_tys with
         | None ->
             Error.typing ~loc "Field %t does not belong to type %t"
@@ -144,87 +144,91 @@ and infer_pattern' ~loc state = function
             ( (fld, p'),
               UnresolvedConstraints.add_ty_equality (fld_ty, p'.ty) cnstrs' )
       in
-      let flds', cnstrs' = infer_many infer_field (Effect.Map.bindings flds) in
-      ( Term.pRecord out_ty (Type.Field.Map.of_bindings flds'),
-        UnresolvedConstraints.list_union cnstrs' )
+      let flds', cnstrs' =
+        infer_many infer_field cnstrs (Effect.Map.bindings flds)
+      in
+      (Term.pRecord out_ty (Type.Field.Map.of_bindings flds'), cnstrs')
 
-let cast_expression e ty =
-  let omega, cons = UnresolvedConstraints.fresh_ty_coer (e.ty, ty) in
-  (Term.castExp (e, omega), cons)
+let cast_expression cnstrs e ty =
+  let omega, cnstrs' = UnresolvedConstraints.fresh_ty_coer cnstrs (e.ty, ty) in
+  (Term.castExp (e, omega), cnstrs')
 
-let cast_computation c dirty =
-  let omega, cnstrs = UnresolvedConstraints.fresh_dirty_coer (c.ty, dirty) in
-  (Term.castComp (c, omega), cnstrs)
+let cast_computation cnstrs c dirty =
+  let omega, cnstrs' =
+    UnresolvedConstraints.fresh_dirty_coer cnstrs (c.ty, dirty)
+  in
+  (Term.castComp (c, omega), cnstrs')
 
-let cast_abstraction { term = pat, cmp; _ } dirty =
-  let cmp', cnstrs = cast_computation cmp dirty in
-  (Term.abstraction (pat, cmp'), cnstrs)
+let cast_abstraction cnstrs { term = pat, cmp; _ } dirty =
+  let cmp', cnstrs' = cast_computation cnstrs cmp dirty in
+  (Term.abstraction (pat, cmp'), cnstrs')
 
-let full_cast_abstraction { term = pat, cmp; _ } ty_in dirty_out =
+let full_cast_abstraction cnstrs { term = pat, cmp; _ } ty_in dirty_out =
   let x_pat, x_var = Term.fresh_variable "x" ty_in in
-  let exp', cnstrs1 = cast_expression x_var pat.ty in
-  let cmp', cnstrs2 = cast_computation cmp dirty_out in
+  let exp', cnstrs' = cast_expression cnstrs x_var pat.ty in
+  let cmp', cnstrs'' = cast_computation cnstrs' cmp dirty_out in
   ( Term.abstraction (x_pat, Term.letVal (exp', Term.abstraction (pat, cmp'))),
-    UnresolvedConstraints.union cnstrs1 cnstrs2 )
+    cnstrs'' )
 
 (* ************************************************************************* *)
 (*                             VALUE TYPING                                  *)
 (* ************************************************************************* *)
 
-let rec infer_expression state exp =
-  let exp', cnstrs = infer_expression' state exp.it in
+let rec infer_expression state cnstrs exp =
+  let exp', cnstrs = infer_expression' state cnstrs exp.it in
   (* Print.debug "%t -> %t : %t / %t"
      (Untyped.print_expression exp)
      (Term.print_expression exp')
      (Type.print_ty exp'.ty) (UnresolvedConstraints.print cnstrs); *)
-  (exp', UnresolvedConstraints.list_union cnstrs)
+  (exp', cnstrs)
 
-and infer_expression' state = function
+and infer_expression' state (cnstrs : UnresolvedConstraints.t) = function
   | Untyped.Var x ->
       let ty_scheme = Term.Variable.Map.find x state.variables in
-      let subst, cnstrs =
-        fresh_instantiation ty_scheme.TyScheme.params ty_scheme.constraints
+      let subst, cnstrs' =
+        fresh_instantiation cnstrs ty_scheme.TyScheme.params
+          ty_scheme.constraints
       in
-      (Term.poly_var x subst ty_scheme.ty, [ cnstrs ])
-  | Untyped.Const c -> (Term.const c, [])
+      (Term.poly_var x subst ty_scheme.ty, cnstrs')
+  | Untyped.Const c -> (Term.const c, cnstrs)
   | Untyped.Annotated (e, ty) ->
-      let e', cnstrs = infer_expression state e in
-      let e'', castCt = cast_expression e' ty in
-      (e'', [ castCt; cnstrs ])
+      let e', cnstrs' = infer_expression state cnstrs e in
+      let e'', cnstrs'' = cast_expression cnstrs' e' ty in
+      (e'', cnstrs'')
   | Untyped.Tuple es ->
-      let es, cs = infer_many (infer_expression state) es in
-      (Term.tuple es, cs)
+      let es, cnstrs' = infer_many (infer_expression state) cnstrs es in
+      (Term.tuple es, cnstrs')
   | Untyped.Record flds ->
       let hd_fld, _ = List.hd (Type.Field.Map.bindings flds) in
       let out_ty, (ty_name, fld_tys) =
         TypeDefinitionContext.infer_field hd_fld state.type_definitions
       in
       let fold fld e (flds', cnstrs) =
-        let e', cnstrs' = infer_expression state e in
+        let e', cnstrs' = infer_expression state cnstrs e in
         match Type.Field.Map.find_opt fld fld_tys with
         | None ->
             Error.typing ~loc:e.at "Field %t does not belong to type %t"
               (Type.Field.print fld)
               (Language.TyName.print ty_name)
         | Some fld_ty ->
-            let e'', cons = cast_expression e' fld_ty in
-            ((fld, e'') :: flds', cons :: cnstrs' :: cnstrs)
+            let e'', cnstrs'' = cast_expression cnstrs' e' fld_ty in
+            ((fld, e'') :: flds', cnstrs'')
       in
-      let flds', cnstrs' = Type.Field.Map.fold fold flds ([], []) in
+      let flds', cnstrs' = Type.Field.Map.fold fold flds ([], cnstrs) in
       (Term.record out_ty (Type.Field.Map.of_bindings flds'), cnstrs')
   | Untyped.Variant (lbl, mbe) -> (
       match
         (TypeDefinitionContext.infer_variant lbl state.type_definitions, mbe)
       with
-      | (None, ty_out), None -> (Term.variant (lbl, None) ty_out, [])
+      | (None, ty_out), None -> (Term.variant (lbl, None) ty_out, cnstrs)
       | (Some ty_in, ty_out), Some e ->
-          let e', cs1 = infer_expression state e in
-          let castExp, castCt = cast_expression e' ty_in in
-          (Term.variant (lbl, Some castExp) ty_out, [ castCt; cs1 ])
+          let e', cnstrs' = infer_expression state cnstrs e in
+          let castExp, cnstrs'' = cast_expression cnstrs' e' ty_in in
+          (Term.variant (lbl, Some castExp) ty_out, cnstrs'')
       | _, _ -> assert false)
   | Untyped.Lambda abs ->
-      let abs', cnstrs = infer_abstraction state abs in
-      (Term.lambda abs', [ cnstrs ])
+      let abs', cnstrs' = infer_abstraction state cnstrs abs in
+      (Term.lambda abs', cnstrs')
   | Untyped.Effect eff ->
       let eff' = Effect.Map.find eff state.effects in
       let in_ty, out_ty = eff'.ty in
@@ -232,51 +236,55 @@ and infer_expression' state = function
       let out_drty = (out_ty, Dirt.closed s) in
       let x_pat, x_var = Term.fresh_variable "x" in_ty
       and y_pat, y_var = Term.fresh_variable "y" out_ty in
-      let ret, cnstrs = cast_computation (Term.value y_var) out_drty in
+      let ret, cnstrs' = cast_computation cnstrs (Term.value y_var) out_drty in
       let outVal =
         Term.lambda
           (Term.abstraction
              (x_pat, Term.call (eff', x_var, Term.abstraction (y_pat, ret))))
       in
-      (outVal, [ cnstrs ])
-  | Untyped.Handler hand -> infer_handler state hand
+      (outVal, cnstrs')
+  | Untyped.Handler hand -> infer_handler state cnstrs hand
 
-and infer_handler state { Untyped.value_clause; effect_clauses; finally_clause }
-    =
+and infer_handler state cnstrs
+    { Untyped.value_clause; effect_clauses; finally_clause } =
   let ty_mid = Type.fresh_ty_with_fresh_skel ()
   and ty_out = Type.fresh_ty_with_fresh_skel ()
   and drt_out = Dirt.fresh () in
 
   let dirty_mid = (ty_mid, drt_out) and dirty_out = (ty_out, drt_out) in
 
-  let infer_effect_clause (eff, abs2) =
+  let infer_effect_clause cnstrs (eff, abs2) =
     let eff' = Effect.Map.find eff state.effects in
     let ty_eff1, ty_eff2 = eff'.ty in
     let ty_cont = Type.arrow (ty_eff2, dirty_mid) in
-    let { term = pat1, pat2, cmp; _ }, cs = infer_abstraction2 state abs2 in
+    let { term = pat1, pat2, cmp; _ }, cnstrs' =
+      infer_abstraction2 state cnstrs abs2
+    in
     let pat1' = { pat1 with ty = ty_eff1 }
     and pat2' = { pat2 with ty = ty_cont } in
-    let csi =
-      cs
+    let cnstrs'' =
+      cnstrs'
       |> UnresolvedConstraints.add_ty_equality (pat1.ty, ty_eff1)
       |> UnresolvedConstraints.add_ty_equality (pat2.ty, ty_cont)
     in
-    let cmp', cast_cs = cast_computation cmp dirty_mid in
+    let cmp', cnstrs''' = cast_computation cnstrs'' cmp dirty_mid in
     let outExpr = (eff', Term.abstraction2 (pat1', pat2', cmp')) in
-    (outExpr, UnresolvedConstraints.list_union [ cast_cs; csi ])
+    (outExpr, cnstrs''')
   in
 
-  let value_clause', value_clause_cnstrs = infer_abstraction state value_clause
-  and effect_clauses', effect_clauses_cnstrs =
-    infer_many infer_effect_clause (Assoc.to_list effect_clauses)
-  and finally_clause', finally_clause_cnstrs =
-    infer_abstraction state finally_clause
+  let value_clause', cnstrs' = infer_abstraction state cnstrs value_clause in
+  let effect_clauses', cnstrs'' =
+    infer_many infer_effect_clause cnstrs' (Assoc.to_list effect_clauses)
+  in
+  let finally_clause', cnstrs''' =
+    infer_abstraction state cnstrs'' finally_clause
   in
 
-  let value_clause'', value_clause_cast_cnstrs =
-    cast_abstraction value_clause' dirty_mid
-  and finally_clause'', finally_clause_cast_cnstrs =
-    full_cast_abstraction finally_clause' ty_mid dirty_out
+  let value_clause'', cnstrs'''' =
+    cast_abstraction cnstrs''' value_clause' dirty_mid
+  in
+  let finally_clause'', cnstrs''''' =
+    full_cast_abstraction cnstrs'''' finally_clause' ty_mid dirty_out
   in
 
   let drt_in =
@@ -291,92 +299,83 @@ and infer_handler state { Untyped.value_clause; effect_clauses; finally_clause }
          drt_in)
       finally_clause''
   in
-  ( handler,
-    [
-      value_clause_cnstrs;
-      finally_clause_cnstrs;
-      value_clause_cast_cnstrs;
-      finally_clause_cast_cnstrs;
-    ]
-    @ effect_clauses_cnstrs )
+  (handler, cnstrs''''')
 
 (* ************************************************************************* *)
 (*                          COMPUTATION TYPING                               *)
 (* ************************************************************************* *)
-and infer_computation state cmp =
-  let cmp', cnstrs = infer_computation' ~loc:cmp.at state cmp.it in
+and infer_computation state cnstrs cmp =
+  let cmp', cnstrs' = infer_computation' ~loc:cmp.at state cnstrs cmp.it in
   (* Print.debug "%t -> %t : %t / %t"
      (Untyped.print_computation c)
      (Term.print_computation cmp')
      (Type.print_dirty cmp'.ty) (UnresolvedConstraints.print cnstrs); *)
-  (cmp', UnresolvedConstraints.list_union cnstrs)
+  (cmp', cnstrs')
 
 (* Dispatch: Type inference for a plan computation *)
-and infer_computation' ~loc state = function
+and infer_computation' ~loc state cnstrs = function
   | Untyped.Value exp ->
-      let exp', outCs = infer_expression state exp in
-      (Term.value exp', [ outCs ])
+      let exp', cnstrs' = infer_expression state cnstrs exp in
+      (Term.value exp', cnstrs')
   (* Nest a list of let-bindings *)
   | Let ([], c2) ->
-      let c, cnstrs = infer_computation state c2 in
-      (c, [ cnstrs ])
+      let c, cnstrs' = infer_computation state cnstrs c2 in
+      (c, cnstrs')
   | Let ([ (pdef, c1) ], c2) ->
-      let trgC1, cs1 = infer_computation state c1 in
-      let trgC2, cs2 = infer_abstraction state (pdef, c2) in
+      let trgC1, cnstrs' = infer_computation state cnstrs c1 in
+      let trgC2, cnstrs'' = infer_abstraction state cnstrs' (pdef, c2) in
       let ty1', (ty2, _) = trgC2.ty in
       let delta = Dirt.fresh () in
-      let cresC1, omegaCt1 = cast_computation trgC1 (ty1', delta) in
-      let cresC2, omegaCt2 = cast_abstraction trgC2 (ty2, delta) in
-      (Term.bind (cresC1, cresC2), [ omegaCt1; omegaCt2; cs1; cs2 ])
+      let cresC1, cnstrs''' = cast_computation cnstrs'' trgC1 (ty1', delta) in
+      let cresC2, cnstrs'''' = cast_abstraction cnstrs''' trgC2 (ty2, delta) in
+      (Term.bind (cresC1, cresC2), cnstrs'''')
   | Let ((pat, c1) :: rest, c2) ->
       let subCmp = { it = Untyped.Let (rest, c2); at = c2.at } in
-      infer_computation' ~loc state (Untyped.Let ([ (pat, c1) ], subCmp))
+      infer_computation' ~loc state cnstrs (Untyped.Let ([ (pat, c1) ], subCmp))
   | LetRec (defs, c2) ->
-      let defs', cs1 = infer_rec_definitions state defs in
+      let defs', cnstrs' = infer_rec_definitions state cnstrs defs in
       let state' =
         List.fold_left
           (fun state (x, abs) -> extend_var x (Type.arrow abs.ty) state)
           state (Assoc.to_list defs')
       in
-      let trgC2, cs2 = infer_computation state' c2 in
-      (Term.letRec (defs', trgC2), [ cs1; cs2 ])
+      let trgC2, cnstrs'' = infer_computation state' cnstrs' c2 in
+      (Term.letRec (defs', trgC2), cnstrs'')
   | Match (exp, cases) ->
       let ty_in = Type.fresh_ty_with_fresh_skel ()
       and dirty_out = Type.fresh_dirty_with_fresh_skel () in
-      let infer_case case =
-        let case', cnstrs = infer_abstraction state case in
+      let infer_case cnstrs case =
+        let case', cnstrs' = infer_abstraction state cnstrs case in
         let ty_in', _ = case'.ty
-        and case'', cnstrs' = cast_abstraction case' dirty_out in
-        ( case'',
-          UnresolvedConstraints.add_ty_equality (ty_in, ty_in')
-            (UnresolvedConstraints.list_union [ cnstrs; cnstrs' ]) )
+        and case'', cnstrs'' = cast_abstraction cnstrs' case' dirty_out in
+        (case'', UnresolvedConstraints.add_ty_equality (ty_in, ty_in') cnstrs'')
       in
-      let cases', cs_cases = infer_many infer_case cases in
-      let exp', cs_exp = infer_expression state exp in
-      let exp'', cs_cast = cast_expression exp' ty_in in
-      (Term.match_ (exp'', cases') dirty_out, [ cs_cast; cs_exp ] @ cs_cases)
+      let cases', cnstrs' = infer_many infer_case cnstrs cases in
+      let exp', cnstrs'' = infer_expression state cnstrs' exp in
+      let exp'', cnstrs''' = cast_expression cnstrs'' exp' ty_in in
+      (Term.match_ (exp'', cases') dirty_out, cnstrs''')
   | Apply (expr1, expr2) ->
-      let expr1', cs1 = infer_expression state expr1 in
-      let expr2', cs2 = infer_expression state expr2 in
+      let expr1', cnstrs' = infer_expression state cnstrs expr1 in
+      let expr2', cnstrs'' = infer_expression state cnstrs' expr2 in
       let outType = Type.fresh_dirty_with_fresh_skel () in
-      let castexpr1, omegaCt =
-        cast_expression expr1' (Type.arrow (expr2'.ty, outType))
+      let castexpr1, cnstrs''' =
+        cast_expression cnstrs'' expr1' (Type.arrow (expr2'.ty, outType))
       in
-      (Term.apply (castexpr1, expr2'), [ omegaCt; cs1; cs2 ])
+      (Term.apply (castexpr1, expr2'), cnstrs''')
   | Handle (hand, cmp) ->
-      let hand', cs1 = infer_expression state hand in
-      let cmp', cs2 = infer_computation state cmp in
+      let hand', cnstrs' = infer_expression state cnstrs hand in
+      let cmp', cnstrs'' = infer_computation state cnstrs' cmp in
       let out_ty = Type.fresh_dirty_with_fresh_skel () in
-      let castHand, omegaCt1 =
-        cast_expression hand' (Type.handler (cmp'.ty, out_ty))
+      let castHand, cnstrs''' =
+        cast_expression cnstrs'' hand' (Type.handler (cmp'.ty, out_ty))
       in
-      (Term.handle (castHand, cmp'), [ omegaCt1; cs1; cs2 ])
+      (Term.handle (castHand, cmp'), cnstrs''')
   | Check cmp ->
-      let cmp', cnstrs = infer_computation state cmp in
-      (Term.check (loc, cmp'), [ cnstrs ])
+      let cmp', cnstrs' = infer_computation state cnstrs cmp in
+      (Term.check (loc, cmp'), cnstrs')
 
 (* Typecheck a (potentially) recursive let *)
-and infer_rec_definitions state defs =
+and infer_rec_definitions state cnstrs defs =
   let defs_with_fresh_types =
     List.map
       (fun (x, abs) ->
@@ -385,33 +384,35 @@ and infer_rec_definitions state defs =
         (x, abs, ty_in, ty_out))
       defs
   in
-  let state_extended_with_all_defs =
+  let (state_extended_with_all_defs : state) =
     List.fold_left
       (fun state (f, _, ty_in, ty_out) ->
         extend_var f (Type.arrow (ty_in, ty_out)) state)
       state defs_with_fresh_types
   in
-  let defs'', cnstrs =
+  let defs'', cnstrs' =
     infer_many
-      (fun (f, abs, ty_in, ty_out) ->
-        let abs', cs1 = infer_abstraction state_extended_with_all_defs abs in
-        let abs'', cs2 = full_cast_abstraction abs' ty_in ty_out in
-        ((f, abs''), UnresolvedConstraints.list_union [ cs1; cs2 ]))
-      defs_with_fresh_types
+      (fun cnstrs (f, abs, ty_in, ty_out) ->
+        let abs', cnstrs' =
+          infer_abstraction state_extended_with_all_defs cnstrs abs
+        in
+        let abs'', cnstrs'' = full_cast_abstraction cnstrs' abs' ty_in ty_out in
+        ((f, abs''), cnstrs''))
+      cnstrs defs_with_fresh_types
   in
-  (Assoc.of_list defs'', UnresolvedConstraints.list_union cnstrs)
+  (Assoc.of_list defs'', cnstrs')
 
-and infer_abstraction state (pat, cmp) :
+and infer_abstraction state cnstrs (pat, cmp) :
     Term.abstraction * UnresolvedConstraints.t =
-  let trgPat, cs1 = infer_pattern state pat in
+  let trgPat, cnstrs' = infer_pattern state cnstrs pat in
   let state' = extend_vars (Term.pattern_vars trgPat) state in
-  let trgCmp, cs2 = infer_computation state' cmp in
-  (Term.abstraction (trgPat, trgCmp), UnresolvedConstraints.union cs1 cs2)
+  let trgCmp, cnstrs'' = infer_computation state' cnstrs' cmp in
+  (Term.abstraction (trgPat, trgCmp), cnstrs'')
 
-and infer_abstraction2 state (pat1, pat2, cmp) :
+and infer_abstraction2 state cnstrs (pat1, pat2, cmp) :
     Term.abstraction2 * UnresolvedConstraints.t =
-  let trgPat1, cs1 = infer_pattern state pat1 in
-  let trgPat2, cs2 = infer_pattern state pat2 in
+  let trgPat1, cnstrs' = infer_pattern state cnstrs pat1 in
+  let trgPat2, cnstrs'' = infer_pattern state cnstrs' pat2 in
   let state' =
     extend_vars
       (Term.Variable.Map.compatible_union
@@ -419,16 +420,17 @@ and infer_abstraction2 state (pat1, pat2, cmp) :
          (Term.pattern_vars trgPat2))
       state
   in
-  let trgCmp, cs = infer_computation state' cmp in
-  ( Term.abstraction2 (trgPat1, trgPat2, trgCmp),
-    UnresolvedConstraints.list_union [ cs1; cs2; cs ] )
+  let trgCmp, cnstrs''' = infer_computation state' cnstrs'' cmp in
+  (Term.abstraction2 (trgPat1, trgPat2, trgCmp), cnstrs''')
 
 (* ************************************************************************* *)
 (* ************************************************************************* *)
 
 let process_computation state comp =
   Print.debug "HER There";
-  let comp', cnstrs = infer_computation state comp in
+  let comp', cnstrs =
+    infer_computation state UnresolvedConstraints.empty comp
+  in
   let sub, residuals =
     Unification.solve ~loc:comp.at state.type_definitions cnstrs
   in
@@ -456,13 +458,11 @@ let process_computation state comp =
 let process_top_let ~loc state defs =
   Print.debug "TOPLET";
   let fold (pat, cmp) (state', defs) =
-    let pat', cnstrs_pat = infer_pattern state pat in
-    let cmp', cnstrs_cmp = infer_computation state cmp in
+    let pat', cnstrs = infer_pattern state UnresolvedConstraints.empty pat in
+    let cmp', cnstrs' = infer_computation state cnstrs cmp in
     let sub, constraints =
       Unification.solve ~loc state.type_definitions
-        (UnresolvedConstraints.add_ty_equality
-           (pat'.ty, fst cmp'.ty)
-           (UnresolvedConstraints.union cnstrs_pat cnstrs_cmp))
+        (UnresolvedConstraints.add_ty_equality (pat'.ty, fst cmp'.ty) cnstrs')
     in
     Print.debug "Inferred type: %t" (Type.print_dirty cmp'.ty);
     Print.debug "Full comp: %t" (Term.print_computation cmp');
@@ -502,13 +502,15 @@ let process_top_let ~loc state defs =
   in
   List.fold_right fold defs (state, [])
 
-let process_top_let_rec ~loc state un_defs =
+let process_top_let_rec ~loc state defs =
   Assoc.iter
     (fun (_, (p, c)) ->
       Exhaust.is_irrefutable state.type_definitions p;
       Exhaust.check_computation state.type_definitions c)
-    un_defs;
-  let defs', cnstrs = infer_rec_definitions state (Assoc.to_list un_defs) in
+    defs;
+  let defs', cnstrs =
+    infer_rec_definitions state UnresolvedConstraints.empty (Assoc.to_list defs)
+  in
   let sub, constraints = Unification.solve state.type_definitions ~loc cnstrs in
   let sub, constraints =
     if !Config.simplify_coercions then
