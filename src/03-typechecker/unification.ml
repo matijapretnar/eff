@@ -2,38 +2,41 @@ open Utils
 open Language
 open Type
 
-let apply_substitution new_sub (paused : Constraints.t) queue =
-  let substitute_ty_constraint s t1 t2 w ty1 ty2 (paused, queue) =
+let apply_substitution new_sub resolved unresolved =
+  let substitute_ty_constraint s t1 t2 w ty1 ty2 (resolved, unresolved) =
     let ty1', ty2' =
       ( Substitution.apply_substitutions_to_type new_sub ty1,
         Substitution.apply_substitutions_to_type new_sub ty2 )
     in
     if Type.equal_ty ty1 ty1' && Type.equal_ty ty2 ty2' then
-      (Constraints.add_ty_constraint s t1 t2 w paused, queue)
+      (Constraints.add_ty_constraint s t1 t2 w resolved, unresolved)
     else
-      (paused, UnresolvedConstraints.add_ty_inequality (w, (ty1', ty2')) queue)
-  and substitute_dirt_constraint d1 d2 w effs drt1 drt2 (paused, queue) =
+      ( resolved,
+        UnresolvedConstraints.add_ty_inequality (w, (ty1', ty2')) unresolved )
+  and substitute_dirt_constraint d1 d2 w effs drt1 drt2 (resolved, unresolved) =
     let drt1', drt2' =
       ( Substitution.apply_substitutions_to_dirt new_sub drt1,
         Substitution.apply_substitutions_to_dirt new_sub drt2 )
     in
     if Type.equal_dirt drt1 drt1' && Type.equal_dirt drt2 drt2' then
-      (Constraints.add_dirt_constraint d1 d2 w effs paused, queue)
+      (Constraints.add_dirt_constraint d1 d2 w effs resolved, unresolved)
     else
-      ( paused,
-        UnresolvedConstraints.add_dirt_inequality (w, (drt1', drt2')) queue )
+      ( resolved,
+        UnresolvedConstraints.add_dirt_inequality (w, (drt1', drt2')) unresolved
+      )
   in
-  let paused', queue' =
-    (Constraints.empty, UnresolvedConstraints.apply_sub new_sub queue)
+  let resolved', unresolved' =
+    (Constraints.empty, UnresolvedConstraints.apply_sub new_sub unresolved)
     |> Constraints.TyConstraints.fold_expanded substitute_ty_constraint
-         paused.ty_constraints
+         resolved.Constraints.ty_constraints
     |> Constraints.DirtConstraints.fold_expanded substitute_dirt_constraint
-         paused.dirt_constraints
+         resolved.Constraints.dirt_constraints
   in
-  (paused', queue')
+  (resolved', unresolved')
 
-let change_subst f (queue : UnresolvedConstraints.t) =
-  { queue with substitution = f queue.substitution }
+let change_subst f unresolved =
+  UnresolvedConstraints.
+    { unresolved with substitution = f unresolved.substitution }
 
 let expand_row ~loc sub row ops =
   match row with
@@ -49,10 +52,11 @@ let expand_row ~loc sub row ops =
       (sub', row')
   | Dirt.Row.Empty -> Error.typing ~loc "Cannot extend an empty row."
 
-let skel_eq_step ~loc (paused : Constraints.t) rest_queue sk1 sk2 =
+let skel_eq_step ~loc resolved unresolved sk1 sk2 =
   match (sk1, sk2) with
   (* ς = ς *)
-  | Skeleton.Param sp1, Skeleton.Param sp2 when sp1 = sp2 -> (paused, rest_queue)
+  | Skeleton.Param sp1, Skeleton.Param sp2 when sp1 = sp2 ->
+      (resolved, unresolved)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
   | Param sp1, sk2a
     when not
@@ -60,82 +64,81 @@ let skel_eq_step ~loc (paused : Constraints.t) rest_queue sk1 sk2 =
     ->
       apply_substitution
         (Substitution.add_skel_param_substitution_e sp1 sk2a)
-        paused rest_queue
+        resolved unresolved
   | sk2a, Param sp1
     when not
            (Skeleton.Param.Set.mem sp1 (free_params_skeleton sk2a).skel_params)
     ->
       apply_substitution
         (Substitution.add_skel_param_substitution_e sp1 sk2a)
-        paused rest_queue
+        resolved unresolved
       (* occurs-check failing *)
   | Param _, _ | _, Param _ ->
       let printer = Type.print_pretty Skeleton.Param.Set.empty in
       Error.typing ~loc "This expression has a forbidden cyclic type %t = %t."
         (printer sk1) (printer sk2)
       (* int = int *)
-  | Basic ps1, Basic ps2 when ps1 = ps2 -> (paused, rest_queue)
+  | Basic ps1, Basic ps2 when ps1 = ps2 -> (resolved, unresolved)
   (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
   | Arrow (ska, skb), Arrow (skc, skd) ->
-      ( paused,
-        rest_queue
+      ( resolved,
+        unresolved
         |> UnresolvedConstraints.add_skeleton_equality (ska, skc)
         |> UnresolvedConstraints.add_skeleton_equality (skb, skd) )
   (* τ₁₁ => τ₁₂ = τ₂₁ => τ₂₂ *)
   | Handler (ska, skb), Handler (skc, skd) ->
-      ( paused,
-        rest_queue
+      ( resolved,
+        unresolved
         |> UnresolvedConstraints.add_skeleton_equality (ska, skc)
         |> UnresolvedConstraints.add_skeleton_equality (skb, skd) )
   | ( Apply { ty_name = ty_name1; skel_args = sks1 },
       Apply { ty_name = ty_name2; skel_args = sks2 } )
     when ty_name1 = ty_name2
          && TyParam.Map.cardinal sks1 = TyParam.Map.cardinal sks2 ->
-      ( paused,
+      ( resolved,
         List.fold_right2
           (fun sk1 sk2 ->
             UnresolvedConstraints.add_skeleton_equality (sk1, sk2))
           (sks1 |> TyParam.Map.values)
           (sks2 |> TyParam.Map.values)
-          rest_queue )
+          unresolved )
   | Tuple sks1, Tuple sks2 when List.length sks1 = List.length sks2 ->
-      ( paused,
+      ( resolved,
         List.fold_right2
           (fun sk1 sk2 ->
             UnresolvedConstraints.add_skeleton_equality (sk1, sk2))
-          sks1 sks2 rest_queue )
+          sks1 sks2 unresolved )
   | _ ->
       let printer = Type.print_pretty Skeleton.Param.Set.empty in
       Error.typing ~loc
         "This expression has type %t but it should have type %t." (printer sk1)
         (printer sk2)
 
-and ty_eq_step (paused : Constraints.t) rest_queue (ty1 : Type.ty)
-    (ty2 : Type.ty) =
+and ty_eq_step resolved unresolved ty1 ty2 =
   match (ty1.term, ty2.term) with
   (* ς = ς *)
-  | TyParam p1, TyParam p2 when p1 = p2 -> (paused, rest_queue)
+  | TyParam p1, TyParam p2 when p1 = p2 -> (resolved, unresolved)
   (* ς₁ = τ₂ / τ₁ = ς₂ *)
   (* There is no need for occurs-check because skeletons of both sides are equal *)
   | TyParam p1, _ ->
       let sub1 = Substitution.add_type_substitution_e p1 ty2 in
-      apply_substitution sub1 paused rest_queue
+      apply_substitution sub1 resolved unresolved
   | _, TyParam p2 ->
       let sub1 = Substitution.add_type_substitution_e p2 ty1 in
-      apply_substitution sub1 paused rest_queue
+      apply_substitution sub1 resolved unresolved
       (* int = int *)
-  | TyBasic ps1, TyBasic ps2 when ps1 = ps2 -> (paused, rest_queue)
+  | TyBasic ps1, TyBasic ps2 when ps1 = ps2 -> (resolved, unresolved)
   (* τ₁₁ -> τ₁₂ = τ₂₁ -> τ₂₂ *)
   | Arrow (tya, (tyb, drt1)), Arrow (tyc, (tyd, drt2)) ->
-      ( paused,
-        rest_queue
+      ( resolved,
+        unresolved
         |> UnresolvedConstraints.add_ty_equality (tya, tyc)
         |> UnresolvedConstraints.add_ty_equality (tyb, tyd)
         |> UnresolvedConstraints.add_dirt_equality (drt1, drt2) )
   (* τ₁₁ => τ₁₂ = τ₂₁ => τ₂₂ *)
   | Handler ((tya, drta), (tyb, drtb)), Handler ((tyc, drtc), (tyd, drtd)) ->
-      ( paused,
-        rest_queue
+      ( resolved,
+        unresolved
         |> UnresolvedConstraints.add_ty_equality (tya, tyc)
         |> UnresolvedConstraints.add_ty_equality (tyb, tyd)
         |> UnresolvedConstraints.add_dirt_equality (drta, drtc)
@@ -144,129 +147,130 @@ and ty_eq_step (paused : Constraints.t) rest_queue (ty1 : Type.ty)
       Apply { ty_name = ty_name2; ty_args = tys2 } )
     when ty_name1 = ty_name2
          && TyParam.Map.cardinal tys1 = TyParam.Map.cardinal tys2 ->
-      ( paused,
+      ( resolved,
         List.fold_right2
           (fun (ty1, _) (ty2, _) ->
             UnresolvedConstraints.add_ty_equality (ty1, ty2))
           (tys1 |> TyParam.Map.values)
           (tys2 |> TyParam.Map.values)
-          rest_queue )
+          unresolved )
   | Tuple tys1, Tuple tys2 when List.length tys1 = List.length tys2 ->
-      ( paused,
+      ( resolved,
         List.fold_right2
           (fun ty1 ty2 -> UnresolvedConstraints.add_ty_equality (ty1, ty2))
-          tys1 tys2 rest_queue )
+          tys1 tys2 unresolved )
   | _ -> assert false
 
-and ty_omega_step type_definitions (paused : Constraints.t) rest_queue omega =
-  function
+and ty_omega_step type_definitions resolved unresolved omega = function
   (* ω : A <= A *)
   | ty1, ty2 when Type.equal_ty ty1 ty2 ->
       let k = omega in
       let v = TyCoercion.reflTy ty1 in
-      (paused, change_subst (Substitution.add_type_coercion k v) rest_queue)
+      (resolved, change_subst (Substitution.add_type_coercion k v) unresolved)
   (* ω : A₁ -> C₁ <= A₂ -> C₂ *)
   | { term = Type.Arrow (a1, dirty1); _ }, { term = Type.Arrow (a2, dirty2); _ }
     ->
-      let new_ty_coercion_var_coer, rest_queue' =
-        UnresolvedConstraints.fresh_ty_coer rest_queue (a2, a1)
+      let new_ty_coercion_var_coer, unresolved' =
+        UnresolvedConstraints.fresh_ty_coer unresolved (a2, a1)
       in
-      let dirty_coercion_c, rest_queue'' =
-        UnresolvedConstraints.fresh_dirty_coer rest_queue' (dirty1, dirty2)
+      let dirty_coercion_c, unresolved'' =
+        UnresolvedConstraints.fresh_dirty_coer unresolved' (dirty1, dirty2)
       in
       let k = omega in
       let v =
         TyCoercion.arrowCoercion (new_ty_coercion_var_coer, dirty_coercion_c)
       in
-      (paused, change_subst (Substitution.add_type_coercion k v) rest_queue'')
+      (resolved, change_subst (Substitution.add_type_coercion k v) unresolved'')
   (* ω : A₁ x A₂ x ... <= B₁ x B₂ x ...  *)
   | { term = Type.Tuple tys; _ }, { term = Type.Tuple tys'; _ } ->
-      let coercions, rest_queue' =
+      let coercions, unresolved' =
         List.fold_right2
-          (fun ty ty' (coercions, rest_queue) ->
-            let coercion, rest_queue' =
-              UnresolvedConstraints.fresh_ty_coer rest_queue (ty, ty')
+          (fun ty ty' (coercions, unresolved) ->
+            let coercion, unresolved' =
+              UnresolvedConstraints.fresh_ty_coer unresolved (ty, ty')
             in
-            (coercion :: coercions, rest_queue'))
-          tys tys' ([], rest_queue)
+            (coercion :: coercions, unresolved'))
+          tys tys' ([], unresolved)
       in
       let k = omega in
       let v = TyCoercion.tupleCoercion coercions in
-      (paused, change_subst (Substitution.add_type_coercion k v) rest_queue')
+      (resolved, change_subst (Substitution.add_type_coercion k v) unresolved')
   (* ω : ty (A₁,  A₂,  ...) <= ty (B₁,  B₂,  ...) *)
   | ( { term = Type.Apply { ty_name = ty_name1; ty_args = tys1 }; _ },
       { term = Type.Apply { ty_name = ty_name2; ty_args = tys2 }; _ } )
     when ty_name1 = ty_name2
          && TyParam.Map.cardinal tys1 = TyParam.Map.cardinal tys2 ->
-      let coercions, rest_queue' =
+      let coercions, unresolved' =
         List.fold_right2
-          (fun (p1, (ty, v1)) (p2, (ty', v2)) (coercions, rest_queue) ->
+          (fun (p1, (ty, v1)) (p2, (ty', v2)) (coercions, unresolved) ->
             assert (p1 = p2);
             assert (v1 = v2);
-            let coercion, rest_queue' =
+            let coercion, unresolved' =
               match v1 with
               | Covariant ->
-                  let coercion, rest_queue' =
-                    UnresolvedConstraints.fresh_ty_coer rest_queue (ty, ty')
+                  let coercion, unresolved' =
+                    UnresolvedConstraints.fresh_ty_coer unresolved (ty, ty')
                   in
-                  (coercion, rest_queue')
+                  (coercion, unresolved')
               | Contravariant ->
-                  let coercion, rest_queue' =
-                    UnresolvedConstraints.fresh_ty_coer rest_queue (ty', ty)
+                  let coercion, unresolved' =
+                    UnresolvedConstraints.fresh_ty_coer unresolved (ty', ty)
                   in
-                  (coercion, rest_queue')
+                  (coercion, unresolved')
               | Invariant ->
                   ( TyCoercion.reflTy ty,
-                    UnresolvedConstraints.add_ty_equality (ty, ty') rest_queue
+                    UnresolvedConstraints.add_ty_equality (ty, ty') unresolved
                   )
             in
-            ((p1, (coercion, v1)) :: coercions, rest_queue'))
+            ((p1, (coercion, v1)) :: coercions, unresolved'))
           (TyParam.Map.bindings tys1)
           (TyParam.Map.bindings tys2)
-          ([], rest_queue)
+          ([], unresolved)
       in
       let v =
         TyCoercion.applyCoercion (ty_name1, coercions |> TyParam.Map.of_bindings)
       in
-      (paused, change_subst (Substitution.add_type_coercion omega v) rest_queue')
+      ( resolved,
+        change_subst (Substitution.add_type_coercion omega v) unresolved' )
   (* ω : D₁ => C₁ <= D₂ => C₂ *)
   | ( { term = Type.Handler (drty11, drty12); _ },
       { term = Type.Handler (drty21, drty22); _ } ) ->
-      let drty_coer1, rest_queue' =
-        UnresolvedConstraints.fresh_dirty_coer rest_queue (drty21, drty11)
+      let drty_coer1, unresolved' =
+        UnresolvedConstraints.fresh_dirty_coer unresolved (drty21, drty11)
       in
-      let drty_coer2, rest_queue'' =
-        UnresolvedConstraints.fresh_dirty_coer rest_queue' (drty12, drty22)
+      let drty_coer2, unresolved'' =
+        UnresolvedConstraints.fresh_dirty_coer unresolved' (drty12, drty22)
       in
       let k = omega in
       let v = TyCoercion.handlerCoercion (drty_coer1, drty_coer2) in
-      (paused, change_subst (Substitution.add_type_coercion k v) rest_queue'')
+      (resolved, change_subst (Substitution.add_type_coercion k v) unresolved'')
   (* ω : α <= A /  ω : A <= α *)
   | ( ({ term = Type.TyParam t1; ty = Skeleton.Param s1 } as ty1),
       ({ term = Type.TyParam t2; ty = Skeleton.Param s2 } as ty2) )
     when s1 = s2 -> (
-      (*unify_ty_vars (sub,paused,rest_queue) tv a cons*)
+      (*unify_ty_vars (sub,resolved,unresolved) tv a cons*)
       let existing =
-        paused.ty_constraints
+        resolved.Constraints.ty_constraints
         |> Constraints.TyConstraints.get_ty_graph s1
         |> Constraints.TyConstraints.TyParamGraph.get_edges t1
         |> TyParam.Map.find_opt t2
       in
       match existing with
-      | None -> (Constraints.add_ty_constraint s1 t1 t2 omega paused, rest_queue)
+      | None ->
+          (Constraints.add_ty_constraint s1 t1 t2 omega resolved, unresolved)
       | Some w ->
-          ( paused,
+          ( resolved,
             change_subst
               (Substitution.add_type_coercion omega
                  (TyCoercion.tyCoercionVar w (ty1, ty2)))
-              rest_queue ))
+              unresolved ))
   | ( { term = Type.TyParam tv; ty = skel }, _
     | _, { term = Type.TyParam tv; ty = skel } ) as ct ->
       let ty = fresh_ty_with_skel type_definitions skel in
       apply_substitution
         (Substitution.add_type_substitution_e tv ty)
-        paused
-        (UnresolvedConstraints.add_ty_inequality (omega, ct) rest_queue)
+        resolved
+        (UnresolvedConstraints.add_ty_inequality (omega, ct) unresolved)
   | _ -> assert false
 
 and dirt_omega_step ~loc resolved unresolved w dcons =
@@ -374,7 +378,7 @@ and dirt_omega_step ~loc resolved unresolved w dcons =
       apply_substitution sub' resolved unresolved
   | _ -> assert false
 
-and dirt_eq_step ~loc paused rest_queue { Dirt.effect_set = o1; row = row1 }
+and dirt_eq_step ~loc resolved unresolved { Dirt.effect_set = o1; row = row1 }
     { Dirt.effect_set = o2; row = row2 } =
   (*
   Consider the equation:
@@ -387,7 +391,7 @@ and dirt_eq_step ~loc paused rest_queue { Dirt.effect_set = o1; row = row1 }
       row₁' = row₂'
 
   *)
-  let sub = rest_queue.UnresolvedConstraints.substitution in
+  let sub = unresolved.UnresolvedConstraints.substitution in
   let sub', row1' = expand_row ~loc sub row1 (Effect.Set.diff o2 o1) in
   let sub'', row2' = expand_row ~loc sub' row2 (Effect.Set.diff o1 o2) in
   let sub''' =
@@ -402,37 +406,39 @@ and dirt_eq_step ~loc paused rest_queue { Dirt.effect_set = o1; row = row1 }
           { effect_set = Effect.Set.empty; row = row1' }
           sub''
   in
-  apply_substitution sub''' paused rest_queue
+  apply_substitution sub''' resolved unresolved
 
-let rec unify' ~loc type_definitions (paused, (queue : UnresolvedConstraints.t))
-    =
+let rec unify' ~loc type_definitions (resolved, unresolved) =
   (* Print.debug "SUB: %t" (Substitution.print sub); *)
-  (* Print.debug "PAUSED: %t" (Constraints.print paused); *)
-  (* Print.debug "QUEUE: %t" (UnresolvedConstraints.print queue); *)
-  match queue with
-  | { skeleton_equalities = (sk1, sk2) :: skeleton_equalities; _ } ->
-      skel_eq_step ~loc paused { queue with skeleton_equalities } sk1 sk2
+  (* Print.debug "resolved: %t" (Constraints.print resolved); *)
+  (* Print.debug "unresolved: %t" (UnresolvedConstraints.print unresolved); *)
+  match unresolved with
+  | UnresolvedConstraints.
+      { skeleton_equalities = (sk1, sk2) :: skeleton_equalities; _ } ->
+      skel_eq_step ~loc resolved { unresolved with skeleton_equalities } sk1 sk2
       |> unify' ~loc type_definitions
   | { dirt_equalities = (drt1, drt2) :: dirt_equalities; _ } ->
-      dirt_eq_step ~loc paused { queue with dirt_equalities } drt1 drt2
+      dirt_eq_step ~loc resolved { unresolved with dirt_equalities } drt1 drt2
       |> unify' ~loc type_definitions
   | { dirt_inequalities = (omega, dcons) :: dirt_inequalities; _ } ->
-      dirt_omega_step ~loc paused { queue with dirt_inequalities } omega dcons
+      dirt_omega_step ~loc resolved
+        { unresolved with dirt_inequalities }
+        omega dcons
       |> unify' ~loc type_definitions
   | { ty_equalities = (ty1, ty2) :: _; _ }
     when not (Skeleton.equal ty1.ty ty2.ty) ->
-      skel_eq_step ~loc paused queue ty1.ty ty2.ty
+      skel_eq_step ~loc resolved unresolved ty1.ty ty2.ty
       |> unify' ~loc type_definitions
   | { ty_equalities = (ty1, ty2) :: ty_equalities; _ } ->
-      ty_eq_step paused { queue with ty_equalities } ty1 ty2
+      ty_eq_step resolved { unresolved with ty_equalities } ty1 ty2
       |> unify' ~loc type_definitions
   | { ty_inequalities = (_, (ty1, ty2)) :: _; _ }
     when not (Skeleton.equal ty1.ty ty2.ty) ->
-      skel_eq_step ~loc paused queue ty1.ty ty2.ty
+      skel_eq_step ~loc resolved unresolved ty1.ty ty2.ty
       |> unify' ~loc type_definitions
   | { ty_inequalities = (omega, tycons) :: ty_inequalities; _ } ->
-      ty_omega_step type_definitions paused
-        { queue with ty_inequalities }
+      ty_omega_step type_definitions resolved
+        { unresolved with ty_inequalities }
         omega tycons
       |> unify' ~loc type_definitions
   | {
@@ -443,12 +449,11 @@ let rec unify' ~loc type_definitions (paused, (queue : UnresolvedConstraints.t))
    ty_inequalities = [];
    substitution;
   } ->
-      (substitution, paused)
+      (substitution, resolved)
 
-let unify ~loc type_definitions (sub, paused, (queue : UnresolvedConstraints.t))
-    =
+let unify ~loc type_definitions (sub, resolved, unresolved) =
   unify' ~loc type_definitions
-    (paused, change_subst (Substitution.merge sub) queue)
+    (resolved, change_subst (Substitution.merge sub) unresolved)
 
 let solve ~loc type_definitions constraints =
   let sub, constraints =
