@@ -2316,7 +2316,7 @@
   coer_hand_to_fun coer_refl_ty force_unsafe
     (_h
        (coer_tuple (coer_refl_ty, coer_refl_ty))
-       coer_refl_ty
+       (coer_tuple (coer_refl_ty, coer_refl_ty))
        (coer_tuple (coer_refl_ty, coer_refl_ty))
        coer_refl_ty
        (coer_tuple (coer_refl_ty, coer_refl_ty)))

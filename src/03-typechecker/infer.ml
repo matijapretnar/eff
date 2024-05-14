@@ -175,12 +175,15 @@ let full_cast_abstraction cnstrs { term = pat, cmp; _ } ty_in dirty_out =
 (* ************************************************************************* *)
 
 let rec infer_expression state cnstrs exp =
-  let exp', cnstrs = infer_expression' state cnstrs exp.it in
-  (* Print.debug "%t -> %t : %t / %t"
-     (Untyped.print_expression exp)
-     (Term.print_expression exp')
-     (Type.print_ty exp'.ty) (UnresolvedConstraints.print cnstrs); *)
-  (exp', cnstrs)
+  let exp', cnstrs' = infer_expression' state cnstrs exp.it in
+  let resolved = Unification.unify ~loc:exp.at state.type_definitions cnstrs' in
+  let exp' = Term.apply_sub_exp resolved.Constraints.substitution exp' in
+  Print.debug "%t -> %t : %t / %t"
+    (Untyped.print_expression exp)
+    (Term.print_expression exp')
+    (Type.print_ty exp'.ty)
+    (UnresolvedConstraints.print cnstrs);
+  (exp', UnresolvedConstraints.from_resolved resolved)
 
 and infer_expression' state (cnstrs : UnresolvedConstraints.t) = function
   | Untyped.Var x ->
@@ -306,11 +309,14 @@ and infer_handler state cnstrs
 (* ************************************************************************* *)
 and infer_computation state cnstrs cmp =
   let cmp', cnstrs' = infer_computation' ~loc:cmp.at state cnstrs cmp.it in
-  (* Print.debug "%t -> %t : %t / %t"
-     (Untyped.print_computation c)
-     (Term.print_computation cmp')
-     (Type.print_dirty cmp'.ty) (UnresolvedConstraints.print cnstrs); *)
-  (cmp', cnstrs')
+  let resolved = Unification.unify ~loc:cmp.at state.type_definitions cnstrs' in
+  let cmp' = Term.apply_sub_comp resolved.Constraints.substitution cmp' in
+  Print.debug "%t -> %t : %t / %t"
+    (Untyped.print_computation cmp)
+    (Term.print_computation cmp')
+    (Type.print_dirty cmp'.ty)
+    (UnresolvedConstraints.print cnstrs);
+  (cmp', UnresolvedConstraints.from_resolved resolved)
 
 (* Dispatch: Type inference for a plan computation *)
 and infer_computation' ~loc state cnstrs = function
