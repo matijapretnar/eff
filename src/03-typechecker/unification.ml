@@ -35,14 +35,16 @@ let apply_substitution new_sub (paused : Constraints.t) queue =
 let change_subst f (queue : UnresolvedConstraints.t) =
   { queue with substitution = f queue.substitution }
 
-let expand_row ~loc row ops =
+let expand_row ~loc sub row ops =
   match row with
-  | _ when Effect.Set.is_empty ops -> (Substitution.empty, row)
+  | _ when Effect.Set.is_empty ops -> (sub, row)
   | Dirt.Row.Param p ->
       let p' = Dirt.Param.refresh p in
       let row' = Dirt.Row.Param p' in
       let sub' =
-        Substitution.add_dirt_substitution_e p { effect_set = ops; row = row' }
+        Substitution.add_dirt_substitution p
+          { effect_set = ops; row = row' }
+          sub
       in
       (sub', row')
   | Dirt.Row.Empty -> Error.typing ~loc "Cannot extend an empty row."
@@ -385,20 +387,22 @@ and dirt_eq_step ~loc paused rest_queue { Dirt.effect_set = o1; row = row1 }
       row₁' = row₂'
 
   *)
-  let sub1, row1' = expand_row ~loc row1 (Effect.Set.diff o2 o1)
-  and sub2, row2' = expand_row ~loc row2 (Effect.Set.diff o1 o2) in
-  let row_sub =
+  let sub = rest_queue.UnresolvedConstraints.substitution in
+  let sub', row1' = expand_row ~loc sub row1 (Effect.Set.diff o2 o1) in
+  let sub'', row2' = expand_row ~loc sub' row2 (Effect.Set.diff o1 o2) in
+  let sub''' =
     match (row1', row2') with
-    | Dirt.Row.Empty, Dirt.Row.Empty -> Substitution.empty
+    | Dirt.Row.Empty, Dirt.Row.Empty -> sub''
     | Dirt.Row.Param p1, _ ->
-        Substitution.add_dirt_substitution_e p1
+        Substitution.add_dirt_substitution p1
           { effect_set = Effect.Set.empty; row = row2' }
+          sub''
     | _, Dirt.Row.Param p2 ->
-        Substitution.add_dirt_substitution_e p2
+        Substitution.add_dirt_substitution p2
           { effect_set = Effect.Set.empty; row = row1' }
+          sub''
   in
-  let sub' = Substitution.merge (Substitution.merge sub1 sub2) row_sub in
-  apply_substitution sub' paused rest_queue
+  apply_substitution sub''' paused rest_queue
 
 let rec unify' ~loc type_definitions (paused, (queue : UnresolvedConstraints.t))
     =
