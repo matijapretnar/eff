@@ -24,20 +24,59 @@ let empty =
 let from_resolved resolved = { empty with resolved }
 let change_resolved f cnstrs = { cnstrs with resolved = f cnstrs.resolved }
 
-let add_skeleton_equality con cons =
-  { cons with skeleton_equalities = con :: cons.skeleton_equalities }
+let add_skeleton_equality (sk1, sk2) cons =
+  {
+    cons with
+    skeleton_equalities =
+      ( Substitution.apply_substitutions_to_skeleton cons.resolved.substitution
+          sk1,
+        Substitution.apply_substitutions_to_skeleton cons.resolved.substitution
+          sk2 )
+      :: cons.skeleton_equalities;
+  }
 
-let add_dirt_equality con cons =
-  { cons with dirt_equalities = con :: cons.dirt_equalities }
+let add_dirt_equality (drt1, drt2) cons =
+  {
+    cons with
+    dirt_equalities =
+      ( Substitution.apply_substitutions_to_dirt cons.resolved.substitution drt1,
+        Substitution.apply_substitutions_to_dirt cons.resolved.substitution drt2
+      )
+      :: cons.dirt_equalities;
+  }
 
-let add_dirt_inequality con cons =
-  { cons with dirt_inequalities = con :: cons.dirt_inequalities }
+let add_dirt_inequality (w, (drt1, drt2)) cons =
+  {
+    cons with
+    dirt_inequalities =
+      ( w,
+        ( Substitution.apply_substitutions_to_dirt cons.resolved.substitution
+            drt1,
+          Substitution.apply_substitutions_to_dirt cons.resolved.substitution
+            drt2 ) )
+      :: cons.dirt_inequalities;
+  }
 
-let add_ty_equality con cons =
-  { cons with ty_equalities = con :: cons.ty_equalities }
+let add_ty_equality (ty1, ty2) cons =
+  {
+    cons with
+    ty_equalities =
+      ( Substitution.apply_substitutions_to_type cons.resolved.substitution ty1,
+        Substitution.apply_substitutions_to_type cons.resolved.substitution ty2
+      )
+      :: cons.ty_equalities;
+  }
 
-let add_ty_inequality con cons =
-  { cons with ty_inequalities = con :: cons.ty_inequalities }
+let add_ty_inequality (w, (ty1, ty2)) cons =
+  {
+    cons with
+    ty_inequalities =
+      ( w,
+        ( Substitution.apply_substitutions_to_type cons.resolved.substitution ty1,
+          Substitution.apply_substitutions_to_type cons.resolved.substitution
+            ty2 ) )
+      :: cons.ty_inequalities;
+  }
 
 let print c =
   let print_skeleton_equality (sk1, sk2) ppf =
