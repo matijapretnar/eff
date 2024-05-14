@@ -8,7 +8,7 @@ type t = {
   dirt_inequalities : (Type.DirtCoercionParam.t * Type.ct_dirt) list;
   ty_equalities : (Type.ty * Type.ty) list;
   ty_inequalities : (Type.TyCoercionParam.t * Type.ct_ty) list;
-  substitution : Substitution.t;
+  resolved : Constraints.t;
 }
 
 let empty =
@@ -18,8 +18,11 @@ let empty =
     dirt_inequalities = [];
     ty_equalities = [];
     ty_inequalities = [];
-    substitution = Substitution.empty;
+    resolved = Constraints.empty;
   }
+
+let from_resolved resolved = { empty with resolved }
+let change_resolved f cnstrs = { cnstrs with resolved = f cnstrs.resolved }
 
 let add_skeleton_equality con cons =
   { cons with skeleton_equalities = con :: cons.skeleton_equalities }
@@ -91,53 +94,71 @@ let free_params cons =
           (fun (_, ct) -> Type.free_params_ct_ty ct)
           cons.ty_inequalities)
 
-let apply_sub subs cons =
+let apply_substitution sub unresolved =
+  let add_substituted_ty_constraint s t1 t2 w ty1 ty2 unresolved =
+    let ty1', ty2' =
+      ( Substitution.apply_substitutions_to_type sub ty1,
+        Substitution.apply_substitutions_to_type sub ty2 )
+    in
+    if Type.equal_ty ty1 ty1' && Type.equal_ty ty2 ty2' then
+      change_resolved (Constraints.add_ty_constraint s t1 t2 w) unresolved
+    else add_ty_inequality (w, (ty1', ty2')) unresolved
+  and add_substituted_dirt_constraint d1 d2 w effs drt1 drt2 unresolved =
+    let drt1', drt2' =
+      ( Substitution.apply_substitutions_to_dirt sub drt1,
+        Substitution.apply_substitutions_to_dirt sub drt2 )
+    in
+    if Type.equal_dirt drt1 drt1' && Type.equal_dirt drt2 drt2' then
+      change_resolved (Constraints.add_dirt_constraint d1 d2 w effs) unresolved
+    else add_dirt_inequality (w, (drt1', drt2')) unresolved
+  in
   {
     skeleton_equalities =
       List.map
         (fun (skel1, skel2) ->
-          ( Substitution.apply_substitutions_to_skeleton subs skel1,
-            Substitution.apply_substitutions_to_skeleton subs skel2 ))
-        cons.skeleton_equalities;
+          ( Substitution.apply_substitutions_to_skeleton sub skel1,
+            Substitution.apply_substitutions_to_skeleton sub skel2 ))
+        unresolved.skeleton_equalities;
     dirt_equalities =
       List.map
         (fun (drt1, drt2) ->
-          ( Substitution.apply_substitutions_to_dirt subs drt1,
-            Substitution.apply_substitutions_to_dirt subs drt2 ))
-        cons.dirt_equalities;
+          ( Substitution.apply_substitutions_to_dirt sub drt1,
+            Substitution.apply_substitutions_to_dirt sub drt2 ))
+        unresolved.dirt_equalities;
     dirt_inequalities =
       List.map
         (fun (coer_p, (drt1, drt2)) ->
           ( coer_p,
-            ( Substitution.apply_substitutions_to_dirt subs drt1,
-              Substitution.apply_substitutions_to_dirt subs drt2 ) ))
-        cons.dirt_inequalities;
+            ( Substitution.apply_substitutions_to_dirt sub drt1,
+              Substitution.apply_substitutions_to_dirt sub drt2 ) ))
+        unresolved.dirt_inequalities;
     ty_equalities =
       List.map
         (fun (ty1, ty2) ->
-          ( Substitution.apply_substitutions_to_type subs ty1,
-            Substitution.apply_substitutions_to_type subs ty2 ))
-        cons.ty_equalities;
+          ( Substitution.apply_substitutions_to_type sub ty1,
+            Substitution.apply_substitutions_to_type sub ty2 ))
+        unresolved.ty_equalities;
     ty_inequalities =
       List.map
         (fun (coer_p, (ty1, ty2)) ->
           ( coer_p,
-            ( Substitution.apply_substitutions_to_type subs ty1,
-              Substitution.apply_substitutions_to_type subs ty2 ) ))
-        cons.ty_inequalities;
-    substitution = Substitution.merge subs cons.substitution;
+            ( Substitution.apply_substitutions_to_type sub ty1,
+              Substitution.apply_substitutions_to_type sub ty2 ) ))
+        unresolved.ty_inequalities;
+    resolved =
+      {
+        Constraints.empty with
+        substitution = Substitution.merge sub unresolved.resolved.substitution;
+      };
   }
+  |> Constraints.TyConstraints.fold_expanded add_substituted_ty_constraint
+       unresolved.resolved.Constraints.ty_constraints
+  |> Constraints.DirtConstraints.fold_expanded add_substituted_dirt_constraint
+       unresolved.resolved.Constraints.dirt_constraints
 
-let return_to_unresolved (resolved : Constraints.t) queue =
-  queue
-  |> Constraints.DirtConstraints.fold_expanded
-       (fun _ _ w _ drt1 drt2 -> add_dirt_inequality (w, (drt1, drt2)))
-       resolved.dirt_constraints
-  |> Constraints.TyConstraints.fold_expanded
-       (fun _s _t1 _t2 w ty1 ty2 -> add_ty_inequality (w, (ty1, ty2)))
-       resolved.ty_constraints
-
-let unresolve resolved = return_to_unresolved resolved empty
+let change_subst f cnstrs =
+  let sub = f cnstrs.resolved.substitution in
+  apply_substitution sub cnstrs
 
 let fresh_ty_coer cnstrs cons =
   let param = Type.TyCoercionParam.fresh () in

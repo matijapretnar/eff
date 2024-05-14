@@ -431,16 +431,16 @@ let process_computation state comp =
   let comp', cnstrs =
     infer_computation state UnresolvedConstraints.empty comp
   in
-  let sub, residuals =
-    Unification.solve ~loc:comp.at state.type_definitions cnstrs
+  let residuals =
+    Unification.unify ~loc:comp.at state.type_definitions cnstrs
   in
-  let sub, residuals =
+  let residuals =
     if !Config.simplify_coercions then
       ConstraintSimplifier.simplify_computation ~loc:comp.at
-        state.type_definitions sub residuals comp'.ty
-    else (sub, residuals)
+        state.type_definitions residuals comp'.ty
+    else residuals
   in
-  let cmp' = Term.apply_sub_comp sub comp' in
+  let cmp' = Term.apply_sub_comp residuals.substitution comp' in
 
   Print.debug "Inferred type: %t" (Type.print_dirty cmp'.ty);
   Print.debug "Full comp: %t" (Term.print_computation cmp');
@@ -460,27 +460,28 @@ let process_top_let ~loc state defs =
   let fold (pat, cmp) (state', defs) =
     let pat', cnstrs = infer_pattern state UnresolvedConstraints.empty pat in
     let cmp', cnstrs' = infer_computation state cnstrs cmp in
-    let sub, constraints =
-      Unification.solve ~loc state.type_definitions
+    let constraints =
+      Unification.unify ~loc state.type_definitions
         (UnresolvedConstraints.add_ty_equality (pat'.ty, fst cmp'.ty) cnstrs')
     in
     Print.debug "Inferred type: %t" (Type.print_dirty cmp'.ty);
     Print.debug "Full comp: %t" (Term.print_computation cmp');
-    let sub, constraints =
+    let constraints =
       if !Config.simplify_coercions then
         ConstraintSimplifier.simplify_computation ~loc state.type_definitions
-          sub constraints cmp'.ty
-      else (sub, constraints)
+          constraints cmp'.ty
+      else constraints
     in
     Print.debug "After optimization";
     let pat'', cmp'' =
-      (Term.apply_sub_pat sub pat', Term.apply_sub_comp sub cmp')
+      ( Term.apply_sub_pat constraints.substitution pat',
+        Term.apply_sub_comp constraints.substitution cmp' )
     in
     Print.debug "Inferred type: %t" (Type.print_dirty cmp''.ty);
     Print.debug "Full comp: %t" (Term.print_computation cmp'');
     let vars' =
       Term.Variable.Map.map
-        (Substitution.apply_sub_ty sub)
+        (Substitution.apply_sub_ty constraints.substitution)
         (Term.pattern_vars pat')
     in
     let params =
@@ -511,15 +512,19 @@ let process_top_let_rec ~loc state defs =
   let defs', cnstrs =
     infer_rec_definitions state UnresolvedConstraints.empty (Assoc.to_list defs)
   in
-  let sub, constraints = Unification.solve state.type_definitions ~loc cnstrs in
-  let sub, constraints =
+  let constraints = Unification.unify state.type_definitions ~loc cnstrs in
+  let constraints =
     if !Config.simplify_coercions then
-      ConstraintSimplifier.simplify_top_let_rec ~loc state.type_definitions sub
+      ConstraintSimplifier.simplify_top_let_rec ~loc state.type_definitions
         constraints
         (defs' |> Assoc.values_of |> List.map (fun abs -> abs.ty))
-    else (sub, constraints)
+    else constraints
   in
-  let defs = Assoc.map (Term.apply_substitutions_to_abstraction sub) defs' in
+  let defs =
+    Assoc.map
+      (Term.apply_substitutions_to_abstraction constraints.substitution)
+      defs'
+  in
   let defs_params = Term.free_params_definitions defs in
   let cnstrs_params = Constraints.free_params constraints in
   let params = Type.Params.union defs_params cnstrs_params in

@@ -101,12 +101,14 @@ end
 type t = {
   ty_constraints : TyConstraints.t;
   dirt_constraints : DirtConstraints.t;
+  substitution : Substitution.t;
 }
 
 let empty =
   {
     ty_constraints = TyConstraints.empty;
     dirt_constraints = DirtConstraints.empty;
+    substitution = Substitution.empty;
   }
 
 let remove_loops g =

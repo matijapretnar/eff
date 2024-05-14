@@ -52,7 +52,8 @@ let check_polarity_same_ty a =
 let check_polarity_same_dirt s =
   check_polarity_same Dirt.Param.Set.fold FreeParams.get_dirt_polarity s
 
-let collapse_type_cycles { Language.Constraints.ty_constraints; _ }
+let collapse_type_cycles
+    ({ Language.Constraints.ty_constraints; _ } as resolved)
     (initial_polarities : FreeParams.params) :
     UnresolvedConstraints.t * FreeParams.params =
   let open Language.Constraints in
@@ -95,11 +96,12 @@ let collapse_type_cycles { Language.Constraints.ty_constraints; _ }
 
   let ty_constraints, polarities =
     Skeleton.Param.Map.fold garbage_collect_skeleton_component ty_constraints
-      (UnresolvedConstraints.empty, initial_polarities)
+      (UnresolvedConstraints.from_resolved resolved, initial_polarities)
   in
   (ty_constraints, polarities)
 
-let collapse_dirt_cycles { Language.Constraints.dirt_constraints; _ }
+let collapse_dirt_cycles
+    ({ Language.Constraints.dirt_constraints; _ } as resolved)
     (polarities : FreeParams.params) =
   (* Beware, dirt polarities are not updated on the fly *)
   (* Dirt constraints *)
@@ -150,7 +152,8 @@ let collapse_dirt_cycles { Language.Constraints.dirt_constraints; _ }
           in
           ty_constraints
         else ty_constraints)
-      UnresolvedConstraints.empty components
+      (UnresolvedConstraints.from_resolved resolved)
+      components
   in
   (ty_constraints, polarities)
 
@@ -172,7 +175,7 @@ type simple_node_constraction_state = {
 }
 
 (* Joins simple type coercions to a reflexive coercion *)
-let remove_type_bridges { Language.Constraints.ty_constraints; _ }
+let remove_type_bridges ({ Language.Constraints.ty_constraints; _ } as resolved)
     (params : FreeParams.params) =
   let open Language.Constraints in
   let join_skeleton_component skel add_constraint graph new_constr =
@@ -393,7 +396,8 @@ let remove_type_bridges { Language.Constraints.ty_constraints; _ }
             constraints
         in
         join_skeleton_component skel add_constraint graph acc)
-      ty_constraints UnresolvedConstraints.empty
+      ty_constraints
+      (UnresolvedConstraints.from_resolved resolved)
   in
   new_constr
 
@@ -403,7 +407,8 @@ let add_constraint p1 p2 =
 let add_empty_constraint p1 =
   UnresolvedConstraints.add_dirt_equality (Dirt.no_effect p1, Dirt.empty)
 
-let contract_source_dirt_nodes { Language.Constraints.dirt_constraints; _ }
+let contract_source_dirt_nodes
+    ({ Language.Constraints.dirt_constraints; _ } as resolved)
     (params : FreeParams.params) =
   let open Language.Constraints in
   let module BaseSym = Dirt.Param in
@@ -479,7 +484,7 @@ let contract_source_dirt_nodes { Language.Constraints.dirt_constraints; _ }
                      (Dirt.no_effect node, Dirt.empty))
                  component ))
         else (indegs, constraints))
-      (indegs, UnresolvedConstraints.empty)
+      (indegs, UnresolvedConstraints.from_resolved resolved)
       components
   in
   new_constraints
@@ -523,7 +528,8 @@ type simple_dirt_node_constraction_state = {
   collected_constraints : UnresolvedConstraints.t;
 }
 
-let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
+let remove_dirt_bridges
+    ({ Language.Constraints.dirt_constraints; _ } as resolved)
     (params : FreeParams.params) =
   let open Language.Constraints in
   let join_dirt_component add_constraint
@@ -715,97 +721,84 @@ let remove_dirt_bridges { Language.Constraints.dirt_constraints; _ }
       constraints
   in
   join_dirt_component add_constraint dirt_constraints
-    UnresolvedConstraints.empty
+    (UnresolvedConstraints.from_resolved resolved)
 
-let simplify_type_constraints ~loc type_definitions subs constraints get_params
-    =
+let simplify_type_constraints ~loc type_definitions constraints get_params =
   let cycle_constraints, _free_params =
-    collapse_type_cycles constraints (get_params subs)
+    collapse_type_cycles constraints (get_params constraints.substitution)
   in
   Print.debug "Full constraints: %t"
-    (Language.Constraints.print_dot ~param_polarity:(get_params subs)
+    (Language.Constraints.print_dot
+       ~param_polarity:(get_params constraints.substitution)
        constraints);
   (* We don't really need the free parameters yet, as we do another unification pass *)
-  let subs, constraints =
-    Unification.unify ~loc type_definitions
-      (subs, constraints, cycle_constraints)
-  in
+  let constraints = Unification.unify ~loc type_definitions cycle_constraints in
   let constraints = Constraints.remove_loops constraints in
-  let subs, constraints =
+  let constraints =
     if simplify_type_params_full then
       let simple_one_constraints =
-        remove_type_bridges constraints (get_params subs)
+        remove_type_bridges constraints (get_params constraints.substitution)
       in
-      let subs', simple_one_constraints' =
-        Unification.unify ~loc type_definitions
-          (subs, constraints, simple_one_constraints)
+      let simple_one_constraints' =
+        Unification.unify ~loc type_definitions simple_one_constraints
       in
-      (subs', simple_one_constraints')
-    else (subs, constraints)
+      simple_one_constraints'
+    else constraints
   in
-  (subs, constraints)
+  constraints
 
-let simplify_dirt_contraints ~loc type_definitions subs constraints get_params =
+let simplify_dirt_contraints ~loc type_definitions constraints get_params =
   Print.debug "Full constraints: %t"
-    (Language.Constraints.print_dot ~param_polarity:(get_params subs)
+    (Language.Constraints.print_dot
+       ~param_polarity:(get_params constraints.Constraints.substitution)
        constraints);
   let new_constraints, _free_params =
-    collapse_dirt_cycles constraints (get_params subs)
+    collapse_dirt_cycles constraints (get_params constraints.substitution)
   in
-  let subs, constraints =
-    Unification.unify ~loc type_definitions (subs, constraints, new_constraints)
-  in
-  let subs, constraints =
+  let constraints = Unification.unify ~loc type_definitions new_constraints in
+  let constraints =
     if simplify_dirt_params_full then
       let new_constraints =
-        contract_source_dirt_nodes constraints (get_params subs)
+        contract_source_dirt_nodes constraints
+          (get_params constraints.substitution)
       in
-      Unification.unify ~loc type_definitions
-        (subs, constraints, new_constraints)
-    else (subs, constraints)
+      Unification.unify ~loc type_definitions new_constraints
+    else constraints
   in
   Print.debug "Full constraints after source contraction: %t"
-    (Language.Constraints.print_dot ~param_polarity:(get_params subs)
+    (Language.Constraints.print_dot
+       ~param_polarity:(get_params constraints.substitution)
        constraints);
-  let rec runner level subs_state cons_state =
+  let rec runner level cons_state =
     Print.debug "Full constraints in runner %d: %t" level
-      (Language.Constraints.print_dot ~param_polarity:(get_params subs)
+      (Language.Constraints.print_dot
+         ~param_polarity:(get_params constraints.substitution)
          constraints);
     let new_constraints, touched =
-      remove_dirt_bridges cons_state (get_params subs_state)
+      remove_dirt_bridges cons_state (get_params cons_state.substitution)
     in
-    let subs_state, cons_state =
-      Unification.unify ~loc type_definitions
-        (subs_state, cons_state, new_constraints)
-    in
+    let cons_state = Unification.unify ~loc type_definitions new_constraints in
     let cons_state = Constraints.remove_loops cons_state in
     Print.debug "Touched: %d %t" (List.length touched)
       (Print.sequence "," Dirt.Param.print touched);
-    if List.length touched > 0 then runner (level + 1) subs_state cons_state
-    else (subs_state, cons_state)
+    if List.length touched > 0 then runner (level + 1) cons_state
+    else cons_state
   in
-  let subs, constraints =
-    if simplify_dirt_params_full then runner 0 subs constraints
-    else (subs, constraints)
+  let constraints =
+    if simplify_dirt_params_full then runner 0 constraints else constraints
   in
 
-  let subs, constraints =
-    Unification.unify ~loc type_definitions
-      (subs, constraints, UnresolvedConstraints.empty)
-  in
   (* Optimize possible empty dirts  *)
   let new_constraints =
-    contract_source_dirt_nodes constraints (get_params subs)
+    contract_source_dirt_nodes constraints (get_params constraints.substitution)
   in
-  let subs, constraints =
-    Unification.unify ~loc type_definitions (subs, constraints, new_constraints)
-  in
+  let constraints = Unification.unify ~loc type_definitions new_constraints in
   (* Some parameters are present in the type, but not in constrains *)
   let present =
     Language.Constraints.DirtConstraints.DirtParamGraph.vertices
       constraints.dirt_constraints
   in
-  let params = (get_params subs).dirt_params in
+  let params = (get_params constraints.substitution).dirt_params in
   let new_constraints =
     Dirt.Param.Set.fold
       (fun p acc ->
@@ -815,43 +808,40 @@ let simplify_dirt_contraints ~loc type_definitions subs constraints get_params =
                (Dirt.no_effect p, Dirt.empty)
         else acc)
       (Dirt.Param.Set.diff params.positive params.negative)
-      UnresolvedConstraints.empty
+      (UnresolvedConstraints.from_resolved constraints)
   in
-  let subs, constraints =
-    Unification.unify ~loc type_definitions (subs, constraints, new_constraints)
-  in
-  (subs, constraints)
+  let constraints = Unification.unify ~loc type_definitions new_constraints in
+  constraints
 
-let simplify_constraints ~loc type_definitions subs constraints get_params =
-  let subs, constraints =
+let simplify_constraints ~loc type_definitions constraints get_params =
+  let constraints =
     if simplify_type_params then
-      simplify_type_constraints ~loc type_definitions subs constraints
-        get_params
-    else (subs, constraints)
+      simplify_type_constraints ~loc type_definitions constraints get_params
+    else constraints
   in
-  let subs, constraints =
+  let constraints =
     if simplify_dirt_params then
-      simplify_dirt_contraints ~loc type_definitions subs constraints get_params
-    else (subs, constraints)
+      simplify_dirt_contraints ~loc type_definitions constraints get_params
+    else constraints
   in
-  (subs, constraints)
+  constraints
 
-let simplify_computation ~loc type_definitions subs constraints typ =
-  simplify_constraints ~loc type_definitions subs constraints (fun subs ->
+let simplify_computation ~loc type_definitions constraints typ =
+  simplify_constraints ~loc type_definitions constraints (fun subs ->
       let polarity =
         calculate_polarity_dirty_ty (Substitution.apply_sub_dirty_ty subs typ)
       in
       polarity)
 
-let simplify_expression ~loc type_definitions subs constraints typ =
-  simplify_constraints ~loc type_definitions subs constraints (fun subs ->
+let simplify_expression ~loc type_definitions constraints typ =
+  simplify_constraints ~loc type_definitions constraints (fun subs ->
       let polarity =
         calculate_polarity_type (Substitution.apply_sub_ty subs typ)
       in
       polarity)
 
-let simplify_top_let_rec ~loc type_definitions subs constraints tys =
-  simplify_constraints ~loc type_definitions subs constraints (fun subs ->
+let simplify_top_let_rec ~loc type_definitions constraints tys =
+  simplify_constraints ~loc type_definitions constraints (fun subs ->
       let tys = List.map (Substitution.apply_sub_abs_ty subs) tys in
       let params =
         List.fold

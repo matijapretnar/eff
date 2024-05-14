@@ -34,7 +34,7 @@
   invalid/invalid_match_type.eff
   ----------------------------------------------------------------------
   Typing error (file "invalid/invalid_match_type.eff", line 4, char 1):
-  This expression has type a list but it should have type b.
+  This expression has type '_a list but it should have type b.
   ======================================================================
   invalid/less_than_complex.eff
   ----------------------------------------------------------------------
@@ -75,7 +75,7 @@
   val u : 'a -> 'a = <fun>
   val v : '_a -> '_a = <fun>
   Typing error (file "invalid/polymorphism_id_id.eff", line 3, char 1):
-  This expression has type int but it should have type string.
+  This expression has type string but it should have type int.
   ======================================================================
   invalid/shadow_eff.eff
   ----------------------------------------------------------------------
