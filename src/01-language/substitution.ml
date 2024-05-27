@@ -134,6 +134,8 @@ and apply_sub_dirtcoer sub drt_coer =
       | None -> { drt_coer with ty = apply_sub_ct_dirt sub drt_coer.ty })
   | UnionDirt (es, dirt_coer1) ->
       DirtCoercion.unionDirt (es, apply_sub_dirtcoer sub dirt_coer1)
+  | UnionRight (es, dirt_coer1) ->
+      DirtCoercion.unionRight (es, apply_sub_dirtcoer sub dirt_coer1)
 
 and apply_sub_dirtycoer (sub : t) { term = ty_coer, dirt_coer; _ } :
     TyCoercion.dirty_coercion =

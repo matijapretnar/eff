@@ -7,6 +7,7 @@ and t' =
   | DirtCoercionVar of Type.DirtCoercionParam.t
   | Empty
   | UnionDirt of (Effect.Set.t * t)
+  | UnionRight of (Effect.Set.t * t)
 
 let dirtCoercionVar omega cd = { term = DirtCoercionVar omega; ty = cd }
 let reflDirt drt = { term = ReflDirt; ty = (drt, drt) }
@@ -18,6 +19,10 @@ let unionDirt (effs, dcoer) =
     term = UnionDirt (effs, dcoer);
     ty = (Dirt.add_effects effs drt, Dirt.add_effects effs drt');
   }
+
+let unionRight (effs, dcoer) =
+  let drt, drt' = dcoer.ty in
+  { term = UnionRight (effs, dcoer); ty = (drt, Dirt.add_effects effs drt') }
 
 let rec equal_dirt_coercion dc1 dc2 =
   let d1, d1' = dc1.ty and d2, d2' = dc2.ty in

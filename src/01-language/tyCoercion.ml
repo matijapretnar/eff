@@ -188,6 +188,9 @@ and print_dirt_coercion ?max_level c ppf =
   | UnionDirt (eset, dc) ->
       print ~at_level:2 "{%t}∪%t" (Effect.Set.print eset)
         (print_dirt_coercion ~max_level:2 dc)
+  | UnionRight (eset, dc) ->
+      print ~at_level:2 "{%t}∪⁺%t" (Effect.Set.print eset)
+        (print_dirt_coercion ~max_level:2 dc)
 
 (* ************************************************************************* *)
 
@@ -249,7 +252,8 @@ and coercion_params_dirt_coercion = function
   | { term = ReflDirt; _ } -> Params.empty
   | { term = DirtCoercionVar dvar; _ } -> Params.dirt_coercion_singelton dvar
   | { term = Empty; _ } -> Params.empty
-  | { term = UnionDirt (_, dcoer); _ } -> coercion_params_dirt_coercion dcoer
+  | { term = UnionDirt (_, dcoer); _ } | { term = UnionRight (_, dcoer); _ } ->
+      coercion_params_dirt_coercion dcoer
 
 and coercion_params_dirty_coercion { term = tc, dc; _ } =
   Params.union

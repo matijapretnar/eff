@@ -294,15 +294,6 @@ and dirt_omega_step ~loc unresolved w dcons =
       UnresolvedConstraints.change_subst
         (Substitution.add_dirt_var_coercion w (DirtCoercion.empty d))
         unresolved
-  (* ω : δ₁ <= Ø *)
-  | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
-      { effect_set = ops2; row = Dirt.Row.Empty } )
-    when Effect.Set.is_empty ops1 && Effect.Set.is_empty ops2 ->
-      let sub' =
-        Substitution.add_dirt_var_coercion_e w (DirtCoercion.empty Dirt.empty)
-        |> Substitution.add_dirt_substitution d1 Dirt.empty
-      in
-      UnresolvedConstraints.apply_substitution sub' unresolved
   (* ω : O₁ <= O₂ *)
   | ( { effect_set = ops1; row = Dirt.Row.Empty },
       { effect_set = ops2; row = Dirt.Row.Empty } ) ->
@@ -339,7 +330,19 @@ and dirt_omega_step ~loc unresolved w dcons =
              }
       in
       UnresolvedConstraints.apply_substitution sub' unresolved
-  | _ -> assert false
+  (* ω : O₁ ∪ δ₁ <= O₂ *)
+  | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
+      { effect_set = ops2; row = Dirt.Row.Empty } ) ->
+      if not (Effect.Set.subset ops1 ops2) then
+        Error.typing ~loc "Effects %t are not a subset of %t"
+          (Effect.Set.print ops1) (Effect.Set.print ops2);
+      let unresolved' =
+        UnresolvedConstraints.change_subst
+          (Substitution.add_dirt_substitution d1
+             (Dirt.closed (Effect.Set.diff ops2 ops1)))
+          unresolved
+      in
+      unresolved'
 
 and dirt_eq_step ~loc unresolved { Dirt.effect_set = o1; row = row1 }
     { Dirt.effect_set = o2; row = row2 } =
