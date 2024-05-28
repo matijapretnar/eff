@@ -421,7 +421,7 @@ module FreeParams = struct
     let add_negative p params =
       { params with negative = S.Set.add p params.negative }
 
-    let bipolar p params = params |> add_positive p |> add_negative p
+    let add_bipolar p params = params |> add_positive p |> add_negative p
 
     let union p1 p2 =
       let adder fn set params = S.Set.fold fn set params in
@@ -447,13 +447,13 @@ module FreeParams = struct
       |> (match get_parameter_type p1 params with
          | Positive -> add_positive p2
          | Negtive -> add_negative p2
-         | Bipolar -> bipolar p2
+         | Bipolar -> add_bipolar p2
          | Neutral -> fun x -> x)
       |>
       match get_parameter_type p2 params with
       | Positive -> add_positive p1
       | Negtive -> add_negative p1
-      | Bipolar -> bipolar p1
+      | Bipolar -> add_bipolar p1
       | Neutral -> fun x -> x
   end
 

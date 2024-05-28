@@ -43,8 +43,8 @@ let options =
         " Compile the Eff code into plain OCaml (sent to standard output)" );
       ( "--output-dot",
         Arg.Unit (fun () -> Config.backend := Dot),
-        " Construct and output residual graphs for toplevel terms (sent to \
-         standard output in .dot format)" );
+        " Output constraint graphs for toplevel terms (sent to standard output \
+         in .dot format)" );
       ("--profile", Arg.Set Config.profiling, " Print out profiling information");
       ( "--no-opts",
         Arg.Clear Config.enable_optimization,

@@ -446,9 +446,7 @@ let contract_source_dirt_nodes
   let can_contract_component component =
     List.for_all
       (fun node ->
-        if Type.FreeParams.DirtParams.can_be_positive node params.dirt_params
-        then true
-        else false)
+        Type.FreeParams.DirtParams.can_be_positive node params.dirt_params)
       component
   in
   let _, new_constraints =
@@ -476,13 +474,7 @@ let contract_source_dirt_nodes
                         | None -> assert false))
                  outgoing
           in
-          ( indegs,
-            constraints
-            |> List.fold_right
-                 (fun node ->
-                   UnresolvedConstraints.add_dirt_equality
-                     (Dirt.no_effect node, Dirt.empty))
-                 component ))
+          (indegs, constraints |> List.fold_right add_empty_constraint component))
         else (indegs, constraints))
       (indegs, UnresolvedConstraints.from_resolved resolved)
       components
@@ -532,7 +524,12 @@ let remove_dirt_bridges
     ({ Language.Constraints.dirt_constraints; _ } as resolved)
     (params : FreeParams.params) =
   let open Language.Constraints in
-  let join_dirt_component add_constraint
+  let add_constraint source target constraints =
+    UnresolvedConstraints.add_dirt_equality
+      (Dirt.no_effect source, Dirt.no_effect target)
+      constraints
+  in
+  let join_dirt_component
       (graph :
         (DirtCoercionParam.t * Label.Set.t) Dirt.Param.Map.t Dirt.Param.Map.t)
       new_constr =
@@ -715,12 +712,7 @@ let remove_dirt_bridges
     in
     process (graph, inverse_graph) params EdgeSym.Set.empty [] new_constr
   in
-  let add_constraint source target constraints =
-    UnresolvedConstraints.add_dirt_equality
-      (Dirt.no_effect source, Dirt.no_effect target)
-      constraints
-  in
-  join_dirt_component add_constraint dirt_constraints
+  join_dirt_component dirt_constraints
     (UnresolvedConstraints.from_resolved resolved)
 
 let simplify_type_constraints ~loc type_definitions constraints get_params =

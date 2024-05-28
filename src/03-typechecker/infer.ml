@@ -437,16 +437,14 @@ let process_computation state comp =
   let comp', cnstrs =
     infer_computation state UnresolvedConstraints.empty comp
   in
-  let residuals =
-    Unification.unify ~loc:comp.at state.type_definitions cnstrs
-  in
-  let residuals =
+  let resolved = Unification.unify ~loc:comp.at state.type_definitions cnstrs in
+  let resolved =
     if !Config.simplify_coercions then
       ConstraintSimplifier.simplify_computation ~loc:comp.at
-        state.type_definitions residuals comp'.ty
-    else residuals
+        state.type_definitions resolved comp'.ty
+    else resolved
   in
-  let cmp' = Term.apply_sub_comp residuals.substitution comp' in
+  let cmp' = Term.apply_sub_comp resolved.substitution comp' in
 
   Print.debug "Inferred type: %t" (Type.print_dirty cmp'.ty);
   Print.debug "Full comp: %t" (Term.print_computation cmp');
@@ -455,11 +453,11 @@ let process_computation state comp =
     | Language.UntypedSyntax.Value _ ->
         Type.Params.union
           (Type.free_params_dirty cmp'.ty)
-          (Constraints.free_params residuals)
+          (Constraints.free_params resolved)
     | _ -> Type.Params.empty
   in
   Exhaust.check_computation state.type_definitions comp;
-  (params, cmp', residuals)
+  (params, cmp', resolved)
 
 let process_top_let ~loc state defs =
   Print.debug "TOPLET";
