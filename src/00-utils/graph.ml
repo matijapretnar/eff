@@ -40,8 +40,8 @@ struct
   let empty = Vertex.Map.empty
   let is_empty = Vertex.Map.is_empty
 
-  let get_edges t graph =
-    Vertex.Map.find_opt t graph |> Option.value ~default:Edges.empty
+  let get_edges v graph =
+    Vertex.Map.find_opt v graph |> Option.value ~default:Edges.empty
 
   let add_edge ?(allow_duplicate = false) v1 v2 e graph =
     let v1_edges' =
@@ -53,7 +53,7 @@ struct
     let v1_edges' = get_edges v1 graph |> Edges.remove_edge v2 in
     Vertex.Map.add v1 v1_edges' graph
 
-  let remove_edges v edges (graph : t) : t =
+  let remove_edges v edges graph =
     Vertex.Map.fold (fun v2 _ graph -> remove_edge v v2 graph) edges graph
 
   let remove_vertex_unsafe v graph = Vertex.Map.remove v graph
@@ -67,6 +67,22 @@ struct
         graph Vertex.Set.empty
     in
     vertices
+
+  let degrees ?(ignore_loops = false) graph =
+    let increment v m =
+      Vertex.Map.update v (function None -> Some 1 | Some x -> Some (x + 1)) m
+    in
+    let indeg, outdeg =
+      fold
+        (fun source sink _edge (indeg, outdeg) ->
+          if ignore_loops && Vertex.compare source sink = 0 then (indeg, outdeg)
+          else
+            (* ignore self cycles *)
+            (increment sink indeg, increment source outdeg))
+        graph
+        (Vertex.Map.empty, Vertex.Map.empty)
+    in
+    (indeg, outdeg)
 
   let reverse graph =
     fold
@@ -243,36 +259,6 @@ struct
     assert (Vertex.Set.equal all (vertices graph));
     (*  *)
     components
-
-  let toposort graph =
-    let permanent = Vertex.Set.empty in
-    let temp = Vertex.Set.empty in
-    let l = [] in
-    let rec visit n (temp, permanent, l) =
-      if Vertex.Set.mem n permanent then (temp, permanent, l)
-      else (
-        (* Check for cycle -> Should not happen *)
-        assert (Vertex.Set.mem n temp |> not);
-
-        let temp = Vertex.Set.add n temp in
-        let outgoing = graph |> Vertex.Map.find n in
-        let temp, permanent, l =
-          Vertex.Set.fold
-            (fun m (temp, permanent, l) -> visit m (temp, permanent, l))
-            outgoing (temp, permanent, l)
-        in
-        let temp = Vertex.Set.remove n temp in
-        let permanent = Vertex.Set.add n permanent in
-        (temp, permanent, n :: l))
-    in
-    let _, _, l =
-      Vertex.Map.fold
-        (fun f _ (temp, permanent, l) ->
-          if Vertex.Set.mem f permanent then (temp, permanent, l)
-          else visit f (temp, permanent, l))
-        graph (temp, permanent, l)
-    in
-    l
 
   let print_node additonal_label node ppf =
     let vertex = Vertex.print node in

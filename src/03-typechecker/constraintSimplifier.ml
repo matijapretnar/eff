@@ -291,18 +291,7 @@ let remove_type_bridges ({ Language.Constraints.ty_constraints; _ } as resolved)
           can_collapse )
       else (state, can_collapse)
     in
-    let increment v m =
-      BaseSym.Map.update v
-        (function None -> Some 1 | Some x -> Some (x + 1))
-        m
-    in
-    let indeg, outdeg =
-      G.fold
-        (fun source sink _edge (indeg, outdeg) ->
-          (increment sink indeg, increment source outdeg))
-        graph
-        (BaseSym.Map.empty, BaseSym.Map.empty)
-    in
+    let indeg, outdeg = G.degrees graph in
     (* Sanity check *)
     let assert_degrees grph line =
       BaseSym.Map.iter
@@ -425,24 +414,16 @@ let contract_source_dirt_nodes
         (Print.sequence "," BaseSym.print
            (List.map (fun x -> BaseSym.Map.find x representatives) dl)))
     components;
-  let increment v m =
-    BaseSym.Map.update v (function None -> Some 1 | Some x -> Some (x + 1)) m
-  in
   Print.debug "Representatives: %t"
     (BaseSym.Map.print BaseSym.print representatives);
-  let indeg = BaseSym.Map.map (fun _ -> 0) quotient_graph in
+  let indegs, _ = G.degrees ~ignore_loops:true quotient_graph in
   let indegs =
-    BaseSym.Map.fold
-      (fun source edges indeg ->
-        BaseSym.Map.fold
-          (fun sink _ indeg ->
-            if BaseSym.compare source sink = 0 then indeg
-            else (* ignore self cycles *)
-              increment sink indeg)
-          edges indeg)
-      quotient_graph indeg
+    let vs = G.vertices quotient_graph in
+    BaseSym.Set.fold
+      (fun v ->
+        BaseSym.Map.update v (function None -> Some 0 | Some deg -> Some deg))
+      vs indegs
   in
-
   let can_contract_component component =
     List.for_all
       (fun node ->
@@ -539,18 +520,7 @@ let remove_dirt_bridges
     let module G = DirtConstraints.DirtParamGraph in
     (* We can assume that the graph is a DAG *)
     let inverse_graph = G.reverse graph in
-    let increment v m =
-      BaseSym.Map.update v
-        (function None -> Some 1 | Some x -> Some (x + 1))
-        m
-    in
-    let indeg, outdeg =
-      G.fold
-        (fun source sink _edge (indeg, outdeg) ->
-          (increment sink indeg, increment source outdeg))
-        graph
-        (BaseSym.Map.empty, BaseSym.Map.empty)
-    in
+    let indeg, outdeg = G.degrees graph in
     let lst = indeg |> BaseSym.Map.bindings in
     Print.debug "Line: bindings indeg: %t"
       (Print.sequence "," (fun (s, _) -> BaseSym.print s) lst);

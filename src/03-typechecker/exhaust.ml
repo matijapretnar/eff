@@ -77,7 +77,9 @@ let pattern_of_constructor ~loc c lst =
 (* Finds all distinct non-wildcard root pattern constructors in [lst], and at
    least one constructor of their type not present in [lst] if it exists. *)
 let find_constructors tctx lst =
-  let cons_lst = List.map (constructor_of_pattern tctx) (List.unique_elements lst) in
+  let cons_lst =
+    List.map (constructor_of_pattern tctx) (List.unique_elements lst)
+  in
   let present = List.filter (fun c -> c <> Wildcard) cons_lst in
   let missing =
     match present with
