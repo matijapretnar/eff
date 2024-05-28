@@ -256,10 +256,10 @@ let rec elab_pattern state p =
   | PVariant (l, Some p) -> NoEff.PNVariant (l, Some (elab_pattern state p))
   | PNonbinding -> PNNonbinding
 
-let rec elab_expression (state : state) exp = elab_expression' state exp
+let rec elab_expression (state : state) expr = elab_expression' state expr
 
-and elab_expression' state exp =
-  match exp.term with
+and elab_expression' state expr =
+  match expr.term with
   | ExEff.Var x ->
       let empty_dirt_params =
         x.instantiation.dirt_var_to_dirt_subs |> Dirt.Param.Map.bindings
@@ -295,8 +295,8 @@ and elab_expression' state exp =
       let elab2 = elab_ty_coercion state coer in
       NoEff.NCast (elab1, elab2)
   | ExEff.Variant (lbl, None) -> NoEff.NVariant (lbl, None)
-  | ExEff.Variant (lbl, Some exp) ->
-      let elab_e = elab_expression state exp in
+  | ExEff.Variant (lbl, Some expr) ->
+      let elab_e = elab_expression state expr in
       NoEff.NVariant (lbl, Some elab_e)
   | ExEff.Record _ass -> failwith __LOC__
 

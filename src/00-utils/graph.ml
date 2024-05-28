@@ -238,7 +238,7 @@ struct
         (vertices graph) (visited, components)
     in
     (* TODO: a bunch of asserts *)
-    List.iter (fun cmp -> assert (Vertex.Set.cardinal cmp >= 1)) components;
+    List.iter (fun comp -> assert (Vertex.Set.cardinal comp >= 1)) components;
     let all = List.fold_right Vertex.Set.union components Vertex.Set.empty in
     assert (Vertex.Set.equal all (vertices graph));
     (*  *)
@@ -284,16 +284,17 @@ struct
     Print.print ppf "      node_%t -> node_%t [label=\"%t\"]" (Vertex.print v1)
       (Vertex.print v2) (Edge.print edge)
 
-  let print_node_component cluster_name additional_label (ind, cmp) ppf =
-    if Vertex.Set.cardinal cmp = 1 then
-      Print.print ppf "%t" (print_node additional_label (Vertex.Set.choose cmp))
+  let print_node_component cluster_name additional_label (ind, comp) ppf =
+    if Vertex.Set.cardinal comp = 1 then
+      Print.print ppf "%t"
+        (print_node additional_label (Vertex.Set.choose comp))
     else
       Print.print ppf
         "subgraph cluster_%t_%d {label=\"\"; graph[style=dotted]; \n %t \n}"
         cluster_name ind
         (Print.sequence "//--k\n"
            (print_node additional_label)
-           (Vertex.Set.elements cmp))
+           (Vertex.Set.elements comp))
 
   let print_dot additional_label graph cluster_name header ppf =
     let additional_label =

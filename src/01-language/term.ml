@@ -197,10 +197,10 @@ let handlerWithFinally handler_clauses finally_clause =
     ty = Type.handler (drty_in, drty_out);
   }
 
-let castExp (exp, coer) =
-  let ty1 = exp.ty and ty1', ty2 = coer.ty in
+let castExp (expr, coer) =
+  let ty1 = expr.ty and ty1', ty2 = coer.ty in
   assert (Type.equal_ty ty1 ty1');
-  { term = CastExp (exp, coer); ty = ty2 }
+  { term = CastExp (expr, coer); ty = ty2 }
 
 let lambdaTyCoerVar (_ : Type.TyCoercionParam.t * expression) : expression =
   failwith __LOC__
@@ -214,28 +214,28 @@ let applyTyCoercion (_ : expression * TyCoercion.ty_coercion) : expression =
 let applyDirtCoercion (_ : expression * DirtCoercion.t) : expression =
   failwith __LOC__
 
-let value exp = { term = Value exp; ty = Type.pure_ty exp.ty }
+let value expr = { term = Value expr; ty = Type.pure_ty expr.ty }
 
-let letVal (exp, abs) =
+let letVal (expr, abs) =
   let ty1, drty2 = abs.ty in
-  assert (Type.equal_ty exp.ty ty1);
-  { term = LetVal (exp, abs); ty = drty2 }
+  assert (Type.equal_ty expr.ty ty1);
+  { term = LetVal (expr, abs); ty = drty2 }
 
 let letRec (defs, comp) = { term = LetRec (defs, comp); ty = comp.ty }
 let match_ (e, cases) drty = { term = Match (e, cases); ty = drty }
 
-let apply (exp1, exp2) =
-  match exp1.ty.term with
+let apply (expr1, expr2) =
+  match expr1.ty.term with
   | Type.Arrow (ty1, drty2) ->
-      assert (Type.equal_ty exp2.ty ty1);
-      { term = Apply (exp1, exp2); ty = drty2 }
+      assert (Type.equal_ty expr2.ty ty1);
+      { term = Apply (expr1, expr2); ty = drty2 }
   | _ -> assert false
 
-let handle (exp, comp) =
-  match exp.ty.term with
+let handle (expr, comp) =
+  match expr.ty.term with
   | Type.Handler (drty1, drty2) ->
       assert (Type.equal_dirty comp.ty drty1);
-      { term = Handle (exp, comp); ty = drty2 }
+      { term = Handle (expr, comp); ty = drty2 }
   | _ -> assert false
 
 let call (eff, e, a) =
@@ -254,13 +254,13 @@ let bind (comp1, abs2) =
   assert (Type.equal_dirt drt1 drt2);
   { term = Bind (comp1, abs2); ty = drty2 }
 
-let castComp (cmp, coer) =
-  let drty1 = cmp.ty and drty1', drty2 = coer.ty in
+let castComp (comp, coer) =
+  let drty1 = comp.ty and drty1', drty2 = coer.ty in
   assert (Type.equal_dirty drty1 drty1');
-  { term = CastComp (cmp, coer); ty = drty2 }
+  { term = CastComp (comp, coer); ty = drty2 }
 
-let check (loc, cmp) =
-  { term = Check (loc, cmp); ty = Type.pure_ty Type.unit_ty }
+let check (loc, comp) =
+  { term = Check (loc, comp); ty = Type.pure_ty Type.unit_ty }
 
 let abstraction (p, c) : abstraction = { term = (p, c); ty = (p.ty, c.ty) }
 
@@ -418,11 +418,11 @@ and apply_sub_comp' sub computation =
 
 and apply_sub_exp sub expression =
   {
-    term = apply_sub_exp' sub expression.term;
+    term = apply_sub_expr' sub expression.term;
     ty = Substitution.apply_sub_ty sub expression.ty;
   }
 
-and apply_sub_exp' sub expression =
+and apply_sub_expr' sub expression =
   match expression with
   | Var v ->
       Var
@@ -540,8 +540,8 @@ and refresh_pattern' sbst = function
       (sbst, PVariant (lbl, Some p'))
   | (PConst _ | PNonbinding | PVariant (_, None)) as p -> (sbst, p)
 
-let rec refresh_expression sbst exp =
-  { exp with term = refresh_expression' sbst exp.term }
+let rec refresh_expression sbst expr =
+  { expr with term = refresh_expression' sbst expr.term }
 
 and refresh_expression' sbst = function
   | Var x as e -> (
@@ -563,8 +563,8 @@ and refresh_expression' sbst = function
   | CastExp (e1, tyco) -> CastExp (refresh_expression sbst e1, tyco)
   | Const _ as e -> e
 
-and refresh_computation sbst cmp =
-  { cmp with term = refresh_computation' sbst cmp.term }
+and refresh_computation sbst comp =
+  { comp with term = refresh_computation' sbst comp.term }
 
 and refresh_computation' sbst = function
   | Bind (c1, c2) ->
@@ -596,8 +596,8 @@ and refresh_computation' sbst = function
       Call (eff, refresh_expression sbst e, refresh_abstraction sbst a)
   | Value e -> Value (refresh_expression sbst e)
   | CastComp (c, dtyco) -> CastComp (refresh_computation sbst c, dtyco)
-  | LetVal (exp, abs) ->
-      LetVal (refresh_expression sbst exp, refresh_abstraction sbst abs)
+  | LetVal (expr, abs) ->
+      LetVal (refresh_expression sbst expr, refresh_abstraction sbst abs)
   | Check (loc, c) -> Check (loc, refresh_computation sbst c)
 
 and refresh_handler sbst { term = h; ty } =
@@ -625,7 +625,7 @@ and refresh_abstraction2 sbst { term = p1, p2, c; ty } =
   let c' = refresh_computation sbst c in
   { term = (p1', p2', c'); ty }
 
-let rec subst_expr sbst exp = { exp with term = subst_expr' sbst exp.term }
+let rec subst_expr sbst expr = { expr with term = subst_expr' sbst expr.term }
 
 and subst_expr' sbst = function
   (* We could afford to check that types of x and e match *)
@@ -645,7 +645,7 @@ and subst_expr' sbst = function
   | Const _ as e -> e
   | CastExp (e, tyco) -> CastExp (subst_expr sbst e, tyco)
 
-and subst_comp sbst cmp = { cmp with term = subst_comp' sbst cmp.term }
+and subst_comp sbst comp = { comp with term = subst_comp' sbst comp.term }
 
 and subst_comp' sbst = function
   | Bind (c1, c2) -> Bind (subst_comp sbst c1, subst_abs sbst c2)
@@ -727,10 +727,10 @@ let pattern_match p e =
   in
   extend_subst p e Assoc.empty
 
-let beta_reduce abs exp =
-  let { term = pat, cmp; _ } = refresh_abstraction Assoc.empty abs in
-  let sub = pattern_match pat exp in
-  Option.map (fun sub -> subst_comp sub cmp) sub
+let beta_reduce abs expr =
+  let { term = pat, comp; _ } = refresh_abstraction Assoc.empty abs in
+  let sub = pattern_match pat expr in
+  Option.map (fun sub -> subst_comp sub comp) sub
 
 let ( @@@ ) occur1 occur2 =
   Variable.Map.merge

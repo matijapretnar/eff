@@ -37,9 +37,9 @@ module Backend : Language.Backend.S = struct
   let process_top_let state defs =
     let elements =
       List.fold_right
-        (fun (pattern, _, cstr, cmp) elements ->
+        (fun (pattern, _, cstr, comp) elements ->
           {
-            free_params = Type.calculate_polarity_dirty_ty cmp.ty;
+            free_params = Type.calculate_polarity_dirty_ty comp.ty;
             constraints = cstr;
             label = Pattern pattern;
           }

@@ -11,8 +11,8 @@ and of_abstraction2 { term = p1, p2, c; _ } =
   (of_pattern p1, of_pattern p2, of_computation c)
 
 (** Conversion functions. *)
-and of_expression exp =
-  match exp.term with
+and of_expression expr =
+  match expr.term with
   | Term.Var v -> Var v.variable
   | Term.Const const -> Const const
   | Term.Tuple es -> Tuple (List.map of_expression es)
@@ -38,7 +38,7 @@ and of_expression exp =
   | Term.Handler h -> of_handler h None
   | Term.HandlerWithFinally h ->
       of_handler h.handler_clauses (Some h.finally_clause)
-  | Term.CastExp (exp, _) -> of_expression exp
+  | Term.CastExp (expr, _) -> of_expression expr
 
 and of_handler
     ({ term = { value_clause; effect_clauses = { effect_part; _ } }; _ } :
@@ -60,8 +60,8 @@ and of_handler
       let p_fin, c_fin = of_abstraction fin in
       Lambda (PVar ghost_bind, Let ([ (p_fin, match_handler) ], c_fin))
 
-and of_computation cmp =
-  match cmp.term with
+and of_computation comp =
+  match comp.term with
   | Term.Value e -> of_expression e
   | Term.LetVal (e, a) ->
       let p, c = of_abstraction a in

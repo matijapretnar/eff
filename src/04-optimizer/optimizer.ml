@@ -56,7 +56,7 @@ type inlinability =
   (* Pattern occurs more than once in a body of abstraction or it occurs recursively *)
   | NotInlinable
 
-let abstraction_inlinability { term = pat, cmp; _ } =
+let abstraction_inlinability { term = pat, comp; _ } =
   match pat.term with
   | Term.PVar v
     when Term.Variable.fold
@@ -64,10 +64,10 @@ let abstraction_inlinability { term = pat, cmp; _ } =
            v ->
       NotInlinable
   | _ ->
-      let free_vars_cmp = Term.free_vars_comp cmp in
+      let free_vars_comp = Term.free_vars_comp comp in
       let aux x _ inlinability =
         let occ =
-          Term.Variable.Map.find_opt x free_vars_cmp |> Option.value ~default:0
+          Term.Variable.Map.find_opt x free_vars_comp |> Option.value ~default:0
         in
         if occ > 1 then NotInlinable
         else
@@ -77,23 +77,23 @@ let abstraction_inlinability { term = pat, cmp; _ } =
       in
       Term.Variable.Map.fold aux (Term.pattern_vars pat) NotPresent
 
-let keep_used_bindings defs cmp =
+let keep_used_bindings defs comp =
   (* Do proper call graph analysis *)
-  let free_vars_cmp = Term.free_vars_comp cmp in
+  let free_vars_comp = Term.free_vars_comp comp in
   let free_vars_defs =
     List.map (fun (_, a) -> Term.free_vars_abs a) (Assoc.to_list defs)
   in
-  let free_vars = Term.concat_vars (free_vars_cmp :: free_vars_defs) in
+  let free_vars = Term.concat_vars (free_vars_comp :: free_vars_defs) in
   List.filter
     (fun (x, _) -> not (Term.does_not_occur x free_vars))
     (Assoc.to_list defs)
 
 let rec extract_cast_value comp =
   match comp.term with
-  | Term.Value exp -> Some exp
+  | Term.Value expr -> Some expr
   | Term.CastComp (comp, { term = tcoer, _; _ }) ->
       Option.map
-        (fun exp -> Term.castExp (exp, tcoer))
+        (fun expr -> Term.castExp (expr, tcoer))
         (extract_cast_value comp)
   | _ -> None
 
@@ -122,82 +122,85 @@ let recast_computation hnd comp =
       else None
   | _ -> None
 
-let rec optimize_expression state exp =
-  (* Print.debug "Optimizing expression: %t" (Term.print_expression exp); *)
-  let exp' = optimize_expression' state exp in
-  (* if exp <> exp' then
-       Print.debug "Subterms optimized to: %t" (Term.print_expression exp')
+let rec optimize_expression state expr =
+  (* Print.debug "Optimizing expression: %t" (Term.print_expression expr); *)
+  let expr' = optimize_expression' state expr in
+  (* if expr <> expr' then
+       Print.debug "Subterms optimized to: %t" (Term.print_expression expr')
      else Print.debug "No subterms optimized"; *)
-  assert (Type.equal_ty exp.ty exp'.ty);
-  let exp'' = reduce_expression state exp' in
-  (* if exp' <> exp'' then
-       Print.debug "Reduced to: %t" (Term.print_expression exp'')
+  assert (Type.equal_ty expr.ty expr'.ty);
+  let expr'' = reduce_expression state expr' in
+  (* if expr' <> expr'' then
+       Print.debug "Reduced to: %t" (Term.print_expression expr'')
      else Print.debug "No reductions"; *)
-  assert (Type.equal_ty exp'.ty exp''.ty);
+  assert (Type.equal_ty expr'.ty expr''.ty);
   (* Print.debug "Done optimizing expression: %t ~> %t"
-     (Term.print_expression exp)
-     (Term.print_expression exp''); *)
-  exp''
+     (Term.print_expression expr)
+     (Term.print_expression expr''); *)
+  expr''
 
-and optimize_expression' state exp =
-  match exp.term with
-  | Term.Var _ | Term.Const _ -> exp
+and optimize_expression' state expr =
+  match expr.term with
+  | Term.Var _ | Term.Const _ -> expr
   | Term.Tuple exps -> Term.tuple (List.map (optimize_expression state) exps)
   | Term.Record flds ->
-      Term.record exp.ty (Type.Field.Map.map (optimize_expression state) flds)
+      Term.record expr.ty (Type.Field.Map.map (optimize_expression state) flds)
   | Term.Variant (lbl, arg) ->
-      Term.variant (lbl, Option.map (optimize_expression state) arg) exp.ty
+      Term.variant (lbl, Option.map (optimize_expression state) arg) expr.ty
   | Term.Lambda abs -> Term.lambda (optimize_abstraction state abs)
   | Term.Handler hnd -> Term.handler (optimize_handler state hnd)
   | Term.HandlerWithFinally hnd ->
       Term.handlerWithFinally
         (optimize_handler state hnd.handler_clauses)
         (optimize_abstraction state hnd.finally_clause)
-  | Term.CastExp (exp, coer) ->
-      Term.castExp (optimize_expression state exp, coer)
+  | Term.CastExp (expr, coer) ->
+      Term.castExp (optimize_expression state expr, coer)
 
-and optimize_computation state cmp =
-  (* Print.debug "Optimizing computation: %t" (Term.print_computation cmp); *)
-  let cmp' = optimize_computation' state cmp in
-  (* if cmp <> cmp' then
-       Print.debug "Subterms optimized to: %t" (Term.print_computation cmp')
+and optimize_computation state comp =
+  (* Print.debug "Optimizing computation: %t" (Term.print_computation comp); *)
+  let comp' = optimize_computation' state comp in
+  (* if comp <> comp' then
+       Print.debug "Subterms optimized to: %t" (Term.print_computation comp')
      else Print.debug "No subterms optimized"; *)
-  assert (Type.equal_dirty cmp.ty cmp'.ty);
-  let cmp'' = reduce_computation state cmp' in
-  (* if cmp' <> cmp'' then
-       Print.debug "Reduced to: %t" (Term.print_computation cmp'')
+  assert (Type.equal_dirty comp.ty comp'.ty);
+  let comp'' = reduce_computation state comp' in
+  (* if comp' <> comp'' then
+       Print.debug "Reduced to: %t" (Term.print_computation comp'')
      else Print.debug "No reductions"; *)
-  assert (Type.equal_dirty cmp'.ty cmp''.ty);
+  assert (Type.equal_dirty comp'.ty comp''.ty);
   (* Print.debug "Done optimizing computation: %t ~> %t"
-     (Term.print_computation cmp)
-     (Term.print_computation cmp''); *)
-  cmp''
+     (Term.print_computation comp)
+     (Term.print_computation comp''); *)
+  comp''
 
-and optimize_computation' state cmp =
-  match cmp.term with
-  | Term.Value exp -> Term.value (optimize_expression state exp)
-  | Term.LetVal (exp, abs) ->
-      Term.letVal (optimize_expression state exp, optimize_abstraction state abs)
-  | Term.LetRec (defs, cmp) ->
+and optimize_computation' state comp =
+  match comp.term with
+  | Term.Value expr -> Term.value (optimize_expression state expr)
+  | Term.LetVal (expr, abs) ->
+      Term.letVal
+        (optimize_expression state expr, optimize_abstraction state abs)
+  | Term.LetRec (defs, comp) ->
       Term.letRec
-        (optimize_rec_definitions state defs, optimize_computation state cmp)
-  | Term.Match (exp, cases) ->
+        (optimize_rec_definitions state defs, optimize_computation state comp)
+  | Term.Match (expr, cases) ->
       Term.match_
-        ( optimize_expression state exp,
+        ( optimize_expression state expr,
           List.map (optimize_abstraction state) cases )
-        cmp.ty
-  | Term.Apply (exp1, exp2) ->
-      Term.apply (optimize_expression state exp1, optimize_expression state exp2)
-  | Term.Handle (exp, cmp) ->
-      Term.handle (optimize_expression state exp, optimize_computation state cmp)
-  | Term.Call (eff, exp, abs) ->
+        comp.ty
+  | Term.Apply (expr1, expr2) ->
+      Term.apply
+        (optimize_expression state expr1, optimize_expression state expr2)
+  | Term.Handle (expr, comp) ->
+      Term.handle
+        (optimize_expression state expr, optimize_computation state comp)
+  | Term.Call (eff, expr, abs) ->
       Term.call
-        (eff, optimize_expression state exp, optimize_abstraction state abs)
-  | Term.Bind (cmp, abs) ->
-      Term.bind (optimize_computation state cmp, optimize_abstraction state abs)
-  | Term.CastComp (cmp, dtcoer) ->
-      Term.castComp (optimize_computation state cmp, dtcoer)
-  | Term.Check (loc, cmp) -> Term.check (loc, optimize_computation state cmp)
+        (eff, optimize_expression state expr, optimize_abstraction state abs)
+  | Term.Bind (comp, abs) ->
+      Term.bind (optimize_computation state comp, optimize_abstraction state abs)
+  | Term.CastComp (comp, dtcoer) ->
+      Term.castComp (optimize_computation state comp, dtcoer)
+  | Term.Check (loc, comp) -> Term.check (loc, optimize_computation state comp)
 
 and optimize_handler state hnd =
   {
@@ -219,31 +222,31 @@ and optimize_handler state hnd =
 and optimize_abstraction state abs =
   { abs with term = optimize_abstraction' state abs.term }
 
-and optimize_abstraction' state (pat, cmp) =
-  let cmp' = optimize_computation state cmp in
-  match (pat.term, cmp'.term) with
+and optimize_abstraction' state (pat, comp) =
+  let comp' = optimize_computation state comp in
+  match (pat.term, comp'.term) with
   | Term.PVar v, Term.Match ({ term = Var v'; _ }, [ abs ])
   | Term.PVar v, Term.LetVal ({ term = Var v'; _ }, abs)
     when v = v'.variable && Term.does_not_occur v (Term.free_vars_abs abs) ->
       abs.term
-  | _ -> (pat, cmp')
+  | _ -> (pat, comp')
 
 and optimize_abstraction2 state abs2 =
   { abs2 with term = optimize_abstraction2' state abs2.term }
 
-and optimize_abstraction2' state (pat1, pat2, cmp) =
-  (pat1, pat2, optimize_computation state cmp)
+and optimize_abstraction2' state (pat1, pat2, comp) =
+  (pat1, pat2, optimize_computation state comp)
 
 and optimize_rec_definitions state defs =
   Assoc.map (fun abs -> optimize_abstraction state abs) defs
 
-and cast_expression state exp coer =
-  match (exp.term, coer.term) with
+and cast_expression state expr coer =
+  match (expr.term, coer.term) with
   | _, _
     when TyCoercion.is_trivial_ty_coercion coer
          && state.config.eliminate_coercions ->
-      exp
-  | _, _ -> Term.castExp (exp, coer)
+      expr
+  | _, _ -> Term.castExp (expr, coer)
 
 and cast_computation state comp coer =
   match (comp.term, coer.term) with
@@ -252,38 +255,38 @@ and cast_computation state comp coer =
          && state.config.eliminate_coercions ->
       (* Elim-Co-Comp *)
       comp
-  | Term.Bind (cmp, abs), (_, dcoer) when state.config.push_coercions ->
+  | Term.Bind (comp, abs), (_, dcoer) when state.config.push_coercions ->
       (* Push-Co-Do *)
-      let ty1, _ = cmp.ty in
+      let ty1, _ = comp.ty in
       let coer1 = TyCoercion.bangCoercion (TyCoercion.reflTy ty1, dcoer) in
       bind_computation state
-        (cast_computation state cmp coer1)
+        (cast_computation state comp coer1)
         (cast_abstraction state abs coer)
-  | Term.Call (eff, exp, abs), _ when state.config.push_coercions ->
+  | Term.Call (eff, expr, abs), _ when state.config.push_coercions ->
       (* Push-Co-Op *)
-      Term.call (eff, exp, cast_abstraction state abs coer)
+      Term.call (eff, expr, cast_abstraction state abs coer)
   | _, _ -> Term.castComp (comp, coer)
 
-and cast_abstraction state { term = pat, cmp; _ } coer =
-  Term.abstraction (pat, cast_computation state cmp coer)
+and cast_abstraction state { term = pat, comp; _ } coer =
+  Term.abstraction (pat, cast_computation state comp coer)
 
 and bind_computation state comp bind =
   match comp.term with
   | Term.Bind (comp, abs) ->
       bind_computation state comp (bind_abstraction state abs bind)
-  | Term.Call (eff, exp, abs) ->
-      Term.call (eff, exp, bind_abstraction state abs bind)
+  | Term.Call (eff, expr, abs) ->
+      Term.call (eff, expr, bind_abstraction state abs bind)
   | _ -> (
       match extract_cast_value comp with
-      | Some exp -> beta_reduce state bind exp
+      | Some expr -> beta_reduce state bind expr
       | None -> Term.bind (comp, bind))
 
-and bind_abstraction state { term = pat, cmp; _ } bind =
-  Term.abstraction (pat, bind_computation state cmp bind)
+and bind_abstraction state { term = pat, comp; _ } bind =
+  Term.abstraction (pat, bind_computation state comp bind)
 
 and handle_computation state hnd comp =
   match comp.term with
-  | Term.Apply ({ term = Var { variable = f; _ }; _ }, exp)
+  | Term.Apply ({ term = Var { variable = f; _ }; _ }, expr)
     when Option.is_some
            (Assoc.lookup
               (hnd.term.Term.effect_clauses.fingerprint, f)
@@ -297,26 +300,26 @@ and handle_computation state hnd comp =
       with
       | Some (f', ty, FixedReturnClause value_clause') ->
           if value_clause = value_clause' then
-            Term.apply (Term.mono_var f' ty, exp)
+            Term.apply (Term.mono_var f' ty, expr)
           else raise (ReturnClauseNotFixed f)
       | Some (f', ty, VaryingReturnClause) ->
           Term.apply
             ( Term.mono_var f' ty,
-              Term.tuple [ exp; Term.lambda hnd.term.Term.value_clause ] )
+              Term.tuple [ expr; Term.lambda hnd.term.Term.value_clause ] )
       | None -> assert false)
   | _ when not state.config.handler_reductions ->
       Term.handle (Term.handler hnd, comp)
-  | Term.Match (exp, cases) ->
+  | Term.Match (expr, cases) ->
       let _, drty_out = hnd.ty in
-      Term.match_ (exp, List.map (handle_abstraction state hnd) cases) drty_out
+      Term.match_ (expr, List.map (handle_abstraction state hnd) cases) drty_out
       |> optimize_computation state
-  | LetVal (exp, abs) ->
-      Term.letVal (exp, handle_abstraction state hnd abs)
+  | LetVal (expr, abs) ->
+      Term.letVal (expr, handle_abstraction state hnd abs)
       |> optimize_computation state
   | LetRec (defs, comp) ->
       Term.letRec (defs, handle_computation state hnd comp)
       |> optimize_computation state
-  | Call (eff, exp, abs) -> (
+  | Call (eff, expr, abs) -> (
       let handled_abs = handle_abstraction state hnd abs in
       match Assoc.lookup eff hnd.term.Term.effect_clauses.effect_part with
       | Some { term = p1, p2, comp; _ } ->
@@ -325,20 +328,20 @@ and handle_computation state hnd comp =
               (Term.abstraction (p2, comp))
               (Term.lambda handled_abs)
           in
-          beta_reduce state (Term.abstraction (p1, comp')) exp
-      | None -> Term.call (eff, exp, handled_abs))
-  | Bind (cmp, abs) ->
+          beta_reduce state (Term.abstraction (p1, comp')) expr
+      | None -> Term.call (eff, expr, handled_abs))
+  | Bind (comp, abs) ->
       let hnd' =
         Term.handler_with_new_value_clause hnd
           (handle_abstraction state hnd abs)
       in
-      handle_computation state hnd' cmp
-  | CastComp (cmp, { term = tcoer, dcoer; _ })
+      handle_computation state hnd' comp
+  | CastComp (comp, { term = tcoer, dcoer; _ })
     when TyCoercion.is_trivial_ty_coercion tcoer ->
       let hnd' = Term.handler_with_smaller_input_dirt hnd dcoer in
-      handle_computation state hnd' cmp
-  | CastComp (cmp, { term = tcoer, dcoer; _ }) ->
-      let ty, _ = cmp.ty in
+      handle_computation state hnd' comp
+  | CastComp (comp, { term = tcoer, dcoer; _ }) ->
+      let ty, _ = comp.ty in
       let x_pat, x_var = Term.fresh_variable "x" ty in
       let hnd' =
         Term.handler_with_new_value_clause hnd
@@ -348,7 +351,7 @@ and handle_computation state hnd comp =
                  (cast_expression state x_var tcoer, hnd.term.value_clause) ))
       in
       let hnd'' = Term.handler_with_smaller_input_dirt hnd' dcoer in
-      handle_computation state hnd'' cmp
+      handle_computation state hnd'' comp
   | _ -> (
       match recast_computation hnd comp with
       | Some comp' -> bind_computation state comp' hnd.term.Term.value_clause
@@ -357,25 +360,25 @@ and handle_computation state hnd comp =
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
 
-and beta_reduce state ({ term = _, cmp; _ } as abs) exp =
+and beta_reduce state ({ term = _, comp; _ } as abs) expr =
   (* Print.debug "Beta reduce: %t; %t"
      (Term.print_abstraction abs)
-     (Term.print_expression exp); *)
-  match (abstraction_inlinability abs, exp.term) with
+     (Term.print_expression expr); *)
+  match (abstraction_inlinability abs, expr.term) with
   | Inlinable, _
   (* Inline constants and variables anyway *)
   | NotInlinable, (Term.Var _ | Term.Const _) -> (
-      match Term.beta_reduce abs exp with
+      match Term.beta_reduce abs expr with
       | Some comp -> optimize_computation state comp
-      | None -> Term.letVal (exp, abs))
-  | NotPresent, _ -> cmp
-  | NotInlinable, _ -> Term.letVal (exp, abs)
+      | None -> Term.letVal (expr, abs))
+  | NotPresent, _ -> comp
+  | NotInlinable, _ -> Term.letVal (expr, abs)
 
 and reduce_expression state expr = reduce_if_fuel reduce_expression' state expr
 
 and reduce_expression' state expr =
   match expr.term with
-  | Term.CastExp (exp, tcoer) -> cast_expression state exp tcoer
+  | Term.CastExp (expr, tcoer) -> cast_expression state expr tcoer
   | _ -> expr
 
 and reduce_computation state comp =
@@ -386,7 +389,7 @@ and reduce_constant_match state const (abs : Term.abstraction list) =
     | [] -> None
     | abs :: xs -> (
         match Term.beta_reduce abs const with
-        | Some cmp -> Some (optimize_computation state cmp)
+        | Some comp -> Some (optimize_computation state comp)
         | None -> folder xs)
   in
   folder abs
@@ -394,14 +397,14 @@ and reduce_constant_match state const (abs : Term.abstraction list) =
 and reduce_computation' state comp =
   match comp.term with
   (* TODO: matches of a constant *)
-  | Term.CastComp (cmp, dtcoer) -> cast_computation state cmp dtcoer
+  | Term.CastComp (comp, dtcoer) -> cast_computation state comp dtcoer
   | Term.LetVal (e, abs) -> beta_reduce state abs e
   | Term.Apply ({ term = Term.Lambda a; _ }, e) -> beta_reduce state a e
   | Term.Apply
       ( {
           term =
             Term.CastExp
-              (exp, { term = TyCoercion.ArrowCoercion (ty_coer, drty_coer); _ });
+              (expr, { term = TyCoercion.ArrowCoercion (ty_coer, drty_coer); _ });
           _;
         },
         e )
@@ -409,7 +412,7 @@ and reduce_computation' state comp =
       (* Push-Co-App *)
       cast_computation state
         (optimize_computation state
-           (Term.apply (exp, cast_expression state e ty_coer)))
+           (Term.apply (expr, cast_expression state e ty_coer)))
         drty_coer
   | Term.LetRec (defs, c) -> (
       let state' =
@@ -421,8 +424,8 @@ and reduce_computation' state comp =
       match keep_used_bindings defs c' with
       | [] -> c'
       | defs' -> Term.letRec (Assoc.of_list defs', c'))
-  | Term.Bind (cmp, abs) -> bind_computation state cmp abs
-  | Term.Handle ({ term = Term.Handler hnd; _ }, cmp) -> (
+  | Term.Bind (comp, abs) -> bind_computation state comp abs
+  | Term.Handle ({ term = Term.Handler hnd; _ }, comp) -> (
       let fingerprint = hnd.term.effect_clauses.fingerprint in
       let drty_in, _ = hnd.ty in
       let unspecialized_declared_functions =
@@ -462,7 +465,7 @@ and reduce_computation' state comp =
         (* TODO: specialize only functions that are used, not just all with matching types *)
         let spec_rec_defs =
           List.map
-            (fun (f, ({ term = pat, cmp; _ } as abs)) ->
+            (fun (f, ({ term = pat, comp; _ } as abs)) ->
               match Assoc.lookup (fingerprint, f) specialized_functions' with
               | Some (f', _ty, FixedReturnClause _) ->
                   (f', handle_abstraction state' hnd abs)
@@ -499,7 +502,7 @@ and reduce_computation' state comp =
                         }
                       in
                       let abs' =
-                        Term.abstraction (Term.pTuple [ pat; k_pat ], cmp)
+                        Term.abstraction (Term.pTuple [ pat; k_pat ], comp)
                       in
                       (f', handle_abstraction state' hnd' abs')
                   | _ -> assert false)
@@ -523,31 +526,31 @@ and reduce_computation' state comp =
              (fun (f, _) -> (f, FixedReturnClause hnd.term.value_clause))
              unspecialized_declared_functions)
       in
-      let cmp' = handle_computation state' hnd cmp in
-      match keep_used_bindings (Assoc.of_list spec_rec_defs) cmp' with
-      | [] -> cmp'
+      let comp' = handle_computation state' hnd comp in
+      match keep_used_bindings (Assoc.of_list spec_rec_defs) comp' with
+      | [] -> comp'
       | defs' ->
-          Term.letRec (Assoc.of_list defs', cmp') |> optimize_computation state'
-      )
+          Term.letRec (Assoc.of_list defs', comp')
+          |> optimize_computation state')
   | Term.Handle
       ( {
           term =
             Term.CastExp
-              ( exp,
+              ( expr,
                 {
                   term = TyCoercion.HandlerCoercion (drty_coer1, drty_coer2);
                   _;
                 } );
           _;
         },
-        cmp )
+        comp )
     when state.config.push_coercions ->
       (* Push-Co-Handle *)
       cast_computation state
         (optimize_computation state
-           (Term.handle (exp, cast_computation state cmp drty_coer1)))
+           (Term.handle (expr, cast_computation state comp drty_coer1)))
         drty_coer2
-  | Term.Match (exp, [ abs ]) -> beta_reduce state abs exp
+  | Term.Match (expr, [ abs ]) -> beta_reduce state abs expr
   | Term.Match (({ term = Term.Const _; _ } as c), abs)
   | Term.Match (({ term = Term.Variant _; _ } as c), abs) -> (
       match reduce_constant_match state c abs with Some t -> t | None -> comp)
@@ -562,8 +565,8 @@ let process_top_let state defs =
   if !Config.enable_optimization then
     let defs' =
       List.map
-        (fun (pat, params, cnstrs, cmp) ->
-          (pat, params, cnstrs, optimize_computation state cmp))
+        (fun (pat, params, cnstrs, comp) ->
+          (pat, params, cnstrs, optimize_computation state comp))
         defs
     in
     let state' =

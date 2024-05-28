@@ -159,31 +159,33 @@ let cast_computation cnstrs c dirty =
   in
   (Term.castComp (c, omega), cnstrs')
 
-let cast_abstraction cnstrs { term = pat, cmp; _ } dirty =
-  let cmp', cnstrs' = cast_computation cnstrs cmp dirty in
-  (Term.abstraction (pat, cmp'), cnstrs')
+let cast_abstraction cnstrs { term = pat, comp; _ } dirty =
+  let comp', cnstrs' = cast_computation cnstrs comp dirty in
+  (Term.abstraction (pat, comp'), cnstrs')
 
-let full_cast_abstraction cnstrs { term = pat, cmp; _ } ty_in dirty_out =
+let full_cast_abstraction cnstrs { term = pat, comp; _ } ty_in dirty_out =
   let x_pat, x_var = Term.fresh_variable "x" ty_in in
-  let exp', cnstrs' = cast_expression cnstrs x_var pat.ty in
-  let cmp', cnstrs'' = cast_computation cnstrs' cmp dirty_out in
-  ( Term.abstraction (x_pat, Term.letVal (exp', Term.abstraction (pat, cmp'))),
+  let expr', cnstrs' = cast_expression cnstrs x_var pat.ty in
+  let comp', cnstrs'' = cast_computation cnstrs' comp dirty_out in
+  ( Term.abstraction (x_pat, Term.letVal (expr', Term.abstraction (pat, comp'))),
     cnstrs'' )
 
 (* ************************************************************************* *)
 (*                             VALUE TYPING                                  *)
 (* ************************************************************************* *)
 
-let rec infer_expression state cnstrs exp =
-  let exp', cnstrs' = infer_expression' state cnstrs exp.it in
-  let resolved = Unification.unify ~loc:exp.at state.type_definitions cnstrs' in
-  let exp' = Term.apply_sub_exp resolved.Constraints.substitution exp' in
+let rec infer_expression state cnstrs expr =
+  let expr', cnstrs' = infer_expression' state cnstrs expr.it in
+  let resolved =
+    Unification.unify ~loc:expr.at state.type_definitions cnstrs'
+  in
+  let expr' = Term.apply_sub_exp resolved.Constraints.substitution expr' in
   Print.debug "%t -> %t : %t / %t"
-    (Untyped.print_expression exp)
-    (Term.print_expression exp')
-    (Type.print_ty exp'.ty)
+    (Untyped.print_expression expr)
+    (Term.print_expression expr')
+    (Type.print_ty expr'.ty)
     (UnresolvedConstraints.print cnstrs);
-  (exp', UnresolvedConstraints.from_resolved resolved)
+  (expr', UnresolvedConstraints.from_resolved resolved)
 
 and infer_expression' state (cnstrs : UnresolvedConstraints.t) = function
   | Untyped.Var x ->
@@ -260,7 +262,7 @@ and infer_handler state cnstrs
     let eff' = Effect.Map.find eff state.effects in
     let ty_eff1, ty_eff2 = eff'.ty in
     let ty_cont = Type.arrow (ty_eff2, dirty_mid) in
-    let { term = pat1, pat2, cmp; _ }, cnstrs' =
+    let { term = pat1, pat2, comp; _ }, cnstrs' =
       infer_abstraction2 state cnstrs abs2
     in
     let pat1' = { pat1 with ty = ty_eff1 }
@@ -270,8 +272,8 @@ and infer_handler state cnstrs
       |> UnresolvedConstraints.add_ty_equality (pat1.ty, ty_eff1)
       |> UnresolvedConstraints.add_ty_equality (pat2.ty, ty_cont)
     in
-    let cmp', cnstrs''' = cast_computation cnstrs'' cmp dirty_mid in
-    let outExpr = (eff', Term.abstraction2 (pat1', pat2', cmp')) in
+    let comp', cnstrs''' = cast_computation cnstrs'' comp dirty_mid in
+    let outExpr = (eff', Term.abstraction2 (pat1', pat2', comp')) in
     (outExpr, cnstrs''')
   in
 
@@ -307,22 +309,24 @@ and infer_handler state cnstrs
 (* ************************************************************************* *)
 (*                          COMPUTATION TYPING                               *)
 (* ************************************************************************* *)
-and infer_computation state cnstrs cmp =
-  let cmp', cnstrs' = infer_computation' ~loc:cmp.at state cnstrs cmp.it in
-  let resolved = Unification.unify ~loc:cmp.at state.type_definitions cnstrs' in
-  let cmp' = Term.apply_sub_comp resolved.Constraints.substitution cmp' in
+and infer_computation state cnstrs comp =
+  let comp', cnstrs' = infer_computation' ~loc:comp.at state cnstrs comp.it in
+  let resolved =
+    Unification.unify ~loc:comp.at state.type_definitions cnstrs'
+  in
+  let comp' = Term.apply_sub_comp resolved.Constraints.substitution comp' in
   Print.debug "%t -> %t : %t / %t"
-    (Untyped.print_computation cmp)
-    (Term.print_computation cmp')
-    (Type.print_dirty cmp'.ty)
+    (Untyped.print_computation comp)
+    (Term.print_computation comp')
+    (Type.print_dirty comp'.ty)
     (UnresolvedConstraints.print cnstrs);
-  (cmp', UnresolvedConstraints.from_resolved resolved)
+  (comp', UnresolvedConstraints.from_resolved resolved)
 
 (* Dispatch: Type inference for a plan computation *)
 and infer_computation' ~loc state cnstrs = function
-  | Untyped.Value exp ->
-      let exp', cnstrs' = infer_expression state cnstrs exp in
-      (Term.value exp', cnstrs')
+  | Untyped.Value expr ->
+      let expr', cnstrs' = infer_expression state cnstrs expr in
+      (Term.value expr', cnstrs')
   (* Nest a list of let-bindings *)
   | Let ([], c2) ->
       let c, cnstrs' = infer_computation state cnstrs c2 in
@@ -336,8 +340,9 @@ and infer_computation' ~loc state cnstrs = function
       let cresC2, cnstrs'''' = cast_abstraction cnstrs''' trgC2 (ty2, delta) in
       (Term.bind (cresC1, cresC2), cnstrs'''')
   | Let ((pat, c1) :: rest, c2) ->
-      let subCmp = { it = Untyped.Let (rest, c2); at = c2.at } in
-      infer_computation' ~loc state cnstrs (Untyped.Let ([ (pat, c1) ], subCmp))
+      let subComp = { it = Untyped.Let (rest, c2); at = c2.at } in
+      infer_computation' ~loc state cnstrs
+        (Untyped.Let ([ (pat, c1) ], subComp))
   | LetRec (defs, c2) ->
       let defs', cnstrs' = infer_rec_definitions state cnstrs defs in
       let state' =
@@ -347,7 +352,7 @@ and infer_computation' ~loc state cnstrs = function
       in
       let trgC2, cnstrs'' = infer_computation state' cnstrs' c2 in
       (Term.letRec (defs', trgC2), cnstrs'')
-  | Match (exp, cases) ->
+  | Match (expr, cases) ->
       let ty_in = Type.fresh_ty_with_fresh_skel ()
       and dirty_out = Type.fresh_dirty_with_fresh_skel () in
       let infer_case cnstrs case =
@@ -357,9 +362,9 @@ and infer_computation' ~loc state cnstrs = function
         (case'', UnresolvedConstraints.add_ty_equality (ty_in, ty_in') cnstrs'')
       in
       let cases', cnstrs' = infer_many infer_case cnstrs cases in
-      let exp', cnstrs'' = infer_expression state cnstrs' exp in
-      let exp'', cnstrs''' = cast_expression cnstrs'' exp' ty_in in
-      (Term.match_ (exp'', cases') dirty_out, cnstrs''')
+      let expr', cnstrs'' = infer_expression state cnstrs' expr in
+      let expr'', cnstrs''' = cast_expression cnstrs'' expr' ty_in in
+      (Term.match_ (expr'', cases') dirty_out, cnstrs''')
   | Apply (expr1, expr2) ->
       let expr1', cnstrs' = infer_expression state cnstrs expr1 in
       let expr2', cnstrs'' = infer_expression state cnstrs' expr2 in
@@ -368,17 +373,17 @@ and infer_computation' ~loc state cnstrs = function
         cast_expression cnstrs'' expr1' (Type.arrow (expr2'.ty, outType))
       in
       (Term.apply (castexpr1, expr2'), cnstrs''')
-  | Handle (hand, cmp) ->
+  | Handle (hand, comp) ->
       let hand', cnstrs' = infer_expression state cnstrs hand in
-      let cmp', cnstrs'' = infer_computation state cnstrs' cmp in
+      let comp', cnstrs'' = infer_computation state cnstrs' comp in
       let out_ty = Type.fresh_dirty_with_fresh_skel () in
       let castHand, cnstrs''' =
-        cast_expression cnstrs'' hand' (Type.handler (cmp'.ty, out_ty))
+        cast_expression cnstrs'' hand' (Type.handler (comp'.ty, out_ty))
       in
-      (Term.handle (castHand, cmp'), cnstrs''')
-  | Check cmp ->
-      let cmp', cnstrs' = infer_computation state cnstrs cmp in
-      (Term.check (loc, cmp'), cnstrs')
+      (Term.handle (castHand, comp'), cnstrs''')
+  | Check comp ->
+      let comp', cnstrs' = infer_computation state cnstrs comp in
+      (Term.check (loc, comp'), cnstrs')
 
 (* Typecheck a (potentially) recursive let *)
 and infer_rec_definitions state cnstrs defs =
@@ -408,14 +413,14 @@ and infer_rec_definitions state cnstrs defs =
   in
   (Assoc.of_list defs'', cnstrs')
 
-and infer_abstraction state cnstrs (pat, cmp) :
+and infer_abstraction state cnstrs (pat, comp) :
     Term.abstraction * UnresolvedConstraints.t =
   let trgPat, cnstrs' = infer_pattern state cnstrs pat in
   let state' = extend_vars (Term.pattern_vars trgPat) state in
-  let trgCmp, cnstrs'' = infer_computation state' cnstrs' cmp in
-  (Term.abstraction (trgPat, trgCmp), cnstrs'')
+  let trgComp, cnstrs'' = infer_computation state' cnstrs' comp in
+  (Term.abstraction (trgPat, trgComp), cnstrs'')
 
-and infer_abstraction2 state cnstrs (pat1, pat2, cmp) :
+and infer_abstraction2 state cnstrs (pat1, pat2, comp) :
     Term.abstraction2 * UnresolvedConstraints.t =
   let trgPat1, cnstrs' = infer_pattern state cnstrs pat1 in
   let trgPat2, cnstrs'' = infer_pattern state cnstrs' pat2 in
@@ -426,8 +431,8 @@ and infer_abstraction2 state cnstrs (pat1, pat2, cmp) :
          (Term.pattern_vars trgPat2))
       state
   in
-  let trgCmp, cnstrs''' = infer_computation state' cnstrs'' cmp in
-  (Term.abstraction2 (trgPat1, trgPat2, trgCmp), cnstrs''')
+  let trgComp, cnstrs''' = infer_computation state' cnstrs'' comp in
+  (Term.abstraction2 (trgPat1, trgPat2, trgComp), cnstrs''')
 
 (* ************************************************************************* *)
 (* ************************************************************************* *)
@@ -444,55 +449,55 @@ let process_computation state comp =
         state.type_definitions resolved comp'.ty
     else resolved
   in
-  let cmp' = Term.apply_sub_comp resolved.substitution comp' in
+  let comp' = Term.apply_sub_comp resolved.substitution comp' in
 
-  Print.debug "Inferred type: %t" (Type.print_dirty cmp'.ty);
-  Print.debug "Full comp: %t" (Term.print_computation cmp');
+  Print.debug "Inferred type: %t" (Type.print_dirty comp'.ty);
+  Print.debug "Full comp: %t" (Term.print_computation comp');
   let params =
     match comp.it with
     | Language.UntypedSyntax.Value _ ->
         Type.Params.union
-          (Type.free_params_dirty cmp'.ty)
+          (Type.free_params_dirty comp'.ty)
           (Constraints.free_params resolved)
     | _ -> Type.Params.empty
   in
   Exhaust.check_computation state.type_definitions comp;
-  (params, cmp', resolved)
+  (params, comp', resolved)
 
 let process_top_let ~loc state defs =
   Print.debug "TOPLET";
-  let fold (pat, cmp) (state', defs) =
+  let fold (pat, comp) (state', defs) =
     let pat', cnstrs = infer_pattern state UnresolvedConstraints.empty pat in
-    let cmp', cnstrs' = infer_computation state cnstrs cmp in
+    let comp', cnstrs' = infer_computation state cnstrs comp in
     let constraints =
       Unification.unify ~loc state.type_definitions
-        (UnresolvedConstraints.add_ty_equality (pat'.ty, fst cmp'.ty) cnstrs')
+        (UnresolvedConstraints.add_ty_equality (pat'.ty, fst comp'.ty) cnstrs')
     in
-    Print.debug "Inferred type: %t" (Type.print_dirty cmp'.ty);
-    Print.debug "Full comp: %t" (Term.print_computation cmp');
+    Print.debug "Inferred type: %t" (Type.print_dirty comp'.ty);
+    Print.debug "Full comp: %t" (Term.print_computation comp');
     let constraints =
       if !Config.simplify_coercions then
         ConstraintSimplifier.simplify_computation ~loc state.type_definitions
-          constraints cmp'.ty
+          constraints comp'.ty
       else constraints
     in
     Print.debug "After optimization";
-    let pat'', cmp'' =
+    let pat'', comp'' =
       ( Term.apply_sub_pat constraints.substitution pat',
-        Term.apply_sub_comp constraints.substitution cmp' )
+        Term.apply_sub_comp constraints.substitution comp' )
     in
-    Print.debug "Inferred type: %t" (Type.print_dirty cmp''.ty);
-    Print.debug "Full comp: %t" (Term.print_computation cmp'');
+    Print.debug "Inferred type: %t" (Type.print_dirty comp''.ty);
+    Print.debug "Full comp: %t" (Term.print_computation comp'');
     let vars' =
       Term.Variable.Map.map
         (Substitution.apply_sub_ty constraints.substitution)
         (Term.pattern_vars pat')
     in
     let params =
-      match cmp.it with
+      match comp.it with
       | Language.UntypedSyntax.Value _ ->
           Type.Params.union
-            (Type.free_params_dirty cmp''.ty)
+            (Type.free_params_dirty comp''.ty)
             (Constraints.free_params constraints)
       | _ -> Type.Params.empty
     in
@@ -502,8 +507,8 @@ let process_top_let ~loc state defs =
         vars' state'
     in
     Exhaust.is_irrefutable state.type_definitions pat;
-    Exhaust.check_computation state.type_definitions cmp;
-    (state'', (pat'', params, constraints, cmp'') :: defs)
+    Exhaust.check_computation state.type_definitions comp;
+    (state'', (pat'', params, constraints, comp'') :: defs)
   in
   List.fold_right fold defs (state, [])
 

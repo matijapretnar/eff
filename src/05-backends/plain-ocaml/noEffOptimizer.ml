@@ -23,7 +23,7 @@ type inlinability =
   (* Pattern occurs more than once in a body of abstraction or it occurs recursively *)
   | NotInlinable
 
-let abstraction_inlinability (pat, cmp) =
+let abstraction_inlinability (pat, comp) =
   match pat with
   | NoEff.PNVar v
     when NoEff.Variable.fold
@@ -31,7 +31,7 @@ let abstraction_inlinability (pat, cmp) =
            v ->
       NotInlinable
   | _ ->
-      let vars = NoEff.free_vars cmp in
+      let vars = NoEff.free_vars comp in
       let rec check_variables = function
         | [] -> NotPresent
         | x :: xs -> (

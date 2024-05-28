@@ -553,8 +553,8 @@ and desugar_abstraction2 state (p1, p2, t) =
   let state'''', t' = desugar_computation state''' t in
   ({ state'''' with context = old_context }, (p1', p2', t'))
 
-and desugar_let_rec state { it = exp; at = loc } =
-  match exp with
+and desugar_let_rec state { it = expr; at = loc } =
+  match expr with
   | Sugared.Lambda a -> desugar_abstraction state a
   | Sugared.Function cs ->
       let x = fresh_var (Some "$let_rec_function") in

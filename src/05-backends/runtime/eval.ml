@@ -175,5 +175,5 @@ let rec top_handle state op =
           Error.runtime "uncaught effect %t %t." (V.print_effect eff)
             (V.print_value v))
 
-let eval_expression state exp = veval state exp
+let eval_expression state expr = veval state expr
 let run state c = top_handle state (ceval state c)

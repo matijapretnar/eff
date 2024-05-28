@@ -32,15 +32,15 @@ let infer_ty = function
   | Float _ -> FloatTy
 
 let compare c1 c2 =
-  let cmp x y =
+  let comp x y =
     let r = Stdlib.compare x y in
     if r < 0 then Less else if r > 0 then Greater else Equal
   in
   match (c1, c2) with
-  | Integer n1, Integer n2 -> cmp n1 n2
-  | String s1, String s2 -> cmp s1 s2
-  | Boolean b1, Boolean b2 -> cmp b1 b2
-  | Float x1, Float x2 -> cmp x1 x2
+  | Integer n1, Integer n2 -> comp n1 n2
+  | String s1, String s2 -> comp s1 s2
+  | Boolean b1, Boolean b2 -> comp b1 b2
+  | Float x1, Float x2 -> comp x1 x2
   | _ -> Error.runtime "Incomparable constants %t and %t" (print c1) (print c2)
 
 let equal c1 c2 = compare c1 c2 = Equal
