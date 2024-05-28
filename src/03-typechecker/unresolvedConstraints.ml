@@ -24,58 +24,60 @@ let empty =
 let from_resolved resolved = { empty with resolved }
 let change_resolved f cnstrs = { cnstrs with resolved = f cnstrs.resolved }
 
-let add_skeleton_equality (sk1, sk2) cons =
+let add_skeleton_equality (sk1, sk2) cnstrs =
   {
-    cons with
+    cnstrs with
     skeleton_equalities =
-      ( Substitution.apply_substitutions_to_skeleton cons.resolved.substitution
-          sk1,
-        Substitution.apply_substitutions_to_skeleton cons.resolved.substitution
-          sk2 )
-      :: cons.skeleton_equalities;
+      ( Substitution.apply_substitutions_to_skeleton
+          cnstrs.resolved.substitution sk1,
+        Substitution.apply_substitutions_to_skeleton
+          cnstrs.resolved.substitution sk2 )
+      :: cnstrs.skeleton_equalities;
   }
 
-let add_dirt_equality (drt1, drt2) cons =
+let add_dirt_equality (drt1, drt2) cnstrs =
   {
-    cons with
+    cnstrs with
     dirt_equalities =
-      ( Substitution.apply_substitutions_to_dirt cons.resolved.substitution drt1,
-        Substitution.apply_substitutions_to_dirt cons.resolved.substitution drt2
-      )
-      :: cons.dirt_equalities;
+      ( Substitution.apply_substitutions_to_dirt cnstrs.resolved.substitution
+          drt1,
+        Substitution.apply_substitutions_to_dirt cnstrs.resolved.substitution
+          drt2 )
+      :: cnstrs.dirt_equalities;
   }
 
-let add_dirt_inequality (w, (drt1, drt2)) cons =
+let add_dirt_inequality (w, (drt1, drt2)) cnstrs =
   {
-    cons with
+    cnstrs with
     dirt_inequalities =
       ( w,
-        ( Substitution.apply_substitutions_to_dirt cons.resolved.substitution
+        ( Substitution.apply_substitutions_to_dirt cnstrs.resolved.substitution
             drt1,
-          Substitution.apply_substitutions_to_dirt cons.resolved.substitution
+          Substitution.apply_substitutions_to_dirt cnstrs.resolved.substitution
             drt2 ) )
-      :: cons.dirt_inequalities;
+      :: cnstrs.dirt_inequalities;
   }
 
-let add_ty_equality (ty1, ty2) cons =
+let add_ty_equality (ty1, ty2) cnstrs =
   {
-    cons with
+    cnstrs with
     ty_equalities =
-      ( Substitution.apply_substitutions_to_type cons.resolved.substitution ty1,
-        Substitution.apply_substitutions_to_type cons.resolved.substitution ty2
-      )
-      :: cons.ty_equalities;
+      ( Substitution.apply_substitutions_to_type cnstrs.resolved.substitution ty1,
+        Substitution.apply_substitutions_to_type cnstrs.resolved.substitution
+          ty2 )
+      :: cnstrs.ty_equalities;
   }
 
-let add_ty_inequality (w, (ty1, ty2)) cons =
+let add_ty_inequality (w, (ty1, ty2)) cnstrs =
   {
-    cons with
+    cnstrs with
     ty_inequalities =
       ( w,
-        ( Substitution.apply_substitutions_to_type cons.resolved.substitution ty1,
-          Substitution.apply_substitutions_to_type cons.resolved.substitution
+        ( Substitution.apply_substitutions_to_type cnstrs.resolved.substitution
+            ty1,
+          Substitution.apply_substitutions_to_type cnstrs.resolved.substitution
             ty2 ) )
-      :: cons.ty_inequalities;
+      :: cnstrs.ty_inequalities;
   }
 
 let print c =
@@ -104,34 +106,34 @@ let print c =
   |> List.concat
   |> Print.printer_sequence ", "
 
-let free_params cons =
+let free_params cnstrs =
   Type.Params.union_map
     (fun (sk1, sk2) ->
       Type.Params.union
         (Type.free_params_skeleton sk1)
         (Type.free_params_skeleton sk2))
-    cons.skeleton_equalities
+    cnstrs.skeleton_equalities
   |> Type.Params.union
        (Type.Params.union_map
           (fun (drt1, drt2) ->
             Type.Params.union
               (Type.free_params_dirt drt1)
               (Type.free_params_dirt drt2))
-          cons.dirt_equalities)
+          cnstrs.dirt_equalities)
   |> Type.Params.union
        (Type.Params.union_map
           (fun (_, ct) -> Type.free_params_ct_dirt ct)
-          cons.dirt_inequalities)
+          cnstrs.dirt_inequalities)
   |> Type.Params.union
        (Type.Params.union_map
           (fun (ty1, ty2) ->
             Type.Params.union (Type.free_params_ty ty1)
               (Type.free_params_ty ty2))
-          cons.ty_equalities)
+          cnstrs.ty_equalities)
   |> Type.Params.union
        (Type.Params.union_map
           (fun (_, ct) -> Type.free_params_ct_ty ct)
-          cons.ty_inequalities)
+          cnstrs.ty_inequalities)
 
 let apply_substitution sub unresolved =
   let add_substituted_ty_constraint s t1 t2 w ty1 ty2 unresolved =
@@ -199,15 +201,15 @@ let change_subst f cnstrs =
   let sub = f cnstrs.resolved.substitution in
   apply_substitution sub cnstrs
 
-let fresh_ty_coer cnstrs cons =
+let fresh_ty_coer cnstrs ct =
   let param = Type.TyCoercionParam.fresh () in
-  ( { term = TyCoercion.TyCoercionVar param; ty = cons },
-    add_ty_inequality (param, cons) cnstrs )
+  ( { term = TyCoercion.TyCoercionVar param; ty = ct },
+    add_ty_inequality (param, ct) cnstrs )
 
-let fresh_dirt_coer cnstrs cons =
+let fresh_dirt_coer cnstrs ct =
   let param = Type.DirtCoercionParam.fresh () in
-  ( { term = DirtCoercion.DirtCoercionVar param; ty = cons },
-    add_dirt_inequality (param, cons) cnstrs )
+  ( { term = DirtCoercion.DirtCoercionVar param; ty = ct },
+    add_dirt_inequality (param, ct) cnstrs )
 
 let fresh_dirty_coer cnstrs ((ty1, drt1), (ty2, drt2)) =
   let ty_coer, cnstrs' = fresh_ty_coer cnstrs (ty1, ty2) in

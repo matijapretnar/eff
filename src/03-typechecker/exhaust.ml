@@ -19,7 +19,7 @@ module Untyped = UntypedSyntax
    [1] http://pauillac.inria.fr/~maranget/papers/warn/index.html
 *)
 (* Types of constructors. *)
-type cons =
+type constructor =
   | Tuple of int
   | Record of Type.Field.t list
   | Variant of Type.Label.t * bool
@@ -41,10 +41,10 @@ let rec remove_as { it = p; _ } =
   | p -> p
 
 (* Reads constructor description from a pattern, discarding any [Untyped.PAs] layers. *)
-let rec cons_of_pattern tctx { it = p; at = loc } =
+let rec constructor_of_pattern tctx { it = p; at = loc } =
   match p with
-  | Untyped.PAs (p, _) -> cons_of_pattern tctx p
-  | Untyped.PAnnotated (p, _) -> cons_of_pattern tctx p
+  | Untyped.PAs (p, _) -> constructor_of_pattern tctx p
+  | Untyped.PAnnotated (p, _) -> constructor_of_pattern tctx p
   | Untyped.PTuple lst -> Tuple (List.length lst)
   | Untyped.PRecord flds -> (
       match Type.Field.Map.choose_opt flds with
@@ -61,7 +61,7 @@ let rec cons_of_pattern tctx { it = p; at = loc } =
 
 (* Constructs a pattern from a constructor and a list of subpatterns, which must
    contain [arity c] elements. *)
-let pattern_of_cons ~loc c lst =
+let pattern_of_constructor ~loc c lst =
   let plain =
     match c with
     | Tuple _n -> Untyped.PTuple lst
@@ -77,13 +77,13 @@ let pattern_of_cons ~loc c lst =
 (* Finds all distinct non-wildcard root pattern constructors in [lst], and at
    least one constructor of their type not present in [lst] if it exists. *)
 let find_constructors tctx lst =
-  let cons_lst = List.map (cons_of_pattern tctx) (List.unique_elements lst) in
+  let cons_lst = List.map (constructor_of_pattern tctx) (List.unique_elements lst) in
   let present = List.filter (fun c -> c <> Wildcard) cons_lst in
   let missing =
     match present with
     | [] -> [ Wildcard ]
-    | cons :: _ -> (
-        match cons with
+    | constructor :: _ -> (
+        match constructor with
         (* Tuples and records of any type have exactly one constructor. *)
         | Tuple _ | Record _ -> []
         (* Try to find an unmatched value in a countable set of constants. *)
@@ -178,14 +178,14 @@ let rec useful tctx ~loc p q =
   | [] -> p = []
   (* Induction on the number of columns of [p] and [q]. *)
   | q1 :: qs -> (
-      let cons = cons_of_pattern tctx q1 in
-      match cons with
+      let constructor = constructor_of_pattern tctx q1 in
+      match constructor with
       (* If the first pattern in [q] is constructed, check the matrix [p]
              specialized for that constructor. *)
       | Tuple _ | Record _ | Variant _ | Const _ -> (
-          match specialize_vector ~loc cons q with
+          match specialize_vector ~loc constructor q with
           | None -> assert false
-          | Some q' -> useful tctx ~loc (specialize ~loc cons p) q')
+          | Some q' -> useful tctx ~loc (specialize ~loc constructor p) q')
       (* Otherwise, check if pattern constructors in the first column of [p]
              form a complete type signature. If they do, check if [q] is useful
              for any specialization of [p] for that type; if not, only the
@@ -227,7 +227,7 @@ let rec exhaustive tctx ~loc p = function
               | None -> find cs
               | Some lst ->
                   let ps, rest = split_at (arity c) lst in
-                  Some (pattern_of_cons ~loc c ps :: rest))
+                  Some (pattern_of_constructor ~loc c ps :: rest))
         in
         find present
       else
@@ -239,7 +239,7 @@ let rec exhaustive tctx ~loc p = function
               List.init (arity c) (fun _ ->
                   { it = Untyped.PNonbinding; at = loc })
             in
-            Some (pattern_of_cons ~loc c nonbinds :: lst))
+            Some (pattern_of_constructor ~loc c nonbinds :: lst))
 
 (* Prints a warning if the list of patterns [pats] is not exhaustive or contains
    unused patterns. *)
