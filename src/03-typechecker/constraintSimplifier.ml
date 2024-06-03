@@ -52,110 +52,68 @@ let check_polarity_same_ty a =
 let check_polarity_same_dirt s =
   check_polarity_same Dirt.Param.Set.fold FreeParams.get_dirt_polarity s
 
-let collapse_type_cycles
-    ({ Language.Constraints.ty_constraints; _ } as resolved)
-    (initial_polarities : FreeParams.params) :
-    UnresolvedConstraints.t * FreeParams.params =
-  let open Language.Constraints in
-  (* Remove type cycles *)
-  let garbage_collect_skeleton_component skel graph (new_constr, polarities) =
-    let pack ty_param = { term = TyParam ty_param; ty = Skeleton.Param skel } in
-    let components = TyConstraints.TyParamGraph.scc graph in
-    (* For each component: pick one and add equal constraint  *)
-    let new_constr, polarities =
-      List.fold
-        (fun (new_constr, polarities) component ->
-          (* We suspect, that polarities are the same in the cycle *)
-          (* Assert that the polarity is the same *)
-          (* check_polarity_same_ty polarities component; *)
-          match TyParam.Set.elements component with
-          (* Can't have an empty cycle *)
-          | [] -> assert false
-          (* Select the first one as representative *)
-          | top :: rest ->
-              let new_constr, polarities =
-                List.fold
-                  (fun ((new_constr, polarities) :
-                         UnresolvedConstraints.t * Type.FreeParams.params) param ->
-                    ( UnresolvedConstraints.add_ty_equality
-                        (pack top, pack param)
-                        new_constr,
-                      {
-                        polarities with
-                        type_params =
-                          polarities.Type.FreeParams.type_params
-                          |> FreeParams.TypeParams.combine_polarity top param;
-                      } ))
-                  (new_constr, polarities) rest
-              in
-              (new_constr, polarities))
-        (new_constr, polarities) components
+(** Add constraints for all cycles in type constraints *)
+let contract_type_cycles ty_constraints unresolved =
+  let contract_edge skeleton_param ty_param1 ty_param2 unresolved =
+    UnresolvedConstraints.add_ty_equality
+      ( { term = TyParam ty_param1; ty = Skeleton.Param skeleton_param },
+        { term = TyParam ty_param2; ty = Skeleton.Param skeleton_param } )
+      unresolved
+  in
+
+  let contract_component skeleton_param component unresolved =
+    let representative = TyParam.Set.choose component in
+    TyParam.Set.fold
+      (contract_edge skeleton_param representative)
+      component unresolved
+  in
+
+  let contract_skeleton skeleton_param skeleton_graph unresolved =
+    let components =
+      Constraints.TyConstraints.TyParamGraph.scc skeleton_graph
     in
-    (new_constr, polarities)
+    List.fold_right (contract_component skeleton_param) components unresolved
   in
 
-  let ty_constraints, polarities =
-    Skeleton.Param.Map.fold garbage_collect_skeleton_component ty_constraints
-      (UnresolvedConstraints.from_resolved resolved, initial_polarities)
-  in
-  (ty_constraints, polarities)
+  Skeleton.Param.Map.fold contract_skeleton ty_constraints unresolved
 
-let collapse_dirt_cycles
-    ({ Language.Constraints.dirt_constraints; _ } as resolved)
-    (polarities : FreeParams.params) =
-  (* Beware, dirt polarities are not updated on the fly *)
-  (* Dirt constraints *)
-  let open Language.Constraints in
-  let components = DirtConstraints.DirtParamGraph.scc dirt_constraints in
-  let ty_constraints =
-    List.fold_left
-      (fun ty_constraints component ->
-        let edge_labels =
-          Dirt.Param.Set.fold
-            (fun v acc ->
-              let outgoing =
-                DirtConstraints.DirtParamGraph.get_edges v dirt_constraints
-              in
-              let outgoing_in_component =
-                outgoing
-                |> Dirt.Param.Map.filter (fun k _ ->
-                       Dirt.Param.Set.mem k component)
-              in
-              let dirts =
-                outgoing_in_component |> Dirt.Param.Map.values |> List.map snd
-              in
-              dirts :: acc)
-            component []
-          |> List.flatten
-        in
-        let should_contract =
-          Dirt.Param.Set.cardinal component > 1
-          &&
-          match edge_labels with
-          | [] -> assert false
-          | x :: _ ->
-              Effect.Set.is_empty x
-              && List.for_all (fun y -> Effect.Set.equal x y) edge_labels
-        in
-        if should_contract then
-          (* Pick one and set all other to equal it *)
-          let representative = Dirt.Param.Set.choose component in
-          let ty_constraints =
-            Dirt.Param.Set.fold
-              (fun v acc ->
-                if Dirt.Param.compare v representative != 0 then
-                  UnresolvedConstraints.add_dirt_equality
-                    (Dirt.no_effect v, Dirt.no_effect representative)
-                    acc
-                else acc)
-              component ty_constraints
-          in
-          ty_constraints
-        else ty_constraints)
-      (UnresolvedConstraints.from_resolved resolved)
-      components
+(** Add constraints for all suitable cycles in dirt constraints *)
+let contract_dirt_cycles (dirt_constraints : Constraints.DirtConstraints.t)
+    unresolved =
+  let contract_edge dirt_param1 dirt_param2 unresolved =
+    UnresolvedConstraints.add_dirt_equality
+      (Dirt.no_effect dirt_param1, Dirt.no_effect dirt_param2)
+      unresolved
   in
-  (ty_constraints, polarities)
+
+  (* We collapse only the components where all internal dirt coercions
+     are of the form d1 <= d2, so without additional effects on
+     the right-hand side *)
+  let is_collapsible component =
+    let check_param param =
+      let neighbours =
+        Constraints.DirtConstraints.DirtParamGraph.get_edges param
+          dirt_constraints
+      in
+      let trivial_neighbour neighbour (_w, effs) =
+        (not (Dirt.Param.Set.mem neighbour component))
+        || Effect.Set.is_empty effs
+      in
+      Dirt.Param.Map.for_all trivial_neighbour neighbours
+    in
+    Dirt.Param.Set.for_all check_param component
+  in
+
+  let contract_component component unresolved =
+    let representative = Dirt.Param.Set.choose component in
+    Dirt.Param.Set.fold (contract_edge representative) component unresolved
+  in
+
+  let components =
+    Constraints.DirtConstraints.DirtParamGraph.scc dirt_constraints
+    |> List.filter is_collapsible
+  in
+  List.fold_right contract_component components unresolved
 
 let graph_to_constraints skel_param graph =
   let open Language.Constraints in
@@ -686,8 +644,9 @@ let remove_dirt_bridges
     (UnresolvedConstraints.from_resolved resolved)
 
 let simplify_type_constraints ~loc type_definitions constraints get_params =
-  let cycle_constraints, _free_params =
-    collapse_type_cycles constraints (get_params constraints.substitution)
+  let unresolved = UnresolvedConstraints.from_resolved constraints in
+  let cycle_constraints =
+    contract_type_cycles constraints.ty_constraints unresolved
   in
   Print.debug "Full constraints: %t"
     (Language.Constraints.print_dot
@@ -714,8 +673,9 @@ let simplify_dirt_contraints ~loc type_definitions constraints get_params =
     (Language.Constraints.print_dot
        ~param_polarity:(get_params constraints.Constraints.substitution)
        constraints);
-  let new_constraints, _free_params =
-    collapse_dirt_cycles constraints (get_params constraints.substitution)
+  let unresolved = UnresolvedConstraints.from_resolved constraints in
+  let new_constraints =
+    contract_dirt_cycles constraints.dirt_constraints unresolved
   in
   let constraints = Unification.unify ~loc type_definitions new_constraints in
   let constraints =
