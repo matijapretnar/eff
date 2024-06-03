@@ -29,29 +29,6 @@ let print_reduction_candidate pn pe
     (pn sink_node)
     (string_of_mode graph_direction)
 
-let check_polarity_same _fold _fn (_polarities : FreeParams.params) _params =
-  (* let _ =
-       fold
-         (fun param acc ->
-           match acc with
-           | None -> acc
-           | Some p -> (
-               let polarity = fn param polarities in
-               match (p, polarity) with
-               | FreeParams.Negative, Some FreeParams.Positive -> assert false
-               | FreeParams.Positive, Some Negative -> assert false
-               | p, _ -> Some p))
-         params None
-     in *)
-  ()
-
-let check_polarity_same_ty a =
-  check_polarity_same TyParam.Set.fold FreeParams.get_type_polarity a
-
-(* TODO: Find out why this can't be generalized *)
-let check_polarity_same_dirt s =
-  check_polarity_same Dirt.Param.Set.fold FreeParams.get_dirt_polarity s
-
 (** Add constraints for all cycles in type constraints *)
 let contract_type_cycles ty_constraints unresolved =
   let contract_edge skeleton_param ty_param1 ty_param2 unresolved =
@@ -347,9 +324,6 @@ let remove_type_bridges ({ Language.Constraints.ty_constraints; _ } as resolved)
       (UnresolvedConstraints.from_resolved resolved)
   in
   new_constr
-
-let add_constraint p1 p2 =
-  UnresolvedConstraints.add_dirt_equality (Dirt.no_effect p1, Dirt.no_effect p2)
 
 let add_empty_constraint p1 =
   UnresolvedConstraints.add_dirt_equality (Dirt.no_effect p1, Dirt.empty)
