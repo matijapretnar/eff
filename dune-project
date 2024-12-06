@@ -19,4 +19,4 @@
   js_of_ocaml-ppx
   menhir
   (ocaml (>= 4.14.1))
-  (ocamlformat (= 0.25.1))))
+  ocamlformat))
