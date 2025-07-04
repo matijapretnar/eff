@@ -1,0 +1,10 @@
+(* https://github.com/matijapretnar/eff/issues/89 *)
+
+effect A : unit
+effect B : unit
+
+type 'a testtype = T of (('a testtype -> 'a) list)
+
+let testbug = handler 
+  | effect A k -> fun (T ks) -> continue k () (T ((k ()) :: ks))
+  | effect B k -> fun (T l) -> perform (Print "hello") ; continue k () (T l)

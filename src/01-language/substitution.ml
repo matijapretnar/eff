@@ -330,7 +330,7 @@ let add_dirt_var_coercion_e dirt_var dc =
   }
 
 let add_dirt_var_coercion dirt_var dc sub =
-  assert (dc = apply_sub_dirtcoer sub dc);
+  assert (Coercion.equal_dirt_coercion dc (apply_sub_dirtcoer sub dc));
   merge (add_dirt_var_coercion_e dirt_var dc) sub
 
 let add_dirt_substitution_e dirt_var dirt =
