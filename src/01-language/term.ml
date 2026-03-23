@@ -10,7 +10,7 @@ type poly_variable = (Variable.t, TyScheme.t) typed
 module EffectFingerprint = Symbol.Make (Symbol.Anonymous)
 
 type effect_fingerprint = EffectFingerprint.t
-type effect = (Effect.t, Type.ty * Type.ty) typed
+type eff = (Effect.t, Type.ty * Type.ty) typed
 
 type pattern = (pattern', Type.ty) typed
 
@@ -81,7 +81,7 @@ and computation' =
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation
-  | Call of effect * expression * abstraction
+  | Call of eff * expression * abstraction
   | Bind of computation * abstraction
   | CastComp of computation * Coercion.dirty_coercion
   | Check of Location.t * computation
@@ -95,7 +95,7 @@ and handler_clauses' = {
 }
 
 and effect_clauses = {
-  effect_part : (effect, abstraction2) Assoc.t;
+  effect_part : (eff, abstraction2) Assoc.t;
   fingerprint : effect_fingerprint;
 }
 
@@ -379,8 +379,8 @@ and print_let_rec_abstraction (f, abs) ppf =
     (Type.print_ty (Type.arrow abs.ty))
     (print_let_abstraction abs)
 
-let apply_sub_effect sub effect =
-  { term = effect.term; ty = Substitution.apply_sub_eff_ty sub effect.ty }
+let apply_sub_effect sub eff =
+  { term = eff.term; ty = Substitution.apply_sub_eff_ty sub eff.ty }
 
 let rec apply_sub_comp sub computation =
   {
@@ -398,11 +398,9 @@ and apply_sub_comp' sub computation =
       Match (apply_sub_exp sub e, List.map (apply_sub_abs sub) alist)
   | Apply (e1, e2) -> Apply (apply_sub_exp sub e1, apply_sub_exp sub e2)
   | Handle (e1, c1) -> Handle (apply_sub_exp sub e1, apply_sub_comp sub c1)
-  | Call (effect, e1, abs) ->
+  | Call (eff, e1, abs) ->
       Call
-        ( apply_sub_effect sub effect,
-          apply_sub_exp sub e1,
-          apply_sub_abs sub abs )
+        (apply_sub_effect sub eff, apply_sub_exp sub e1, apply_sub_abs sub abs)
   | Bind (c1, a1) -> Bind (apply_sub_comp sub c1, apply_sub_abs sub a1)
   | CastComp (c1, dc1) ->
       CastComp (apply_sub_comp sub c1, Substitution.apply_sub_dirtycoer sub dc1)

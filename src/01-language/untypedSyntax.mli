@@ -3,7 +3,7 @@ open Utils
 (** Syntax of the core language. *)
 
 type variable = Term.Variable.t
-type effect = Effect.t
+type eff = Effect.t
 type label = Type.Label.t
 type field = Type.Field.t
 
@@ -30,7 +30,7 @@ and plain_expression =
   | Record of expression Type.Field.Map.t
   | Variant of label * expression option
   | Lambda of abstraction
-  | Effect of effect
+  | Effect of eff
   | Handler of handler
 
 and computation = plain_computation located
@@ -46,7 +46,7 @@ and plain_computation =
   | Check of computation
 
 and handler = {
-  effect_clauses : (effect, abstraction2) Assoc.t;
+  effect_clauses : (eff, abstraction2) Assoc.t;
   value_clause : abstraction;
   finally_clause : abstraction;
 }

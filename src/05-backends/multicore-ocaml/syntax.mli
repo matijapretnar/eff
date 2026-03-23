@@ -1,7 +1,7 @@
 open Language
 
 type variable = Term.Variable.t
-type effect = Effect.t
+type eff = Effect.t
 type label = Type.Label.t
 type field = Type.Field.t
 
@@ -39,7 +39,7 @@ type term =
   | Variant of label * term option
   | Lambda of abstraction
   | Function of match_case list
-  | Effect of effect
+  | Effect of eff
   | Let of (pattern * term) list * term
   | LetRec of (variable * abstraction) list * term
   | Match of term * match_case list
@@ -48,7 +48,7 @@ type term =
 
 and match_case =
   | ValueClause of abstraction
-  | EffectClause of effect * abstraction2
+  | EffectClause of eff * abstraction2
 
 and abstraction = pattern * term
 (** Abstractions that take one argument. *)
@@ -58,14 +58,14 @@ and abstraction2 = pattern * pattern * term
 
 type cmd =
   | Term of term
-  | DefEffect of effect * (ty * ty)
+  | DefEffect of eff * (ty * ty)
   | TopLet of (pattern * term) list
   | TopLetRec of (variable * abstraction) list
   | RawSource of (variable * string)
   | TyDef of (label * (Type.TyParam.t list * tydef)) list
 
 val print_header :
-  (effect * (ty * ty) * (string * string * string)) list ->
+  (eff * (ty * ty) * (string * string * string)) list ->
   Format.formatter ->
   unit
 

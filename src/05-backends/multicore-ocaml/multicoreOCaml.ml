@@ -9,8 +9,7 @@ module Backend : Language.Backend.S = struct
   type state = {
     prog : Syntax.cmd list;
     primitive_effects :
-      (Syntax.effect * (Syntax.ty * Syntax.ty) * (string * string * string))
-      list;
+      (Syntax.eff * (Syntax.ty * Syntax.ty) * (string * string * string)) list;
   }
 
   let initial_state = { prog = []; primitive_effects = [] }
