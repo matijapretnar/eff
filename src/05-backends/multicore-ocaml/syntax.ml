@@ -101,12 +101,12 @@ let rec print_term t ppf =
   | Var x -> print ppf "%t" (Symbol.print_variable x)
   | Const c -> print ppf "%t" (Const.print c)
   | Annotated (t, ty) -> print ppf "(%t : %t)" (print_term t) (print_type ty)
-  | Tuple lst -> print ppf "%t" (print_tuple print_term lst)
+  | Tuple lst -> print ppf "%t" (print_tuple print_term_parens lst)
   | Record assoc -> print ppf "%t" (print_record print_term "=" assoc)
   | Variant (lbl, None) when lbl = Type.nil -> print ppf "[]"
   | Variant (lbl, None) -> print ppf "%t" (Symbol.print_label lbl)
   | Variant (lbl, Some (Tuple [ hd; tl ])) when lbl = Type.cons ->
-      print ppf "@[<hov>(%t::%t)@]" (print_term hd) (print_term tl)
+      print ppf "@[<hov>((%t)::%t)@]" (print_term hd) (print_term tl)
   | Variant (lbl, Some t) ->
       print ppf "(%t @[<hov>%t@])" (Symbol.print_label lbl) (print_term t)
   | Lambda a -> print ppf "@[<hv 2>fun %t@]" (print_abstraction a)
@@ -133,6 +133,12 @@ let rec print_term t ppf =
   | Check _t ->
       Print.warning
         "[#check] commands are ignored when compiling to Multicore OCaml."
+
+and print_term_parens t ppf =
+  match t with
+  | Lambda _ | Let _ | LetRec _ | Match _ | Function _ ->
+      print ppf "(%t)" (print_term t)
+  | _ -> print_term t ppf
 
 and print_pattern p ppf =
   match p with
@@ -191,8 +197,8 @@ and print_tydef (name, (params, tydef)) ppf =
         (Symbol.print_tyname name) (print_def tydef)
 
 and print_def_effect (eff, (ty1, ty2)) ppf =
-  print ppf "@[effect %t : %t ->@ %t@]@." (Symbol.print_effect eff)
-    (print_type ty1) (print_type ty2)
+  print ppf "@[type _ Effect.t += %t : %t ->@ %t Effect.t@]@."
+    (Symbol.print_effect eff) (print_type ty1) (print_type ty2)
 
 and print_top_let defs ppf = print ppf "@[<hv>%t@]@." (print_let defs)
 and print_top_let_rec defs ppf = print ppf "@[<hv>%t@]@." (print_let_rec defs)
@@ -255,19 +261,20 @@ and print_case case ppf =
   | ValueClause abs -> print ppf "@[<hv 2>%t@]" (print_abstraction abs)
   | EffectClause (eff, (p1, p2, t)) ->
       if p2 = PNonbinding then
-        print ppf "@[<hv 2>effect (%t %t) %t -> @,%t@]"
+        print ppf "@[<hv 2>effect (%t %t), %t -> @,%t@]"
           (Symbol.print_effect eff) (print_pattern p1) (print_pattern p2)
           (print_term t)
       else
         print ppf
-          ("@[<hv 2>effect (%t %t) %t ->@,"
-         ^^ "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]")
+          ("@[<hv 2>effect (%t %t), %t ->@,"
+         ^^ "(let %t x = continue (Multicont.Deep.clone_continuation %t) x in @,\
+             %t)@]")
           (Symbol.print_effect eff) (print_pattern p1) (print_pattern p2)
           (print_pattern p2) (print_pattern p2) (print_term t)
 
 let print_top_handler cases ppf =
   let print_top_handler_case (eff, _, (x, k, t)) ppf =
-    print ppf "  | effect (%t %s) %s -> %s" (Symbol.print_effect eff) x k t
+    print ppf "  | effect (%t %s), %s -> %s" (Symbol.print_effect eff) x k t
   in
   print ppf "let _ocaml_tophandler c =\n  match c () with\n%t\n  | x -> x\n"
     (Print.sequence "" print_top_handler_case cases)
