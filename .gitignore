@@ -1,4 +1,5 @@
 _build
+_opam
 # Executable
 eff.exe
 docs/try/jseff.bc.js

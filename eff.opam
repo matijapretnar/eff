@@ -10,11 +10,12 @@ homepage: "http://www.eff-lang.org/"
 bug-reports: "https://github.com/matijapretnar/eff/issues"
 depends: [
   "dune" {>= "2.8"}
+  "multicont"
   "js_of_ocaml"
   "js_of_ocaml-ppx"
   "menhir"
   "ocaml" {>= "4.14.1"}
-  "ocamlformat" {= "0.25.1"}
+  "ocamlformat" {= "0.29.0"}
   "odoc" {with-doc}
 ]
 build: [
