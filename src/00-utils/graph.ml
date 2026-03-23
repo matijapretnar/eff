@@ -13,7 +13,8 @@ module MakeEdges (Vertex : Symbol.S) = struct
 end
 
 module Make
-    (Vertex : Symbol.S) (Edge : sig
+    (Vertex : Symbol.S)
+    (Edge : sig
       type t
 
       val print : ?safe:bool -> t -> Format.formatter -> unit
@@ -80,7 +81,7 @@ struct
     List.iter (fun cmp -> assert (Vertex.Set.cardinal cmp >= 1)) components;
     let all = List.fold_right Vertex.Set.union components Vertex.Set.empty in
     assert (Vertex.Set.equal all (vertices graph));
-    (*  *)
+    (* *)
     components
 
   let toposort graph =

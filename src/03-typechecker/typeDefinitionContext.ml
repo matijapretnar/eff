@@ -53,8 +53,8 @@ let rec find_some f = function
   | [] -> None
   | hd :: tl -> ( match f hd with Some y -> Some y | None -> find_some f tl)
 
-(** [find_variant lbl] returns the information about the variant type that defines the
-    label [lbl]. *)
+(** [find_variant lbl] returns the information about the variant type that
+    defines the label [lbl]. *)
 let find_variant lbl st =
   let construct = function
     | ty_name, { params; type_def = Sum vs } -> (
@@ -65,8 +65,8 @@ let find_variant lbl st =
   in
   find_some construct (Assoc.to_list st)
 
-(** [find_field fld] returns the information about the record type that defines the field
-    [fld]. *)
+(** [find_field fld] returns the information about the record type that defines
+    the field [fld]. *)
 
 let find_field fld (st : state) =
   let construct = function
@@ -83,12 +83,12 @@ let apply_to_tydef_params tyname (ps : tydef_params) p_map =
     ( tyname,
       p_map
       |> TyParam.Map.map (fun p ->
-             let skel, variance = TyParam.Map.find p ps.type_params in
-             (tyParam p skel, variance)) )
+          let skel, variance = TyParam.Map.find p ps.type_params in
+          (tyParam p skel, variance)) )
 
-(** [infer_variant lbl] finds a variant type that defines the label [lbl] and returns it
-    with refreshed type parameters and additional information needed for type
-    inference. *)
+(** [infer_variant lbl] finds a variant type that defines the label [lbl] and
+    returns it with refreshed type parameters and additional information needed
+    for type inference. *)
 let infer_variant lbl st =
   match find_variant lbl st with
   | None -> assert false
@@ -101,8 +101,9 @@ let infer_variant lbl st =
       in
       (u', apply_to_tydef_params ty_name ps' p_map)
 
-(** [infer_field fld] finds a record type that defines the field [fld] and returns it with
-    refreshed type parameters and additional information needed for type inference. *)
+(** [infer_field fld] finds a record type that defines the field [fld] and
+    returns it with refreshed type parameters and additional information needed
+    for type inference. *)
 let infer_field fld st =
   match find_field fld st with
   | None -> assert false
@@ -115,8 +116,9 @@ let infer_field fld st =
       in
       (apply_to_tydef_params ty_name ps' p_map, (ty_name, us'))
 
-(** [extend_type_definitions tydefs state] checks that the simulatenous type definitions [tydefs] are
-    well-formed and returns the extended type context. *)
+(** [extend_type_definitions tydefs state] checks that the simulatenous type
+    definitions [tydefs] are well-formed and returns the extended type context.
+*)
 let extend_type_definitions tydefs st =
   (* We wish we wrote this in eff, where we could have transactional memory. *)
   let extend_tydef name { params; type_def } st' =

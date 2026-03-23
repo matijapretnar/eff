@@ -120,8 +120,11 @@ let loop_incr__direct n =
               (let _y_60 = _x_59 in
                fun (_x_61 : int) -> _x_61));
         effect_clauses =
-          (fun (type a b) (eff : (a, b) eff_internal_effect) :
-               (a -> (b -> _) -> _) ->
+          (fun (type a b)
+            (eff : (a, b) eff_internal_effect)
+            :
+            (a -> (b -> _) -> _)
+          ->
             match eff with
             | Incr ->
                 fun () _l_64 ->
@@ -159,8 +162,11 @@ let loop_incr__purity_aware n =
               (let _y_60 = _x_59 in
                fun (_x_61 : int) -> _x_61));
         effect_clauses =
-          (fun (type a b) (eff : (a, b) eff_internal_effect) :
-               (a -> (b -> _) -> _) ->
+          (fun (type a b)
+            (eff : (a, b) eff_internal_effect)
+            :
+            (a -> (b -> _) -> _)
+          ->
             match eff with
             | Incr ->
                 fun () _l_64 ->
@@ -219,8 +225,11 @@ let loop_state__direct n =
     handler
       {
         effect_clauses =
-          (fun (type a b) (eff : (a, b) eff_internal_effect) :
-               (a -> (b -> _) -> _) ->
+          (fun (type a b)
+            (eff : (a, b) eff_internal_effect)
+            :
+            (a -> (b -> _) -> _)
+          ->
             match eff with
             | Put ->
                 fun (_s'_45 : int) _l_61 ->
@@ -262,8 +271,11 @@ let loop_state__purity_aware n =
     handler
       {
         effect_clauses =
-          (fun (type a b) (eff : (a, b) eff_internal_effect) :
-               (a -> (b -> _) -> _) ->
+          (fun (type a b)
+            (eff : (a, b) eff_internal_effect)
+            :
+            (a -> (b -> _) -> _)
+          ->
             match eff with
             | Put ->
                 fun (_s'_45 : int) _l_61 ->
