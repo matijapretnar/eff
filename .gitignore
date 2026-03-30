@@ -7,6 +7,9 @@ docs/try/jseff.bc.js
 # Backup files
 *~
 
+# Direnv
+.envrc
+
 # Silly Mac OS X files
 .DS_Store
 
