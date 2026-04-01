@@ -5,7 +5,7 @@ type eff = Effect.t
 type label = Type.Label.t
 type field = Type.Field.t
 
-(** Types used by MulticoreOcaml. *)
+(** Types used by OcamlHandlers. *)
 type ty =
   | TyApply of TyName.t * ty list
   | TyParam of Type.TyParam.t

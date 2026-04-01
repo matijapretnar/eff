@@ -9,7 +9,7 @@ type eff = Effect.t
 type label = Type.Label.t
 type field = Type.Field.t
 
-(** Types used by MulticoreOcaml. *)
+(** Types used by OcamlHandlers. *)
 type ty =
   | TyApply of TyName.t * ty list
   | TyParam of Type.TyParam.t
@@ -139,7 +139,7 @@ let rec print_term ?max_level t ppf =
         (print_term ~max_level:0 t2)
   | Check _t ->
       Print.warning
-        "[#check] commands are ignored when compiling to Multicore OCaml."
+        "[#check] commands are ignored when compiling to OCaml Handlers."
 
 and print_pattern p ppf =
   match p with
