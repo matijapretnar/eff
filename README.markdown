@@ -44,7 +44,7 @@ on Windows, we just have not tested it yet.
 
 To install Eff, you need a standard Unix-style build environment as well as
 
-1. [OCaml](https://ocaml.org/), version 4.14.1 or newer,
+1. [OCaml](https://ocaml.org/), version 5.4.1 or newer,
 2. [Js_of_ocaml](http://ocsigen.github.io/js_of_ocaml) compiler from OCaml bytecode to Javascript
 3. its syntax extension `js_of_ocaml-ppx`,
 4. [Menhir](http://gitlab.inria.fr/fpottier/menhir) LR(1) parser generator,

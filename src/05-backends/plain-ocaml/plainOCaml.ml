@@ -1,4 +1,4 @@
-(* Compilation to multicore ocaml *)
+(* Compilation to plain ocaml *)
 open Utils
 module Term = Language.Term
 module Type = Language.Type
