@@ -31,31 +31,29 @@ val print :
 
     As an example, let us look at untyped lambda calculus, naively defined as
     {[
-      type term =
-        | Var of string
-        | App of term * term
-        | Abs of string * term
+    type term = Var of string | App of term * term | Abs of string * term
     ]}
 
     - Variables are atomic constructs so we print them at the lowest level.
-    - Application is left associative, so we print [App (App (e1, e2), e3)]
-      as ["e1 e2 e3"], but [App (e1, App (e2, e3))] as ["e1 (e2 e3)"].
-      We achieve this by printing [App (e1, e2)] at level 1 and limiting the
-      maximum level of [e1] to 1 and of [e2] to 0.
+    - Application is left associative, so we print [App (App (e1, e2), e3)] as
+      ["e1 e2 e3"], but [App (e1, App (e2, e3))] as ["e1 (e2 e3)"]. We achieve
+      this by printing [App (e1, e2)] at level 1 and limiting the maximum level
+      of [e1] to 1 and of [e2] to 0.
     - Lambda abstraction has the lowest precedence, so we print it at level 2.
       The abstraction binds everything that follows it, so the level of its body
       is unlimited.
 
     The most convenient way to express this is as follows.
     {[
-      let rec print_term ?max_level e ppf =
-        let print ?at_level = Print.print ?max_level ?at_level ppf in
-        match e with
-        | Var x -> print "%s" x
-        | App (e1, e2) ->
+    let rec print_term ?max_level e ppf =
+      let print ?at_level = Print.print ?max_level ?at_level ppf in
+      match e with
+      | Var x -> print "%s" x
+      | App (e1, e2) ->
           print ~at_level:1 "%t %t"
-            (print_term ~max_level:1 e1) (print_term ~max_level:0 e2)
-        | Abs (x, e) -> print ~at_level:2 "lam %s. %t" x (print_term e)
+            (print_term ~max_level:1 e1)
+            (print_term ~max_level:0 e2)
+      | Abs (x, e) -> print ~at_level:2 "lam %s. %t" x (print_term e)
     ]}
     We define a recursive function [print_term ?max_level e ppf] that prints [e]
     at [max_level] to the pretty-printer [ppf]. Since each case will be printed
@@ -85,15 +83,15 @@ val sequence :
 
 val printer_sequence :
   string -> (Format.formatter -> unit) list -> Format.formatter -> unit
-(** [printer_sequence sep pps ppf] calls pretty-printers [pps] which have already
-    received all their inputs apart from the formatter and applies them to the
-    formatter [ppf]. This is useful for printing heterogeneous sequences, such as
-    substitutions, constraints, ... *)
+(** [printer_sequence sep pps ppf] calls pretty-printers [pps] which have
+    already received all their inputs apart from the formatter and applies them
+    to the formatter [ppf]. This is useful for printing heterogeneous sequences,
+    such as substitutions, constraints, ... *)
 
 val tuple :
   ('a -> Format.formatter -> unit) -> 'a list -> Format.formatter -> unit
-(** [tuple pp lst ppf] prints a tuple given by a list of elements [lst] using
-    a pretty-printer [pp] to the formatter [ppf]. *)
+(** [tuple pp lst ppf] prints a tuple given by a list of elements [lst] using a
+    pretty-printer [pp] to the formatter [ppf]. *)
 
 val record :
   ('f -> Format.formatter -> unit) ->
@@ -101,6 +99,6 @@ val record :
   ('f * 'v) list ->
   Format.formatter ->
   unit
-(** [record fpp vpp lst ppf] prints a record given by an associative list of elements
-    [lst] using a pretty-printer [fpp] for fields and [vpp] for values to the formatter
-    [ppf]. *)
+(** [record fpp vpp lst ppf] prints a record given by an associative list of
+    elements [lst] using a pretty-printer [fpp] for fields and [vpp] for values
+    to the formatter [ppf]. *)

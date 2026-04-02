@@ -1,4 +1,4 @@
-(* Compilation to multicore ocaml *)
+(* Compilation to ocaml handlers *)
 
 open Utils
 
@@ -9,8 +9,7 @@ module Backend : Language.Backend.S = struct
   type state = {
     prog : Syntax.cmd list;
     primitive_effects :
-      (Syntax.effect * (Syntax.ty * Syntax.ty) * (string * string * string))
-      list;
+      (Syntax.eff * (Syntax.ty * Syntax.ty) * (string * string * string)) list;
   }
 
   let initial_state = { prog = []; primitive_effects = [] }
@@ -42,7 +41,7 @@ module Backend : Language.Backend.S = struct
 
   let process_type_of state _ =
     Print.warning
-      "[#typeof] commands are ignored when compiling to Multicore OCaml.";
+      "[#typeof] commands are ignored when compiling to OCaml Handlers.";
     state
 
   let process_def_effect state eff =

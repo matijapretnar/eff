@@ -9,7 +9,7 @@ module type S = sig
   val process_type_of :
     state -> Type.Params.t * Term.computation * Constraints.t -> state
 
-  val process_def_effect : state -> Term.effect -> state
+  val process_def_effect : state -> Term.eff -> state
 
   val process_top_let :
     state ->
@@ -22,7 +22,7 @@ module type S = sig
     state -> Term.variable -> Primitives.primitive_value -> state
 
   val load_primitive_effect :
-    state -> Term.effect -> Primitives.primitive_effect -> state
+    state -> Term.eff -> Primitives.primitive_effect -> state
 
   val process_tydef : state -> (TyName.t, Type.type_data) Utils.Assoc.t -> state
   val finalize : state -> unit

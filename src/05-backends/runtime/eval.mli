@@ -10,4 +10,4 @@ val eval_expression : state -> Term.expression -> Value.value
 val run : state -> Term.computation -> Value.value
 val update : Language.Term.Variable.t -> Value.value -> state -> state
 val lookup : Term.variable -> state -> Value.value option
-val add_runner : Term.effect -> (Value.value -> Value.value) -> state -> state
+val add_runner : Term.eff -> (Value.value -> Value.value) -> state -> state

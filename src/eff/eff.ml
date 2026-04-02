@@ -34,9 +34,9 @@ let options =
       ( "--no-header",
         Arg.Clear Config.include_header_open,
         " Do not include open OcamlHeader in generated files" );
-      ( "--compile-multicore-ocaml",
-        Arg.Unit (fun () -> Config.backend := Multicore),
-        " Compile the Eff code into a Multicore OCaml (sent to standard output)"
+      ( "--compile-ocaml-handlers",
+        Arg.Unit (fun () -> Config.backend := Handlers),
+        " Compile the Eff code into OCaml 5 handlers (sent to standard output)"
       );
       ( "--compile-plain-ocaml",
         Arg.Unit (fun () -> Config.backend := Ocaml),
@@ -188,7 +188,7 @@ let main =
     let (module Backend : Language.Backend.S) =
       match !Config.backend with
       | Config.Runtime -> (module Runtime.Backend)
-      | Config.Multicore -> (module MulticoreOCaml.Backend)
+      | Config.Handlers -> (module OcamlHandlers.Backend)
       | Config.Ocaml -> (module PlainOCaml.Backend)
     in
     let (module Shell) =
@@ -206,7 +206,7 @@ let main =
         let stdlib =
           match !Config.backend with
           | Config.Runtime | Config.Ocaml -> Loader.Stdlib_eff.source
-          | Config.Multicore -> MulticoreOCaml.stdlib
+          | Config.Handlers -> OcamlHandlers.stdlib
         in
         Shell.load_source stdlib state
       else state

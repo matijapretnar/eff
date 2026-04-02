@@ -64,7 +64,7 @@ let fresh_instantiation (params : Type.Params.t) (constraints : Constraints.t) =
 
 type state = {
   variables : TyScheme.t Term.Variable.Map.t;
-  effects : Term.effect Effect.Map.t;
+  effects : Term.eff Effect.Map.t;
   type_definitions : TypeDefinitionContext.state;
 }
 

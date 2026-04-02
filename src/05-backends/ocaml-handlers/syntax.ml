@@ -5,11 +5,11 @@ module Print = Utils.Print
 type variable = Term.Variable.t
 (** Syntax of the core language. *)
 
-type effect = Effect.t
+type eff = Effect.t
 type label = Type.Label.t
 type field = Type.Field.t
 
-(** Types used by MulticoreOcaml. *)
+(** Types used by OcamlHandlers. *)
 type ty =
   | TyApply of TyName.t * ty list
   | TyParam of Type.TyParam.t
@@ -43,7 +43,7 @@ type term =
   | Variant of label * term option
   | Lambda of abstraction
   | Function of match_case list
-  | Effect of effect
+  | Effect of eff
   | Let of (pattern * term) list * term
   | LetRec of (variable * abstraction) list * term
   | Match of term * match_case list
@@ -52,7 +52,7 @@ type term =
 
 and match_case =
   | ValueClause of abstraction
-  | EffectClause of effect * abstraction2
+  | EffectClause of eff * abstraction2
 
 and abstraction = pattern * term
 (** Abstractions that take one argument. *)
@@ -62,7 +62,7 @@ and abstraction2 = pattern * pattern * term
 
 type cmd =
   | Term of term
-  | DefEffect of effect * (ty * ty)
+  | DefEffect of eff * (ty * ty)
   | TopLet of (pattern * term) list
   | TopLetRec of (variable * abstraction) list
   | RawSource of (variable * string)
@@ -96,43 +96,50 @@ let print_record pp sep assoc ppf =
   let lst = Type.Field.Map.bindings assoc in
   print ppf "{@[<hov>%t@]}" (print_sequence "; " (print_field pp sep) lst)
 
-let rec print_term t ppf =
+let rec print_term ?max_level t ppf =
+  let print ?at_level = Print.print ?max_level ?at_level ppf in
   match t with
-  | Var x -> print ppf "%t" (Symbol.print_variable x)
-  | Const c -> print ppf "%t" (Const.print c)
-  | Annotated (t, ty) -> print ppf "(%t : %t)" (print_term t) (print_type ty)
-  | Tuple lst -> print ppf "%t" (print_tuple print_term lst)
-  | Record assoc -> print ppf "%t" (print_record print_term "=" assoc)
-  | Variant (lbl, None) when lbl = Type.nil -> print ppf "[]"
-  | Variant (lbl, None) -> print ppf "%t" (Symbol.print_label lbl)
+  | Var x -> print "%t" (Symbol.print_variable x)
+  | Const c -> print "%t" (Const.print c)
+  | Annotated (t, ty) ->
+      print ~at_level:1 "%t : %t" (print_term ~max_level:0 t) (print_type ty)
+  | Tuple lst -> print "%t" (print_tuple print_term lst)
+  | Record assoc -> print "%t" (print_record print_term "=" assoc)
+  | Variant (lbl, None) when lbl = Type.nil -> print "[]"
+  | Variant (lbl, None) -> print "%t" (Symbol.print_label lbl)
   | Variant (lbl, Some (Tuple [ hd; tl ])) when lbl = Type.cons ->
-      print ppf "@[<hov>(%t::%t)@]" (print_term hd) (print_term tl)
+      print "@[<hov>(%t::%t)@]" (print_term ~max_level:0 hd) (print_term tl)
   | Variant (lbl, Some t) ->
-      print ppf "(%t @[<hov>%t@])" (Symbol.print_label lbl) (print_term t)
-  | Lambda a -> print ppf "@[<hv 2>fun %t@]" (print_abstraction a)
+      print ~at_level:1 "%t @[<hov>%t@]" (Symbol.print_label lbl)
+        (print_term ~max_level:0 t)
+  | Lambda a -> print ~at_level:1 "@[<hv 2>fun %t@]" (print_abstraction a)
   | Function lst ->
-      print ppf "@[<hv>(function @, | %t)@]"
+      print ~at_level:1 "@[<hv>function @, | %t@]"
         (print_sequence "@, | " print_case lst)
-  | Effect eff -> print ppf "%t" (Symbol.print_effect eff)
+  | Effect eff -> print "%t" (Symbol.print_effect eff)
   | Let (lst, t) ->
-      print ppf "@[<hv>@[<hv>%tin@] @,%t@]" (print_let lst) (print_term t)
+      print ~at_level:1 "@[<hv>@[<hv>%tin@] @,%t@]" (print_let lst)
+        (print_term t)
   | LetRec (lst, t) ->
-      print ppf "@[<hv>@[<hv>%tin@] @,%t@]" (print_let_rec lst) (print_term t)
+      print ~at_level:1 "@[<hv>@[<hv>%tin@] @,%t@]" (print_let_rec lst)
+        (print_term t)
   | Match (t, []) ->
       (* Absurd case *)
-      print ppf "@[<hv>(match %t with | _ -> assert false)@]" (print_term t)
+      print ~at_level:1 "@[<hv>match %t with | _ -> assert false@]"
+        (print_term t)
   | Match (t, lst) ->
-      print ppf "@[<hv>(match %t with@, | %t)@]" (print_term t)
+      print ~at_level:1 "@[<hv>match %t with@, | %t@]" (print_term t)
         (print_sequence "@, | " print_case lst)
-  | Apply (Effect eff, (Lambda _ as t2)) ->
-      print ppf "perform (%t (%t))" (Symbol.print_effect eff) (print_term t2)
   | Apply (Effect eff, t2) ->
-      print ppf "perform (%t %t)" (Symbol.print_effect eff) (print_term t2)
+      print ~at_level:1 "perform (%t %t)" (Symbol.print_effect eff)
+        (print_term ~max_level:0 t2)
   | Apply (t1, t2) ->
-      print ppf "@[<hov 2>(%t) @,(%t)@]" (print_term t1) (print_term t2)
+      print ~at_level:1 "@[<hov 2>%t @,%t@]"
+        (print_term ~max_level:0 t1)
+        (print_term ~max_level:0 t2)
   | Check _t ->
       Print.warning
-        "[#check] commands are ignored when compiling to Multicore OCaml."
+        "[#check] commands are ignored when compiling to OCaml Handlers."
 
 and print_pattern p ppf =
   match p with
@@ -191,8 +198,8 @@ and print_tydef (name, (params, tydef)) ppf =
         (Symbol.print_tyname name) (print_def tydef)
 
 and print_def_effect (eff, (ty1, ty2)) ppf =
-  print ppf "@[effect %t : %t ->@ %t@]@." (Symbol.print_effect eff)
-    (print_type ty1) (print_type ty2)
+  print ppf "@[type _ Effect.t += %t : %t ->@ %t Effect.t@]@."
+    (Symbol.print_effect eff) (print_type ty1) (print_type ty2)
 
 and print_top_let defs ppf = print ppf "@[<hv>%t@]@." (print_let defs)
 and print_top_let_rec defs ppf = print ppf "@[<hv>%t@]@." (print_let_rec defs)
@@ -255,19 +262,20 @@ and print_case case ppf =
   | ValueClause abs -> print ppf "@[<hv 2>%t@]" (print_abstraction abs)
   | EffectClause (eff, (p1, p2, t)) ->
       if p2 = PNonbinding then
-        print ppf "@[<hv 2>effect (%t %t) %t -> @,%t@]"
+        print ppf "@[<hv 2>effect (%t %t), %t -> @,%t@]"
           (Symbol.print_effect eff) (print_pattern p1) (print_pattern p2)
           (print_term t)
       else
         print ppf
-          ("@[<hv 2>effect (%t %t) %t ->@,"
-         ^^ "(let %t x = continue (Obj.clone_continuation %t) x in @,%t)@]")
+          ("@[<hv 2>effect (%t %t), %t ->@,"
+         ^^ "(let %t x = continue (Multicont.Deep.clone_continuation %t) x in @,\
+             %t)@]")
           (Symbol.print_effect eff) (print_pattern p1) (print_pattern p2)
           (print_pattern p2) (print_pattern p2) (print_term t)
 
 let print_top_handler cases ppf =
   let print_top_handler_case (eff, _, (x, k, t)) ppf =
-    print ppf "  | effect (%t %s) %s -> %s" (Symbol.print_effect eff) x k t
+    print ppf "  | effect (%t %s), %s -> %s" (Symbol.print_effect eff) x k t
   in
   print ppf "let _ocaml_tophandler c =\n  match c () with\n%t\n  | x -> x\n"
     (Print.sequence "" print_top_handler_case cases)
@@ -283,7 +291,7 @@ let print_cmd cmd ppf =
   match cmd with
   | Term t ->
       print ppf "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@."
-        (print_term t)
+        (print_term ~max_level:1 t)
   | DefEffect (eff, (ty1, ty2)) -> print_def_effect (eff, (ty1, ty2)) ppf
   | TopLet defs -> print_top_let defs ppf
   | TopLetRec defs -> print_top_let_rec defs ppf

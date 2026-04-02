@@ -15,25 +15,25 @@ module Shell = Loader.Shell.Make (Runtime.Backend)
 (* Export the interface to Javascript. *)
 let _ =
   Js.export "jseff"
-    (object%js
-       method initialize echo =
-         Config.output_formatter := js_formatter "[;#00a8ff;#192a56]" echo;
-         Config.error_formatter := js_formatter "[b;#e84118;#192a56]" echo;
-         let state = Shell.initialize () in
-         let state = Shell.load_source Loader.Stdlib_eff.source state in
-         Format.fprintf !Config.output_formatter "eff %s@." Config.version;
-         Format.fprintf !Config.output_formatter "[Type #help for help.]@.";
-         state
+    object%js
+      method initialize echo =
+        Config.output_formatter := js_formatter "[;#00a8ff;#192a56]" echo;
+        Config.error_formatter := js_formatter "[b;#e84118;#192a56]" echo;
+        let state = Shell.initialize () in
+        let state = Shell.load_source Loader.Stdlib_eff.source state in
+        Format.fprintf !Config.output_formatter "eff %s@." Config.version;
+        Format.fprintf !Config.output_formatter "[Type #help for help.]@.";
+        state
 
-       method executeSource state source =
-         try Shell.execute_source (Js.to_string source) state
-         with Error.Error err ->
-           Error.print err;
-           state
+      method executeSource state source =
+        try Shell.execute_source (Js.to_string source) state
+        with Error.Error err ->
+          Error.print err;
+          state
 
-       method loadSource state source =
-         try Shell.load_source (Js.to_string source) state
-         with Error.Error err ->
-           Error.print err;
-           state
-    end)
+      method loadSource state source =
+        try Shell.load_source (Js.to_string source) state
+        with Error.Error err ->
+          Error.print err;
+          state
+    end

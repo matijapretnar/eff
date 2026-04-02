@@ -184,9 +184,9 @@ let of_tydef_parameters (params : Type.tydef_params) =
   let ty_params' =
     Type.TyParam.Map.bindings params.type_params
     |> List.map (fun (p, (skel, variance)) ->
-           ( p,
-             ( TyParam.refresh p,
-               (apply_substitutions_to_skeleton subst skel, variance) ) ))
+        ( p,
+          ( TyParam.refresh p,
+            (apply_substitutions_to_skeleton subst skel, variance) ) ))
   in
   let params' =
     {
@@ -235,9 +235,7 @@ let of_parameters (params : Type.Params.t) =
   let ty_params' =
     Type.TyParam.Map.bindings params.ty_params
     |> List.map (fun (p, skel) ->
-           ( p,
-             (Type.TyParam.refresh p, apply_substitutions_to_skeleton subst skel)
-           ))
+        (p, (Type.TyParam.refresh p, apply_substitutions_to_skeleton subst skel)))
   in
   let params' =
     {

@@ -470,8 +470,7 @@ and reduce_computation' state comp =
                              Type.Tuple
                                [
                                  _;
-                                 ({ term = Type.Arrow (ty_in, _); _ } as
-                                 ty_cont);
+                                 ({ term = Type.Arrow (ty_in, _); _ } as ty_cont);
                                ];
                            _;
                          },

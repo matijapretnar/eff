@@ -6,7 +6,7 @@ open Language
 type variable = string
 (** Terms *)
 
-type effect = string
+type eff = string
 type label = string
 type field = string
 type tyname = string
@@ -26,7 +26,8 @@ type tydef =
   | TyRecord of (field, ty) Assoc.t
       (** [{ field1 : ty1; field2 : ty2; ...; fieldn : tyn }] *)
   | TySum of (label, ty option) Assoc.t
-      (** [Label1 of ty1 | Label2 of ty2 | ... | Labeln of tyn | Label' | Label''] *)
+      (** [Label1 of ty1 | Label2 of ty2 | ... | Labeln of tyn | Label' |
+           Label''] *)
   | TyInline of ty  (** [ty] *)
 
 type pattern = plain_pattern located
@@ -56,7 +57,7 @@ and plain_term =
   | Variant of label * term option  (** [Label] or [Label t] *)
   | Lambda of abstraction  (** [fun p1 p2 ... pn -> t] *)
   | Function of abstraction list  (** [function p1 -> t1 | ... | pn -> tn] *)
-  | Effect of effect * term  (** [eff], where [eff] is an effect symbol. *)
+  | Effect of eff * term  (** [eff], where [eff] is an effect symbol. *)
   | Handler of handler
       (** [handler clauses], where [clauses] are described below. *)
   | Let of (pattern * term) list * term
@@ -71,16 +72,13 @@ and plain_term =
   | Check of term  (** [check t] *)
 
 and handler = {
-  effect_clauses : (effect, abstraction2) Assoc.t;
+  effect_clauses : (eff, abstraction2) Assoc.t;
       (** [t1#op1 p1 k1 -> t1' | ... | tn#opn pn kn -> tn'] *)
   value_clause : abstraction list;  (** [val p -> t] *)
   finally_clause : abstraction list;  (** [finally p -> t] *)
 }
 
-and match_case =
-  | Val_match of abstraction
-  | Eff_match of (effect * abstraction2)
-
+and match_case = Val_match of abstraction | Eff_match of (eff * abstraction2)
 and abstraction = pattern * term
 and abstraction2 = pattern * pattern * term
 
