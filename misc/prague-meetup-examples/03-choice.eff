@@ -1,0 +1,25 @@
+effect Choose : unit -> bool
+
+let choose a b =
+  if perform (Choose ()) then a else b
+
+let test () =
+  let x = choose 20 10 in
+  let y = choose 30 40 in
+  x * y
+
+let _ =
+  handle test () with
+  | effect (Choose ()) k -> k true @ k false
+  | x -> [x]
+
+let _ = 1 / 0
+
+let _ =
+  handle test () with
+  | x -> [x]
+  | effect (Choose ()) k -> k true @ k false
+  
+(* let choose_left = ... *)
+
+(* let collect_list = ... *)

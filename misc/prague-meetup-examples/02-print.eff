@@ -1,0 +1,56 @@
+(*  *)
+
+(* effect MyPrint : string -> unit *)
+(* effect Print : string -> unit *)
+
+let abc () =
+  perform (Print "a");
+  perform (Print "b");
+  perform (Print "c")
+
+let handle_print =
+  handler
+  | effect (Print msg) _ -> 42
+  | _ -> 10
+
+let deleteA =
+  handler
+  | effect (Print msg) k -> perform (Print msg); k (); k ()
+
+let d = with deleteA handle abc ()
+
+let emphasise_print =
+  handler
+  | effect (Print msg) k ->
+      perform (Print (">" ^ msg ^ "<"));
+      k ()
+
+let reverse_print =
+  handler
+  | effect (Print msg) k ->
+      k ();
+      perform (Print msg)
+
+let collect_all_prints =
+  handler
+  | x -> (x, [])
+  | effect (Print msg) k ->
+      let (y, msgs) = k () in
+      (y, msg :: msgs)
+
+
+let _ =
+  with collect_all_prints handle
+    with reverse_print handle
+        abc (); abc (); perform (Print "\n\n")
+    (* A B C A B C \n\n *)
+
+(* let ignore_print = *)
+
+(* let emphasise_print = *)
+
+(* let mirror = *)
+
+(* let continue_twice = *)
+
+(* let collect = *)

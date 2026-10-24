@@ -1,0 +1,41 @@
+effect Toss : float -> bool
+
+let rec uniform = function
+  | [x] -> x
+  | x :: xs ->
+      let n = length xs + 1 in
+      let p = 1.0 /. float_of_int n in
+      if perform (Toss p) then x else uniform xs
+
+let one_die () =
+  uniform [1.; 2.; 3.; 4.; 5.; 6.]
+
+let sum_of_two_dice () =
+  one_die () +. one_die ()
+
+
+let expectation = handler
+  | effect (Toss p) k ->
+      p *. (k true) +. (1.0 -. p) *. (k false)
+
+let _ = with expectation handle
+one_die () +. 2. *. one_die () 
+
+   
+
+let combine p dist1 dist2 =
+  let scale p dist = map (fun (x, q) -> (x, p *. q)) dist in
+  let rec add (x, p) = function
+    | [] -> [(x, p)]
+    | (y, q) :: dist ->
+      if x = y then (x, p +. q) :: dist else (y, q) :: add (x, p) dist
+  in
+  let dist1 = scale p dist1 in
+  let dist2 = scale (1.0 -. p) dist2 in
+  fold_right add dist1 dist2
+
+let distribution = handler
+  | v -> [(v, 1.0)]
+  | effect (Toss p) k -> combine p (k true) (k false)
+
+let _ = with distribution handle one_die () +. one_die ()
