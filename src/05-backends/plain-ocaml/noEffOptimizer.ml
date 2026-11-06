@@ -113,9 +113,9 @@ let naive_lambda_lift state e =
           let subs =
             leafs
             |> List.filter_map (fun (x, _) ->
-                   Option.map
-                     (fun x -> (x, NoEff.NVar { variable = v; coercions = [] }))
-                     x)
+                Option.map
+                  (fun x -> (x, NoEff.NVar { variable = v; coercions = [] }))
+                  x)
             |> Assoc.of_list
           in
           NoEff.NFun (p, ty, sub_leafs subs e))

@@ -3,7 +3,7 @@
 let version = "5.1"
 let use_stdlib = ref true
 
-type backend = Runtime | Multicore | Ocaml | Dot
+type backend = Runtime | Handlers | Ocaml | Dot
 
 let backend = ref Runtime
 let ascii = ref false

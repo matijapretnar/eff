@@ -383,8 +383,8 @@ let contract_source_dirt_nodes
                  (fun sink _ indegs ->
                    indegs
                    |> BaseSym.Map.update sink (function
-                        | Some x -> Some (x - 1)
-                        | None -> assert false))
+                     | Some x -> Some (x - 1)
+                     | None -> assert false))
                  outgoing
           in
           (indegs, constraints |> List.fold_right add_empty_constraint component))

@@ -185,9 +185,9 @@ let of_tydef_parameters (params : Type.tydef_params) =
   let ty_params' =
     Type.TyParam.Map.bindings params.type_params
     |> List.map (fun (p, (skel, variance)) ->
-           ( p,
-             ( TyParam.refresh p,
-               (apply_substitutions_to_skeleton subst skel, variance) ) ))
+        ( p,
+          ( TyParam.refresh p,
+            (apply_substitutions_to_skeleton subst skel, variance) ) ))
   in
   let params' =
     {
@@ -236,9 +236,7 @@ let of_parameters (params : Type.Params.t) =
   let ty_params' =
     Type.TyParam.Map.bindings params.ty_params
     |> List.map (fun (p, skel) ->
-           ( p,
-             (Type.TyParam.refresh p, apply_substitutions_to_skeleton subst skel)
-           ))
+        (p, (Type.TyParam.refresh p, apply_substitutions_to_skeleton subst skel)))
   in
   let params' =
     {
@@ -331,7 +329,7 @@ let add_dirt_var_coercion_e dirt_var dc =
   }
 
 let add_dirt_var_coercion dirt_var dc sub =
-  assert (dc = apply_sub_dirtcoer sub dc);
+  assert (DirtCoercion.equal_dirt_coercion dc (apply_sub_dirtcoer sub dc));
   merge (add_dirt_var_coercion_e dirt_var dc) sub
 
 let add_dirt_substitution_e dirt_var dirt =

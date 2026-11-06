@@ -1,0 +1,48 @@
+effect Get : unit -> int
+effect Set : int -> unit
+
+let get () = perform (Get ())
+let set n = perform (Set n)
+let inc () = set (get () + 1)
+
+let monad_state =
+  handler
+  | effect (Get ()) k -> fun n -> (k n) n
+  | effect (Set n) k -> fun _ -> (k ()) n
+  | x -> fun n -> (x, n)
+
+let _ =
+  (with monad_state handle (inc (); inc ())) 0
+
+let state n0 =
+  handler
+  | effect (Get ()) k -> fun n -> (k n) n
+  | effect (Set n) k -> fun _ -> (k ()) n
+  | x -> fun n -> (x, n)
+  | finally f -> f n0
+
+let _ =
+  with state 0 handle (inc (); inc ())
+  
+effect Choose : unit -> bool
+
+let choose a b = if perform (Choose ()) then a else b
+
+let choose_all =
+  handler
+  | x -> [x]
+  | effect (Choose ()) k -> k true @ k false
+
+let _ =
+  with choose_all handle
+    with state 0 handle
+      let x = choose 10 20 in
+      inc ();
+      x
+
+let _ =
+with state 0 handle
+  with choose_all handle
+    let x = choose 10 20 in
+    inc ();
+    x

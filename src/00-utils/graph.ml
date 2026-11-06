@@ -26,7 +26,8 @@ module MakeEdges (Vertex : Symbol.S) = struct
 end
 
 module Make
-    (Vertex : Symbol.S) (Edge : sig
+    (Vertex : Symbol.S)
+    (Edge : sig
       type t
 
       val print : ?safe:bool -> t -> Format.formatter -> unit
@@ -108,8 +109,8 @@ struct
       let v_index =
         v_index
         |> Vertex.Map.update v (function
-             | None -> Some index
-             | Some _ -> assert false)
+          | None -> Some index
+          | Some _ -> assert false)
       in
       let v_lowlink = v_lowlink |> Vertex.Map.add v index in
 
@@ -128,18 +129,18 @@ struct
               let v_lowlink =
                 v_lowlink
                 |> Vertex.Map.update v (function
-                     | None -> assert false
-                     | Some lowlink ->
-                         Some (min lowlink (Vertex.Map.find to_ v_lowlink)))
+                  | None -> assert false
+                  | Some lowlink ->
+                      Some (min lowlink (Vertex.Map.find to_ v_lowlink)))
               in
               (v_index, v_lowlink, stack, on_stack, index, components)
             else if Vertex.Set.mem to_ on_stack then
               let v_lowlink =
                 v_lowlink
                 |> Vertex.Map.update v (function
-                     | None -> assert false
-                     | Some lowlink ->
-                         Some (min lowlink (v_index |> Vertex.Map.find to_)))
+                  | None -> assert false
+                  | Some lowlink ->
+                      Some (min lowlink (v_index |> Vertex.Map.find to_)))
               in
               (v_index, v_lowlink, stack, on_stack, index, components)
             else (v_index, v_lowlink, stack, on_stack, index, components))
@@ -172,7 +173,8 @@ struct
     let index = 0 in
     let _, _, stack, on_stack, index, components =
       Vertex.Set.fold
-        (fun v ((v_index, v_lowlink, stack, on_stack, index, components) as acc) ->
+        (fun v ((v_index, v_lowlink, stack, on_stack, index, components) as acc)
+           ->
           match Vertex.Map.find_opt v v_index with
           | None ->
               let v_index, v_lowlink, stack, on_stack, index, components' =
@@ -194,8 +196,8 @@ struct
     assert (
       components |> List.map List.length |> List.fold ( + ) 0
       = (graph |> vertices |> Vertex.Set.cardinal));
-    let (quotient_graph, representative)
-          : Edge.t list Vertex.Map.t Vertex.Map.t * Vertex.t Vertex.Map.t =
+    let (quotient_graph, representative) :
+        Edge.t list Vertex.Map.t Vertex.Map.t * Vertex.t Vertex.Map.t =
       List.fold_right
         (fun component (quotient_graph, representative) ->
           let representative =
@@ -225,8 +227,8 @@ struct
                       let edges =
                         edges
                         |> Vertex.Map.update rep' (function
-                             | None -> Some [ e ]
-                             | Some es -> Some (e :: es))
+                          | None -> Some [ e ]
+                          | Some es -> Some (e :: es))
                       in
                       quotient_graph |> Vertex.Map.add rep edges)
                     outgoing quotient_graph
@@ -257,7 +259,7 @@ struct
     List.iter (fun comp -> assert (Vertex.Set.cardinal comp >= 1)) components;
     let all = List.fold_right Vertex.Set.union components Vertex.Set.empty in
     assert (Vertex.Set.equal all (vertices graph));
-    (*  *)
+    (* *)
     components
 
   let print_node additonal_label node ppf =

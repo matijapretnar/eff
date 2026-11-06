@@ -1,4 +1,4 @@
-(* Compilation to multicore ocaml *)
+(* Compilation to plain ocaml *)
 open Utils
 module Term = Language.Term
 module Type = Language.Type
@@ -26,7 +26,7 @@ module Backend : Language.Backend.S = struct
     no_eff_optimizer_state : NoEffOptimizer.state;
     primitive_values :
       (Language.Term.Variable.t, Language.Primitives.primitive_value) Assoc.t;
-    primitive_effects : Term.effect list;
+    primitive_effects : Term.eff list;
   }
 
   let initial_state =

@@ -168,13 +168,13 @@ let syntax_to_core_params ts =
   let core_params =
     ts
     |> List.map (fun (p, variance) ->
-           let param, ty = fresh_ty_param () in
-           (p, (param, ty, variance)))
+        let param, ty = fresh_ty_param () in
+        (p, (param, ty, variance)))
   in
   core_params |> List.to_seq |> StringMap.of_seq
 
-(** [desugar_tydef state params def] desugars the type definition with parameters
-    [params] and definition [def]. *)
+(** [desugar_tydef state params def] desugars the type definition with
+    parameters [params] and definition [def]. *)
 let desugar_tydef ~loc state
     (ty_sbst : (T.TyParam.t * T.ty * variance) StringMap.t) ty_name def =
   let state', def' =
@@ -259,8 +259,8 @@ let desugar_tydefs ~loc (state : state) sugared_defs =
     let ty_param_subs =
       params
       |> List.map (fun (pname, _) ->
-             ty_sbst |> StringMap.find pname |> fun (_, ty, variance) ->
-             (force_param ty, variance))
+          ty_sbst |> StringMap.find pname |> fun (_, ty, variance) ->
+          (force_param ty, variance))
     in
     ( add_unique ~loc "Type" name (sym, ty_param_subs) tyname_symbols,
       (name, (ty_sbst, tydef)) )

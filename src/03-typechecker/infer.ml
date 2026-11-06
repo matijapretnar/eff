@@ -66,7 +66,7 @@ let fresh_instantiation cnstrs (params : Type.Params.t)
 
 type state = {
   variables : TyScheme.t Term.Variable.Map.t;
-  effects : Term.effect Effect.Map.t;
+  effects : Term.eff Effect.Map.t;
   type_definitions : TypeDefinitionContext.state;
 }
 

@@ -445,10 +445,10 @@ module FreeParams = struct
     let combine_polarity p1 p2 params =
       params
       |> (match get_parameter_type p1 params with
-         | Positive -> add_positive p2
-         | Negtive -> add_negative p2
-         | Bipolar -> add_bipolar p2
-         | Neutral -> fun x -> x)
+        | Positive -> add_positive p2
+        | Negtive -> add_negative p2
+        | Bipolar -> add_bipolar p2
+        | Neutral -> fun x -> x)
       |>
       match get_parameter_type p2 params with
       | Positive -> add_positive p1

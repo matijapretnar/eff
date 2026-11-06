@@ -84,10 +84,10 @@ module Backend : Language.Backend.S = struct
 
     List.rev state.prog
     |> List.iter (fun elements ->
-           match elements with
-           | [] -> assert false
-           | [ element ] -> print_element element
-           | _ -> assert false);
+        match elements with
+        | [] -> assert false
+        | [ element ] -> print_element element
+        | _ -> assert false);
 
     Format.fprintf !Config.output_formatter "}\n"
 end

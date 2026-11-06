@@ -187,7 +187,8 @@ let print_dot ?param_polarity ?header ?footer c ppf =
      %t    }\n\
     \    // Dirt\n\
      %t\n\
-    \ %s" (header ())
+    \ %s"
+    (header ())
     (Print.sequence "\n"
        (print_skeleton_graph (Some additional_label_ty))
        skeleton_graphs)

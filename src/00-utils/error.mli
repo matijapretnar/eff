@@ -18,8 +18,8 @@ exception Error of t
 (** Exception representing all possible Eff errors. *)
 
 val fatal : ?loc:Location.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
-(** Fatal errors are errors over which Eff has no control, for example when
-    a file cannot be opened. *)
+(** Fatal errors are errors over which Eff has no control, for example when a
+    file cannot be opened. *)
 
 val syntax : loc:Location.t -> ('a, Format.formatter, unit, 'b) format4 -> 'a
 (** Syntax errors occur during lexing, parsing, or desugaring into Eff's core

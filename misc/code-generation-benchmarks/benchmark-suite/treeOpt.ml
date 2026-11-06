@@ -174,8 +174,11 @@ let _test_leaf_state_422 (_m_423 : int) =
                            (fun (_x_584 : intlist) ->
                              Value (fun (_ : intlist) -> _x_584));
                          effect_clauses =
-                           (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                                (a -> (b -> _) -> _) ->
+                           (fun (type a b)
+                             (eff : (a, b) eff_internal_effect)
+                             :
+                             (a -> (b -> _) -> _)
+                           ->
                              match eff with
                              | Get ->
                                  fun () _l_585 ->
@@ -218,8 +221,10 @@ let _test_leaf_state_422 (_m_423 : int) =
                                           _op_173 (* @ *) _b_458 _b_594));
                                   effect_clauses =
                                     (fun (type a b)
-                                         (eff : (a, b) eff_internal_effect) :
-                                         (a -> (b -> _) -> _) ->
+                                      (eff : (a, b) eff_internal_effect)
+                                      :
+                                      (a -> (b -> _) -> _)
+                                    ->
                                       match eff with
                                       | Get ->
                                           fun () _l_596 ->
@@ -235,8 +240,11 @@ let _test_leaf_state_422 (_m_423 : int) =
                                 })
                                (_l_482 false))));
                    effect_clauses =
-                     (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                          (a -> (b -> _) -> _) ->
+                     (fun (type a b)
+                       (eff : (a, b) eff_internal_effect)
+                       :
+                       (a -> (b -> _) -> _)
+                     ->
                        match eff with
                        | Get ->
                            fun () _l_495 ->
@@ -309,8 +317,10 @@ let _test_leaf_state_loop_2631 (_m_2632 : int) =
                                      Value (fun (_ : intlist) -> _x_2843));
                                  effect_clauses =
                                    (fun (type a b)
-                                        (eff : (a, b) eff_internal_effect) :
-                                        (a -> (b -> _) -> _) ->
+                                     (eff : (a, b) eff_internal_effect)
+                                     :
+                                     (a -> (b -> _) -> _)
+                                   ->
                                      match eff with
                                      | Get ->
                                          fun () _l_2844 ->
@@ -357,14 +367,16 @@ let _test_leaf_state_loop_2631 (_m_2632 : int) =
                                                     _b_2853));
                                           effect_clauses =
                                             (fun (type a b)
-                                                 (eff :
-                                                   (a, b) eff_internal_effect) :
-                                                 (a -> (b -> _) -> _) ->
+                                              (eff : (a, b) eff_internal_effect)
+                                              :
+                                              (a -> (b -> _) -> _)
+                                            ->
                                               match eff with
                                               | Get ->
                                                   fun () _l_2855 ->
                                                     Value
-                                                      (fun (_s_2856 : intlist) ->
+                                                      (fun (_s_2856 : intlist)
+                                                      ->
                                                         match _s_2856 with
                                                         | Cons
                                                             (_x_2858, _rest_2857)
@@ -381,8 +393,11 @@ let _test_leaf_state_loop_2631 (_m_2632 : int) =
                                         })
                                        (_l_2703 false))));
                            effect_clauses =
-                             (fun (type a b) (eff : (a, b) eff_internal_effect)
-                                  : (a -> (b -> _) -> _) ->
+                             (fun (type a b)
+                               (eff : (a, b) eff_internal_effect)
+                               :
+                               (a -> (b -> _) -> _)
+                             ->
                                match eff with
                                | Get ->
                                    fun () _l_2753 ->
@@ -449,8 +464,11 @@ let _test_leaf_state_update_4890 (_m_4891 : int) =
                      (fun (_x_5109 : intlist) ->
                        Value (fun (_ : int) -> _x_5109));
                    effect_clauses =
-                     (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                          (a -> (b -> _) -> _) ->
+                     (fun (type a b)
+                       (eff : (a, b) eff_internal_effect)
+                       :
+                       (a -> (b -> _) -> _)
+                     ->
                        match eff with
                        | Get ->
                            fun () _l_5110 ->
@@ -495,8 +513,10 @@ let _test_leaf_state_update_4890 (_m_4891 : int) =
                                            _op_173 (* @ *) _b_5443 _b_5445));
                                    effect_clauses =
                                      (fun (type a b)
-                                          (eff : (a, b) eff_internal_effect) :
-                                          (a -> (b -> _) -> _) ->
+                                       (eff : (a, b) eff_internal_effect)
+                                       :
+                                       (a -> (b -> _) -> _)
+                                     ->
                                        match eff with
                                        | Get ->
                                            fun () _l_5447 ->
@@ -516,8 +536,11 @@ let _test_leaf_state_update_4890 (_m_4891 : int) =
                                  })
                                 (_l_5442 false))));
                     effect_clauses =
-                      (fun (type a b) (eff : (a, b) eff_internal_effect) :
-                           (a -> (b -> _) -> _) ->
+                      (fun (type a b)
+                        (eff : (a, b) eff_internal_effect)
+                        :
+                        (a -> (b -> _) -> _)
+                      ->
                         match eff with
                         | Get ->
                             fun () _l_5453 ->
@@ -591,8 +614,11 @@ let _test_leaf_state_update_loop_21688 (_m_21689 : int) =
                              (fun (_x_21958 : intlist) ->
                                Value (fun (_ : int) -> _x_21958));
                            effect_clauses =
-                             (fun (type a b) (eff : (a, b) eff_internal_effect)
-                                  : (a -> (b -> _) -> _) ->
+                             (fun (type a b)
+                               (eff : (a, b) eff_internal_effect)
+                               :
+                               (a -> (b -> _) -> _)
+                             ->
                                match eff with
                                | Get ->
                                    fun () _l_21959 ->
@@ -640,9 +666,11 @@ let _test_leaf_state_update_loop_21688 (_m_21689 : int) =
                                                      _b_22294));
                                            effect_clauses =
                                              (fun (type a b)
-                                                  (eff :
-                                                    (a, b) eff_internal_effect)
-                                                  : (a -> (b -> _) -> _) ->
+                                               (eff :
+                                                 (a, b) eff_internal_effect)
+                                               :
+                                               (a -> (b -> _) -> _)
+                                             ->
                                                match eff with
                                                | Get ->
                                                    fun () _l_22296 ->
@@ -664,8 +692,11 @@ let _test_leaf_state_update_loop_21688 (_m_21689 : int) =
                                          })
                                         (_l_22291 false))));
                             effect_clauses =
-                              (fun (type a b) (eff : (a, b) eff_internal_effect)
-                                   : (a -> (b -> _) -> _) ->
+                              (fun (type a b)
+                                (eff : (a, b) eff_internal_effect)
+                                :
+                                (a -> (b -> _) -> _)
+                              ->
                                 match eff with
                                 | Get ->
                                     fun () _l_22302 ->

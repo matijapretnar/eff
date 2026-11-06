@@ -17,8 +17,8 @@ let value_fun f = V.Value (from_fun f)
     nested closures. *)
 let binary_closure f = from_fun (fun v1 -> value_fun (fun v2 -> f v1 v2))
 
-(** [ternary_closure f] converts a function [f] that takes three values into three
-    nested closures. *)
+(** [ternary_closure f] converts a function [f] that takes three values into
+    three nested closures. *)
 let ternary_closure f =
   from_fun (fun v1 -> value_fun (fun v2 -> value_fun (fun v3 -> f v1 v2 v3)))
 
@@ -28,12 +28,12 @@ let int_int_to_int f =
   let int_f v1 v2 = value_int (f (V.to_int v1) (V.to_int v2)) in
   binary_closure int_f
 
-(** [int_to_int f] takes a unary integer function f and transforms it into
-    a closure that takes two values and evaluates to a value. *)
+(** [int_to_int f] takes a unary integer function f and transforms it into a
+    closure that takes two values and evaluates to a value. *)
 let int_to_int f = from_fun (fun v -> value_int (f (V.to_int v)))
 
-(** [float_to_float f] takes a unary float function f and transforms it into
-    a closure that takes two values and evaluates to a value. *)
+(** [float_to_float f] takes a unary float function f and transforms it into a
+    closure that takes two values and evaluates to a value. *)
 let float_to_float f = from_fun (fun v -> value_float (f (V.to_float v)))
 
 (** [float_float_to_float f] takes a binary float function f and transforms it

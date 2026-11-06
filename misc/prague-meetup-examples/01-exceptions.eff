@@ -1,0 +1,24 @@
+let a =
+  handle 42 / 6 with
+  | effect (DivisionByZero ()) _ -> 0
+
+let div_by_zero_is_zero =
+  handler
+  | effect (DivisionByZero ()) _ -> 0
+
+let b =
+  with
+    div_by_zero_is_zero
+  handle
+    42 / 0 + 100 + 200
+
+(* data Maybe a = Nothing | Just a *)
+(* type 'a option = None | Some a *)
+
+let div_by_zero_is_none =
+  handler
+  | effect (DivisionByZero ()) _ -> None
+  | x -> Some x
+
+let c =
+  with div_by_zero_is_none handle (42 / 0)

@@ -1,0 +1,70 @@
+effect Fail : unit -> empty
+effect Choose : unit -> bool
+
+let fail () = match perform (Fail ()) with
+let choose () = perform (Choose ())
+
+let rec choose_int m n =
+  if m = n then
+    m
+  else if m < n then
+    if choose () then m else choose_int (m + 1) n
+  else
+    fail ()
+
+let int_sqrt m =
+  let rec try n =
+    let n2 = n ** 2 in
+    if n2 > m then
+      fail ()
+    else if n2 = m then
+      n
+    else
+      try (n + 1)
+  in
+  try 0
+
+let pythagorean m n =
+  let a = choose_int m (n - 1) in
+  let b = choose_int a n in
+  let c = int_sqrt (a ** 2 + b ** 2) in
+  (a, b, c)
+
+let choose_all =
+  handler
+  | x -> [x]
+  | effect (Fail ()) _ -> []
+  | effect (Choose ()) k -> (k true) @ (k false)
+
+let _ =
+  with choose_all handle
+    pythagorean 1 10
+
+let backtrack =
+  handler
+  | effect (Choose ()) k ->
+    handle k true with
+    | effect (Fail ()) _ -> k false
+
+let no_attack (x, y) (x', y') =
+  x <> x' && y <> y' && abs (x - x') <> abs (y - y')
+
+let available x qs =
+  filter
+    (fun y -> forall (no_attack (x, y)) qs)
+    [1; 2; 3; 4; 5; 6; 7; 8]
+
+let rec choose_from_a_list = function
+  | [] -> fail ()
+  | x :: xs -> if choose () then x else choose_from_a_list xs
+
+let rec place x qs =
+  if x = 9 then
+    qs
+  else
+    let y = choose_from_a_list (available x qs) in
+    place (x + 1) ((x, y) :: qs)
+
+let qs =
+  with backtrack handle
+    place 1 []

@@ -266,25 +266,24 @@ and dirt_omega_step ~loc unresolved w dcons =
       { effect_set = ops2; row = Dirt.Row.Param d2 } ) ->
       let w' = DirtCoercionParam.refresh w in
       let d2' = Dirt.Param.refresh d2 in
+      let dirt_sub =
+        Substitution.add_dirt_substitution_e d2
+          { effect_set = Effect.Set.diff ops1 ops2; row = Dirt.Row.Param d2' }
+      in
       let w_ty' =
-        ( { Dirt.effect_set = Effect.Set.empty; row = Dirt.Row.Param d1 },
+        ( (* In case d1 = d2, we need to substitute d1 as well *)
+          Substitution.apply_substitutions_to_dirt dirt_sub
+            { Dirt.effect_set = Effect.Set.empty; row = Dirt.Row.Param d1 },
           {
             Dirt.effect_set = Effect.Set.union ops1 ops2;
             row = Dirt.Row.Param d2';
           } )
       in
-      let sub_d =
-        Substitution.add_dirt_substitution_e d2
-          { effect_set = Effect.Set.diff ops1 ops2; row = Dirt.Row.Param d2' }
-      in
       let sub' =
-        sub_d
+        dirt_sub
         |> Substitution.add_dirt_var_coercion w
-             (* In case d1 = d2, we need to replace d1 as well in order for the
-                substitution to be idempotent *)
-             (Substitution.apply_sub_dirtcoer sub_d
-                (DirtCoercion.unionDirt
-                   (ops1, DirtCoercion.dirtCoercionVar w' w_ty')))
+             (DirtCoercion.unionDirt
+                (ops1, DirtCoercion.dirtCoercionVar w' w_ty'))
       in
       UnresolvedConstraints.apply_substitution sub'
         (UnresolvedConstraints.add_dirt_inequality (w', w_ty') unresolved)

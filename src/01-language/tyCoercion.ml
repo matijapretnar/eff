@@ -85,8 +85,8 @@ let applyCoercion (ty_name, tcoers) =
   let tys, tys' =
     TyParam.Map.bindings tcoers
     |> List.map (fun (p, (tcoer, variance)) ->
-           let t1, t2 = tcoer.ty in
-           ((p, (t1, variance)), (p, (t2, variance))))
+        let t1, t2 = tcoer.ty in
+        ((p, (t1, variance)), (p, (t2, variance))))
     |> List.split
   in
   {

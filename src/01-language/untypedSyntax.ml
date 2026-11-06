@@ -3,7 +3,7 @@ open Utils
 (** Syntax of the core language. *)
 
 type variable = Term.Variable.t
-type effect = Effect.t
+type eff = Effect.t
 type label = Type.Label.t
 type field = Type.Field.t
 
@@ -30,7 +30,7 @@ and plain_expression =
   | Record of expression Type.Field.Map.t
   | Variant of label * expression option
   | Lambda of abstraction
-  | Effect of effect
+  | Effect of eff
   | Handler of handler
 
 and computation = plain_computation located
@@ -46,7 +46,7 @@ and plain_computation =
   | Check of computation
 
 and handler = {
-  effect_clauses : (effect, abstraction2) Assoc.t;
+  effect_clauses : (eff, abstraction2) Assoc.t;
   value_clause : abstraction;
   finally_clause : abstraction;
 }
@@ -127,10 +127,10 @@ and print_expression ?max_level e ppf =
       print ~at_level:1 "%t @[<hov>%t@]" (Type.Label.print lbl)
         (print_expression e)
   | Lambda a -> print "fun %t" (abstraction a)
-  | Handler h ->
-      print "{effect_clauses = %t; value_clause = (%t)}"
-        (Print.sequence " | " effect_clause (Assoc.to_list h.effect_clauses))
-        (abstraction h.value_clause)
+  | Handler { effect_clauses = e; value_clause = v; finally_clause = f } ->
+      print "handler @[<hov>%t@ | %t@ | finally %t@]"
+        (Print.sequence "" effect_clause (Assoc.to_list e))
+        (abstraction v) (abstraction f)
   | Effect eff -> print "%t" (Effect.print eff)
 
 and abstraction (p, c) ppf =
@@ -146,7 +146,7 @@ and letrec_abstraction (v, (p, c)) ppf =
 and case a ppf = Format.fprintf ppf "%t" (abstraction a)
 
 and effect_clause (eff, a2) ppf =
-  Format.fprintf ppf "| %t -> %t" (Effect.print eff) (abstraction2 a2)
+  Format.fprintf ppf "| effect %t %t" (Effect.print eff) (abstraction2 a2)
 
 and abstraction2 (p1, p2, c) ppf =
   Format.fprintf ppf "%t %t -> %t" (print_pattern p1) (print_pattern p2)
