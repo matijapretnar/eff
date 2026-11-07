@@ -61,6 +61,9 @@
   let _three = 3
   let three = _three;;
   
+  let rec _f _x =
+    Call (Decide, (), fun (_y : bool) -> Value (if _y then 2 else 3))
+  in
   force_unsafe
     ((handler
         {
@@ -81,10 +84,7 @@
               | eff' -> fun arg k -> Call (eff', arg, k));
         }
         (fun (_x : int) -> Value _x))
-       (let rec _f _x =
-          Call (Decide, (), fun (_y : bool) -> Value (if _y then 2 else 3))
-        in
-        _f ()))
+       (_f ()))
   ======================================================================
   codegen/capability_benchmarks.eff
   ----------------------------------------------------------------------
@@ -144,7 +144,71 @@
      force_unsafe
        ((handler
            {
-             value_clause = (fun (_id : triple_int_list) -> Value _id);
+             value_clause =
+               (fun (_i : int) ->
+                 Value
+                   (force_unsafe
+                      ((handler
+                          {
+                            value_clause =
+                              (fun (_j : int) ->
+                                Value
+                                  (force_unsafe
+                                     ((handler
+                                         {
+                                           value_clause =
+                                             (fun (_k : int) ->
+                                               Value
+                                                 (if _i + _j + _k = _s then
+                                                    TripleCons
+                                                      ((_i, _j, _k), TripleNil)
+                                                  else TripleNil));
+                                           effect_clauses =
+                                             (fun (type a)
+                                               (type b)
+                                               (eff : (a, b) eff_internal_effect)
+                                               :
+                                               (a -> (b -> _) -> _)
+                                             ->
+                                               match eff with
+                                               | TripleFail ->
+                                                   fun (_ : unit) _k ->
+                                                     Value TripleNil
+                                               | TripleFlip ->
+                                                   fun (() : unit) _k ->
+                                                     Value
+                                                       (_op (* @ *)
+                                                          (coer_arrow coer_refl_ty
+                                                             force_unsafe _k true)
+                                                          (coer_arrow coer_refl_ty
+                                                             force_unsafe _k false))
+                                               | eff' ->
+                                                   fun arg k -> Call (eff', arg, k));
+                                         }
+                                         (fun (_x : triple_int_list) -> Value _x))
+                                        (_choice (_j - 1)))));
+                            effect_clauses =
+                              (fun (type a)
+                                (type b)
+                                (eff : (a, b) eff_internal_effect)
+                                :
+                                (a -> (b -> _) -> _)
+                              ->
+                                match eff with
+                                | TripleFail ->
+                                    fun (_ : unit) _k -> Value TripleNil
+                                | TripleFlip ->
+                                    fun (() : unit) _k ->
+                                      Value
+                                        (_op (* @ *)
+                                           (coer_arrow coer_refl_ty force_unsafe
+                                              _k true)
+                                           (coer_arrow coer_refl_ty force_unsafe
+                                              _k false))
+                                | eff' -> fun arg k -> Call (eff', arg, k));
+                          }
+                          (fun (_x : triple_int_list) -> Value _x))
+                         (_choice (_i - 1)))));
              effect_clauses =
                (fun (type a)
                  (type b)
@@ -163,16 +227,7 @@
                  | eff' -> fun arg k -> Call (eff', arg, k));
            }
            (fun (_x : triple_int_list) -> Value _x))
-          ( _choice _n >>= fun _i ->
-            _choice (_i - 1) >>= fun _j ->
-            _choice (_j - 1) >>= fun _k ->
-            (if _i + _j + _k = _s then Value (_i, _j, _k)
-             else
-               Call
-                 ( TripleFail,
-                   (),
-                   fun (_y : empty) -> Value (match _y with _ -> assert false) ))
-            >>= fun _r -> Value (TripleCons (_r, TripleNil)) ))
+          (_choice _n))
   
   let testTriple = _testTriple
   let _handleTripleWrap = fun ((_x, _y) : int * int) -> _testTriple _x _y
@@ -235,6 +290,19 @@
   
   let _find_solution =
    fun (_n : int) ->
+    let rec _init _x =
+     fun (_acc : intlist) ->
+      if _x = 0 then _acc else _init (_x - 1) (Lst (_x, _acc))
+    in
+    let ____l = _init _n End in
+    let rec _place (_x, _qs) =
+      if _x = _n + 1 then Value (Some _qs)
+      else
+        Call
+          ( Select,
+            _available _x _qs ____l,
+            fun (_y : int) -> _place (_x + 1, Cons ((_x, _y), _qs)) )
+    in
     force_unsafe
       ((handler
           {
@@ -265,20 +333,7 @@
                 | eff' -> fun arg k -> Call (eff', arg, k));
           }
           (fun (_x : option) -> Value _x))
-         (let rec _init _x =
-           fun (_acc : intlist) ->
-            if _x = 0 then _acc else _init (_x - 1) (Lst (_x, _acc))
-          in
-          let ____l = _init _n End in
-          let rec _place (_x, _qs) =
-            if _x = _n + 1 then Value (Some _qs)
-            else
-              Call
-                ( Select,
-                  _available _x _qs ____l,
-                  fun (_y : int) -> _place (_x + 1, Cons ((_x, _y), _qs)) )
-          in
-          _place (1, Nil)))
+         (_place (1, Nil)))
   
   let find_solution = _find_solution
   
@@ -505,12 +560,11 @@
   let _f =
    fun (_y : int_list) ->
     begin match _y with
-    | Nil -> 1
-    | Cons (_x, Nil) -> _x
-    | Cons (_, Cons (_y, Nil)) -> _y
-    | Cons (_x, _) -> _x
+    | Nil -> 1 + 10
+    | Cons (_x, Nil) -> _x + 10
+    | Cons (_, Cons (_y, Nil)) -> _y + 10
+    | Cons (_x, _) -> _x + 10
     end
-    + 10
   
   let f = _f;;
   
@@ -565,25 +619,7 @@
   ;;
   
   let rec _g _x = if _x = 0 then 1 else _g (_x - 1) in
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_id : int) -> Value _id);
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Eff ->
-                  fun (() : unit) _k ->
-                    Value (coer_arrow coer_refl_ty force_unsafe _k () * 2)
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : int) -> Value _x))
-       (Value (_g 5)))
+  _g 5
   ======================================================================
   codegen/handler_beta_reduction.eff
   ----------------------------------------------------------------------
@@ -609,25 +645,7 @@
   
   type (_, _) eff_internal_effect += Eff : (int, int) eff_internal_effect;;
   
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x : int) -> Value (_x + 4));
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Eff ->
-                  fun (_x : int) _k ->
-                    Value (coer_arrow coer_refl_ty force_unsafe _k (_x + 2))
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : int) -> Value _x))
-       (Call (Eff, 1 + 3, fun (_y : int) -> Value _y)))
+  1 + 3 + 2 + 4
   ======================================================================
   codegen/ifthenelse.eff
   ----------------------------------------------------------------------
@@ -963,22 +981,7 @@
   type (_, _) eff_internal_effect += Op1 : (int, unit) eff_internal_effect
   type (_, _) eff_internal_effect += Op2 : (int, unit) eff_internal_effect;;
   
-  (handler
-     {
-       value_clause = (fun (_x : unit) -> Value _x);
-       effect_clauses =
-         (fun (type a)
-           (type b)
-           (eff : (a, b) eff_internal_effect)
-           :
-           (a -> (b -> _) -> _)
-         ->
-           match eff with
-           | Op2 -> fun (_n : int) _k -> _k ()
-           | eff' -> fun arg k -> Call (eff', arg, k));
-     }
-     (fun (_x : unit) -> Value _x))
-    (Call (Op1, 1, fun (_y : unit) -> Value _y))
+  Call (Op1, 1, fun (_y : unit) -> Value _y)
   ======================================================================
   codegen/let_list_to_bind.eff
   ----------------------------------------------------------------------
@@ -1254,7 +1257,7 @@
     force_unsafe
       ((handler
           {
-            value_clause = (fun (_id : int) -> Value _id);
+            value_clause = (fun (_x : int) -> Value _x);
             effect_clauses =
               (fun (type a)
                 (type b)
@@ -1269,19 +1272,7 @@
                 | eff' -> fun arg k -> Call (eff', arg, k));
           }
           (fun (_x : int) -> Value _x))
-         ((handler
-             {
-               value_clause = (fun (_x : int) -> Value _x);
-               effect_clauses =
-                 (fun (type a)
-                   (type b)
-                   (eff : (a, b) eff_internal_effect)
-                   :
-                   (a -> (b -> _) -> _)
-                 -> match eff with eff' -> fun arg k -> Call (eff', arg, k));
-             }
-             (fun (_x : int) -> Value _x))
-            (_simple ())))
+         (_simple ()))
   
   let test_nested = _test_nested
   
@@ -1380,25 +1371,7 @@
   
   type (_, _) eff_internal_effect += Op1 : (int, int) eff_internal_effect;;
   
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x : int) -> Value _x);
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Op1 ->
-                  fun (_x : int) _k ->
-                    Value (coer_arrow coer_refl_ty force_unsafe _k 11)
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : int) -> Value _x))
-       (Call (Op1, 5, fun (_y : int) -> Value _y)))
+  11
   ======================================================================
   codegen/one_input.eff
   ----------------------------------------------------------------------
@@ -1424,27 +1397,8 @@
   
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect;;
   
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x : int) -> Value _x);
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Decide ->
-                  fun (() : unit) _k ->
-                    Value
-                      (coer_arrow coer_refl_ty force_unsafe _k true
-                      + coer_arrow coer_refl_ty force_unsafe _k false)
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : int) -> Value _x))
-       (Call (Decide, (), fun (_y : bool) -> Value (if _y then 10 else 20))))
+  let _k = fun (_y : bool) -> if _y then 10 else 20 in
+  _k true + _k false
   ======================================================================
   codegen/optimize_pattern_match.eff
   ----------------------------------------------------------------------
@@ -1550,6 +1504,10 @@
   
   type (_, _) eff_internal_effect += WriteInt : (int, unit) eff_internal_effect;;
   
+  let rec _f _x =
+    Call
+      (WriteInt, _x, fun (_y : unit) -> if _x = 0 then Value () else _f (_x - 1))
+  in
   force_unsafe
     ((handler
         {
@@ -1568,13 +1526,7 @@
               | eff' -> fun arg k -> Call (eff', arg, k));
         }
         (fun (_x : int) -> Value _x))
-       (let rec _f _x =
-          Call
-            ( WriteInt,
-              _x,
-              fun (_y : unit) -> if _x = 0 then Value () else _f (_x - 1) )
-        in
-        _f 10))
+       (_f 10))
   ======================================================================
   codegen/parser.eff
   ----------------------------------------------------------------------
@@ -1966,6 +1918,9 @@
     | IntCons (_z, _zs) -> IntCons (_z, _concat _zs _x)
     end
   in
+  let rec _f _x =
+    Call (Decide, (), fun (_y : bool) -> Value (if _y then 2 else 3))
+  in
   force_unsafe
     ((handler
         {
@@ -1987,10 +1942,7 @@
               | eff' -> fun arg k -> Call (eff', arg, k));
         }
         (fun (_x : intlist) -> Value _x))
-       (let rec _f _x =
-          Call (Decide, (), fun (_y : bool) -> Value (if _y then 2 else 3))
-        in
-        _f ()))
+       (_f ()))
   ======================================================================
   codegen/pm-3_passes.eff
   ----------------------------------------------------------------------
@@ -2024,36 +1976,22 @@
     | IntCons (_z, _zs) -> IntCons (_z, _concat _zs _x)
     end
   in
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x : int) -> Value (IntCons (_x, IntNil)));
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Decide ->
-                  fun (() : unit) _k ->
-                    Value
-                      (_concat
-                         (coer_arrow coer_refl_ty force_unsafe _k true)
-                         (coer_arrow coer_refl_ty force_unsafe _k false))
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : intlist) -> Value _x))
-       (Call
-          ( Decide,
-            (),
-            fun (_y : bool) ->
-              Call
-                ( Decide,
-                  (),
-                  fun (_y : bool) ->
-                    Value ((if _y then 10 else 20) - if _y then 0 else 5) ) )))
+  let _k =
+   fun (_y : bool) ->
+    if _y then
+      let _k =
+       fun (_y : bool) ->
+        if _y then IntCons (10 - 0, IntNil) else IntCons (10 - 5, IntNil)
+      in
+      _concat (_k true) (_k false)
+    else
+      let _k =
+       fun (_y : bool) ->
+        if _y then IntCons (20 - 0, IntNil) else IntCons (20 - 5, IntNil)
+      in
+      _concat (_k true) (_k false)
+  in
+  _concat (_k true) (_k false)
   ======================================================================
   codegen/poly_bind.eff
   ----------------------------------------------------------------------
@@ -2482,52 +2420,9 @@
   
   type (_, _) eff_internal_effect += Ping : (unit, unit) eff_internal_effect
   
-  let _test_simple =
-   fun (_x : 'ty) ->
-    force_unsafe
-      ((handler
-          {
-            value_clause = (fun (_id : unit * int) -> Value _id);
-            effect_clauses =
-              (fun (type a)
-                (type b)
-                (eff : (a, b) eff_internal_effect)
-                :
-                (a -> (b -> _) -> _)
-              ->
-                match eff with
-                | Ping ->
-                    fun (() : unit) _k ->
-                      Value (coer_arrow coer_refl_ty force_unsafe _k ())
-                | eff' -> fun arg k -> Call (eff', arg, k));
-          }
-          (fun (_x : unit * int) -> Value _x))
-         (Call (Ping, (), fun (_y : unit) -> Value (_y, 1))))
-  
+  let _test_simple = fun (_x : 'ty) -> ((), 1)
   let test_simple = _test_simple
-  
-  let _test_simple2 =
-   fun (() : unit) ->
-    force_unsafe
-      ((handler
-          {
-            value_clause = (fun (_id : unit) -> Value _id);
-            effect_clauses =
-              (fun (type a)
-                (type b)
-                (eff : (a, b) eff_internal_effect)
-                :
-                (a -> (b -> _) -> _)
-              ->
-                match eff with
-                | Ping ->
-                    fun (() : unit) _k ->
-                      Value (coer_arrow coer_refl_ty force_unsafe _k ())
-                | eff' -> fun arg k -> Call (eff', arg, k));
-          }
-          (fun (_x : unit) -> Value _x))
-         (Call (Ping, (), fun (_y : unit) -> Value _y)))
-  
+  let _test_simple2 = fun (() : unit) -> ()
   let test_simple2 = _test_simple2
   ======================================================================
   codegen/reuse_toplevel_handler.eff
@@ -2633,19 +2528,7 @@
     | Write : (string * string, unit) eff_internal_effect
   ;;
   
-  (handler
-     {
-       value_clause = (fun (_x : unit) -> Value 42);
-       effect_clauses =
-         (fun (type a)
-           (type b)
-           (eff : (a, b) eff_internal_effect)
-           :
-           (a -> (b -> _) -> _)
-         -> match eff with eff' -> fun arg k -> Call (eff', arg, k));
-     }
-     (fun (_x : int) -> Value _x))
-    (Call (Print, "hello\n", fun (_y : unit) -> Value _y))
+  Call (Print, "hello\n", fun (_y : unit) -> Value 42)
   ======================================================================
   codegen/test1.eff
   ----------------------------------------------------------------------
@@ -2787,24 +2670,7 @@
   type (_, _) eff_internal_effect += Op1 : (int, int) eff_internal_effect
   type (_, _) eff_internal_effect += Op2 : (int, int) eff_internal_effect;;
   
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x : int) -> Value _x);
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Op1 -> fun (_n : int) _k -> Value 1
-              | Op2 -> fun (_n : int) _k -> Value 2
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : int) -> Value _x))
-       (Call (Op1, 1, fun (_y : int) -> Call (Op2, 2, fun (_y : int) -> Value _y))))
+  1
   ======================================================================
   codegen/test14.eff
   ----------------------------------------------------------------------
@@ -3228,23 +3094,7 @@
   
   type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect;;
   
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x : int) -> Value _x);
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Op -> fun (_n : int) _k -> Value 2
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : int) -> Value _x))
-       (Value 1))
+  1
   ======================================================================
   codegen/test7.eff
   ----------------------------------------------------------------------
@@ -3270,23 +3120,7 @@
   
   type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect;;
   
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x : int) -> Value _x);
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Op -> fun (_n : int) _k -> Value 2
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : int) -> Value _x))
-       (Call (Op, 1, fun (_y : int) -> Value _y)))
+  2
   ======================================================================
   codegen/test8.eff
   ----------------------------------------------------------------------
@@ -3312,25 +3146,7 @@
   
   type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect;;
   
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x : int) -> Value _x);
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Op ->
-                  fun (_n : int) _k ->
-                    Value (coer_arrow coer_refl_ty force_unsafe _k 2)
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : int) -> Value _x))
-       (Call (Op, 1, fun (_y : int) -> Value _y)))
+  2
   ======================================================================
   codegen/test9.eff
   ----------------------------------------------------------------------
@@ -3356,25 +3172,7 @@
   
   type (_, _) eff_internal_effect += Op : (int, int) eff_internal_effect;;
   
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x : int) -> Value _x);
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Op ->
-                  fun (_n : int) _k ->
-                    Value (coer_arrow coer_refl_ty force_unsafe _k _n)
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : int) -> Value _x))
-       (Call (Op, 1, fun (_y : int) -> Value _y)))
+  1
   ======================================================================
   codegen/top-letrec_fails.eff
   ----------------------------------------------------------------------
@@ -4179,26 +3977,6 @@
     | Cons (_x, _xs) -> Cons (_x, _op (* @ *) _xs _ys)
     end
   in
-  force_unsafe
-    ((handler
-        {
-          value_clause = (fun (_x : int) -> Value (Cons (_x, Nil)));
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Decide ->
-                  fun (() : unit) _k ->
-                    Value
-                      (_op (* @ *)
-                         (coer_arrow coer_refl_ty force_unsafe _k true)
-                         (coer_arrow coer_refl_ty force_unsafe _k false))
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : int_list) -> Value _x))
-       (Call (Decide, (), fun (_y : bool) -> Value (if _y then 10 else 20))))
+  let _k = fun (_y : bool) -> if _y then Cons (10, Nil) else Cons (20, Nil) in
+  _op (* @ *) (_k true) (_k false)
 -------------------------------------------------------------------------------
