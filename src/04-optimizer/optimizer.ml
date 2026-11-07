@@ -1,12 +1,6 @@
 open Utils
 open Language
 
-type return_clause_kind =
-  | FixedReturnClause of Term.abstraction
-  | VaryingReturnClause
-
-exception ReturnClauseNotFixed of Language.Term.Variable.t
-
 type optimization_config = {
   specialize_functions : bool;
   eliminate_coercions : bool;
@@ -15,34 +9,13 @@ type optimization_config = {
   purity_aware_translation : bool;
 }
 
-type state = {
-  declared_functions : (Language.Term.Variable.t, Term.abstraction) Assoc.t;
-  fuel : int;
-  (* Cache of already specialized functions *)
-  specialized_functions :
-    ( Term.EffectFingerprint.t * Language.Term.Variable.t,
-      Term.variable * Type.ty * return_clause_kind )
-    Assoc.t;
-  config : optimization_config;
-}
+type state = { fuel : int; config : optimization_config }
 
-let initial_state config =
-  {
-    declared_functions = Assoc.empty;
-    fuel = !Config.optimization_fuel;
-    specialized_functions = Assoc.empty;
-    config;
-  }
+let initial_state config = { fuel = !Config.optimization_fuel; config }
 
 let reduce_if_fuel reduce_term state term =
   if state.fuel > 0 then reduce_term { state with fuel = state.fuel - 1 } term
   else term
-
-let add_function state x abs =
-  {
-    state with
-    declared_functions = Assoc.update x abs state.declared_functions;
-  }
 
 (* Optimization functions *)
 
@@ -286,27 +259,6 @@ and bind_abstraction state { term = pat, comp; _ } bind =
 
 and handle_computation state hnd comp =
   match comp.term with
-  | Term.Apply ({ term = Var { variable = f; _ }; _ }, expr)
-    when Option.is_some
-           (Assoc.lookup
-              (hnd.term.Term.effect_clauses.fingerprint, f)
-              state.specialized_functions)
-         && state.config.specialize_functions -> (
-      let value_clause = hnd.term.Term.value_clause in
-      match
-        Assoc.lookup
-          (hnd.term.Term.effect_clauses.fingerprint, f)
-          state.specialized_functions
-      with
-      | Some (f', ty, FixedReturnClause value_clause') ->
-          if value_clause = value_clause' then
-            Term.apply (Term.mono_var f' ty, expr)
-          else raise (ReturnClauseNotFixed f)
-      | Some (f', ty, VaryingReturnClause) ->
-          Term.apply
-            ( Term.mono_var f' ty,
-              Term.tuple [ expr; Term.lambda hnd.term.Term.value_clause ] )
-      | None -> assert false)
   | _ when not state.config.handler_reductions ->
       Term.handle (Term.handler hnd, comp)
   | Term.Match (expr, cases) ->
@@ -415,122 +367,11 @@ and reduce_computation' state comp =
            (Term.apply (expr, cast_expression state e ty_coer)))
         drty_coer
   | Term.LetRec (defs, c) -> (
-      let state' =
-        Assoc.fold_right
-          (fun (v, abs) state -> add_function state v abs)
-          defs state
-      in
-      let c' = optimize_computation state' c in
+      let c' = optimize_computation state c in
       match keep_used_bindings defs c' with
       | [] -> c'
       | defs' -> Term.letRec (Assoc.of_list defs', c'))
   | Term.Bind (comp, abs) -> bind_computation state comp abs
-  | Term.Handle ({ term = Term.Handler hnd; _ }, comp) -> (
-      let fingerprint = hnd.term.effect_clauses.fingerprint in
-      let drty_in, _ = hnd.ty in
-      let unspecialized_declared_functions =
-        List.filter
-          (fun (f, { ty = _, drty_out; _ }) ->
-            Type.equal_dirty drty_in drty_out
-            && Option.is_none
-                 (Assoc.lookup (fingerprint, f) state.specialized_functions))
-          (Assoc.to_list state.declared_functions)
-      in
-      let attempt_specialization ret_clause_kinds =
-        let add_specialized specialized (f, abs) =
-          let f' = Language.Term.Variable.refresh f in
-          let ret_clause_kind =
-            match Assoc.lookup f ret_clause_kinds with
-            | Some ret_clause_kind -> ret_clause_kind
-            | None -> assert false
-          in
-          let (ty_arg, _), ((ty_in, _), drty_out) = (abs.ty, hnd.ty) in
-          let ty' =
-            match ret_clause_kind with
-            | FixedReturnClause _ -> Type.arrow (ty_arg, drty_out)
-            | VaryingReturnClause ->
-                Type.arrow
-                  (Type.tuple [ ty_arg; Type.arrow (ty_in, drty_out) ], drty_out)
-          in
-
-          Assoc.update (fingerprint, f) (f', ty', ret_clause_kind) specialized
-        in
-        let specialized_functions' =
-          List.fold_left add_specialized state.specialized_functions
-            unspecialized_declared_functions
-        in
-        let state' =
-          { state with specialized_functions = specialized_functions' }
-        in
-        (* TODO: specialize only functions that are used, not just all with matching types *)
-        let spec_rec_defs =
-          List.map
-            (fun (f, ({ term = pat, comp; _ } as abs)) ->
-              match Assoc.lookup (fingerprint, f) specialized_functions' with
-              | Some (f', _ty, FixedReturnClause _) ->
-                  (f', handle_abstraction state' hnd abs)
-              | Some (f', ty, VaryingReturnClause) -> (
-                  match ty with
-                  | {
-                   term =
-                     Type.Arrow
-                       ( {
-                           term =
-                             Type.Tuple
-                               [
-                                 _;
-                                 ({ term = Type.Arrow (ty_in, _); _ } as ty_cont);
-                               ];
-                           _;
-                         },
-                         _ );
-                   _;
-                  } ->
-                      let x_pat, x_var = Term.fresh_variable "x" ty_in
-                      and k_pat, k_var = Term.fresh_variable "k" ty_cont in
-                      let hnd' =
-                        {
-                          hnd with
-                          term =
-                            {
-                              hnd.term with
-                              Term.value_clause =
-                                Term.abstraction
-                                  (x_pat, Term.apply (k_var, x_var));
-                            };
-                        }
-                      in
-                      let abs' =
-                        Term.abstraction (Term.pTuple [ pat; k_pat ], comp)
-                      in
-                      (f', handle_abstraction state' hnd' abs')
-                  | _ -> assert false)
-              | _ -> assert false)
-            unspecialized_declared_functions
-        in
-        (state', spec_rec_defs)
-      in
-      let rec find_best_specializations ret_clause_kinds =
-        try attempt_specialization ret_clause_kinds
-        with ReturnClauseNotFixed f ->
-          let ret_clause_kinds' =
-            Assoc.update f VaryingReturnClause ret_clause_kinds
-          in
-          find_best_specializations ret_clause_kinds'
-      in
-
-      let state', spec_rec_defs =
-        find_best_specializations
-          (Assoc.map_of_list
-             (fun (f, _) -> (f, FixedReturnClause hnd.term.value_clause))
-             unspecialized_declared_functions)
-      in
-      let comp' = handle_computation state' hnd comp in
-      match keep_used_bindings (Assoc.of_list spec_rec_defs) comp' with
-      | [] -> comp'
-      | defs' ->
-          Term.letRec (Assoc.of_list defs', comp')
-          |> optimize_computation state')
   | Term.Handle
       ( {
           term =
@@ -568,17 +409,7 @@ let process_top_let state defs =
           (pat, params, cnstrs, optimize_computation state comp))
         defs
     in
-    let state' =
-      List.fold_left
-        (fun state (pat, _, _, comp) ->
-          match (pat, comp) with
-          | ( { term = Term.PVar f; _ },
-              { term = Term.Value { term = Term.Lambda abs; _ }; _ } ) ->
-              add_function state f abs
-          | _ -> state)
-        state defs'
-    in
-    (state', defs')
+    (state, defs')
   else (state, defs)
 
 let optimize_top_rec_definitions state defs =
@@ -590,10 +421,5 @@ let optimize_top_rec_definitions state defs =
 let process_top_let_rec state defs =
   if !Config.enable_optimization then
     let defs' = optimize_top_rec_definitions state defs in
-    let state' =
-      Assoc.fold_left
-        (fun state (f, (_, _, abs)) -> add_function state f abs)
-        state defs'
-    in
-    (state', defs')
+    (state, defs')
   else (state, defs)
