@@ -9,9 +9,33 @@ type optimization_config = {
   purity_aware_translation : bool;
 }
 
-type state = { fuel : int; config : optimization_config }
+type state = {
+  fuel : int;
+  config : optimization_config;
+  rec_functions : (Term.variable, Term.abstraction) Assoc.t;
+      (** The local recursive functions in scope, for With-Rec-Fun. Only groups
+          with one definition: [let rec f x = M in N] is the paper's
+          [let f = rec f x. M in N], and a group of several mutually recursive
+          definitions has no counterpart in the paper. *)
+  specialising : Term.variable list;
+      (** The functions whose body With-Rec-Fun is rewriting under a handler.
+          Inside, they are not specialised again, which is how the paper's
+          Termination paragraph stops specialisation from diverging. *)
+}
 
-let initial_state config = { fuel = !Config.optimization_fuel; config }
+let initial_state config =
+  {
+    fuel = !Config.optimization_fuel;
+    config;
+    rec_functions = Assoc.empty;
+    specialising = [];
+  }
+
+let add_rec_definitions state defs =
+  match Assoc.to_list defs with
+  | [ (f, abs) ] ->
+      { state with rec_functions = Assoc.update f abs state.rec_functions }
+  | _ -> state
 
 let reduce_if_fuel reduce_term state term =
   if state.fuel > 0 then reduce_term { state with fuel = state.fuel - 1 } term
@@ -109,6 +133,119 @@ let recast_computation hnd comp =
       else None
   | _ -> None
 
+(* Function specialisation, With-Rec-Fun
+
+   For a handled call [with H handle f v] of a local recursive function
+   [let rec f x = M], the rule makes a new recursive function [g'] whose body
+   is [M] with the handler pushed in and rewritten. Recursive calls of [f] that
+   end up under a handler with the same operation clauses are replaced by
+   calls of [g'], which ties the knot. That replacement is the paper's
+   [extract]. It has two modes:
+
+   - [Fixed]: [g'] is specialised for all of [H], so it takes only [x]. It ties
+     the knot only for calls under a handler with the same return clause, which
+     is the case for tail calls.
+   - [Varying]: [g'] is specialised for the operation clauses of [H] only, and
+     takes the return clause as an extra argument [k]. It ties the knot also
+     where With-Do has moved a continuation into the return clause, but [g']
+     then carries [k] at run time.
+
+   Both are correct, so choosing between them is strategy: we use [Fixed]
+   unless it leaves a handled call of [f] that [Varying] would replace.
+
+   The paper copies [rec f x. M] to the call site with Let-Val, and replaces
+   calls that [extract] leaves by calls of a fresh copy [f']. We look [f] up in
+   [state.rec_functions] instead, and leave such calls to [f] itself, which is
+   still in scope. Both differ from the paper only in sharing, not in meaning.
+
+   The paper defines [extract] on computations and copies values unchanged. We
+   also enter values, because a handler clause that calls its continuation
+   under a [fun], such as [Get] in a state handler, puts the recursive call
+   inside a function body. Replacing [with H handle f w] by [g' w] is correct
+   in any context where [g'] is in scope. *)
+
+type specialisation_mode = Fixed | Varying
+
+let extract mode hnd f g' ~left =
+  let rec extract_comp comp =
+    match comp.term with
+    | Term.Handle
+        ( { term = Term.Handler h'; _ },
+          { term = Term.Apply ({ term = Term.Var { variable; _ }; _ }, w); _ }
+        )
+      when variable = f && Term.same_operation_clauses h' hnd -> (
+        let g_arg_ty, g_out_ty =
+          match g'.ty.term with
+          | Type.Arrow (ty, drty) -> (ty, drty)
+          | _ -> assert false
+        in
+        match mode with
+        | Fixed
+          when Term.same_return_clause h' hnd
+               && Type.equal_ty w.ty g_arg_ty
+               && Type.equal_dirty comp.ty g_out_ty ->
+            Term.apply (g', w)
+        | Varying ->
+            let arg =
+              Term.tuple [ Term.lambda (extract_abs h'.term.value_clause); w ]
+            in
+            if
+              Type.equal_ty arg.ty g_arg_ty && Type.equal_dirty comp.ty g_out_ty
+            then Term.apply (g', arg)
+            else comp
+        | Fixed ->
+            left := true;
+            comp)
+    | Term.Value e -> { comp with term = Term.Value (extract_expr e) }
+    | Term.LetVal (e, abs) -> Term.letVal (extract_expr e, extract_abs abs)
+    | Term.LetRec (defs, c) ->
+        Term.letRec (Assoc.map extract_abs defs, extract_comp c)
+    | Term.Match (e, cases) ->
+        Term.match_ (extract_expr e, List.map extract_abs cases) comp.ty
+    | Term.Apply (e1, e2) -> Term.apply (extract_expr e1, extract_expr e2)
+    | Term.Handle (e, c) -> Term.handle (extract_expr e, extract_comp c)
+    | Term.Call (eff, e, abs) -> Term.call (eff, extract_expr e, extract_abs abs)
+    | Term.Bind (c, abs) -> Term.bind (extract_comp c, extract_abs abs)
+    | Term.CastComp (c, coer) -> Term.castComp (extract_comp c, coer)
+    | Term.Check (loc, c) -> Term.check (loc, extract_comp c)
+  and extract_expr expr =
+    match expr.term with
+    | Term.Var _ | Term.Const _ -> expr
+    | Term.Tuple es -> Term.tuple (List.map extract_expr es)
+    | Term.Record flds ->
+        Term.record expr.ty (Type.Field.Map.map extract_expr flds)
+    | Term.Variant (lbl, e) ->
+        Term.variant (lbl, Option.map extract_expr e) expr.ty
+    | Term.Lambda abs -> Term.lambda (extract_abs abs)
+    | Term.Handler h -> Term.handler (extract_handler h)
+    | Term.HandlerWithFinally { handler_clauses; finally_clause } ->
+        Term.handlerWithFinally
+          (extract_handler handler_clauses)
+          (extract_abs finally_clause)
+    | Term.CastExp (e, coer) -> Term.castExp (extract_expr e, coer)
+  and extract_abs abs =
+    let pat, comp = abs.term in
+    Term.abstraction (pat, extract_comp comp)
+  and extract_abs2 abs2 =
+    let pat1, pat2, comp = abs2.term in
+    Term.abstraction2 (pat1, pat2, extract_comp comp)
+  and extract_handler h =
+    {
+      h with
+      term =
+        {
+          Term.value_clause = extract_abs h.term.value_clause;
+          Term.effect_clauses =
+            {
+              h.term.effect_clauses with
+              effect_part =
+                Assoc.map extract_abs2 h.term.effect_clauses.effect_part;
+            };
+        };
+    }
+  in
+  extract_comp
+
 let rec optimize_expression state expr =
   (* Print.debug "Optimizing expression: %t" (Term.print_expression expr); *)
   let expr' = optimize_expression' state expr in
@@ -167,8 +304,10 @@ and optimize_computation' state comp =
       Term.letVal
         (optimize_expression state expr, optimize_abstraction state abs)
   | Term.LetRec (defs, comp) ->
+      let state' = add_rec_definitions state defs in
+      let defs' = optimize_rec_definitions state' defs in
       Term.letRec
-        (optimize_rec_definitions state defs, optimize_computation state comp)
+        (defs', optimize_computation (add_rec_definitions state defs') comp)
   | Term.Match (expr, cases) ->
       Term.match_
         ( optimize_expression state expr,
@@ -273,6 +412,15 @@ and bind_abstraction state { term = pat, comp; _ } bind =
 
 and handle_computation state hnd comp =
   match comp.term with
+  | Term.Apply ({ term = Term.Var { variable = f; instantiation; _ }; _ }, v)
+    when state.config.specialize_functions
+         && (not (List.mem f state.specialising))
+         && Assoc.lookup f state.rec_functions <> None
+         && Type.equal_dirty comp.ty (fst hnd.ty) -> (
+      match Assoc.lookup f state.rec_functions with
+      | Some abs ->
+          with_rec_fun state hnd f (Term.apply_sub_abs instantiation abs) v
+      | None -> assert false)
   | _ when not state.config.handler_reductions ->
       Term.handle (Term.handler hnd, comp)
   | Term.Match (expr, cases) ->
@@ -283,7 +431,8 @@ and handle_computation state hnd comp =
       Term.letVal (expr, handle_abstraction state hnd abs)
       |> optimize_computation state
   | LetRec (defs, comp) ->
-      Term.letRec (defs, handle_computation state hnd comp)
+      Term.letRec
+        (defs, handle_computation (add_rec_definitions state defs) hnd comp)
       |> optimize_computation state
   | Call (eff, expr, abs) -> (
       let handled_abs = handle_abstraction state hnd abs in
@@ -325,6 +474,52 @@ and handle_computation state hnd comp =
 
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
+
+(* With-Rec-Fun; see the comment at [extract] *)
+and with_rec_fun state hnd f abs v =
+  let { term = pat, body; ty = ty_arg, _ } =
+    Term.refresh_abstraction Assoc.empty abs
+  in
+  let (ty_in, _), drty_out = hnd.ty in
+  let state' = { state with specialising = f :: state.specialising } in
+  let attempt mode =
+    let g_arg_ty, hnd_m, g_pat, g_arg =
+      match mode with
+      | Fixed -> (ty_arg, hnd, pat, v)
+      | Varying ->
+          let k_ty = Type.arrow (ty_in, drty_out) in
+          let k_pat, k_var = Term.fresh_variable "k" k_ty in
+          let y_pat, y_var = Term.fresh_variable "y" ty_in in
+          let hnd_k =
+            Term.handler_with_new_value_clause hnd
+              (Term.abstraction (y_pat, Term.apply (k_var, y_var)))
+          in
+          ( Type.tuple [ k_ty; ty_arg ],
+            hnd_k,
+            Term.pTuple [ k_pat; pat ],
+            Term.tuple [ Term.lambda hnd.term.value_clause; v ] )
+    in
+    let g = Term.Variable.refresh f in
+    let g_var = Term.mono_var g (Type.arrow (g_arg_ty, drty_out)) in
+    let left = ref false in
+    let body' =
+      extract mode hnd f g_var ~left (handle_computation state' hnd_m body)
+    in
+    let comp =
+      Term.letRec
+        ( Assoc.of_list [ (g, Term.abstraction (g_pat, body')) ],
+          Term.apply (g_var, g_arg) )
+    in
+    (comp, !left)
+  in
+  let comp =
+    match attempt Fixed with
+    | comp, false -> comp
+    | _, true -> fst (attempt Varying)
+  in
+  (* Still with [f] in [specialising]: calls of [f] that [extract] has left
+     are not specialised again. *)
+  optimize_computation state' comp
 
 and beta_reduce state ({ term = _, comp; _ } as abs) expr =
   (* Print.debug "Beta reduce: %t; %t"
