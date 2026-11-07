@@ -82,6 +82,9 @@ and computation' =
   | Value of expression
   | LetVal of expression * abstraction
   | LetRec of rec_definitions * computation
+      (** With one definition, [let rec f x = M in N] is the paper's
+          [let f = rec f x. M in N]. The paper has no mutual recursion, so a
+          group of several definitions is outside it. *)
   | Match of expression * abstraction list
   | Apply of expression * expression
   | Handle of expression * computation
@@ -182,6 +185,140 @@ let handler_with_smaller_input_dirt hnd dcoer =
   let drt, drt_in' = dcoer.ty in
   assert (Type.equal_dirt drt_in drt_in');
   { term = hnd.term; ty = ((ty_in, drt), drty_out) }
+
+(* Equality up to renaming of bound term variables (alpha-equivalence), which
+   is how the paper compares handler clauses in With-Rec-Fun. The map [env]
+   sends each bound variable of the first term to the corresponding one of the
+   second. Types, coercions and instantiations are compared structurally,
+   which may say [false] for equal ones; that only makes With-Rec-Fun tie the
+   knot less often. A representation of binders with alpha-equivalence would
+   replace these functions. *)
+let rec alpha_pattern env p1 p2 =
+  match (p1.term, p2.term) with
+  | PVar x1, PVar x2 -> Some (Variable.Map.add x1 x2 env)
+  | PAs (p1, x1), PAs (p2, x2) ->
+      Option.map (Variable.Map.add x1 x2) (alpha_pattern env p1 p2)
+  | PTuple ps1, PTuple ps2 -> alpha_patterns env ps1 ps2
+  | PRecord flds1, PRecord flds2 ->
+      let flds1 = Type.Field.Map.bindings flds1
+      and flds2 = Type.Field.Map.bindings flds2 in
+      if List.map fst flds1 = List.map fst flds2 then
+        alpha_patterns env (List.map snd flds1) (List.map snd flds2)
+      else None
+  | PVariant (lbl1, None), PVariant (lbl2, None) when lbl1 = lbl2 -> Some env
+  | PVariant (lbl1, Some p1), PVariant (lbl2, Some p2) when lbl1 = lbl2 ->
+      alpha_pattern env p1 p2
+  | PConst c1, PConst c2 when c1 = c2 -> Some env
+  | PNonbinding, PNonbinding -> Some env
+  | _ -> None
+
+and alpha_patterns env ps1 ps2 =
+  match (ps1, ps2) with
+  | [], [] -> Some env
+  | p1 :: ps1, p2 :: ps2 -> (
+      match alpha_pattern env p1 p2 with
+      | Some env -> alpha_patterns env ps1 ps2
+      | None -> None)
+  | _ -> None
+
+let alpha_list alpha env xs1 xs2 =
+  List.length xs1 = List.length xs2 && List.for_all2 (alpha env) xs1 xs2
+
+let rec alpha_expression env e1 e2 =
+  match (e1.term, e2.term) with
+  | Var v1, Var v2 ->
+      let x1 =
+        Variable.Map.find_opt v1.variable env
+        |> Option.value ~default:v1.variable
+      in
+      x1 = v2.variable && v1.instantiation = v2.instantiation
+  | Const c1, Const c2 -> c1 = c2
+  | Tuple es1, Tuple es2 -> alpha_list alpha_expression env es1 es2
+  | Record flds1, Record flds2 ->
+      let flds1 = Type.Field.Map.bindings flds1
+      and flds2 = Type.Field.Map.bindings flds2 in
+      List.map fst flds1 = List.map fst flds2
+      && alpha_list alpha_expression env (List.map snd flds1)
+           (List.map snd flds2)
+  | Variant (lbl1, None), Variant (lbl2, None) -> lbl1 = lbl2
+  | Variant (lbl1, Some e1), Variant (lbl2, Some e2) ->
+      lbl1 = lbl2 && alpha_expression env e1 e2
+  | Lambda abs1, Lambda abs2 -> alpha_abstraction env abs1 abs2
+  | Handler h1, Handler h2 -> alpha_handler env h1 h2
+  | HandlerWithFinally h1, HandlerWithFinally h2 ->
+      alpha_handler env h1.handler_clauses h2.handler_clauses
+      && alpha_abstraction env h1.finally_clause h2.finally_clause
+  | CastExp (e1, coer1), CastExp (e2, coer2) ->
+      coer1 = coer2 && alpha_expression env e1 e2
+  | _ -> false
+
+and alpha_computation env c1 c2 =
+  match (c1.term, c2.term) with
+  | Value e1, Value e2 -> alpha_expression env e1 e2
+  | LetVal (e1, abs1), LetVal (e2, abs2) ->
+      alpha_expression env e1 e2 && alpha_abstraction env abs1 abs2
+  | LetRec (defs1, c1), LetRec (defs2, c2) ->
+      let defs1 = Assoc.to_list defs1 and defs2 = Assoc.to_list defs2 in
+      List.length defs1 = List.length defs2
+      &&
+      let env =
+        List.fold_left2
+          (fun env (f1, _) (f2, _) -> Variable.Map.add f1 f2 env)
+          env defs1 defs2
+      in
+      alpha_list alpha_abstraction env (List.map snd defs1) (List.map snd defs2)
+      && alpha_computation env c1 c2
+  | Match (e1, cases1), Match (e2, cases2) ->
+      alpha_expression env e1 e2
+      && alpha_list alpha_abstraction env cases1 cases2
+  | Apply (e11, e12), Apply (e21, e22) ->
+      alpha_expression env e11 e21 && alpha_expression env e12 e22
+  | Handle (e1, c1), Handle (e2, c2) ->
+      alpha_expression env e1 e2 && alpha_computation env c1 c2
+  | Call (eff1, e1, abs1), Call (eff2, e2, abs2) ->
+      eff1.term = eff2.term && alpha_expression env e1 e2
+      && alpha_abstraction env abs1 abs2
+  | Bind (c1, abs1), Bind (c2, abs2) ->
+      alpha_computation env c1 c2 && alpha_abstraction env abs1 abs2
+  | CastComp (c1, coer1), CastComp (c2, coer2) ->
+      coer1 = coer2 && alpha_computation env c1 c2
+  | Check (_, c1), Check (_, c2) -> alpha_computation env c1 c2
+  | _ -> false
+
+and alpha_abstraction env abs1 abs2 =
+  let p1, c1 = abs1.term and p2, c2 = abs2.term in
+  match alpha_pattern env p1 p2 with
+  | Some env -> alpha_computation env c1 c2
+  | None -> false
+
+and alpha_abstraction2 env abs1 abs2 =
+  let p11, p12, c1 = abs1.term and p21, p22, c2 = abs2.term in
+  match alpha_patterns env [ p11; p12 ] [ p21; p22 ] with
+  | Some env -> alpha_computation env c1 c2
+  | None -> false
+
+and alpha_handler env h1 h2 =
+  alpha_abstraction env h1.term.value_clause h2.term.value_clause
+  && alpha_effect_clauses env h1.term.effect_clauses h2.term.effect_clauses
+
+and alpha_effect_clauses env clauses1 clauses2 =
+  let part1 = Assoc.to_list clauses1.effect_part
+  and part2 = Assoc.to_list clauses2.effect_part in
+  List.length part1 = List.length part2
+  && List.for_all
+       (fun (eff, abs1) ->
+         match Assoc.lookup eff clauses2.effect_part with
+         | Some abs2 -> alpha_abstraction2 env abs1 abs2
+         | None -> false)
+       part1
+
+(* The two comparisons that With-Rec-Fun makes *)
+let same_operation_clauses h1 h2 =
+  alpha_effect_clauses Variable.Map.empty h1.term.effect_clauses
+    h2.term.effect_clauses
+
+let same_return_clause h1 h2 =
+  alpha_abstraction Variable.Map.empty h1.term.value_clause h2.term.value_clause
 
 let handler h =
   let drty1, drty2 = h.ty in
