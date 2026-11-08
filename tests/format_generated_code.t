@@ -975,8 +975,7 @@
         coer_computation _tycoer (coer_computation _tycoer (_x (_tycoer _x)))
         >>= fun _b ->
         _map _tycoer _tycoer _tycoer _tycoer _tycoer _x _xs >>= fun _b ->
-        Value
-          ((fun (x, xs) -> x :: xs) (coer_tuple (_tycoer, coer_refl_ty) (_b, _b)))
+        Value (_tycoer _b :: _b)
     end
   
   let map = _map
@@ -1282,10 +1281,7 @@
    fun (_ys : 'ty list) ->
     begin match _x with
     | [] -> coer_list _tycoer _ys
-    | _x :: _xs ->
-        (fun (x, xs) -> x :: xs)
-          (coer_tuple (_tycoer, coer_refl_ty)
-             (_x, _op (* @ *) _tycoer _tycoer _xs _ys))
+    | _x :: _xs -> _tycoer _x :: _op (* @ *) _tycoer _tycoer _xs _ys
     end
   
   let _op (* @ *) = _op (* @ *)
@@ -1356,9 +1352,7 @@
         value_clause =
           (fun (_x : 'ty) ->
             coer_return (coer_list _tycoer)
-              (coer_list _tycoer
-                 ((fun (x, xs) -> x :: xs)
-                    (coer_tuple (_tycoer, coer_list _tycoer) (_tycoer _x, [])))));
+              (coer_list _tycoer (_tycoer (_tycoer _x) :: coer_list _tycoer [])));
         effect_clauses =
           (fun (type a)
             (type b)

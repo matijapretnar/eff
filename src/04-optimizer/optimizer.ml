@@ -371,7 +371,14 @@ and cast_expression state expr coer =
   | _, _
     when TyCoercion.is_trivial_ty_coercion coer
          && state.config.eliminate_coercions ->
+      (* Elim-Co-Val *)
       expr
+  | Term.Tuple exprs, TyCoercion.TupleCoercion coers
+    when state.config.push_coercions && List.length exprs = List.length coers ->
+      (* Push-Co-Pair, for tuples of any length. Push-Co-Inl and Push-Co-Inr
+         have no counterpart yet: Eff's variants belong to named types, and the
+         coercion on a constructor's argument needs the type definition. *)
+      Term.tuple (List.map2 (cast_expression state) exprs coers)
   | _, _ -> Term.castExp (expr, coer)
 
 and cast_computation state comp coer =
