@@ -1,0 +1,28 @@
+(* Closed handlers: handlers whose base forwards no operations. *)
+
+effect Get : unit -> int
+effect Put : int -> unit
+effect Log : int -> unit
+
+(* The handler is used at a smaller input dirt than it supports, so
+   Handler-Subsume drops the clause for Put, and apply_h is used with an
+   empty output dirt. *)
+let apply_h h = with h handle perform (Get ())
+
+let subsume n =
+  apply_h (handler
+    | effect (Get ()) k -> k n
+    | effect (Put m) k -> k ()
+    | x -> x + 1)
+
+(* With-Cast narrows the inner handler to Get, so it forwards nothing, but
+   its return clause calls Log, so its result is still a computation. *)
+let get_twice () = perform (Get ()) + perform (Get ())
+
+let closed_impure n =
+  handle
+    (handle get_twice () with
+     | x -> perform (Log x); x
+     | effect (Get ()) k -> k n)
+  with
+  | effect (Log m) k -> m + k ()

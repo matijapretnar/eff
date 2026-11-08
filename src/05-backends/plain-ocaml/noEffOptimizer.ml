@@ -202,6 +202,7 @@ and optimize_term' state (n_term : NoEff.n_term) =
 
 and optimize_handler state (hnd : NoEff.n_handler) =
   {
+    forwarding = hnd.forwarding;
     return_clause = optimize_abstraction_with_ty state hnd.return_clause;
     effect_clauses = Assoc.map (n_abstraction_2_args state) hnd.effect_clauses;
     finally_clause = optimize_abstraction_with_ty state hnd.finally_clause;

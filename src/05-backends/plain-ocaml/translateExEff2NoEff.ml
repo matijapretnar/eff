@@ -29,9 +29,10 @@ let rec elab_ty (ty : ExEffTypes.ty) =
       if Dirt.is_empty dirt1 (* Handler type - Case 1: empty input dirt *) then
         let elab2 = elab_dirty (type2, dirt2) in
         NoEff.NTyArrow (elab1, elab2)
-        (* Handler type - Case 2: non-empty input dirt *)
+        (* Handler type - Case 2: non-empty input dirt. The output keeps its
+           dirt, so a closed handler may return a pure value. *)
       else
-        let elab2 = elab_ty type2 in
+        let elab2 = elab_dirty (type2, dirt2) in
         NoEff.NTyHandler (elab1, elab2)
   | ExEffTypes.Tuple tys ->
       let ty_elab_list = List.map elab_ty tys in
@@ -63,39 +64,22 @@ let rec elab_ty_coercion state coer =
       let dirtyelab = elab_dirty_coercion state dirtycoer in
       NoEff.NCoerArrow (tyelab, dirtyelab)
   | TyCoercion.HandlerCoercion (coerA, coerB) -> (
-      let coerA2, coerA1 = coerA.ty
-      and elabA = elab_dirty_coercion state coerA
-      and coerB1, _coerB2 = coerB.ty
+      (* The paper's four cases, split on the input dirts of the two handler
+         types: [coerA] goes from the input of the target type, [drt_in'], to
+         the input of the source type, [drt_in]. *)
+      let (_, drt_in'), (_, drt_in) = coerA.ty in
+      let elabA = elab_dirty_coercion state coerA
       and elabB = elab_dirty_coercion state coerB in
-      if
-        has_empty_dirt coerA1 && has_empty_dirt coerA2
-        (* Handler coercion - Case 1 *)
-      then NoEff.NCoerArrow (elabA, elabB)
-      else
-        match coerB.term with
-        | tycoer, _dirtcoer -> (
-            let elab2 = elab_ty_coercion state tycoer in
-            if
-              (not (has_empty_dirt coerA2)) && not (has_empty_dirt coerA2)
-              (* Handler coercion - Case 2 *)
-            then NoEff.NCoerHandler (elabA, NoEff.NCoerComp elab2)
-            else
-              match coerA.term with
-              | tycoerA, _dirtcoerA ->
-                  let elab1 = elab_ty_coercion state tycoerA in
-                  if
-                    has_empty_dirt coerB1
-                    && (not (has_empty_dirt coerA1))
-                    && has_empty_dirt coerA2
-                    (* Handler coercion - Case 3 *)
-                  then NoEff.NCoerHandToFun (elab1, NoEff.NCoerUnsafe elab2)
-                  else if
-                    has_empty_dirt coerA2
-                    && (not (has_empty_dirt coerA1))
-                    && not (has_empty_dirt coerB1)
-                    (* Handler coercion - Case 4 *)
-                  then NoEff.NCoerHandToFun (elab1, elab2)
-                  else assert false))
+      match (Dirt.is_empty drt_in, Dirt.is_empty drt_in') with
+      | true, true -> NoEff.NCoerArrow (elabA, elabB)
+      | false, true ->
+          let tycoerA, _ = coerA.term in
+          NoEff.NCoerHandToFun (elab_ty_coercion state tycoerA, elabB)
+      | true, false ->
+          (* funToHand: [drt_in'] is in [drt_in], so this needs a dirt
+             parameter that counts as non-empty in [drt_in']. *)
+          assert false
+      | false, false -> NoEff.NCoerHandler (elabA, elabB))
   | TyCoercion.TyCoercionVar par -> NoEff.NCoerVar par
   | TyCoercion.ApplyCoercion { ty_name; tcoers } ->
       NoEff.NCoerApply
@@ -154,12 +138,12 @@ let rec value_coercion_from_impure_dirt empty_dirt_params ty =
                 ( computation_coercion_to_impure_dirt empty_dirt_params
                     (ty1, drt1),
                   computation_coercion_from_impure_dirt empty_dirt_params
-                    (ty2, Dirt.fresh ()) )
+                    (ty2, drt2) )
         | Dirt.Row.Empty ->
             NoEff.NCoerHandler
               ( computation_coercion_to_impure_dirt empty_dirt_params (ty1, drt1),
                 computation_coercion_from_impure_dirt empty_dirt_params
-                  (ty2, Dirt.fresh ()) ))
+                  (ty2, drt2) ))
   | ExEffTypes.TyBasic _ -> NoEff.NCoerRefl
 
 and computation_coercion_from_impure_dirt empty_dirt_params (ty1, drt) =
@@ -218,13 +202,13 @@ and value_coercion_to_impure_dirt empty_dirt_params ty =
                 ( computation_coercion_from_impure_dirt empty_dirt_params
                     (ty1, drt1),
                   computation_coercion_to_impure_dirt empty_dirt_params
-                    (ty2, Dirt.fresh ()) )
+                    (ty2, drt2) )
         | Dirt.Row.Empty ->
             NoEff.NCoerHandler
               ( computation_coercion_from_impure_dirt empty_dirt_params
                   (ty1, drt1),
-                computation_coercion_to_impure_dirt empty_dirt_params
-                  (ty2, Dirt.fresh ()) ))
+                computation_coercion_to_impure_dirt empty_dirt_params (ty2, drt2)
+              ))
   | ExEffTypes.TyBasic _ -> NoEff.NCoerRefl
 
 and computation_coercion_to_impure_dirt empty_dirt_params (ty1, drt) =
@@ -280,22 +264,10 @@ and elab_expression' state expr =
   | ExEff.Const c -> NoEff.NConst c
   | ExEff.Tuple vs -> NoEff.NTuple (List.map (elab_expression state) vs)
   | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty state abs)
-  | ExEff.Handler h ->
-      let (_, drt_in), (ty, drt_out) = h.ty in
-      let x = Variable.fresh "$finally" in
-      let x_var = NoEff.NVar { variable = x; coercions = [] } in
-      (* The identity finally clause. In Case 3 of [elab_handler], the runtime
-         [handler] binds the finally clause with [>>=], so it must return a
-         computation; in Cases 1 and 2 it is used as a pure function. *)
-      let body =
-        if Dirt.is_empty drt_in || Dirt.is_empty drt_out then x_var
-        else NoEff.NReturn x_var
-      in
-      let finally_clause = (NoEff.PNVar x, elab_ty ty, body) in
-      elab_handler state h finally_clause
+  | ExEff.Handler h -> elab_handler state h None
   | ExEff.HandlerWithFinally h ->
       elab_handler state h.handler_clauses
-        (elab_abstraction_with_param_ty state h.finally_clause)
+        (Some (elab_abstraction_with_param_ty state h.finally_clause))
   | ExEff.CastExp (value, coer) ->
       let elab1 = elab_expression state value in
       let elab2 = elab_ty_coercion state coer in
@@ -306,62 +278,72 @@ and elab_expression' state expr =
       NoEff.NVariant (lbl, Some elab_e)
   | ExEff.Record _ass -> failwith __LOC__
 
+(* The paper's three cases, split on the input dirt and on the dirt that the
+   base [fwd] forwards. [elabfc] is the finally clause, which the paper does
+   not have; [None] stands for the identity. *)
 and elab_handler state h elabfc =
   let elabvc = elab_abstraction_with_param_ty state h.term.value_clause in
   let (_, drt_in), _ = h.ty in
-  if Dirt.is_empty drt_in (* Handler - Case 1 *) then
-    let p_vc, p_vc_ty, c_vc = elabvc in
-    let p_fc, _, c_fc = elabfc in
-    NoEff.NFun (p_vc, p_vc_ty, NoEff.NLet (c_vc, (p_fc, c_fc)))
-  else
-    let _, (_ty, dirt) = h.term.value_clause.ty in
-    if Dirt.is_empty dirt (* Handler - Case 2 *) then
-      let subst_cont_effect (eff, { term = p1, p2, comp; _ }) =
-        let eff' = elab_effect eff in
-        let elabcomp = elab_computation state comp in
-        match p2.term with
-        | PVar x ->
-            ( eff',
-              ( elab_pattern state p1,
-                elab_pattern state p2,
-                NReturn
-                  (subs_var_in_term x
-                     (NCast
-                        ( NVar { variable = x; coercions = [] },
-                          NoEff.NCoerArrow
-                            (NoEff.NCoerRefl, NoEff.NCoerUnsafe NoEff.NCoerRefl)
-                        ))
-                     elabcomp) ) )
-        | PNonbinding ->
-            ( eff',
-              (elab_pattern state p1, elab_pattern state p2, NReturn elabcomp)
-            )
-        | _ -> failwith __LOC__
-      in
-      let p, ty, c = elabvc in
-      let pf, tyf, cf = elabfc in
-      NoEff.NHandler
-        {
-          return_clause = (p, ty, NoEff.NReturn c);
-          effect_clauses =
-            Assoc.map_of_list subst_cont_effect
-              (Assoc.to_list h.term.effect_clauses.effect_part);
-          finally_clause = (pf, tyf, NoEff.NReturn cf);
-        } (* Handler - Case 3 *)
-    else
-      let elab_effect_clause (eff, { term = p1, p2, comp; _ }) =
-        let eff' = elab_effect eff in
-        let elabcomp = elab_computation state comp in
-        (eff', (elab_pattern state p1, elab_pattern state p2, elabcomp))
-      in
-      NoEff.NHandler
-        {
-          return_clause = elabvc;
-          effect_clauses =
-            Assoc.map_of_list elab_effect_clause
-              (Assoc.to_list h.term.effect_clauses.effect_part);
-          finally_clause = elabfc;
-        }
+  let _, (ty_mid, drt_mid) = h.term.value_clause.ty in
+  (* Apply the finally clause to [t], the result of the clauses. *)
+  let apply_finally t (p_fc, _, c_fc) =
+    if Dirt.is_empty drt_mid then NoEff.NLet (t, (p_fc, c_fc))
+    else NoEff.NBind (t, (p_fc, c_fc))
+  in
+  let elab_effect_clause (eff, { term = p1, p2, comp; _ }) =
+    ( elab_effect eff,
+      (elab_pattern state p1, elab_pattern state p2, elab_computation state comp)
+    )
+  in
+  let effect_clauses =
+    Assoc.map_of_list elab_effect_clause
+      (Assoc.to_list h.term.effect_clauses.effect_part)
+  in
+  if Dirt.is_empty drt_in then
+    (* Handler - Case 1: no operations, so a function *)
+    match elabfc with
+    | None -> NoEff.NFun elabvc
+    | Some fc ->
+        let p_vc, ty_vc, c_vc = elabvc in
+        NoEff.NFun (p_vc, ty_vc, apply_finally c_vc fc)
+  else if Dirt.is_empty (ExEff.forwarded_dirt h) then
+    (* Handler - Case 2: closed. The clauses return [elab_dirty] of the
+       output type, which need not be a computation. *)
+    let x = Variable.fresh "$finally" in
+    let x_var = NoEff.NVar { variable = x; coercions = [] } in
+    let ty_clauses = elab_dirty (ty_mid, drt_mid) in
+    let finally_clause =
+      match elabfc with
+      | None -> (NoEff.PNVar x, ty_clauses, x_var)
+      | Some fc -> (NoEff.PNVar x, ty_clauses, apply_finally x_var fc)
+    in
+    NoEff.NHandler
+      {
+        forwarding = false;
+        return_clause = elabvc;
+        effect_clauses;
+        finally_clause;
+      }
+  else (
+    (* Handler - Case 3: forwarding. The forwarded dirt is in the output
+       dirt, so the clauses return computations. *)
+    assert (not (Dirt.is_empty drt_mid));
+    let finally_clause =
+      match elabfc with
+      | None ->
+          let x = Variable.fresh "$finally" in
+          ( NoEff.PNVar x,
+            elab_ty ty_mid,
+            NoEff.NReturn (NoEff.NVar { variable = x; coercions = [] }) )
+      | Some fc -> fc
+    in
+    NoEff.NHandler
+      {
+        forwarding = true;
+        return_clause = elabvc;
+        effect_clauses;
+        finally_clause;
+      })
 
 and elab_abstraction state { term = p, c; _ } =
   let elab2 = elab_computation state c in
@@ -403,14 +385,10 @@ and elab_computation' state c _is_empty =
       and vtype = value.ty
       and velab = elab_expression state value in
       match vtype.term with
-      | ExEffTypes.Handler ((vty1, _vdirt1), (_vty2, vdirt2)) when ctype = vty1
-        ->
+      | ExEffTypes.Handler ((vty1, _vdirt1), _) when ctype = vty1 ->
           if Dirt.is_empty cdirt (* Handle - Case 1 *) then
             NoEff.NApplyTerm (velab, elabc)
-          else if Dirt.is_empty vdirt2 (* Handle - Case 2 *) then
-            NoEff.NCast
-              (NoEff.NHandle (elabc, velab), NoEff.NCoerUnsafe NoEff.NCoerRefl)
-            (* Handle - Case 3 *)
+            (* Handle - Case 2: closed or forwarding alike *)
           else NoEff.NHandle (elabc, velab)
       | _ -> assert false)
   | ExEff.Call (eff, value, abs) ->

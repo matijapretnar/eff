@@ -32,6 +32,28 @@ let handler (h : ('a, 'b computation) handler_clauses)
   in
   fun comp -> handler comp >>= finally_clause
 
+(* A handler with no forwarding case: its clauses return any type. *)
+let closed_handler (h : ('a, 'b) handler_clauses) (finally_clause : 'b -> 'c) :
+    'a computation -> 'c =
+  let rec handler = function
+    | Value x -> h.value_clause x
+    | Call (eff, arg, k) ->
+        let clause = h.effect_clauses eff in
+        clause arg (fun y -> handler (k y))
+  in
+  fun comp -> finally_clause (handler comp)
+
+(* A handler with no forwarding case: its clauses return any type. *)
+let closed_handler (h : ('a, 'b) handler_clauses) (finally_clause : 'b -> 'c) :
+    'a computation -> 'c =
+  let rec handler = function
+    | Value x -> h.value_clause x
+    | Call (eff, arg, k) ->
+        let clause = h.effect_clauses eff in
+        clause arg (fun y -> handler (k y))
+  in
+  fun comp -> finally_clause (handler comp)
+
 let rec lift (f : 'a -> 'b) : 'a computation -> 'b computation = function
   | Value x -> Value (f x)
   | Call (eff, arg, k) -> Call (eff, arg, fun y -> lift f (k y))

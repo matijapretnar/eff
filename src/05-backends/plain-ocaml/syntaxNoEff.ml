@@ -73,6 +73,10 @@ type n_term =
   | NDirectPrimitive of Language.Primitives.primitive_value
 
 and n_handler = {
+  forwarding : bool;
+      (** The paper's two forms of NoEff handler. A forwarding handler ends with
+          [fwd], and its clauses return computations. A closed handler has no
+          [fwd], and its clauses return any type. *)
   effect_clauses : (n_effect, n_abstraction_2_args) Assoc.t;
   return_clause : n_abstraction_with_param_ty;
   finally_clause : n_abstraction_with_param_ty;
@@ -97,44 +101,6 @@ type cmd =
   | TopLetRec of n_top_rec_definitions
   | DefEffect of n_effect
   | TyDef of (Language.TyName.t * (Type.TyParam.t list * n_tydef)) list
-
-let rec subs_var_in_term par subs term =
-  match term with
-  | NVar v -> if v.variable = par then subs else term
-  | NTuple ls -> NTuple (List.map (subs_var_in_term par subs) ls)
-  | NFun abs -> NFun (subs_var_in_abs_with_ty par subs abs)
-  | NApplyTerm (t1, t2) ->
-      NApplyTerm (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
-  | NCast (t, c) -> NCast (subs_var_in_term par subs t, c)
-  | NReturn t -> NReturn (subs_var_in_term par subs t)
-  | NHandler h -> NHandler h
-  | NLet (t, abs) ->
-      NLet (subs_var_in_term par subs t, subs_var_in_abs par subs abs)
-  | NCall (eff, t, abs) ->
-      NCall
-        (eff, subs_var_in_term par subs t, subs_var_in_abs_with_ty par subs abs)
-  | NBind (t, abs) ->
-      NBind (subs_var_in_term par subs t, subs_var_in_abs par subs abs)
-  | NHandle (t1, t2) ->
-      NHandle (subs_var_in_term par subs t1, subs_var_in_term par subs t2)
-  | NConst c -> NConst c
-  | NLetRec (abss, t) ->
-      NLetRec
-        ( Assoc.map (fun abs -> subs_var_in_abs par subs abs) abss,
-          subs_var_in_term par subs t )
-  | NMatch (t, abss) ->
-      NMatch
-        (subs_var_in_term par subs t, List.map (subs_var_in_abs par subs) abss)
-  | NRecord a -> NRecord (Type.Field.Map.map (subs_var_in_term par subs) a)
-  | NVariant (lbl, None) -> NVariant (lbl, None)
-  | NVariant (lbl, Some t) -> NVariant (lbl, Some (subs_var_in_term par subs t))
-  | NDirectPrimitive _ as t -> t
-
-and subs_var_in_abs par subs (p, c) = (p, subs_var_in_term par subs c)
-
-and subs_var_in_abs_with_ty par subs (p, t, c) =
-  let p, c = subs_var_in_abs par subs (p, c) in
-  (p, t, c)
 
 let occurrences x (inside, outside) =
   let count ys = List.length (List.filter (fun y -> x = y) ys) in
@@ -217,8 +183,10 @@ and substitute_abstraction_with_ty sbst (p, ty, c) =
 
 and substitute_abstraction2 sbst (p1, p2, c) = (p1, p2, (substitute_term sbst) c)
 
-and substitue_handler sbst { effect_clauses; return_clause; finally_clause } =
+and substitue_handler sbst
+    { forwarding; effect_clauses; return_clause; finally_clause } =
   {
+    forwarding;
     return_clause = substitute_abstraction_with_ty sbst return_clause;
     effect_clauses = Assoc.map (substitute_abstraction2 sbst) effect_clauses;
     finally_clause = substitute_abstraction_with_ty sbst finally_clause;
