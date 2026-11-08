@@ -100,6 +100,11 @@ and handler_clauses' = {
   effect_clauses : effect_clauses;
   value_clause : abstraction;
 }
+(** The paper ends a handler's clauses with a base [fwd_Δ] that forwards the
+    operations in [Δ]. Here [Δ] is not stored, because the type determines it:
+    the input dirt is [Δ ∪ ops], so [Δ] is the input dirt without [ops] (see
+    [forwarded_dirt]). An operation in both [Δ] and [ops] goes to its clause
+    either way, so nothing is lost. *)
 
 and effect_clauses = {
   effect_part : (eff, abstraction2) Assoc.t;
@@ -164,11 +169,20 @@ let handler_clauses (value_clause : abstraction) effect_part drt_in =
     assert (Type.equal_dirty drty_out drty)
   in
   Assoc.iter check_effect_clause effect_part;
-  assert (
-    Effect.Set.equal drt_in.Dirt.effect_set
-      (Effect.Set.union drt_out.Dirt.effect_set (handled_effects effect_part)));
+  (* The paper's typing of [ops, fwd_Δ]: the input dirt is [Δ ∪ ops], and
+     [Δ] is in the output dirt. *)
+  let ops = handled_effects effect_part in
+  assert (Effect.Set.subset ops drt_in.Dirt.effect_set);
+  assert (Dirt.is_subset (Dirt.remove_effects ops drt_in) drt_out);
   let ty = ((ty_in, drt_in), drty_out) in
   { term = { value_clause; effect_clauses = { fingerprint; effect_part } }; ty }
+
+(* The [Δ] of the base [fwd_Δ]; see [handler_clauses']. *)
+let forwarded_dirt hnd =
+  let (_, drt_in), _ = hnd.ty in
+  Dirt.remove_effects
+    (handled_effects hnd.term.effect_clauses.effect_part)
+    drt_in
 
 let handler_with_new_value_clause hnd value_clause =
   (* TODO: verify the same as above *)
