@@ -354,6 +354,44 @@ and cast_expression state expr coer =
          have no counterpart yet: Eff's variants belong to named types, and the
          coercion on a constructor's argument needs the type definition. *)
       Term.tuple (List.map2 (cast_expression state) exprs coers)
+  | ( (Term.Handler _ | Term.HandlerWithFinally _),
+      TyCoercion.HandlerCoercion
+        (({ term = tcoer, dcoer; _ } as dtcoer1), dtcoer2) )
+    when state.config.push_coercions
+         && Dirt.is_closed (fst dcoer.ty)
+         && not (TyCoercion.is_trivial_dirty_coercion dtcoer1) ->
+      (* Handler-Subsume. The input part of the coercion moves into the
+         handler: the type coercion into the return clause, and the dirt
+         coercion narrows the input dirt, which drops the clauses for the
+         operations outside it (see With-Cast). The output part stays. The
+         finally clause is outside the paper and stays as it is. *)
+      let subsume hnd =
+        let hnd' =
+          if TyCoercion.is_trivial_ty_coercion tcoer then hnd
+          else
+            let ty, _ = tcoer.ty in
+            let x_pat, x_var = Term.fresh_variable "x" ty in
+            Term.handler_with_new_value_clause hnd
+              (Term.abstraction
+                 ( x_pat,
+                   Term.letVal
+                     (cast_expression state x_var tcoer, hnd.term.value_clause)
+                 ))
+        in
+        match Term.handler_with_smaller_input_dirt hnd' dcoer with
+        | Some hnd'' -> hnd''
+        | None -> assert false
+      in
+      let expr' =
+        match expr.term with
+        | Term.Handler hnd -> Term.handler (subsume hnd)
+        | Term.HandlerWithFinally { handler_clauses; finally_clause } ->
+            Term.handlerWithFinally (subsume handler_clauses) finally_clause
+        | _ -> assert false
+      in
+      let drty_in, _ = dtcoer1.ty in
+      cast_expression state expr'
+        (TyCoercion.handlerCoercion (TyCoercion.reflDirty drty_in, dtcoer2))
   | _, _ -> Term.castExp (expr, coer)
 
 and cast_computation state comp coer =
