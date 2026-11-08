@@ -402,6 +402,12 @@ and bind_computation state comp bind =
       bind_computation state comp (bind_abstraction state abs bind)
   | Term.Call (eff, expr, abs) ->
       Term.call (eff, expr, bind_abstraction state abs bind)
+  | Term.LetRec (defs, comp)
+    when List.for_all
+           (fun (f, _) -> Term.does_not_occur f (Term.free_vars_abs bind))
+           (Assoc.to_list defs) ->
+      (* Do-Rec-Fun *)
+      Term.letRec (defs, bind_computation state comp bind)
   | _ -> (
       match extract_cast_value comp with
       | Some expr -> beta_reduce state bind expr
