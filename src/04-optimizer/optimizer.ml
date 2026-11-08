@@ -391,6 +391,9 @@ and cast_computation state comp coer =
   | Term.Call (eff, expr, abs), _ when state.config.push_coercions ->
       (* Push-Co-Op *)
       Term.call (eff, expr, cast_abstraction state abs coer)
+  | Term.LetRec (defs, comp), _ when state.config.push_coercions ->
+      (* Push-Co-Rec-Fun *)
+      Term.letRec (defs, cast_computation state comp coer)
   | _, _ -> Term.castComp (comp, coer)
 
 and cast_abstraction state { term = pat, comp; _ } coer =
