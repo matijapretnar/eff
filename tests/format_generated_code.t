@@ -110,46 +110,42 @@
   let _testTriple =
    fun (_n : int) ->
     fun (_s : int) ->
-     let rec _choice (_k, _x) =
+     let rec _choice _x =
        if _x < 1 then TripleNil
        else
          let _k =
           fun (_y : bool) ->
-           if _y then _k _x else _choice ((fun (_y : int) -> _k _y), _x - 1)
+           if _y then
+             let rec _choice _x =
+               if _x < 1 then TripleNil
+               else
+                 let _k =
+                  fun (_y : bool) ->
+                   if _y then
+                     let rec _choice _x =
+                       if _x < 1 then TripleNil
+                       else
+                         let _k =
+                          fun (_y : bool) ->
+                           if _y then
+                             if _x + _x + _x = _s then
+                               TripleCons ((_x, _x, _x), TripleNil)
+                             else TripleNil
+                           else _choice (_x - 1)
+                         in
+                         _op (* @ *) (_k true) (_k false)
+                     in
+                     _choice (_x - 1)
+                   else _choice (_x - 1)
+                 in
+                 _op (* @ *) (_k true) (_k false)
+             in
+             _choice (_x - 1)
+           else _choice (_x - 1)
          in
          _op (* @ *) (_k true) (_k false)
      in
-     _choice
-       ( (fun (_i : int) ->
-           let rec _choice (_k, _x) =
-             if _x < 1 then TripleNil
-             else
-               let _k =
-                fun (_y : bool) ->
-                 if _y then _k _x else _choice ((fun (_y : int) -> _k _y), _x - 1)
-               in
-               _op (* @ *) (_k true) (_k false)
-           in
-           _choice
-             ( (fun (_j : int) ->
-                 let rec _choice (_k, _x) =
-                   if _x < 1 then TripleNil
-                   else
-                     let _k =
-                      fun (_y : bool) ->
-                       if _y then _k _x
-                       else _choice ((fun (_y : int) -> _k _y), _x - 1)
-                     in
-                     _op (* @ *) (_k true) (_k false)
-                 in
-                 _choice
-                   ( (fun (_k : int) ->
-                       if _i + _j + _k = _s then
-                         TripleCons ((_i, _j, _k), TripleNil)
-                       else TripleNil),
-                     _j - 1 )),
-               _i - 1 )),
-         _n )
+     _choice _n
   
   let testTriple = _testTriple
   let _handleTripleWrap = fun ((_x, _y) : int * int) -> _testTriple _x _y
@@ -416,11 +412,12 @@
   let _f =
    fun (_y : int_list) ->
     begin match _y with
-    | Nil -> 1 + 10
-    | Cons (_x, Nil) -> _x + 10
-    | Cons (_, Cons (_y, Nil)) -> _y + 10
-    | Cons (_x, _) -> _x + 10
+    | Nil -> 1
+    | Cons (_x, Nil) -> _x
+    | Cons (_, Cons (_y, Nil)) -> _y
+    | Cons (_x, _) -> _x
     end
+    + 10
   
   let f = _f;;
   
@@ -1572,9 +1569,7 @@
     end
   in
   let rec _f _x =
-    let _k =
-     fun (_y : bool) -> if _y then IntCons (2, IntNil) else IntCons (3, IntNil)
-    in
+    let _k = fun (_y : bool) -> IntCons ((if _y then 2 else 3), IntNil) in
     _concat (_k true) (_k false)
   in
   _f ()
@@ -1618,9 +1613,7 @@
     end
   in
   let rec _f _x =
-    let _k =
-     fun (_y : bool) -> if _y then IntCons (2, IntNil) else IntCons (3, IntNil)
-    in
+    let _k = fun (_y : bool) -> IntCons ((if _y then 2 else 3), IntNil) in
     _concat (_k true) (_k false)
   in
   _f ()
@@ -1659,18 +1652,11 @@
   in
   let _k =
    fun (_y : bool) ->
-    if _y then
-      let _k =
-       fun (_y : bool) ->
-        if _y then IntCons (10 - 0, IntNil) else IntCons (10 - 5, IntNil)
-      in
-      _concat (_k true) (_k false)
-    else
-      let _k =
-       fun (_y : bool) ->
-        if _y then IntCons (20 - 0, IntNil) else IntCons (20 - 5, IntNil)
-      in
-      _concat (_k true) (_k false)
+    let _k =
+     fun (_y : bool) ->
+      IntCons (((if _y then 10 else 20) - if _y then 0 else 5), IntNil)
+    in
+    _concat (_k true) (_k false)
   in
   _concat (_k true) (_k false)
   ======================================================================
@@ -2983,8 +2969,8 @@
       | Node (_left, _x, _right) ->
           let _k =
            fun (_y : bool) ->
-            if _y then _explore ((fun (_b : int) -> _k (_op _x _b)), _left)
-            else _explore ((fun (_b : int) -> _k (_op _x _b)), _right)
+            _explore
+              ((fun (_b : int) -> _k (_op _x _b)), if _y then _left else _right)
           in
           _k true >>= fun _b ->
           _k false >>= fun _b -> Value (_op (* @ *) _b _b)
@@ -3029,8 +3015,8 @@
       | Node (_left, _x, _right) ->
           let _k =
            fun (_y : bool) ->
-            if _y then _explore ((fun (_b : int) -> _k (_op _x _b)), _left)
-            else _explore ((fun (_b : int) -> _k (_op _x _b)), _right)
+            _explore
+              ((fun (_b : int) -> _k (_op _x _b)), if _y then _left else _right)
           in
           force_unsafe
             ((handler
@@ -3127,8 +3113,9 @@
           | Node (_left, _x, _right) ->
               let _k =
                fun (_y : bool) ->
-                if _y then _explore ((fun (_b : int) -> _k (_op _x _b)), _left)
-                else _explore ((fun (_b : int) -> _k (_op _x _b)), _right)
+                _explore
+                  ( (fun (_b : int) -> _k (_op _x _b)),
+                    if _y then _left else _right )
               in
               _k true >>= fun _b ->
               _k false >>= fun _b -> Value (_op (* @ *) _b _b)
@@ -3174,8 +3161,9 @@
           | Node (_left, _x, _right) ->
               let _k =
                fun (_y : bool) ->
-                if _y then _explore ((fun (_b : int) -> _k (_op _x _b)), _left)
-                else _explore ((fun (_b : int) -> _k (_op _x _b)), _right)
+                _explore
+                  ( (fun (_b : int) -> _k (_op _x _b)),
+                    if _y then _left else _right )
               in
               force_unsafe
                 ((handler
@@ -3273,8 +3261,9 @@
               fun (_y : unit) ->
                 let _k =
                  fun (_y : bool) ->
-                  if _y then _explore ((fun (_b : int) -> _k (_op _x _b)), _left)
-                  else _explore ((fun (_b : int) -> _k (_op _x _b)), _right)
+                  _explore
+                    ( (fun (_b : int) -> _k (_op _x _b)),
+                      if _y then _left else _right )
                 in
                 _k true >>= fun _b ->
                 _k false >>= fun _b -> Value (_op (* @ *) _b _b) )
@@ -3315,8 +3304,8 @@
       | Node (_left, _x, _right) ->
           (let _k =
             fun (_y : bool) ->
-             if _y then _explore ((fun (_b : int) -> _k (_op _x _b)), _left)
-             else _explore ((fun (_b : int) -> _k (_op _x _b)), _right)
+             _explore
+               ((fun (_b : int) -> _k (_op _x _b)), if _y then _left else _right)
            in
            force_unsafe
              ((handler
@@ -3414,9 +3403,9 @@
                   fun (_y : unit) ->
                     let _k =
                      fun (_y : bool) ->
-                      if _y then
-                        _explore ((fun (_b : int) -> _k (_op _x _b)), _left)
-                      else _explore ((fun (_b : int) -> _k (_op _x _b)), _right)
+                      _explore
+                        ( (fun (_b : int) -> _k (_op _x _b)),
+                          if _y then _left else _right )
                     in
                     _k true >>= fun _b ->
                     _k false >>= fun _b -> Value (_op (* @ *) _b _b) )
@@ -3457,8 +3446,9 @@
           | Node (_left, _x, _right) ->
               (let _k =
                 fun (_y : bool) ->
-                 if _y then _explore ((fun (_b : int) -> _k (_op _x _b)), _left)
-                 else _explore ((fun (_b : int) -> _k (_op _x _b)), _right)
+                 _explore
+                   ( (fun (_b : int) -> _k (_op _x _b)),
+                     if _y then _left else _right )
                in
                force_unsafe
                  ((handler
@@ -3554,8 +3544,8 @@
       | Node (_left, _x, _right) ->
           (let _k =
             fun (_y : bool) ->
-             if _y then _explore ((fun (_b : int) -> _k (_op _x _b)), _left)
-             else _explore ((fun (_b : int) -> _k (_op _x _b)), _right)
+             _explore
+               ((fun (_b : int) -> _k (_op _x _b)), if _y then _left else _right)
            in
            fun (_s : int) -> _op (* @ *) (_k true _s) (_k false _s))
             (_x * _x)
@@ -3594,8 +3584,9 @@
           | Node (_left, _x, _right) ->
               (let _k =
                 fun (_y : bool) ->
-                 if _y then _explore ((fun (_b : int) -> _k (_op _x _b)), _left)
-                 else _explore ((fun (_b : int) -> _k (_op _x _b)), _right)
+                 _explore
+                   ( (fun (_b : int) -> _k (_op _x _b)),
+                     if _y then _left else _right )
                in
                fun (_s : int) -> _op (* @ *) (_k true _s) (_k false _s))
                 (_x * _x)
@@ -3645,6 +3636,6 @@
     | Cons (_x, _xs) -> Cons (_x, _op (* @ *) _xs _ys)
     end
   in
-  let _k = fun (_y : bool) -> if _y then Cons (10, Nil) else Cons (20, Nil) in
+  let _k = fun (_y : bool) -> Cons ((if _y then 10 else 20), Nil) in
   _op (* @ *) (_k true) (_k false)
 -------------------------------------------------------------------------------

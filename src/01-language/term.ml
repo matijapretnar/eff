@@ -193,12 +193,37 @@ let handler_with_new_value_clause hnd value_clause =
     ty = ((ty_in, drt_in), drty_out);
   }
 
+(* With-Cast narrows the input dirt of [hnd] to the source [drt] of [dcoer].
+   It keeps the clauses for the operations in [drt] and drops the others, so
+   the base forwards [drt] without the handled operations. Dropping a clause
+   is sound only when [drt] is closed: an instance of a dirt parameter could
+   contain the dropped operation. So for a [drt] with a parameter the result
+   is [None]. *)
 let handler_with_smaller_input_dirt hnd dcoer =
-  (* TODO: verify the same as above *)
   let (ty_in, drt_in), drty_out = hnd.ty in
   let drt, drt_in' = dcoer.ty in
   assert (Type.equal_dirt drt_in drt_in');
-  { term = hnd.term; ty = ((ty_in, drt), drty_out) }
+  if not (Dirt.is_closed drt) then None
+  else
+    let effect_part =
+      hnd.term.effect_clauses.effect_part |> Assoc.to_list
+      |> List.filter (fun (eff, _) ->
+          Effect.Set.mem eff.term drt.Dirt.effect_set)
+      |> Assoc.of_list
+    in
+    let hnd' =
+      {
+        term =
+          {
+            hnd.term with
+            effect_clauses =
+              { effect_part; fingerprint = EffectFingerprint.fresh () };
+          };
+        ty = ((ty_in, drt), drty_out);
+      }
+    in
+    assert (Dirt.is_subset (forwarded_dirt hnd') (snd drty_out));
+    Some hnd'
 
 (* Equality up to renaming of bound term variables (alpha-equivalence), which
    is how the paper compares handler clauses in With-Rec-Fun. The map [env]

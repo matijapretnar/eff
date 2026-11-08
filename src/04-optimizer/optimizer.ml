@@ -108,31 +108,6 @@ let rec extract_cast_value comp =
         (extract_cast_value comp)
   | _ -> None
 
-let recast_computation hnd comp =
-  match comp.ty with
-  | ty, { Dirt.effect_set = effs; Dirt.row = Dirt.Row.Empty } ->
-      let handled_effs =
-        Effect.Set.of_list
-          (List.map
-             (fun (eff, _) -> eff.term)
-             (Assoc.to_list hnd.term.Term.effect_clauses.effect_part))
-      in
-      if Effect.Set.disjoint effs handled_effs then
-        let _, (_, drt_out) = hnd.ty in
-        let drt_diff =
-          {
-            Dirt.effect_set = Effect.Set.diff drt_out.Dirt.effect_set effs;
-            Dirt.row = drt_out.Dirt.row;
-          }
-        in
-        let ty_coer = TyCoercion.reflTy ty
-        and drt_coer =
-          DirtCoercion.unionDirt (effs, DirtCoercion.empty drt_diff)
-        in
-        Some (Term.castComp (comp, TyCoercion.bangCoercion (ty_coer, drt_coer)))
-      else None
-  | _ -> None
-
 (* Function specialisation, With-Rec-Fun
 
    For a handled call [with H handle f v] of a local recursive function
@@ -439,6 +414,20 @@ and handle_computation state hnd comp =
       | None -> assert false)
   | _ when not state.config.handler_reductions ->
       Term.handle (Term.handler hnd, comp)
+  | _ when Assoc.is_empty hnd.term.Term.effect_clauses.effect_part ->
+      (* With-Fwd: a handler with no operation clauses only forwards, so it
+         becomes a sequence with its return clause. *)
+      let ty, drt_in = comp.ty and _, (_, drt_out) = hnd.ty in
+      let coer =
+        TyCoercion.bangCoercion
+          (TyCoercion.reflTy ty, DirtCoercion.subset drt_in drt_out)
+      in
+      bind_computation state
+        (cast_computation state comp coer)
+        hnd.term.Term.value_clause
+  | Term.Value expr ->
+      (* With-Ret *)
+      beta_reduce state hnd.term.Term.value_clause expr
   | Term.Match (expr, cases) ->
       let _, drty_out = hnd.ty in
       Term.match_ (expr, List.map (handle_abstraction state hnd) cases) drty_out
@@ -467,26 +456,26 @@ and handle_computation state hnd comp =
           (handle_abstraction state hnd abs)
       in
       handle_computation state hnd' comp
-  | CastComp (comp, { term = tcoer, dcoer; _ })
-    when TyCoercion.is_trivial_ty_coercion tcoer ->
-      let hnd' = Term.handler_with_smaller_input_dirt hnd dcoer in
-      handle_computation state hnd' comp
-  | CastComp (comp, { term = tcoer, dcoer; _ }) ->
-      let ty, _ = comp.ty in
-      let x_pat, x_var = Term.fresh_variable "x" ty in
+  | CastComp (comp', { term = tcoer, dcoer; _ })
+    when Dirt.is_closed (fst dcoer.ty) -> (
+      (* With-Cast. The type coercion moves into the return clause, and the
+         dirt coercion narrows the handler, which drops the clauses for the
+         operations that [comp'] does not call. *)
       let hnd' =
-        Term.handler_with_new_value_clause hnd
-          (Term.abstraction
-             ( x_pat,
-               Term.letVal
-                 (cast_expression state x_var tcoer, hnd.term.value_clause) ))
+        if TyCoercion.is_trivial_ty_coercion tcoer then hnd
+        else
+          let ty, _ = comp'.ty in
+          let x_pat, x_var = Term.fresh_variable "x" ty in
+          Term.handler_with_new_value_clause hnd
+            (Term.abstraction
+               ( x_pat,
+                 Term.letVal
+                   (cast_expression state x_var tcoer, hnd.term.value_clause) ))
       in
-      let hnd'' = Term.handler_with_smaller_input_dirt hnd' dcoer in
-      handle_computation state hnd'' comp
-  | _ -> (
-      match recast_computation hnd comp with
-      | Some comp' -> bind_computation state comp' hnd.term.Term.value_clause
-      | None -> Term.handle (Term.handler hnd, comp))
+      match Term.handler_with_smaller_input_dirt hnd' dcoer with
+      | Some hnd'' -> handle_computation state hnd'' comp'
+      | None -> assert false)
+  | _ -> Term.handle (Term.handler hnd, comp)
 
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
