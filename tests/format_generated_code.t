@@ -597,6 +597,81 @@
   
   ()
   ======================================================================
+  codegen/instantiate_in_list.eff
+  ----------------------------------------------------------------------
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | RandomFloat : (float, float) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | Write : (string * string, unit) eff_internal_effect
+  
+  let rec _map _tycoer _tycoer _tycoer _tycoer _tycoer _x =
+   fun (_x : 'ty list) ->
+    begin match _x with
+    | [] -> coer_return (coer_list _tycoer) []
+    | _x :: _xs ->
+        coer_computation _tycoer (coer_computation _tycoer (_x (_tycoer _x)))
+        >>= fun _b ->
+        _map _tycoer _tycoer _tycoer _tycoer _tycoer _x _xs >>= fun _b ->
+        Value (_tycoer _b :: _b)
+    end
+  
+  let map = _map
+  
+  let _apply_all _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer
+      _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer _tycoer
+      _tycoer _tycoer _tycoer =
+   fun (_fs : ('ty -> 'ty computation) list) ->
+    fun (_x : 'ty) ->
+     coer_return
+       (coer_arrow
+          (coer_list (coer_arrow _tycoer (coer_computation _tycoer)))
+          (coer_computation (coer_list _tycoer)))
+       (coer_arrow
+          (coer_list (coer_arrow _tycoer (coer_computation _tycoer)))
+          (coer_computation (coer_list _tycoer))
+          (_map
+             (coer_arrow _tycoer (coer_computation _tycoer))
+             _tycoer _tycoer _tycoer _tycoer
+             (coer_arrow
+                (coer_arrow _tycoer (coer_computation _tycoer))
+                (coer_computation _tycoer)
+                (fun (_f : 'ty -> 'ty computation) ->
+                  coer_computation _tycoer (_f (_tycoer _x))))))
+     >>= fun _b ->
+     coer_computation (coer_list _tycoer)
+       (_b (coer_list (coer_arrow _tycoer (coer_computation _tycoer)) _fs))
+  
+  let apply_all = _apply_all
+  
+  let _test =
+   fun (() : unit) ->
+    coer_arrow
+      (coer_list (coer_arrow coer_refl_ty (coer_return coer_refl_ty)))
+      (coer_arrow coer_refl_ty force_unsafe)
+      (_apply_all coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty
+         coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty
+         coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty
+         coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty)
+      [ (fun (_x : int) -> _x + 1); (fun (_x : int) -> 2 * _x) ]
+      3
+  
+  let test = _test
+  ======================================================================
   codegen/interp.eff
   ----------------------------------------------------------------------
   (* primitive effect *)

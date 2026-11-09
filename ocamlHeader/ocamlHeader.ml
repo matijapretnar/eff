@@ -108,10 +108,11 @@ let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
 let coer_handler coer1 coer2 h x = coer2 (h (coer1 x))
 let coer_hand_to_fun coer1 coer2 h x = coer2 (h (Value (coer1 x)))
 
-let rec coer_fun_to_hand coer1 coer2 f comp =
+(* As in the paper, undefined on an operation call: the function it coerces
+   handles no operations. *)
+let coer_fun_to_hand coer1 coer2 f comp =
   match comp with
   | Value t -> coer2 (f (coer1 t))
-  | Call (eff, arg, k) ->
-      Call (eff, arg, fun x -> coer_fun_to_hand coer1 coer2 f (k x))
+  | Call (_eff, _arg, _k) -> failwith "Unsafe coercion"
 
 let coer_list coer = List.map coer

@@ -76,9 +76,10 @@ let rec elab_ty_coercion state coer =
           let tycoerA, _ = coerA.term in
           NoEff.NCoerHandToFun (elab_ty_coercion state tycoerA, elabB)
       | true, false ->
-          (* funToHand: [drt_in'] is in [drt_in], so this needs a dirt
-             parameter that counts as non-empty in [drt_in']. *)
-          assert false
+          (* funToHand. [drt_in'] is in [drt_in], so this needs a dirt
+             parameter in [drt_in'], which counts as non-empty. *)
+          let tycoerA, _ = coerA.term in
+          NoEff.NCoerFunToHand (elab_ty_coercion state tycoerA, elabB)
       | false, false -> NoEff.NCoerHandler (elabA, elabB))
   | TyCoercion.TyCoercionVar par -> NoEff.NCoerVar par
   | TyCoercion.ApplyCoercion { ty_name; tcoers } ->
@@ -96,12 +97,45 @@ and elab_dirty_coercion state { term = tcoer, dcoer; _ } =
   if Dirt.is_empty d1 && Dirt.is_empty d2 then tyelab
   else if Dirt.is_empty d1 then NoEff.NCoerReturn tyelab
   else if not (Dirt.is_empty d2) then NoEff.NCoerComp tyelab
-  else assert false
+  else
+    (* [d1] is in [d2], so this needs a dirt parameter in [d1], which counts
+       as non-empty. *)
+    NoEff.NCoerUnsafe tyelab
+
+let rec is_refl_coercion = function
+  | NoEff.NCoerRefl -> true
+  | NoEff.NCoerArrow (c1, c2) | NoEff.NCoerHandler (c1, c2) ->
+      is_refl_coercion c1 && is_refl_coercion c2
+  | NoEff.NCoerTuple cs | NoEff.NCoerApply (_, cs) ->
+      List.for_all is_refl_coercion cs
+  | _ -> false
+
+(* The coercions of a named type's arguments, in the order of [elab_ty]. A
+   contravariant argument needs the coercion in the other direction, and an
+   invariant one only admits a reflexive coercion. *)
+let apply_instantiation_coercion ~same ~other ty_name ty_args =
+  let coer_arg (ty, variance) =
+    match variance with
+    | Covariant -> same ty
+    | Contravariant -> other ty
+    | Invariant ->
+        let coer = same ty in
+        if is_refl_coercion coer then coer
+        else
+          failwith
+            "A dirt in an invariant type argument is instantiated to the empty \
+             dirt"
+  in
+  NoEff.NCoerApply (ty_name, ty_args |> TyParam.Map.values |> List.map coer_arg)
 
 let rec value_coercion_from_impure_dirt empty_dirt_params ty =
   match ty.term with
   | ExEffTypes.TyParam _ -> NoEff.NCoerRefl
-  | ExEffTypes.Apply _ -> NoEff.NCoerRefl
+  | ExEffTypes.Apply { ty_name; ty_args } ->
+      apply_instantiation_coercion
+        ~same:(value_coercion_from_impure_dirt empty_dirt_params)
+        ~other:(value_coercion_to_impure_dirt empty_dirt_params)
+        ty_name ty_args
   | ExEffTypes.Arrow (ty1, drty2) ->
       NoEff.NCoerArrow
         ( value_coercion_to_impure_dirt empty_dirt_params ty1,
@@ -166,7 +200,11 @@ and computation_coercion_from_impure_dirt empty_dirt_params (ty1, drt) =
 and value_coercion_to_impure_dirt empty_dirt_params ty =
   match ty.term with
   | ExEffTypes.TyParam _ -> NoEff.NCoerRefl
-  | ExEffTypes.Apply _ -> NoEff.NCoerRefl
+  | ExEffTypes.Apply { ty_name; ty_args } ->
+      apply_instantiation_coercion
+        ~same:(value_coercion_to_impure_dirt empty_dirt_params)
+        ~other:(value_coercion_from_impure_dirt empty_dirt_params)
+        ty_name ty_args
   | ExEffTypes.Arrow (ty1, drty2) ->
       NoEff.NCoerArrow
         ( value_coercion_from_impure_dirt empty_dirt_params ty1,
