@@ -458,10 +458,14 @@ let elab_tydef = function
       NoEff.TyDefSum (Type.Field.Map.map converter assoc)
   | Inline ty -> NoEff.TyDefInline (elab_ty ty)
 
+(* The coercion parameters of a definition. A use passes its coercions in
+   the order of [Type.TyCoercionParam.Map.bindings] (see [ExEff.Var] in
+   [elab_expression']), so the parameters are sorted in the same order. *)
 let elab_constraints cnstrs =
   Constraints.TyConstraints.fold
     (fun _ _ _ w lst -> w :: lst)
     cnstrs.Constraints.ty_constraints []
+  |> List.sort Type.TyCoercionParam.compare
 
 let elab_top_rec_definitions state defs =
   Assoc.kmap

@@ -399,6 +399,72 @@
   
   let closed_impure = _closed_impure
   ======================================================================
+  codegen/coercion_argument_order.eff
+  ----------------------------------------------------------------------
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | RandomFloat : (float, float) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | Write : (string * string, unit) eff_internal_effect
+  
+  type (_, _) eff_internal_effect += Tick : (unit, unit) eff_internal_effect
+  
+  let _compose _tycoer _tycoer _tycoer _tycoer _tycoer =
+   fun (_f : 'ty -> 'ty computation) ->
+    fun (_g : 'ty -> 'ty computation) ->
+     fun (_x : 'ty) ->
+      coer_computation _tycoer (coer_computation _tycoer (_g (_tycoer _x)))
+      >>= fun _b -> coer_computation _tycoer (_f (_tycoer _b))
+  
+  let compose = _compose
+  
+  let _test =
+   fun (() : unit) ->
+    (closed_handler
+       {
+         value_clause = (fun (_id : int) -> _id);
+         effect_clauses =
+           (fun (type a)
+             (type b)
+             (eff : (a, b) eff_internal_effect)
+             :
+             (a -> (b -> _) -> _)
+           ->
+             match eff with
+             | Tick -> fun (() : unit) _k -> 10 + _k ()
+             | _ -> fun _ _ -> assert false);
+       }
+       (fun (_x : int) -> _x))
+      (coer_arrow coer_refl_ty
+         (coer_arrow
+            (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+            coer_refl_ty)
+         (_compose coer_refl_ty
+            (coer_arrow coer_refl_ty coer_refl_ty)
+            (coer_arrow coer_refl_ty coer_refl_ty)
+            coer_refl_ty
+            (coer_arrow coer_refl_ty coer_refl_ty))
+         (fun (_h : int -> int) ->
+           Call (Tick, (), fun (_y : unit) -> Value (_h 1)))
+         (fun (_x : int) -> fun (_y : int) -> _x + _y)
+         2)
+  
+  let test = _test
+  ======================================================================
   codegen/compose.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
