@@ -9,6 +9,10 @@ type optimization_config = {
   purity_aware_translation : bool;
 }
 
+(* A top-level definition, as the paper's Inline-Top sees it. A [let rec] with
+   one definition is the paper's [let f = rec f x. M]. *)
+type top_definition = TopValue of Term.expression | TopRec of Term.abstraction
+
 type state = {
   fuel : int;
   config : optimization_config;
@@ -21,6 +25,9 @@ type state = {
       (** The functions whose body With-Rec-Fun is rewriting under a handler.
           Inside, they are not specialised again, which is how the paper's
           Termination paragraph stops specialisation from diverging. *)
+  top_definitions : (Term.variable, top_definition) Assoc.t;
+      (** The top-level definitions before the current one: the paper's [D],
+          which only Inline-Top reads. *)
 }
 
 let initial_state config =
@@ -29,6 +36,7 @@ let initial_state config =
     config;
     rec_functions = Assoc.empty;
     specialising = [];
+    top_definitions = Assoc.empty;
   }
 
 let add_rec_definitions state defs =
@@ -107,6 +115,46 @@ let rec extract_cast_value comp =
         (fun expr -> Term.castExp (expr, tcoer))
         (extract_cast_value comp)
   | _ -> None
+
+(* Inline-Top, applied only on demand: where a rule applies right after it.
+   The paper's rule replaces [x η] by the innermost value of [x]'s
+   definition, instantiated at [η]. *)
+let inline_top_value state (x : Term.variable) instantiation =
+  match Assoc.lookup x state.top_definitions with
+  | Some (TopValue e) ->
+      Some
+        (Term.refresh_expression Assoc.empty
+           (Term.apply_sub_exp instantiation e))
+  | _ -> None
+
+(* Inline-Top for an application [x η v]. A recursive [x] becomes a local
+   copy, [let rec x' = M[η][x'/x η] in x' v], which is the paper's
+   [(rec x' y. M[η]) v] in Eff's syntax. Inside its definition, [x] calls
+   itself at the identity instantiation, so after [[η]] every recursive call
+   is [x η], and the substitution replaces them all. *)
+let expand_top_application state (x : Term.variable) instantiation v =
+  match Assoc.lookup x state.top_definitions with
+  | Some (TopValue _) ->
+      Option.map
+        (fun e -> Term.apply (e, v))
+        (inline_top_value state x instantiation)
+  | Some (TopRec abs) ->
+      let abs' = Term.apply_sub_abs instantiation abs in
+      let x' = Term.Variable.refresh x in
+      let x'_var = Term.mono_var x' (Type.arrow abs'.ty) in
+      let abs'' =
+        Term.refresh_abstraction Assoc.empty
+          (Term.subst_abs (Assoc.of_list [ (x, x'_var) ]) abs')
+      in
+      Some (Term.letRec (Assoc.of_list [ (x', abs'') ], Term.apply (x'_var, v)))
+  | None -> None
+
+let rec is_handler_value (e : Term.expression) =
+  match e.term with
+  | Term.Handler _ | Term.HandlerWithFinally _ -> true
+  | Term.CastExp (e, _) -> is_handler_value e
+  | Term.Tuple es -> List.exists is_handler_value es
+  | _ -> false
 
 (* Function specialisation, With-Rec-Fun
 
@@ -441,6 +489,32 @@ and bind_abstraction state { term = pat, comp; _ } bind =
 
 and handle_computation state hnd comp =
   match comp.term with
+  | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
+    when state.fuel > 0
+         && (not (List.mem x state.specialising))
+         &&
+         match Assoc.lookup x state.top_definitions with
+         | Some (TopValue _) -> state.config.handler_reductions
+         | Some (TopRec _) -> state.config.specialize_functions
+         | None -> false -> (
+      (* Inline-Top, so that With-Fun or With-Rec-Fun applies. Each expansion
+         makes a fresh local copy, so the guard of With-Rec-Fun, which records
+         local names, does not stop a cycle through top-level definitions,
+         such as [many1] calling [many many1]. So [x] is not expanded again
+         inside its own expansion. The handler rules call each other without
+         passing through [reduce_if_fuel], so an expansion takes one unit of
+         fuel: fuel bounds how deeply expansions nest. *)
+      let state' =
+        {
+          state with
+          specialising = x :: state.specialising;
+          fuel = state.fuel - 1;
+        }
+      in
+      match expand_top_application state x instantiation v with
+      | Some comp' ->
+          handle_computation state' hnd (optimize_computation state' comp')
+      | None -> assert false)
   | Term.Apply ({ term = Term.Var { variable = f; instantiation; _ }; _ }, v)
     when state.config.specialize_functions
          && (not (List.mem f state.specialising))
@@ -466,17 +540,23 @@ and handle_computation state hnd comp =
   | Term.Value expr ->
       (* With-Ret *)
       beta_reduce state hnd.term.Term.value_clause expr
+  (* With-Match-Pair and With-Match-Sum, With-Let-Val, and the push into a
+     [let rec]. The branches are results of handler rules, which are already
+     optimised, so only the root of the new term is reduced: handling can make
+     Let-Val apply, or leave a recursive function unused. A full pass would
+     rewrite the handled calls left in the branches again, with this state,
+     where the guards of the rules that left them no longer hold. *)
   | Term.Match (expr, cases) ->
       let _, drty_out = hnd.ty in
       Term.match_ (expr, List.map (handle_abstraction state hnd) cases) drty_out
-      |> optimize_computation state
+      |> reduce_computation state
   | LetVal (expr, abs) ->
       Term.letVal (expr, handle_abstraction state hnd abs)
-      |> optimize_computation state
+      |> reduce_computation state
   | LetRec (defs, comp) ->
       Term.letRec
         (defs, handle_computation (add_rec_definitions state defs) hnd comp)
-      |> optimize_computation state
+      |> reduce_computation state
   | Call (eff, expr, abs) -> (
       let handled_abs = handle_abstraction state hnd abs in
       match Assoc.lookup eff hnd.term.Term.effect_clauses.effect_part with
@@ -583,6 +663,12 @@ and reduce_expression state expr = reduce_if_fuel reduce_expression' state expr
 and reduce_expression' state expr =
   match expr.term with
   | Term.CastExp (expr, tcoer) -> cast_expression state expr tcoer
+  | Term.Var { variable; instantiation; _ } -> (
+      (* Inline-Top for a top-level variable or constant, which copies
+         nothing, as the local Let-Val does *)
+      match inline_top_value state variable instantiation with
+      | Some ({ term = Term.Var _ | Term.Const _; _ } as e) -> e
+      | _ -> expr)
   | _ -> expr
 
 and reduce_computation state comp =
@@ -604,6 +690,17 @@ and reduce_computation' state comp =
   | Term.CastComp (comp, dtcoer) -> cast_computation state comp dtcoer
   | Term.LetVal (e, abs) -> beta_reduce state abs e
   | Term.Apply ({ term = Term.Lambda a; _ }, e) -> beta_reduce state a e
+  | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
+    when is_handler_value v
+         &&
+         match Assoc.lookup x state.top_definitions with
+         | Some (TopValue _) -> true
+         | _ -> false -> (
+      (* Inline-Top for a function applied to a handler, so that the handler
+         reaches the [with] that installs it *)
+      match expand_top_application state x instantiation v with
+      | Some comp' -> optimize_computation state comp'
+      | None -> comp)
   | Term.Apply
       ( {
           term =
@@ -624,6 +721,14 @@ and reduce_computation' state comp =
       | [] -> c'
       | defs' -> Term.letRec (Assoc.of_list defs', c'))
   | Term.Bind (comp, abs) -> bind_computation state comp abs
+  | Term.Handle ({ term = Term.Var { variable; instantiation; _ }; _ }, comp')
+    when state.config.handler_reductions
+         && inline_top_value state variable instantiation <> None -> (
+      (* Inline-Top for a top-level handler, so that the handler rules see
+         its clauses *)
+      match inline_top_value state variable instantiation with
+      | Some e -> reduce_computation state (Term.handle (e, comp'))
+      | None -> comp)
   | Term.Handle ({ term = Term.Handler hnd; _ }, comp) ->
       handle_computation state hnd comp
   | Term.Handle
@@ -664,6 +769,10 @@ let process_computation state ((params, comp, constraints) as top_comp) =
     (params, optimize_computation state comp, constraints)
   else top_comp
 
+(* Record a top-level definition for Inline-Top: the paper's [D]. *)
+let add_top_definition state x def =
+  { state with top_definitions = Assoc.update x def state.top_definitions }
+
 let process_top_let state defs =
   if !Config.enable_optimization then
     let defs' =
@@ -672,7 +781,15 @@ let process_top_let state defs =
           (pat, params, cnstrs, optimize_computation state comp))
         defs
     in
-    (state, defs')
+    let state' =
+      List.fold_left
+        (fun state (pat, _, _, comp) ->
+          match (pat.term, comp.term) with
+          | Term.PVar x, Term.Value e -> add_top_definition state x (TopValue e)
+          | _ -> state)
+        state defs'
+    in
+    (state', defs')
   else (state, defs)
 
 let optimize_top_rec_definitions state defs =
@@ -684,5 +801,10 @@ let optimize_top_rec_definitions state defs =
 let process_top_let_rec state defs =
   if !Config.enable_optimization then
     let defs' = optimize_top_rec_definitions state defs in
-    (state, defs')
+    let state' =
+      match Assoc.to_list defs' with
+      | [ (f, (_, _, abs)) ] -> add_top_definition state f (TopRec abs)
+      | _ -> state
+    in
+    (state', defs')
   else (state, defs)
