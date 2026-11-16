@@ -225,13 +225,18 @@ let handler_with_smaller_input_dirt hnd dcoer =
     assert (Dirt.is_subset (forwarded_dirt hnd') (snd drty_out));
     Some hnd'
 
-(* Equality up to renaming of bound term variables (alpha-equivalence), which
-   is how the paper compares handler clauses in With-Rec-Fun. The map [env]
+(* Equality up to renaming of bound term variables (alpha-equivalence) and up
+   to casts, which is how we compare handler clauses in With-Rec-Fun. The
+   paper compares them up to renaming only. Casts do not change what a term
+   computes, since the semantics ignores them, and the optimiser removes or
+   merges them to different degrees in different copies of one handler, so
+   comparing them would stop the knot from being tied. A replacement is still
+   well typed, because its types are checked where it is made. The map [env]
    sends each bound variable of the first term to the corresponding one of the
-   second. Types, coercions and instantiations are compared structurally,
-   which may say [false] for equal ones; that only makes With-Rec-Fun tie the
-   knot less often. A representation of binders with alpha-equivalence would
-   replace these functions. *)
+   second. Instantiations are compared structurally, which may say [false]
+   for equal ones; that only makes With-Rec-Fun tie the knot less often. A
+   representation of binders with alpha-equivalence would replace these
+   functions. *)
 let rec alpha_pattern env p1 p2 =
   match (p1.term, p2.term) with
   | PVar x1, PVar x2 -> Some (Variable.Map.add x1 x2 env)
@@ -265,6 +270,8 @@ let alpha_list alpha env xs1 xs2 =
 
 let rec alpha_expression env e1 e2 =
   match (e1.term, e2.term) with
+  | CastExp (e1, _), _ -> alpha_expression env e1 e2
+  | _, CastExp (e2, _) -> alpha_expression env e1 e2
   | Var v1, Var v2 ->
       let x1 =
         Variable.Map.find_opt v1.variable env
@@ -287,12 +294,12 @@ let rec alpha_expression env e1 e2 =
   | HandlerWithFinally h1, HandlerWithFinally h2 ->
       alpha_handler env h1.handler_clauses h2.handler_clauses
       && alpha_abstraction env h1.finally_clause h2.finally_clause
-  | CastExp (e1, coer1), CastExp (e2, coer2) ->
-      coer1 = coer2 && alpha_expression env e1 e2
   | _ -> false
 
 and alpha_computation env c1 c2 =
   match (c1.term, c2.term) with
+  | CastComp (c1, _), _ -> alpha_computation env c1 c2
+  | _, CastComp (c2, _) -> alpha_computation env c1 c2
   | Value e1, Value e2 -> alpha_expression env e1 e2
   | LetVal (e1, abs1), LetVal (e2, abs2) ->
       alpha_expression env e1 e2 && alpha_abstraction env abs1 abs2
@@ -319,8 +326,6 @@ and alpha_computation env c1 c2 =
       && alpha_abstraction env abs1 abs2
   | Bind (c1, abs1), Bind (c2, abs2) ->
       alpha_computation env c1 c2 && alpha_abstraction env abs1 abs2
-  | CastComp (c1, coer1), CastComp (c2, coer2) ->
-      coer1 = coer2 && alpha_computation env c1 c2
   | Check (_, c1), Check (_, c2) -> alpha_computation env c1 c2
   | _ -> false
 
