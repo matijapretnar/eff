@@ -10,7 +10,9 @@ type optimization_config = {
 }
 
 (* A top-level definition, as the paper's Inline-Top sees it. A [let rec] with
-   one definition is the paper's [let f = rec f x. M]. *)
+   one definition is the paper's [let f = rec f x. M]. Each member of a group
+   of several is recorded on its own: the other members are top-level names
+   in its body. The paper has no mutual recursion. *)
 type top_definition = TopValue of Term.expression | TopRec of Term.abstraction
 type specialisation_mode = Fixed | Varying
 
@@ -28,6 +30,11 @@ type cached_specialisation = {
 }
 
 and specialisation_result =
+  | Building of { name_var : Term.expression; mutable left : int }
+      (** Being built. A handled call of [original] inside it, possibly in the
+          body of another top-level function, goes to [name_var], which ties the
+          knot through mutually recursive top-level functions. In [Fixed] mode,
+          [left] counts the handled calls that could not go there. *)
   | Built of {
       name : Term.variable;
       name_var : Term.expression;
@@ -292,6 +299,45 @@ let extract mode hnd f g' ~left =
   in
   extract_comp
 
+(* The newest specialisation of the top-level [x] at [instantiation] that is
+   being built for a handler with the operation clauses of [hnd], if a handled
+   call [with hnd handle x v] can go to it. A call that could go to a [Fixed]
+   one only with another return clause marks it as [left] instead. *)
+let building_specialisation state hnd x instantiation comp =
+  let matching entry =
+    entry.original = x
+    && entry.instantiation = instantiation
+    && Term.same_operation_clauses entry.handler hnd
+    && match entry.result with Building _ -> true | _ -> false
+  in
+  match List.find_opt matching !(state.specialisations) with
+  | Some { mode; result = Building b; handler; _ } -> (
+      let arg_ty, out_ty =
+        match b.name_var.ty.term with
+        | Type.Arrow (ty, drty) -> (ty, drty)
+        | _ -> assert false
+      in
+      let v_ty =
+        match comp.term with Term.Apply (_, v) -> v.ty | _ -> assert false
+      in
+      let _, drty_out = hnd.ty in
+      let types_agree arg_ty' =
+        Type.equal_ty arg_ty arg_ty' && Type.equal_dirty out_ty drty_out
+      in
+      match mode with
+      | Fixed when Term.same_return_clause handler hnd ->
+          if types_agree v_ty then Some (Fixed, b.name_var) else None
+      | Fixed ->
+          b.left <- b.left + 1;
+          None
+      | Varying ->
+          let ty_in, _ = fst hnd.ty in
+          let k_ty = Type.arrow (ty_in, drty_out) in
+          if types_agree (Type.tuple [ k_ty; v_ty ]) then
+            Some (Varying, b.name_var)
+          else None)
+  | _ -> None
+
 (* A specialisation [rec g p. M] is closed if [M] mentions only [g] and
    top-level names, and no type, dirt or skeleton parameters of the enclosing
    definition. Coercion parameters have types, so they are covered too. *)
@@ -522,6 +568,15 @@ and bind_abstraction state { term = pat, comp; _ } bind =
 and handle_computation state hnd comp =
   match comp.term with
   | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
+    when List.mem x state.specialising
+         && building_specialisation state hnd x instantiation comp <> None -> (
+      match building_specialisation state hnd x instantiation comp with
+      | Some (Fixed, name_var) -> Term.apply (name_var, v)
+      | Some (Varying, name_var) ->
+          Term.apply
+            (name_var, Term.tuple [ Term.lambda hnd.term.value_clause; v ])
+      | None -> assert false)
+  | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
     when state.fuel > 0
          && (not (List.mem x state.specialising))
          &&
@@ -538,13 +593,7 @@ and handle_computation state hnd comp =
          The handler rules call each other without passing through
          [reduce_if_fuel], so an expansion takes one unit of fuel: fuel bounds
          how deeply expansions nest. *)
-      let state' =
-        {
-          state with
-          specialising = x :: state.specialising;
-          fuel = state.fuel - 1;
-        }
-      in
+      let state' = { state with specialising = x :: state.specialising } in
       match Assoc.lookup x state.top_definitions with
       | Some (TopValue _) -> (
           match expand_top_application state x instantiation v with
@@ -694,9 +743,31 @@ and with_rec_fun state hnd f abs v ~top =
     in
     let g_var = Term.mono_var g (g_ty mode) in
     let left = ref false in
+    let building =
+      match top with
+      | None -> None
+      | Some instantiation ->
+          let entry =
+            {
+              original = f;
+              instantiation;
+              mode;
+              handler = hnd;
+              result = Building { name_var = g_var; left = 0 };
+            }
+          in
+          state.specialisations := entry :: !(state.specialisations);
+          Some entry
+    in
     let body' =
       extract mode hnd f g_var ~left (handle_computation state hnd_m body)
     in
+    (match building with
+    | Some ({ result = Building b; _ } as entry) ->
+        if b.left > 0 then left := true;
+        state.specialisations :=
+          List.filter (fun e -> e != entry) !(state.specialisations)
+    | _ -> ());
     (g, g_var, Term.abstraction (g_pat, body'), !left)
   in
   let lookup mode =
@@ -712,7 +783,8 @@ and with_rec_fun state hnd f abs v ~top =
             &&
             match entry.result with
             | Built { name_var; _ } -> Type.equal_ty name_var.ty (g_ty mode)
-            | FixedFails -> true)
+            | FixedFails -> true
+            | Building _ -> false)
           !(state.specialisations)
   in
   let store mode result =
@@ -727,9 +799,24 @@ and with_rec_fun state hnd f abs v ~top =
     match lookup mode with
     | Some { result = Built { name_var; _ }; _ } -> `Shared name_var
     | Some { result = FixedFails; _ } -> `Fails
-    | None ->
+    | Some { result = Building _; _ } | None ->
+        (* If building leaves a handled call that an enclosing [Fixed]
+           attempt could not take, that attempt is discarded, and this
+           specialisation has a handled call that the next attempt would
+           replace. So it is not cached. *)
+        let enclosing = !(state.specialisations) in
+        let enclosing_left () =
+          List.fold_left
+            (fun n e -> match e.result with Building b -> n + b.left | _ -> n)
+            0 enclosing
+        in
+        let left_before = enclosing_left () in
         let g, g_var, g_abs, left = build mode in
-        let closed = top <> None && is_closed state g g_abs in
+        let closed =
+          top <> None
+          && enclosing_left () = left_before
+          && is_closed state g g_abs
+        in
         if left then (
           if closed then store mode FixedFails;
           `Fails)
@@ -967,9 +1054,9 @@ let process_top_let_rec state defs =
   if !Config.enable_optimization then (
     let defs' = optimize_top_rec_definitions state defs in
     let state' =
-      match Assoc.to_list defs' with
-      | [ (f, (_, _, abs)) ] -> add_top_definition state f (TopRec abs)
-      | _ -> state
+      Assoc.fold_left
+        (fun state (f, (_, _, abs)) -> add_top_definition state f (TopRec abs))
+        state defs'
     in
     List.iter (fun (f, _) -> add_top_name state f) (Assoc.to_list defs);
     let fvs =
