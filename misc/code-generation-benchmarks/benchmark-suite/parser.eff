@@ -103,27 +103,6 @@ let rec many1 () =
 ;;
 
 let rec expr () =
-    let rec term () =
-        let rec factor () =
-            if (perform (Decide ())) then (
-                let i = many1 () in
-                (toNum i)
-            ) else (
-                let p = perform (Symbol "(") in
-                let j = expr () in
-                let p = perform (Symbol ")") in
-                j
-            )
-        in
-        if (perform (Decide ())) then (
-            let i = factor () in
-            let p = perform (Symbol "*") in
-            let j = term () in
-            i * j
-        ) else (
-            factor ()
-        )
-    in
     if (perform (Decide ())) then (
         let i = term () in
         let p = perform (Symbol "+") in
@@ -131,6 +110,27 @@ let rec expr () =
         i + j
     ) else (
         term ()
+    )
+
+and term () =
+    if (perform (Decide ())) then (
+        let i = factor () in
+        let p = perform (Symbol "*") in
+        let j = term () in
+        i * j
+    ) else (
+        factor ()
+    )
+
+and factor () =
+    if (perform (Decide ())) then (
+        let i = many1 () in
+        (toNum i)
+    ) else (
+        let p = perform (Symbol "(") in
+        let j = expr () in
+        let p = perform (Symbol ")") in
+        j
     )
 ;;
 
