@@ -12,6 +12,30 @@ type optimization_config = {
 (* A top-level definition, as the paper's Inline-Top sees it. A [let rec] with
    one definition is the paper's [let f = rec f x. M]. *)
 type top_definition = TopValue of Term.expression | TopRec of Term.abstraction
+type specialisation_mode = Fixed | Varying
+
+(* A specialisation of a top-level recursive function under a handler, made
+   by With-Rec-Fun and kept so that it is made only once. If it mentions only
+   top-level names, it becomes a new top-level definition, emitted before the
+   first top-level definition that uses it. *)
+type cached_specialisation = {
+  original : Term.variable;
+  instantiation : Substitution.t;
+  mode : specialisation_mode;
+  handler : Term.handler_clauses;
+      (** In [Varying] mode, only its operation clauses are compared. *)
+  result : specialisation_result;
+}
+
+and specialisation_result =
+  | Built of {
+      name : Term.variable;
+      name_var : Term.expression;
+      definition : Term.abstraction;
+      mutable emitted : bool;
+    }
+  | FixedFails
+      (** The [Fixed] mode leaves a handled call, so [Varying] is used. *)
 
 type state = {
   fuel : int;
@@ -28,6 +52,13 @@ type state = {
   top_definitions : (Term.variable, top_definition) Assoc.t;
       (** The top-level definitions before the current one: the paper's [D],
           which only Inline-Top reads. *)
+  top_names : Term.Variable.Set.t ref;
+      (** All top-level names, including primitives and the names of shared
+          specialisations. A term whose free variables are among them can be a
+          top-level definition. Mutable, because specialisations made deep
+          inside a term must be visible after it. *)
+  specialisations : cached_specialisation list ref;
+      (** The cache of specialisations, newest first *)
 }
 
 let initial_state config =
@@ -37,7 +68,16 @@ let initial_state config =
     rec_functions = Assoc.empty;
     specialising = [];
     top_definitions = Assoc.empty;
+    top_names = ref Term.Variable.Set.empty;
+    specialisations = ref [];
   }
+
+let add_top_name state x =
+  state.top_names := Term.Variable.Set.add x !(state.top_names)
+
+let load_primitive_value state x =
+  add_top_name state x;
+  state
 
 let add_rec_definitions state defs =
   match Assoc.to_list defs with
@@ -127,27 +167,12 @@ let inline_top_value state (x : Term.variable) instantiation =
            (Term.apply_sub_exp instantiation e))
   | _ -> None
 
-(* Inline-Top for an application [x η v]. A recursive [x] becomes a local
-   copy, [let rec x' = M[η][x'/x η] in x' v], which is the paper's
-   [(rec x' y. M[η]) v] in Eff's syntax. Inside its definition, [x] calls
-   itself at the identity instantiation, so after [[η]] every recursive call
-   is [x η], and the substitution replaces them all. *)
+(* Inline-Top for an application [x η v] of a non-recursive [x], followed by
+   β. A recursive [x] goes to With-Rec-Fun directly; see [with_rec_fun]. *)
 let expand_top_application state (x : Term.variable) instantiation v =
-  match Assoc.lookup x state.top_definitions with
-  | Some (TopValue _) ->
-      Option.map
-        (fun e -> Term.apply (e, v))
-        (inline_top_value state x instantiation)
-  | Some (TopRec abs) ->
-      let abs' = Term.apply_sub_abs instantiation abs in
-      let x' = Term.Variable.refresh x in
-      let x'_var = Term.mono_var x' (Type.arrow abs'.ty) in
-      let abs'' =
-        Term.refresh_abstraction Assoc.empty
-          (Term.subst_abs (Assoc.of_list [ (x, x'_var) ]) abs')
-      in
-      Some (Term.letRec (Assoc.of_list [ (x', abs'') ], Term.apply (x'_var, v)))
-  | None -> None
+  Option.map
+    (fun e -> Term.apply (e, v))
+    (inline_top_value state x instantiation)
 
 let rec is_handler_value (e : Term.expression) =
   match e.term with
@@ -186,8 +211,6 @@ let rec is_handler_value (e : Term.expression) =
    under a [fun], such as [Get] in a state handler, puts the recursive call
    inside a function body. Replacing [with H handle f w] by [g' w] is correct
    in any context where [g'] is in scope. *)
-
-type specialisation_mode = Fixed | Varying
 
 let extract mode hnd f g' ~left =
   let rec extract_comp comp =
@@ -268,6 +291,15 @@ let extract mode hnd f g' ~left =
     }
   in
   extract_comp
+
+(* A specialisation [rec g p. M] is closed if [M] mentions only [g] and
+   top-level names, and no type, dirt or skeleton parameters of the enclosing
+   definition. Coercion parameters have types, so they are covered too. *)
+let is_closed state g abs =
+  Term.Variable.Map.for_all
+    (fun x n -> n = 0 || x = g || Term.Variable.Set.mem x !(state.top_names))
+    (Term.free_vars_abs abs)
+  && Type.Params.subset (Term.free_params_abstraction abs) Type.Params.empty
 
 let rec optimize_expression state expr =
   (* Print.debug "Optimizing expression: %t" (Term.print_expression expr); *)
@@ -495,15 +527,17 @@ and handle_computation state hnd comp =
          &&
          match Assoc.lookup x state.top_definitions with
          | Some (TopValue _) -> state.config.handler_reductions
-         | Some (TopRec _) -> state.config.specialize_functions
+         | Some (TopRec _) ->
+             state.config.specialize_functions
+             && Type.equal_dirty comp.ty (fst hnd.ty)
          | None -> false -> (
-      (* Inline-Top, so that With-Fun or With-Rec-Fun applies. Each expansion
-         makes a fresh local copy, so the guard of With-Rec-Fun, which records
-         local names, does not stop a cycle through top-level definitions,
-         such as [many1] calling [many many1]. So [x] is not expanded again
-         inside its own expansion. The handler rules call each other without
-         passing through [reduce_if_fuel], so an expansion takes one unit of
-         fuel: fuel bounds how deeply expansions nest. *)
+      (* Inline-Top, so that With-Fun or With-Rec-Fun applies. A top-level
+         name is not expanded again inside its own expansion: the guard of
+         With-Rec-Fun records local names, so it would not stop a cycle
+         through top-level definitions, such as [many1] calling [many many1].
+         The handler rules call each other without passing through
+         [reduce_if_fuel], so an expansion takes one unit of fuel: fuel bounds
+         how deeply expansions nest. *)
       let state' =
         {
           state with
@@ -511,9 +545,16 @@ and handle_computation state hnd comp =
           fuel = state.fuel - 1;
         }
       in
-      match expand_top_application state x instantiation v with
-      | Some comp' ->
-          handle_computation state' hnd (optimize_computation state' comp')
+      match Assoc.lookup x state.top_definitions with
+      | Some (TopValue _) -> (
+          match expand_top_application state x instantiation v with
+          | Some comp' ->
+              handle_computation state' hnd (optimize_computation state' comp')
+          | None -> assert false)
+      | Some (TopRec abs) ->
+          with_rec_fun state' hnd x
+            (Term.apply_sub_abs instantiation abs)
+            v ~top:(Some instantiation)
       | None -> assert false)
   | Term.Apply ({ term = Term.Var { variable = f; instantiation; _ }; _ }, v)
     when state.config.specialize_functions
@@ -522,7 +563,11 @@ and handle_computation state hnd comp =
          && Type.equal_dirty comp.ty (fst hnd.ty) -> (
       match Assoc.lookup f state.rec_functions with
       | Some abs ->
-          with_rec_fun state hnd f (Term.apply_sub_abs instantiation abs) v
+          with_rec_fun
+            { state with specialising = f :: state.specialising }
+            hnd f
+            (Term.apply_sub_abs instantiation abs)
+            v ~top:None
       | None -> assert false)
   | _ when not state.config.handler_reductions ->
       Term.handle (Term.handler hnd, comp)
@@ -598,51 +643,116 @@ and handle_computation state hnd comp =
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
 
-(* With-Rec-Fun; see the comment at [extract] *)
-and with_rec_fun state hnd f abs v =
+(* With-Rec-Fun; see the comment at [extract]. [f] is already in
+   [state.specialising].
+
+   For a top-level [f] at the instantiation [top], the paper first applies
+   Inline-Top, which gives a local copy [rec f' x. M[η]]. We specialise [f]
+   itself: the calls that [extract] leaves go to [f η], which Inline-Top would
+   turn into [f'] anyway. Then the specialisation is closed if the handler
+   mentions only top-level names, which is always the case for the operation
+   clauses in the tests, and the return clause too in [Fixed] mode. A closed
+   specialisation becomes a new top-level definition and is cached, so the
+   next call of [f] under an equal handler reuses it. *)
+and with_rec_fun state hnd f abs v ~top =
   let { term = pat, body; ty = ty_arg, _ } =
     Term.refresh_abstraction Assoc.empty abs
   in
   let (ty_in, _), drty_out = hnd.ty in
-  let state' = { state with specialising = f :: state.specialising } in
-  let attempt mode =
-    let g_arg_ty, hnd_m, g_pat, g_arg =
+  let k_ty = Type.arrow (ty_in, drty_out) in
+  let g_ty = function
+    | Fixed -> Type.arrow (ty_arg, drty_out)
+    | Varying -> Type.arrow (Type.tuple [ k_ty; ty_arg ], drty_out)
+  in
+  let call mode g_var =
+    match mode with
+    | Fixed -> Term.apply (g_var, v)
+    | Varying ->
+        Term.apply (g_var, Term.tuple [ Term.lambda hnd.term.value_clause; v ])
+  in
+  let build mode =
+    let hnd_m, g_pat =
       match mode with
-      | Fixed -> (ty_arg, hnd, pat, v)
+      | Fixed -> (hnd, pat)
       | Varying ->
-          let k_ty = Type.arrow (ty_in, drty_out) in
           let k_pat, k_var = Term.fresh_variable "k" k_ty in
           let y_pat, y_var = Term.fresh_variable "y" ty_in in
           let hnd_k =
             Term.handler_with_new_value_clause hnd
               (Term.abstraction (y_pat, Term.apply (k_var, y_var)))
           in
-          ( Type.tuple [ k_ty; ty_arg ],
-            hnd_k,
-            Term.pTuple [ k_pat; pat ],
-            Term.tuple [ Term.lambda hnd.term.value_clause; v ] )
+          (hnd_k, Term.pTuple [ k_pat; pat ])
     in
-    let g = Term.Variable.refresh f in
-    let g_var = Term.mono_var g (Type.arrow (g_arg_ty, drty_out)) in
+    let g =
+      match top with
+      | None -> Term.Variable.refresh f
+      | Some _ ->
+          (* It may become a top-level definition, which needs a name that
+             no source definition has. *)
+          Term.Variable.fresh
+            ("$handled_" ^ Term.Variable.fold (fun desc _ -> desc) f)
+    in
+    let g_var = Term.mono_var g (g_ty mode) in
     let left = ref false in
     let body' =
-      extract mode hnd f g_var ~left (handle_computation state' hnd_m body)
+      extract mode hnd f g_var ~left (handle_computation state hnd_m body)
     in
-    let comp =
-      Term.letRec
-        ( Assoc.of_list [ (g, Term.abstraction (g_pat, body')) ],
-          Term.apply (g_var, g_arg) )
-    in
-    (comp, !left)
+    (g, g_var, Term.abstraction (g_pat, body'), !left)
   in
-  let comp =
-    match attempt Fixed with
-    | comp, false -> comp
-    | _, true -> fst (attempt Varying)
+  let lookup mode =
+    match top with
+    | None -> None
+    | Some instantiation ->
+        List.find_opt
+          (fun entry ->
+            entry.original = f && entry.mode = mode
+            && entry.instantiation = instantiation
+            && Term.same_operation_clauses entry.handler hnd
+            && (mode = Varying || Term.same_return_clause entry.handler hnd)
+            &&
+            match entry.result with
+            | Built { name_var; _ } -> Type.equal_ty name_var.ty (g_ty mode)
+            | FixedFails -> true)
+          !(state.specialisations)
   in
-  (* Still with [f] in [specialising]: calls of [f] that [extract] has left
-     are not specialised again. *)
-  optimize_computation state' comp
+  let store mode result =
+    match top with
+    | None -> ()
+    | Some instantiation ->
+        state.specialisations :=
+          { original = f; instantiation; mode; handler = hnd; result }
+          :: !(state.specialisations)
+  in
+  let specialise mode =
+    match lookup mode with
+    | Some { result = Built { name_var; _ }; _ } -> `Shared name_var
+    | Some { result = FixedFails; _ } -> `Fails
+    | None ->
+        let g, g_var, g_abs, left = build mode in
+        let closed = top <> None && is_closed state g g_abs in
+        if left then (
+          if closed then store mode FixedFails;
+          `Fails)
+        else if closed then (
+          let definition = optimize_abstraction state g_abs in
+          add_top_name state g;
+          store mode
+            (Built { name = g; name_var = g_var; definition; emitted = false });
+          `Shared g_var)
+        else `Local (g, g_var, g_abs)
+  in
+  let finish mode = function
+    | `Shared g_var -> call mode g_var
+    | `Local (g, g_var, g_abs) ->
+        (* Still with [f] in [specialising]: calls of [f] that [extract] has
+           left are not specialised again. *)
+        optimize_computation state
+          (Term.letRec (Assoc.of_list [ (g, g_abs) ], call mode g_var))
+    | `Fails -> assert false
+  in
+  match specialise Fixed with
+  | `Fails -> finish Varying (specialise Varying)
+  | result -> finish Fixed result
 
 and beta_reduce state ({ term = _, comp; _ } as abs) expr =
   (* Print.debug "Beta reduce: %t; %t"
@@ -764,17 +874,39 @@ and reduce_computation' state comp =
       match reduce_constant_match state c abs with Some t -> t | None -> comp)
   | _ -> comp
 
+(* The shared specialisations that the terms with free variables [fvs] use,
+   directly or through each other, and that are not emitted yet. A
+   specialisation uses only older ones, so one pass from newest to oldest
+   finds them all, and the result is in the order of definition. *)
+let new_top_definitions state fvs =
+  let used = ref fvs in
+  let is_used x = not (Term.does_not_occur x !used) in
+  List.fold_left
+    (fun defs entry ->
+      match entry.result with
+      | Built ({ name; definition; emitted = false; _ } as b) when is_used name
+        ->
+          b.emitted <- true;
+          used := Term.( @@@ ) !used (Term.free_vars_abs definition);
+          Assoc.of_list
+            [ (name, (Type.Params.empty, Constraints.empty, definition)) ]
+          :: defs
+      | _ -> defs)
+    [] !(state.specialisations)
+
 let process_computation state ((params, comp, constraints) as top_comp) =
   if !Config.enable_optimization then
-    (params, optimize_computation state comp, constraints)
-  else top_comp
+    let comp' = optimize_computation state comp in
+    ( new_top_definitions state (Term.free_vars_comp comp'),
+      (params, comp', constraints) )
+  else ([], top_comp)
 
 (* Record a top-level definition for Inline-Top: the paper's [D]. *)
 let add_top_definition state x def =
   { state with top_definitions = Assoc.update x def state.top_definitions }
 
 let process_top_let state defs =
-  if !Config.enable_optimization then
+  if !Config.enable_optimization then (
     let defs' =
       List.map
         (fun (pat, params, cnstrs, comp) ->
@@ -789,8 +921,18 @@ let process_top_let state defs =
           | _ -> state)
         state defs'
     in
-    (state', defs')
-  else (state, defs)
+    List.iter
+      (fun (pat, _, _, _) ->
+        Term.Variable.Map.iter
+          (fun x _ -> add_top_name state x)
+          (Term.pattern_vars pat))
+      defs;
+    let fvs =
+      Term.concat_vars
+        (List.map (fun (_, _, _, c) -> Term.free_vars_comp c) defs')
+    in
+    (state', new_top_definitions state fvs, defs'))
+  else (state, [], defs)
 
 let optimize_top_rec_definitions state defs =
   Assoc.map
@@ -799,12 +941,19 @@ let optimize_top_rec_definitions state defs =
     defs
 
 let process_top_let_rec state defs =
-  if !Config.enable_optimization then
+  if !Config.enable_optimization then (
     let defs' = optimize_top_rec_definitions state defs in
     let state' =
       match Assoc.to_list defs' with
       | [ (f, (_, _, abs)) ] -> add_top_definition state f (TopRec abs)
       | _ -> state
     in
-    (state', defs')
-  else (state, defs)
+    List.iter (fun (f, _) -> add_top_name state f) (Assoc.to_list defs);
+    let fvs =
+      Term.concat_vars
+        (List.map
+           (fun (_, (_, _, abs)) -> Term.free_vars_abs abs)
+           (Assoc.to_list defs'))
+    in
+    (state', new_top_definitions state fvs, defs'))
+  else (state, [], defs)

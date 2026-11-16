@@ -44,9 +44,13 @@ module Backend : Language.Backend.S = struct
   let process_top_let_rec state defs =
     Assoc.iter
       (fun (f, ((params : Type.Params.t), _constraints, abs)) ->
-        Format.fprintf !Config.output_formatter "@[val %t : %t = <fun>@]@."
-          (Language.Term.Variable.print f)
-          (Type.print_pretty params.skel_params (Type.arrow abs.ty).ty))
+        (* A name that starts with [$] has no source, such as a specialisation
+           that the optimiser has made a top-level definition. *)
+        if not (Language.Term.Variable.fold (fun desc _ -> desc.[0] = '$') f)
+        then
+          Format.fprintf !Config.output_formatter "@[val %t : %t = <fun>@]@."
+            (Language.Term.Variable.print f)
+            (Type.print_pretty params.skel_params (Type.arrow abs.ty).ty))
       defs;
     Eval.extend_let_rec state (Assoc.map (fun (_, _, abs) -> abs) defs)
 

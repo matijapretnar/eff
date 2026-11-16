@@ -73,6 +73,15 @@ let pp_variable ?(safe = true) state var ppf =
               | "$id_par" -> Format.fprintf ppf "_id_%d" n
               | "$anon" -> Format.fprintf ppf "_anon_%d" n
               | "$bind" -> Format.fprintf ppf "_b_%d" n
+              | _ when String.starts_with ~prefix:"$handled_" desc ->
+                  (* A specialisation that the optimiser has made a top-level
+                     definition. It has no source name, so even the unsafe
+                     name is numbered. *)
+                  let name = String.sub desc 9 (String.length desc - 9) in
+                  let name =
+                    match name.[0] with 'a' .. 'z' | '_' -> name | _ -> "op"
+                  in
+                  Format.fprintf ppf "_handled_%s_%d" name n
               | _ -> Format.fprintf ppf "_x_%d" n)
           | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
       in

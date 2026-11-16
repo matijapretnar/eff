@@ -43,13 +43,17 @@ module Make (Backend : Language.Backend.S) = struct
       Language.Term.Variable.fresh (Primitives.primitive_value_name prim)
     in
     {
-      state with
       desugarer_state =
         Desugarer.load_primitive_value state.desugarer_state x prim;
       type_system_state =
         TypeSystem.load_primitive_value state.type_system_state x prim;
+      optimizer_state = Optimizer.load_primitive_value state.optimizer_state x;
       backend_state = Backend.load_primitive_value state.backend_state x prim;
     }
+
+  (* Definitions that the optimiser adds before the current one *)
+  let emit_top_rec_definitions backend_state defs =
+    List.fold_left Backend.process_top_let_rec backend_state defs
 
   let initialize () =
     Random.self_init ();
@@ -88,9 +92,13 @@ module Make (Backend : Language.Backend.S) = struct
     | Commands.Term t ->
         let _, c = Desugarer.desugar_computation state.desugarer_state t in
         let c' = TypeSystem.process_computation state.type_system_state c in
-        let c'' = Optimizer.process_computation state.optimizer_state c' in
+        let new_defs, c'' =
+          Optimizer.process_computation state.optimizer_state c'
+        in
         let backend_state' =
-          Backend.process_computation state.backend_state c''
+          Backend.process_computation
+            (emit_top_rec_definitions state.backend_state new_defs)
+            c''
         in
         { state with backend_state = backend_state' }
     | Commands.TypeOf t ->
@@ -98,11 +106,13 @@ module Make (Backend : Language.Backend.S) = struct
         let top_comp =
           TypeSystem.process_computation state.type_system_state c
         in
-        let top_comp' =
+        let new_defs, top_comp' =
           Optimizer.process_computation state.optimizer_state top_comp
         in
         let backend_state' =
-          Backend.process_type_of state.backend_state top_comp'
+          Backend.process_type_of
+            (emit_top_rec_definitions state.backend_state new_defs)
+            top_comp'
         in
         { state with backend_state = backend_state' }
     | Commands.Help ->
@@ -142,11 +152,13 @@ module Make (Backend : Language.Backend.S) = struct
         let type_system_state', defs'' =
           TypeSystem.process_top_let ~loc state.type_system_state defs'
         in
-        let optimizer_state', defs''' =
+        let optimizer_state', new_defs, defs''' =
           Optimizer.process_top_let state.optimizer_state defs''
         in
         let backend_state' =
-          Backend.process_top_let state.backend_state defs'''
+          Backend.process_top_let
+            (emit_top_rec_definitions state.backend_state new_defs)
+            defs'''
         in
         {
           desugarer_state = desugarer_state';
@@ -162,11 +174,13 @@ module Make (Backend : Language.Backend.S) = struct
         let type_system_state', defs''' =
           TypeSystem.process_top_let_rec ~loc state.type_system_state defs''
         in
-        let optimizer_state', defs'''' =
+        let optimizer_state', new_defs, defs'''' =
           Optimizer.process_top_let_rec state.optimizer_state defs'''
         in
         let backend_state' =
-          Backend.process_top_let_rec state.backend_state defs''''
+          Backend.process_top_let_rec
+            (emit_top_rec_definitions state.backend_state new_defs)
+            defs''''
         in
         {
           desugarer_state = desugarer_state';
