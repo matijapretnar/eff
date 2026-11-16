@@ -750,9 +750,32 @@ and with_rec_fun state hnd f abs v ~top =
           (Term.letRec (Assoc.of_list [ (g, g_abs) ], call mode g_var))
     | `Fails -> assert false
   in
-  match specialise Fixed with
-  | `Fails -> finish Varying (specialise Varying)
-  | result -> finish Fixed result
+  (* For a top-level [f], a [Fixed] specialisation can be shared only if the
+     return clause is closed, and a [Varying] one if the operation clauses
+     are. If only the latter holds, we use [Varying], which is slower at run
+     time but made once, instead of a local [Fixed] copy at every call. *)
+  let share_varying =
+    let top_only fvs =
+      Term.Variable.Map.for_all
+        (fun x n -> n = 0 || Term.Variable.Set.mem x !(state.top_names))
+        fvs
+    in
+    Term.Variable.Map.empty
+    |> Assoc.fold_right
+         (fun (_, abs2) fvs -> Term.( @@@ ) fvs (Term.free_vars_abs2 abs2))
+         hnd.term.effect_clauses.effect_part
+    |> top_only
+    && Type.Params.subset
+         (Term.free_params_handler_clauses hnd)
+         Type.Params.empty
+    && not (top_only (Term.free_vars_abs hnd.term.value_clause))
+  in
+  match top with
+  | Some _ when share_varying -> finish Varying (specialise Varying)
+  | _ -> (
+      match specialise Fixed with
+      | `Fails -> finish Varying (specialise Varying)
+      | result -> finish Fixed result)
 
 and beta_reduce state ({ term = _, comp; _ } as abs) expr =
   (* Print.debug "Beta reduce: %t; %t"
