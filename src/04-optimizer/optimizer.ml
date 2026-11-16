@@ -52,10 +52,17 @@ type state = {
           with one definition: [let rec f x = M in N] is the paper's
           [let f = rec f x. M in N], and a group of several mutually recursive
           definitions has no counterpart in the paper. *)
-  specialising : Term.variable list;
-      (** The functions whose body With-Rec-Fun is rewriting under a handler.
-          Inside, they are not specialised again, which is how the paper's
-          Termination paragraph stops specialisation from diverging. *)
+  specialising : (Term.variable * Term.effect_fingerprint) list;
+      (** The functions whose body With-Rec-Fun is rewriting under a handler, as
+          the source function and the fingerprint of the handler. Inside, a
+          function is not specialised again under a handler with the same
+          fingerprint, which comes from the same source handler. Under other
+          handlers it is. There are finitely many source functions and
+          fingerprints, so specialisations nest only finitely deep. The paper's
+          Termination paragraph does not specialise a specialised function at
+          all. *)
+  origins : Term.variable Term.Variable.Map.t ref;
+      (** The source function of each specialisation *)
   top_definitions : (Term.variable, top_definition) Assoc.t;
       (** The top-level definitions before the current one: the paper's [D],
           which only Inline-Top reads. *)
@@ -74,6 +81,7 @@ let initial_state config =
     config;
     rec_functions = Assoc.empty;
     specialising = [];
+    origins = ref Term.Variable.Map.empty;
     top_definitions = Assoc.empty;
     top_names = ref Term.Variable.Set.empty;
     specialisations = ref [];
@@ -298,6 +306,37 @@ let extract mode hnd f g' ~left =
     }
   in
   extract_comp
+
+let origin state f =
+  Term.Variable.Map.find_opt f !(state.origins) |> Option.value ~default:f
+
+let may_specialise state f (hnd : Term.handler_clauses) =
+  not
+    (List.mem
+       (origin state f, hnd.term.effect_clauses.fingerprint)
+       state.specialising)
+
+let specialising_under state f (hnd : Term.handler_clauses) =
+  {
+    state with
+    specialising =
+      (origin state f, hnd.term.effect_clauses.fingerprint)
+      :: state.specialising;
+  }
+
+(* A top-level definition: a source one, or a shared specialisation, which
+   Inline-Top sees like any other. *)
+let top_definition state x =
+  match Assoc.lookup x state.top_definitions with
+  | Some def -> Some def
+  | None ->
+      List.find_map
+        (fun entry ->
+          match entry.result with
+          | Built { name; definition; _ } when name = x ->
+              Some (TopRec definition)
+          | _ -> None)
+        !(state.specialisations)
 
 (* The newest specialisation of the top-level [x] at [instantiation] that is
    being built for a handler with the operation clauses of [hnd], if a handled
@@ -568,8 +607,7 @@ and bind_abstraction state { term = pat, comp; _ } bind =
 and handle_computation state hnd comp =
   match comp.term with
   | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
-    when List.mem x state.specialising
-         && building_specialisation state hnd x instantiation comp <> None -> (
+    when building_specialisation state hnd x instantiation comp <> None -> (
       match building_specialisation state hnd x instantiation comp with
       | Some (Fixed, name_var) -> Term.apply (name_var, v)
       | Some (Varying, name_var) ->
@@ -577,24 +615,20 @@ and handle_computation state hnd comp =
             (name_var, Term.tuple [ Term.lambda hnd.term.value_clause; v ])
       | None -> assert false)
   | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
-    when state.fuel > 0
-         && (not (List.mem x state.specialising))
+    when state.fuel > 0 && may_specialise state x hnd
          &&
-         match Assoc.lookup x state.top_definitions with
+         match top_definition state x with
          | Some (TopValue _) -> state.config.handler_reductions
          | Some (TopRec _) ->
              state.config.specialize_functions
              && Type.equal_dirty comp.ty (fst hnd.ty)
          | None -> false -> (
-      (* Inline-Top, so that With-Fun or With-Rec-Fun applies. A top-level
-         name is not expanded again inside its own expansion: the guard of
-         With-Rec-Fun records local names, so it would not stop a cycle
-         through top-level definitions, such as [many1] calling [many many1].
-         The handler rules call each other without passing through
-         [reduce_if_fuel], so an expansion takes one unit of fuel: fuel bounds
-         how deeply expansions nest. *)
-      let state' = { state with specialising = x :: state.specialising } in
-      match Assoc.lookup x state.top_definitions with
+      (* Inline-Top, so that With-Fun or With-Rec-Fun applies. The guard is
+         that of With-Rec-Fun, also for a non-recursive [x], so that it stops
+         a cycle through top-level definitions, such as [many1] calling
+         [many many1]. *)
+      let state' = specialising_under state x hnd in
+      match top_definition state x with
       | Some (TopValue _) -> (
           match expand_top_application state x instantiation v with
           | Some comp' ->
@@ -606,14 +640,13 @@ and handle_computation state hnd comp =
             v ~top:(Some instantiation)
       | None -> assert false)
   | Term.Apply ({ term = Term.Var { variable = f; instantiation; _ }; _ }, v)
-    when state.config.specialize_functions
-         && (not (List.mem f state.specialising))
+    when state.config.specialize_functions && may_specialise state f hnd
          && Assoc.lookup f state.rec_functions <> None
          && Type.equal_dirty comp.ty (fst hnd.ty) -> (
       match Assoc.lookup f state.rec_functions with
       | Some abs ->
           with_rec_fun
-            { state with specialising = f :: state.specialising }
+            (specialising_under state f hnd)
             hnd f
             (Term.apply_sub_abs instantiation abs)
             v ~top:None
@@ -693,7 +726,7 @@ and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
 
 (* With-Rec-Fun; see the comment at [extract]. [f] is already in
-   [state.specialising].
+   [state.specialising] with the fingerprint of [hnd].
 
    For a top-level [f] at the instantiation [top], the paper first applies
    Inline-Top, which gives a local copy [rec f' x. M[η]]. We specialise [f]
@@ -739,9 +772,11 @@ and with_rec_fun state hnd f abs v ~top =
           (* It may become a top-level definition, which needs a name that
              no source definition has. *)
           Term.Variable.fresh
-            ("$handled_" ^ Term.Variable.fold (fun desc _ -> desc) f)
+            ("$handled_"
+            ^ Term.Variable.fold (fun desc _ -> desc) (origin state f))
     in
     let g_var = Term.mono_var g (g_ty mode) in
+    state.origins := Term.Variable.Map.add g (origin state f) !(state.origins);
     let left = ref false in
     let building =
       match top with
@@ -832,7 +867,7 @@ and with_rec_fun state hnd f abs v ~top =
     | `Shared g_var -> call mode g_var
     | `Local (g, g_var, g_abs) ->
         (* Still with [f] in [specialising]: calls of [f] that [extract] has
-           left are not specialised again. *)
+           left are not specialised again under the same handler. *)
         optimize_computation state
           (Term.letRec (Assoc.of_list [ (g, g_abs) ], call mode g_var))
     | `Fails -> assert false
