@@ -97,7 +97,7 @@ let rec pp_type noeff_ty ppf =
   | NTyArrow (ty1, ty2) ->
       print ppf "@[<h>(%t ->@ %t)@]" (pp_type ty1) (pp_type ty2)
   | NTyHandler (ty1, ty2) ->
-      print ppf "@[<h>(%t ->@ %t)@]" (pp_type ty1) (pp_type ty2)
+      print ppf "@[<h>(%t computation ->@ %t)@]" (pp_type ty1) (pp_type ty2)
   | NTyComp ty -> print ppf "%t computation" (pp_type ty)
 
 let rec pp_pattern ?(safe = true) state pat ppf =
@@ -214,26 +214,28 @@ let rec pp_term ?max_level ?(top_level = false) state noEff_term ppf =
         (pp_coercion ~max_level:1 c)
         (pp_term state ~max_level:0 t)
   | NReturn t -> print ~at_level:1 "Value %t" (pp_term state ~max_level:0 t)
-  | NHandler { effect_clauses; return_clause; finally_clause } ->
+  | NHandler { forwarding; effect_clauses; return_clause; finally_clause } ->
+      let handler = if forwarding then "handler" else "closed_handler" in
       (* Top level handlers need to be printed in a fully applied form,
          otherwise value restriction kicks in when compiling the
          resulting files with OCaml*)
       if top_level then
         let v = Variable.fresh "cmd" in
         print ~at_level:2
-          "(fun %t -> handler {@[<hov>value_clause = (fun %t);@] \
+          "(fun %t -> %s {@[<hov>value_clause = (fun %t);@] \
            @[<hov>effect_clauses = %t;@]} (@[<hov>(fun %t)@]) %t)"
-          (pp_variable state v)
+          (pp_variable state v) handler
           (pp_abs_with_ty state return_clause)
-          (pp_effect_cls state effect_clauses)
+          (pp_effect_cls state forwarding effect_clauses)
           (pp_abs_with_ty state finally_clause)
           (pp_term state (SyntaxNoEff.NVar { variable = v; coercions = [] }))
       else
         print ~at_level:2
-          "handler {@[<hov>value_clause = (fun %t);@] @[<hov>effect_clauses = \
+          "%s {@[<hov>value_clause = (fun %t);@] @[<hov>effect_clauses = \
            %t;@]} (@[<hov>(fun %t)@])"
+          handler
           (pp_abs_with_ty state return_clause)
-          (pp_effect_cls state effect_clauses)
+          (pp_effect_cls state forwarding effect_clauses)
           (pp_abs_with_ty state finally_clause)
   | NLet (t1, (pat, t2)) ->
       print ~at_level:2 "@[<hv>@[<hv>let %t = %t in@] @,%t@]"
@@ -309,20 +311,28 @@ and pp_top_let_rec state lst ppf =
   in
   pp_lets "let rec" pp_top_let_rec_def lst ppf
 
-and pp_effect_cls state eff_cls ppf =
+and pp_effect_cls state forwarding eff_cls ppf =
   let pp_effect_abs2 (((_, (ty1, _)) as eff), (pat1, pat2, t)) ppf =
     print ppf "@[<hv 2>| %t -> fun (%t : %t) %t -> %t @]" (pp_effect eff)
       (pp_pattern state pat1) (pp_type ty1) (pp_pattern state pat2)
       (pp_term state t)
+  in
+  (* The default case is the base [fwd] of a forwarding handler. A closed
+     handler is only applied to computations that call handled operations,
+     so its default case is never reached. *)
+  let default =
+    if forwarding then "| eff' -> (fun arg k -> Call (eff', arg, k))"
+    else "| _ -> (fun _ _ -> assert false)"
   in
   print ppf
     "@[<h>(fun (type a) (type b) (eff : (a, b) eff_internal_effect) : (a -> (b \
      -> _) -> _) -> \n\
     \  (match eff with\n\
     \    %t  \n\
-    \    | eff' -> (fun arg k -> Call (eff', arg, k))\n\
+    \    %s\n\
     \      ))@]"
     (pp_sequence " " pp_effect_abs2 (Assoc.to_list eff_cls))
+    default
 
 let pp_def_effect (eff, (ty1, ty2)) ppf =
   print ppf

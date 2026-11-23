@@ -1,0 +1,10 @@
+(* A function that is polymorphic in a dirt inside a list argument, used at
+   the empty dirt. The instantiation coercion goes through coer_list. *)
+
+let rec map f = function
+  | [] -> []
+  | x :: xs -> f x :: map f xs
+
+let apply_all fs x = map (fun f -> f x) fs
+
+let test () = apply_all [(fun x -> x + 1); (fun x -> 2 * x)] 3

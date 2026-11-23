@@ -1,0 +1,12 @@
+(* A polymorphic function whose coercion arguments differ, so they must be
+   passed in the order the definition takes them. *)
+
+effect Tick : unit -> unit
+
+let compose f g x = f (g x)
+
+let test () =
+  handle
+    compose (fun h -> perform (Tick ()); h 1) (fun x -> (fun y -> x + y)) 2
+  with
+  | effect (Tick ()) k -> 10 + k ()

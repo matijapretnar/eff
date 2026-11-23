@@ -32,6 +32,17 @@ let handler (h : ('a, 'b computation) handler_clauses)
   in
   fun comp -> handler comp >>= finally_clause
 
+(* A handler with no forwarding case: its clauses return any type. *)
+let closed_handler (h : ('a, 'b) handler_clauses) (finally_clause : 'b -> 'c) :
+    'a computation -> 'c =
+  let rec handler = function
+    | Value x -> h.value_clause x
+    | Call (eff, arg, k) ->
+        let clause = h.effect_clauses eff in
+        clause arg (fun y -> handler (k y))
+  in
+  fun comp -> finally_clause (handler comp)
+
 let rec lift (f : 'a -> 'b) : 'a computation -> 'b computation = function
   | Value x -> Value (f x)
   | Call (eff, arg, k) -> Call (eff, arg, fun y -> lift f (k y))
@@ -86,10 +97,11 @@ let coer_arrow coer1 coer2 f x = coer2 (f (coer1 x))
 let coer_handler coer1 coer2 h x = coer2 (h (coer1 x))
 let coer_hand_to_fun coer1 coer2 h x = coer2 (h (Value (coer1 x)))
 
-let rec coer_fun_to_hand coer1 coer2 f comp =
+(* As in the paper, undefined on an operation call: the function it coerces
+   handles no operations. *)
+let coer_fun_to_hand coer1 coer2 f comp =
   match comp with
   | Value t -> coer2 (f (coer1 t))
-  | Call (eff, arg, k) ->
-      Call (eff, arg, fun x -> coer_fun_to_hand coer1 coer2 f (k x))
+  | Call (_eff, _arg, _k) -> failwith "Unsafe coercion"
 
 let coer_list coer = List.map coer
