@@ -204,23 +204,38 @@
     let rec _init _x (_acc : intlist) =
       if _x = 0 then _acc else _init (_x - 1) (Lst (_x, _acc))
     in
-    let ____l = _init _n End in
-    let rec _place (_x, _qs) =
-      if _x = _n + 1 then Some _qs
-      else
-        let rec _loop _x (_x : intlist) =
-          begin match _x with
-          | End -> None
-          | Lst (_x, _xs) ->
-              begin match _x _x with None -> _loop _x _xs | Some _x -> Some _x
-              end
-          end
-        in
-        _loop
-          (fun (_y : int) -> _place (_x + 1, Cons ((_x, _y), _qs)))
-          (_available _x _qs ____l)
+    let rec _init _x =
+      let _acc = End in
+      let ____l = if _x = 0 then _acc else _init (_x - 1) (Lst (_x, _acc)) in
+      let rec _place (_x, _qs) =
+        if _x = _n + 1 then Some _qs
+        else
+          let rec _loop _x (_x : intlist) =
+            begin match _x with
+            | End -> None
+            | Lst (_x, _xs) ->
+                begin match _x _x with None -> _loop _x _xs | Some _x -> Some _x
+                end
+            end
+          in
+          _loop
+            (fun (_y : int) -> _place (_x + 1, Cons ((_x, _y), _qs)))
+            (coer_arrow
+               (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+               (coer_arrow coer_refl_ty force_unsafe)
+               _filter
+               (fun (_y : int) ->
+                 coer_arrow
+                   (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+                   (coer_arrow coer_refl_ty force_unsafe)
+                   _forall
+                   (_no_attack (_x, _y))
+                   _qs)
+               ____l)
+      in
+      _place (1, Nil)
     in
-    _place (1, Nil)
+    _init _n
   
   let find_solution = _find_solution
   let _queens_all = _find_solution
@@ -239,11 +254,11 @@
   
   let count = _count
   
-  let _testCount =
-   fun (_m : int) ->
-    let rec _count _x (_s : int) = if _s = 0 then _s else _count () (_s - 1) in
-    _count () _m
+  let rec _handled_count _x (_s : int) =
+    if _s = 0 then _s else _handled_count () (_s - 1)
   
+  let _handled_count = _handled_count
+  let _testCount = fun (_m : int) -> _handled_count () _m
   let testCount = _testCount
   
   type (_, _) eff_internal_effect +=
@@ -295,28 +310,7 @@
     _h (Call (Get, (), fun (_y : int) -> Value _y))
   
   let apply_h = _apply_h
-  
-  let _subsume =
-   fun (_n : int) ->
-    coer_arrow
-      (coer_handler coer_refl_ty (coer_return coer_refl_ty))
-      force_unsafe _apply_h
-      (closed_handler
-         {
-           value_clause = (fun (_x : int) -> _x + 1);
-           effect_clauses =
-             (fun (type a)
-               (type b)
-               (eff : (a, b) eff_internal_effect)
-               :
-               (a -> (b -> _) -> _)
-             ->
-               match eff with
-               | Get -> fun (() : unit) _k -> _k _n
-               | _ -> fun _ _ -> assert false);
-         }
-         (fun (_x : int) -> _x))
-  
+  let _subsume = fun (_n : int) -> _n + 1
   let subsume = _subsume
   
   let _get_twice =
@@ -330,11 +324,8 @@
   
   let _closed_impure =
    fun (_n : int) ->
-    let rec _get_twice () =
-      let _x = _n + _n in
-      _x + _x
-    in
-    _get_twice ()
+    let _x = _n + _n in
+    _x + _x
   
   let closed_impure = _closed_impure
   ======================================================================
@@ -609,6 +600,7 @@
   _f 5
   ;;
   
+  let rec _g _x = if _x = 0 then 1 else _g (_x - 1) in
   let rec _g _x = if _x = 0 then 1 else _g (_x - 1) in
   _g 5
   ======================================================================
@@ -1046,22 +1038,27 @@
       if _x = 0 then Value _s
       else Call (Op, _x, fun (_y : unit) -> _loop (_x - 1) _s)
     in
-    (closed_handler
-       {
-         value_clause = (fun (_id : int) -> _id);
-         effect_clauses =
-           (fun (type a)
-             (type b)
-             (eff : (a, b) eff_internal_effect)
-             :
-             (a -> (b -> _) -> _)
-           ->
-             match eff with
-             | Op -> fun (_x : int) _k -> _k ()
-             | _ -> fun _ _ -> assert false);
-       }
-       (fun (_x : int) -> _x))
-      (_loop _n 0)
+    let rec _loop _x =
+      if _x = 0 then 0
+      else
+        (closed_handler
+           {
+             value_clause = (fun (_id : int) -> _id);
+             effect_clauses =
+               (fun (type a)
+                 (type b)
+                 (eff : (a, b) eff_internal_effect)
+                 :
+                 (a -> (b -> _) -> _)
+               ->
+                 match eff with
+                 | Op -> fun (_x : int) _k -> _k ()
+                 | _ -> fun _ _ -> assert false);
+           }
+           (fun (_x : int) -> _x))
+          (_loop (_x - 1) 0)
+    in
+    _loop _n
   
   let test = _test
   let _x = _test 3
@@ -1114,13 +1111,11 @@
   
   let loop_incr = _loop_incr
   
-  let _test_incr =
-   fun (_n : int) ->
-    let rec _loop_incr _x (_x : int) =
-      if _x = 0 then _x else _loop_incr (_x - 1) (_x + 1)
-    in
-    _loop_incr _n 0
+  let rec _handled_loop_incr _x (_x : int) =
+    if _x = 0 then _x else _handled_loop_incr (_x - 1) (_x + 1)
   
+  let _handled_loop_incr = _handled_loop_incr
+  let _test_incr = fun (_n : int) -> _handled_loop_incr _n 0
   let test_incr = _test_incr
   
   let rec _loop_incr' _x =
@@ -1131,13 +1126,14 @@
   
   let loop_incr' = _loop_incr'
   
+  let rec _handled_loop_incr' (_x, _k) =
+    if _x = 0 then _k ()
+    else _handled_loop_incr' (_x - 1, fun (_ : unit) (_x : int) -> _k () (_x + 1))
+  
+  let _handled_loop_incr' = _handled_loop_incr'
+  
   let _test_incr' =
-   fun (_n : int) ->
-    let rec _loop_incr' (_x, _k) =
-      if _x = 0 then _k ()
-      else _loop_incr' (_x - 1, fun (_ : unit) (_x : int) -> _k () (_x + 1))
-    in
-    _loop_incr' (_n, fun (_x : unit) (_x : int) -> _x) 0
+   fun (_n : int) -> _handled_loop_incr' (_n, fun (_x : unit) (_x : int) -> _x) 0
   
   let test_incr' = _test_incr'
   
@@ -1155,13 +1151,11 @@
   
   let loop_state = _loop_state
   
-  let _test_state =
-   fun (_n : int) ->
-    let rec _loop_state _x (_x : int) =
-      if _x = 0 then _x else _loop_state (_x - 1) (_x + 1)
-    in
-    _loop_state _n 0
+  let rec _handled_loop_state _x (_x : int) =
+    if _x = 0 then _x else _handled_loop_state (_x - 1) (_x + 1)
   
+  let _handled_loop_state = _handled_loop_state
+  let _test_state = fun (_n : int) -> _handled_loop_state _n 0
   let test_state = _test_state
   ======================================================================
   codegen/map.eff
@@ -1547,7 +1541,7 @@
              | _ -> fun _ _ -> assert false);
        }
        (fun (_x : int) -> _x))
-      (_g (fun (() : unit) -> Call (A, (), fun (_y : unit) -> Value 1)) false)
+      (Call (A, (), fun (_y : unit) -> Value 1))
   
   let test = _test
   let _x = _test ()
@@ -1787,11 +1781,400 @@
   
   let expr = _expr
   
+  let rec _handled_parseNum ((_l, _v), _k) =
+    begin match _l with
+    | [] -> Value _v
+    | _x :: _xs ->
+        begin match _x with
+        | "0" -> _parseNum (_xs, _createNumber (_v, 0))
+        | "1" -> _parseNum (_xs, _createNumber (_v, 1))
+        | "2" -> _parseNum (_xs, _createNumber (_v, 2))
+        | "3" -> _parseNum (_xs, _createNumber (_v, 3))
+        | "4" -> _parseNum (_xs, _createNumber (_v, 4))
+        | "5" -> _parseNum (_xs, _createNumber (_v, 5))
+        | "6" -> _parseNum (_xs, _createNumber (_v, 6))
+        | "7" -> _parseNum (_xs, _createNumber (_v, 7))
+        | "8" -> _parseNum (_xs, _createNumber (_v, 8))
+        | "9" -> _parseNum (_xs, _createNumber (_v, 9))
+        | _ -> _fail ()
+        end
+    end
+    >>= fun _y -> _k _y
+  
+  let _handled_parseNum = _handled_parseNum
+  let rec _handled_toNum (_x, _k) = _handled_parseNum ((_x, 0), _k)
+  let _handled_toNum = _handled_toNum
+  
+  let rec _handled_op (_x, _k) =
+    _k (fun (_ys : string list) ->
+        begin match _x with [] -> _ys | _x :: _xs -> _x :: _op (* @ *) _xs _ys
+        end)
+  
+  let _handled_op = _handled_op
+  
+  let rec _handled_many (_x, _k) =
+    Call
+      ( Decide,
+        (),
+        fun (_y : bool) ->
+          if _y then
+            (handler
+               {
+                 value_clause = (fun (_y : string list) -> _k _y);
+                 effect_clauses =
+                   (fun (type a)
+                     (type b)
+                     (eff : (a, b) eff_internal_effect)
+                     :
+                     (a -> (b -> _) -> _)
+                   ->
+                     match eff with
+                     | Symbol ->
+                         fun (_c : string) _k ->
+                           Value
+                             (fun (_s : string list) ->
+                               begin match _s with
+                               | [] -> _fail ()
+                               | _x :: _xs ->
+                                   if _c = _x then _k _x >>= fun _b -> _b _xs
+                                   else _fail ()
+                               end)
+                     | eff' -> fun arg k -> Call (eff', arg, k));
+               }
+               (fun (_x : string list -> int computation) -> Value _x))
+              (_x ())
+          else _k [] )
+  
+  let _handled_many = _handled_many
+  
+  let rec _handled_many1 (_x, _k) =
+    let rec _checkNums _x =
+      begin match _x with
+      | [] -> _fail ()
+      | _x :: _xs ->
+          Call
+            ( Decide,
+              (),
+              fun (_y : bool) ->
+                if _y then Call (Symbol, _x, fun (_y : string) -> Value _y)
+                else _checkNums _xs )
+      end
+    in
+    let rec _checkNums _x =
+      begin match _x with
+      | [] ->
+          _fail () >>= fun _x ->
+          _handled_many
+            ( _many1,
+              fun (_xs : string list) ->
+                _handled_op
+                  (_x :: [], fun (_b : string list -> string list) -> _k (_b _xs))
+            )
+      | _x :: _xs ->
+          Call
+            ( Decide,
+              (),
+              fun (_y : bool) ->
+                if _y then
+                  Value
+                    (fun (_s : string list) ->
+                      begin match _s with
+                      | [] -> _fail ()
+                      | _x :: _xs ->
+                          if _x = _x then
+                            _handled_many
+                              ( _many1,
+                                fun (_xs : string list) ->
+                                  _handled_op
+                                    ( _x :: [],
+                                      fun (_b : string list -> string list) ->
+                                        _k (_b _xs) ) )
+                            >>= fun _b -> _b _xs
+                          else _fail ()
+                      end)
+                else _checkNums _xs )
+      end
+    in
+    _checkNums [ "0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9" ]
+  
+  let _handled_many1 = _handled_many1
+  
+  let rec _handled_expr (_x, _k) =
+    Call
+      ( Decide,
+        (),
+        fun (_y : bool) ->
+          if _y then
+            let rec _term (_x, _k) =
+              Call
+                ( Decide,
+                  (),
+                  fun (_y : bool) ->
+                    if _y then
+                      let rec _factor _x =
+                        Call
+                          ( Decide,
+                            (),
+                            fun (_y : bool) ->
+                              if _y then
+                                _handled_many1
+                                  ( (),
+                                    fun (_i : string list) ->
+                                      _handled_toNum
+                                        ( _i,
+                                          fun (_i : int) ->
+                                            Value
+                                              (fun (_s : string list) ->
+                                                begin match _s with
+                                                | [] -> _fail ()
+                                                | _x :: _xs ->
+                                                    if "*" = _x then
+                                                      _term
+                                                        ( (),
+                                                          fun (_j : int) ->
+                                                            _k (_i * _j) )
+                                                      >>= fun _b -> _b _xs
+                                                    else _fail ()
+                                                end) ) )
+                              else
+                                Value
+                                  (fun (_s : string list) ->
+                                    begin match _s with
+                                    | [] -> _fail ()
+                                    | _x :: _xs ->
+                                        if "(" = _x then
+                                          _handled_expr
+                                            ( (),
+                                              fun (_j : int) ->
+                                                Value
+                                                  (fun (_s : string list) ->
+                                                    begin match _s with
+                                                    | [] -> _fail ()
+                                                    | _x :: _xs ->
+                                                        if ")" = _x then
+                                                          begin match _xs with
+                                                          | [] -> _fail ()
+                                                          | _x :: _xs ->
+                                                              if "*" = _x then
+                                                                _term
+                                                                  ( (),
+                                                                    fun (_j : int)
+                                                                    -> _k (_j * _j)
+                                                                  )
+                                                                >>= fun _b ->
+                                                                _b _xs
+                                                              else _fail ()
+                                                          end
+                                                        else _fail ()
+                                                    end) )
+                                          >>= fun _b -> _b _xs
+                                        else _fail ()
+                                    end) )
+                      in
+                      _factor ()
+                    else
+                      let rec _factor _x =
+                        Call
+                          ( Decide,
+                            (),
+                            fun (_y : bool) ->
+                              if _y then
+                                _handled_many1
+                                  ( (),
+                                    fun (_i : string list) ->
+                                      _handled_toNum (_i, _k) )
+                              else
+                                Value
+                                  (fun (_s : string list) ->
+                                    begin match _s with
+                                    | [] -> _fail ()
+                                    | _x :: _xs ->
+                                        if "(" = _x then
+                                          _handled_expr
+                                            ( (),
+                                              fun (_j : int) ->
+                                                Value
+                                                  (fun (_s : string list) ->
+                                                    begin match _s with
+                                                    | [] -> _fail ()
+                                                    | _x :: _xs ->
+                                                        if ")" = _x then
+                                                          _k _j >>= fun _b ->
+                                                          _b _xs
+                                                        else _fail ()
+                                                    end) )
+                                          >>= fun _b -> _b _xs
+                                        else _fail ()
+                                    end) )
+                      in
+                      _factor () )
+            in
+            _term
+              ( (),
+                fun (_i : int) ->
+                  Value
+                    (fun (_s : string list) ->
+                      begin match _s with
+                      | [] -> _fail ()
+                      | _x :: _xs ->
+                          if "+" = _x then
+                            _handled_expr ((), fun (_j : int) -> _k (_i + _j))
+                            >>= fun _b -> _b _xs
+                          else _fail ()
+                      end) )
+          else
+            let rec _term (_x, _k) =
+              Call
+                ( Decide,
+                  (),
+                  fun (_y : bool) ->
+                    if _y then
+                      let rec _factor _x =
+                        Call
+                          ( Decide,
+                            (),
+                            fun (_y : bool) ->
+                              if _y then
+                                _handled_many1
+                                  ( (),
+                                    fun (_i : string list) ->
+                                      _handled_toNum
+                                        ( _i,
+                                          fun (_i : int) ->
+                                            Value
+                                              (fun (_s : string list) ->
+                                                begin match _s with
+                                                | [] -> _fail ()
+                                                | _x :: _xs ->
+                                                    if "*" = _x then
+                                                      _term
+                                                        ( (),
+                                                          fun (_j : int) ->
+                                                            _k (_i * _j) )
+                                                      >>= fun _b -> _b _xs
+                                                    else _fail ()
+                                                end) ) )
+                              else
+                                Value
+                                  (fun (_s : string list) ->
+                                    begin match _s with
+                                    | [] -> _fail ()
+                                    | _x :: _xs ->
+                                        if "(" = _x then
+                                          _handled_expr
+                                            ( (),
+                                              fun (_j : int) ->
+                                                Value
+                                                  (fun (_s : string list) ->
+                                                    begin match _s with
+                                                    | [] -> _fail ()
+                                                    | _x :: _xs ->
+                                                        if ")" = _x then
+                                                          begin match _xs with
+                                                          | [] -> _fail ()
+                                                          | _x :: _xs ->
+                                                              if "*" = _x then
+                                                                _term
+                                                                  ( (),
+                                                                    fun (_j : int)
+                                                                    -> _k (_j * _j)
+                                                                  )
+                                                                >>= fun _b ->
+                                                                _b _xs
+                                                              else _fail ()
+                                                          end
+                                                        else _fail ()
+                                                    end) )
+                                          >>= fun _b -> _b _xs
+                                        else _fail ()
+                                    end) )
+                      in
+                      _factor ()
+                    else
+                      let rec _factor _x =
+                        Call
+                          ( Decide,
+                            (),
+                            fun (_y : bool) ->
+                              if _y then
+                                _handled_many1
+                                  ( (),
+                                    fun (_i : string list) ->
+                                      _handled_toNum (_i, _k) )
+                              else
+                                Value
+                                  (fun (_s : string list) ->
+                                    begin match _s with
+                                    | [] -> _fail ()
+                                    | _x :: _xs ->
+                                        if "(" = _x then
+                                          _handled_expr
+                                            ( (),
+                                              fun (_j : int) ->
+                                                Value
+                                                  (fun (_s : string list) ->
+                                                    begin match _s with
+                                                    | [] -> _fail ()
+                                                    | _x :: _xs ->
+                                                        if ")" = _x then
+                                                          _k _j >>= fun _b ->
+                                                          _b _xs
+                                                        else _fail ()
+                                                    end) )
+                                          >>= fun _b -> _b _xs
+                                        else _fail ()
+                                    end) )
+                      in
+                      _factor () )
+            in
+            _term ((), _k) )
+  
+  let _handled_expr = _handled_expr
+  
   let _parseTest =
    fun (() : unit) ->
-    coer_handler coer_refl_ty force_unsafe _allsols
-      ( _parse (_expr ()) >>= fun _b ->
-        _b [ "4"; "3"; "*"; "("; "3"; "+"; "3"; ")" ] )
+    (closed_handler
+       {
+         value_clause =
+           (fun (_b : string list -> int computation) ->
+             (closed_handler
+                {
+                  value_clause = (fun (_x : int) -> _x :: []);
+                  effect_clauses =
+                    (fun (type a)
+                      (type b)
+                      (eff : (a, b) eff_internal_effect)
+                      :
+                      (a -> (b -> _) -> _)
+                    ->
+                      match eff with
+                      | Decide ->
+                          fun (_ : unit) _k -> _op (* @ *) (_k true) (_k false)
+                      | Fail -> fun (_ : unit) _ -> []
+                      | _ -> fun _ _ -> assert false);
+                }
+                (fun (_x : int list) -> _x))
+               (_b [ "4"; "3"; "*"; "("; "3"; "+"; "3"; ")" ]));
+         effect_clauses =
+           (fun (type a)
+             (type b)
+             (eff : (a, b) eff_internal_effect)
+             :
+             (a -> (b -> _) -> _)
+           ->
+             match eff with
+             | Decide -> fun (_ : unit) _k -> _op (* @ *) (_k true) (_k false)
+             | Fail -> fun (_ : unit) _ -> []
+             | _ -> fun _ _ -> assert false);
+       }
+       (fun (_x : int list) -> _x))
+      (_handled_expr
+         ( (),
+           fun (_x : int) ->
+             Value
+               (fun (_s : string list) ->
+                 begin match _s with [] -> Value _x | _ -> _fail ()
+                 end) ))
   
   let parseTest = _parseTest
   let _x = _parseTest ()
@@ -2050,84 +2433,99 @@
   
   let queens = _queens
   
+  let rec _handled_choose (_x, _k) =
+    begin match _x with
+    | RowsEmpty -> None
+    | RowsCons (_x, _xs') ->
+        let _k =
+         fun (_y : bool) -> if _y then _k _x else _handled_choose (_xs', _k)
+        in
+        begin match _k true with Some _x -> Some _x | None -> _k false
+        end
+    end
+  
+  let _handled_choose = _handled_choose
+  
   let _queens_one_option =
    fun (_number_of_queens : int) ->
-    let rec _queens _number_of_queens =
-      let rec _place (_x, _qs) =
-        if _x > _number_of_queens then Some _qs
-        else
-          let rec _choose _x =
-            begin match _x with
-            | RowsEmpty -> None
-            | RowsCons (_x, _xs') ->
-                let _k =
-                 fun (_y : bool) ->
-                  if _y then _place (_x + 1, SolutionPlace ((_x, _x), _qs))
-                  else _choose _xs'
-                in
-                begin match _k true with Some _x -> Some _x | None -> _k false
-                end
-            end
-          in
-          _choose (_available _number_of_queens _x _qs)
-      in
-      _place (1, SolutionEmpty)
+    let rec _place (_x, _qs) =
+      if _x > _number_of_queens then Some _qs
+      else
+        let rec _loop (_possible, _y) =
+          if _y < 1 then _possible
+          else if _not_attacked (_x, _y) _qs then
+            _loop (RowsCons (_y, _possible), _y - 1)
+          else _loop (_possible, _y - 1)
+        in
+        _handled_choose
+          ( _loop (RowsEmpty, _number_of_queens),
+            fun (_y : int) -> _place (_x + 1, SolutionPlace ((_x, _y), _qs)) )
     in
-    _queens _number_of_queens
+    _place (1, SolutionEmpty)
   
   let queens_one_option = _queens_one_option
   
+  let rec _handled_choose (_x, _k) =
+    begin match _x with
+    | RowsEmpty -> SolutionsNil
+    | RowsCons (_x, _xs') ->
+        let _k =
+         fun (_y : bool) -> if _y then _k _x else _handled_choose (_xs', _k)
+        in
+        _op (* @ *) (_k true) (_k false)
+    end
+  
+  let _handled_choose = _handled_choose
+  
   let _queens_all =
    fun (_number_of_queens : int) ->
-    let rec _queens _number_of_queens =
-      let rec _place (_x, _qs) =
-        if _x > _number_of_queens then SolutionsCons (_qs, SolutionsNil)
-        else
-          let rec _choose _x =
-            begin match _x with
-            | RowsEmpty -> SolutionsNil
-            | RowsCons (_x, _xs') ->
-                let _k =
-                 fun (_y : bool) ->
-                  if _y then _place (_x + 1, SolutionPlace ((_x, _x), _qs))
-                  else _choose _xs'
-                in
-                _op (* @ *) (_k true) (_k false)
-            end
-          in
-          _choose (_available _number_of_queens _x _qs)
-      in
-      _place (1, SolutionEmpty)
+    let rec _place (_x, _qs) =
+      if _x > _number_of_queens then SolutionsCons (_qs, SolutionsNil)
+      else
+        let rec _loop (_possible, _y) =
+          if _y < 1 then _possible
+          else if _not_attacked (_x, _y) _qs then
+            _loop (RowsCons (_y, _possible), _y - 1)
+          else _loop (_possible, _y - 1)
+        in
+        _handled_choose
+          ( _loop (RowsEmpty, _number_of_queens),
+            fun (_y : int) -> _place (_x + 1, SolutionPlace ((_x, _y), _qs)) )
     in
-    _queens _number_of_queens
+    _place (1, SolutionEmpty)
   
   let queens_all = _queens_all
   
+  let rec _handled_choose (_x, _k) (_x : unit -> solution computation) =
+    begin match _x with
+    | RowsEmpty -> _x ()
+    | RowsCons (_x, _xs') ->
+        let _k =
+         fun (_y : bool) -> if _y then _k _x else _handled_choose (_xs', _k)
+        in
+        _k true (fun (_ : unit) -> _k false _x)
+    end
+  
+  let _handled_choose = _handled_choose
+  
   let _queens_one_cps =
    fun (_number_of_queens : int) ->
-    let rec _queens _number_of_queens =
-      let rec _place (_x, _qs) =
-        if _x > _number_of_queens then
-          coer_arrow coer_refl_ty (coer_return coer_refl_ty)
-            (fun (_ : unit -> solution computation) -> _qs)
-        else
-          let rec _choose _x (_x : unit -> solution computation) =
-            begin match _x with
-            | RowsEmpty -> _x ()
-            | RowsCons (_x, _xs') ->
-                let _k =
-                 fun (_y : bool) ->
-                  if _y then _place (_x + 1, SolutionPlace ((_x, _x), _qs))
-                  else _choose _xs'
-                in
-                _k true (fun (_ : unit) -> _k false _x)
-            end
-          in
-          _choose (_available _number_of_queens _x _qs)
-      in
-      _place (1, SolutionEmpty)
+    let rec _place (_x, _qs) =
+      if _x > _number_of_queens then
+        coer_arrow coer_refl_ty (coer_return coer_refl_ty)
+          (fun (_ : unit -> solution computation) -> _qs)
+      else
+        let rec _loop (_possible, _y) =
+          if _y < 1 then _possible
+          else if _not_attacked (_x, _y) _qs then
+            _loop (RowsCons (_y, _possible), _y - 1)
+          else _loop (_possible, _y - 1)
+        in
+        _handled_choose
+          ( _loop (RowsEmpty, _number_of_queens),
+            fun (_y : int) -> _place (_x + 1, SolutionPlace ((_x, _y), _qs)) )
     in
-    _queens _number_of_queens (fun (() : unit) ->
+    _place (1, SolutionEmpty) (fun (() : unit) ->
         Call (Fail, (), fun (_y : empty) -> match _y with _ -> assert false))
   
   let queens_one_cps = _queens_one_cps
@@ -2307,8 +2705,8 @@
   
   let h = _h;;
   
-  coer_hand_to_fun coer_refl_ty force_unsafe _h 1;;
-  coer_hand_to_fun coer_refl_ty force_unsafe _h (1, 2)
+  1;;
+  1, 2
   ======================================================================
   codegen/substitution.eff
   ----------------------------------------------------------------------
@@ -3093,8 +3491,8 @@
       | Node (_left, _x, _right) ->
           let _k =
            fun (_y : bool) ->
-            if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-            else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+            if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+            else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
           in
           _op (* @ *) (_k true) (_k false)
       end
@@ -3119,8 +3517,8 @@
           | Node (_left, _x, _right) ->
               let _k =
                fun (_y : bool) ->
-                if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+                if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+                else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
               in
               _op (* @ *) (_k true) (_k false)
           end
@@ -3137,6 +3535,15 @@
   let _absurd = fun (_void : 'ty) -> match _void with _ -> assert false
   let absurd = _absurd
   
+  let rec _handled_op (_x, _k) =
+    _k (fun (_ys : intlist) ->
+        begin match _x with
+        | Nil -> _ys
+        | Cons (_x, _xs) -> Cons (_x, _op (* @ *) _xs _ys)
+        end)
+  
+  let _handled_op = _handled_op
+  
   let _test_leaf_state =
    fun (_m : int) ->
     let rec _maxl _x (_x : intlist) =
@@ -3152,8 +3559,8 @@
       | Node (_left, _x, _right) ->
           let _k =
            fun (_y : bool) ->
-            if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-            else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+            if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+            else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
           in
           _k true >>= fun _b ->
           _k false >>= fun _b -> Value (_op (* @ *) _b _b)
@@ -3193,37 +3600,39 @@
       | Node (_left, _x, _right) ->
           let _k =
            fun (_y : bool) ->
-            if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-            else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+            if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+            else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
           in
           (closed_handler
              {
                value_clause =
                  (fun (_b : intlist) ->
-                   (closed_handler
-                      {
-                        value_clause =
-                          (fun (_b : intlist) ->
-                            fun (_ : intlist) -> _op (* @ *) _b _b);
-                        effect_clauses =
-                          (fun (type a)
-                            (type b)
-                            (eff : (a, b) eff_internal_effect)
-                            :
-                            (a -> (b -> _) -> _)
-                          ->
-                            match eff with
-                            | Get ->
-                                fun (() : unit) _k ->
-                                  fun (_s : intlist) ->
-                                   begin match _s with
-                                   | Cons (_x, _rest) -> _k _x _rest
-                                   | Nil -> Nil
-                                   end
-                            | _ -> fun _ _ -> assert false);
-                      }
-                      (fun (_x : intlist -> intlist) -> _x))
-                     (_k false));
+                   _handled_op
+                     ( _b,
+                       fun (_b : intlist -> intlist) ->
+                         (closed_handler
+                            {
+                              value_clause =
+                                (fun (_b : intlist) -> fun (_ : intlist) -> _b _b);
+                              effect_clauses =
+                                (fun (type a)
+                                  (type b)
+                                  (eff : (a, b) eff_internal_effect)
+                                  :
+                                  (a -> (b -> _) -> _)
+                                ->
+                                  match eff with
+                                  | Get ->
+                                      fun (() : unit) _k ->
+                                        fun (_s : intlist) ->
+                                         begin match _s with
+                                         | Cons (_x, _rest) -> _k _x _rest
+                                         | Nil -> Nil
+                                         end
+                                  | _ -> fun _ _ -> assert false);
+                            }
+                            (fun (_x : intlist -> intlist) -> _x))
+                           (_k false) ));
                effect_clauses =
                  (fun (type a)
                    (type b)
@@ -3272,8 +3681,8 @@
           | Node (_left, _x, _right) ->
               let _k =
                fun (_y : bool) ->
-                if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+                if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+                else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
               in
               _k true >>= fun _b ->
               _k false >>= fun _b -> Value (_op (* @ *) _b _b)
@@ -3313,37 +3722,40 @@
           | Node (_left, _x, _right) ->
               let _k =
                fun (_y : bool) ->
-                if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+                if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+                else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
               in
               (closed_handler
                  {
                    value_clause =
                      (fun (_b : intlist) ->
-                       (closed_handler
-                          {
-                            value_clause =
-                              (fun (_b : intlist) ->
-                                fun (_ : intlist) -> _op (* @ *) _b _b);
-                            effect_clauses =
-                              (fun (type a)
-                                (type b)
-                                (eff : (a, b) eff_internal_effect)
-                                :
-                                (a -> (b -> _) -> _)
-                              ->
-                                match eff with
-                                | Get ->
-                                    fun (() : unit) _k ->
-                                      fun (_s : intlist) ->
-                                       begin match _s with
-                                       | Cons (_x, _rest) -> _k _x _rest
-                                       | Nil -> Nil
-                                       end
-                                | _ -> fun _ _ -> assert false);
-                          }
-                          (fun (_x : intlist -> intlist) -> _x))
-                         (_k false));
+                       _handled_op
+                         ( _b,
+                           fun (_b : intlist -> intlist) ->
+                             (closed_handler
+                                {
+                                  value_clause =
+                                    (fun (_b : intlist) ->
+                                      fun (_ : intlist) -> _b _b);
+                                  effect_clauses =
+                                    (fun (type a)
+                                      (type b)
+                                      (eff : (a, b) eff_internal_effect)
+                                      :
+                                      (a -> (b -> _) -> _)
+                                    ->
+                                      match eff with
+                                      | Get ->
+                                          fun (() : unit) _k ->
+                                            fun (_s : intlist) ->
+                                             begin match _s with
+                                             | Cons (_x, _rest) -> _k _x _rest
+                                             | Nil -> Nil
+                                             end
+                                      | _ -> fun _ _ -> assert false);
+                                }
+                                (fun (_x : intlist -> intlist) -> _x))
+                               (_k false) ));
                    effect_clauses =
                      (fun (type a)
                        (type b)
@@ -3378,6 +3790,15 @@
   
   type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
   
+  let rec _handled_op (_x, _k) =
+    _k (fun (_ys : intlist) ->
+        begin match _x with
+        | Nil -> _ys
+        | Cons (_x, _xs) -> Cons (_x, _op (* @ *) _xs _ys)
+        end)
+  
+  let _handled_op = _handled_op
+  
   let _test_leaf_state_update =
    fun (_m : int) ->
     let rec _maxl _x (_x : intlist) =
@@ -3394,8 +3815,8 @@
               fun (_y : unit) ->
                 let _k =
                  fun (_y : bool) ->
-                  if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                  else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+                  if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+                  else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
                 in
                 _k true >>= fun _b ->
                 _k false >>= fun _b -> Value (_op (* @ *) _b _b) )
@@ -3424,34 +3845,38 @@
       | Node (_left, _x, _right) ->
           let _k =
            fun (_y : bool) ->
-            if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-            else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+            if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+            else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
           in
           (closed_handler
              {
                value_clause =
                  (fun (_b : intlist) ->
-                   (closed_handler
-                      {
-                        value_clause =
-                          (fun (_b : intlist) ->
-                            fun (_ : int) -> _op (* @ *) _b _b);
-                        effect_clauses =
-                          (fun (type a)
-                            (type b)
-                            (eff : (a, b) eff_internal_effect)
-                            :
-                            (a -> (b -> _) -> _)
-                          ->
-                            match eff with
-                            | Get ->
-                                fun (() : unit) _k -> fun (_s : int) -> _k _s _s
-                            | Set ->
-                                fun (_s : int) _k -> fun (_ : int) -> _k () _s
-                            | _ -> fun _ _ -> assert false);
-                      }
-                      (fun (_x : int -> intlist) -> _x))
-                     (_k false));
+                   _handled_op
+                     ( _b,
+                       fun (_b : intlist -> intlist) ->
+                         (closed_handler
+                            {
+                              value_clause =
+                                (fun (_b : intlist) -> fun (_ : int) -> _b _b);
+                              effect_clauses =
+                                (fun (type a)
+                                  (type b)
+                                  (eff : (a, b) eff_internal_effect)
+                                  :
+                                  (a -> (b -> _) -> _)
+                                ->
+                                  match eff with
+                                  | Get ->
+                                      fun (() : unit) _k ->
+                                        fun (_s : int) -> _k _s _s
+                                  | Set ->
+                                      fun (_s : int) _k ->
+                                        fun (_ : int) -> _k () _s
+                                  | _ -> fun _ _ -> assert false);
+                            }
+                            (fun (_x : int -> intlist) -> _x))
+                           (_k false) ));
                effect_clauses =
                  (fun (type a)
                    (type b)
@@ -3493,8 +3918,9 @@
                   fun (_y : unit) ->
                     let _k =
                      fun (_y : bool) ->
-                      if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                      else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+                      if _y then
+                        _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+                      else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
                     in
                     _k true >>= fun _b ->
                     _k false >>= fun _b -> Value (_op (* @ *) _b _b) )
@@ -3523,35 +3949,38 @@
           | Node (_left, _x, _right) ->
               let _k =
                fun (_y : bool) ->
-                if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+                if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+                else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
               in
               (closed_handler
                  {
                    value_clause =
                      (fun (_b : intlist) ->
-                       (closed_handler
-                          {
-                            value_clause =
-                              (fun (_b : intlist) ->
-                                fun (_ : int) -> _op (* @ *) _b _b);
-                            effect_clauses =
-                              (fun (type a)
-                                (type b)
-                                (eff : (a, b) eff_internal_effect)
-                                :
-                                (a -> (b -> _) -> _)
-                              ->
-                                match eff with
-                                | Get ->
-                                    fun (() : unit) _k ->
-                                      fun (_s : int) -> _k _s _s
-                                | Set ->
-                                    fun (_s : int) _k -> fun (_ : int) -> _k () _s
-                                | _ -> fun _ _ -> assert false);
-                          }
-                          (fun (_x : int -> intlist) -> _x))
-                         (_k false));
+                       _handled_op
+                         ( _b,
+                           fun (_b : intlist -> intlist) ->
+                             (closed_handler
+                                {
+                                  value_clause =
+                                    (fun (_b : intlist) -> fun (_ : int) -> _b _b);
+                                  effect_clauses =
+                                    (fun (type a)
+                                      (type b)
+                                      (eff : (a, b) eff_internal_effect)
+                                      :
+                                      (a -> (b -> _) -> _)
+                                    ->
+                                      match eff with
+                                      | Get ->
+                                          fun (() : unit) _k ->
+                                            fun (_s : int) -> _k _s _s
+                                      | Set ->
+                                          fun (_s : int) _k ->
+                                            fun (_ : int) -> _k () _s
+                                      | _ -> fun _ _ -> assert false);
+                                }
+                                (fun (_x : int -> intlist) -> _x))
+                               (_k false) ));
                    effect_clauses =
                      (fun (type a)
                        (type b)
@@ -3592,8 +4021,8 @@
           let _b = _x * _x in
           let _k =
            fun (_y : bool) ->
-            if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-            else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+            if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+            else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
           in
           _op (* @ *) (_k true _b) (_k false _b)
       end
@@ -3623,8 +4052,8 @@
               let _b = _x * _x in
               let _k =
                fun (_y : bool) ->
-                if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+                if _y then _explore (_left, fun (_b : int) -> _k (_x - (3 * _b)))
+                else _explore (_right, fun (_b : int) -> _k (_x - (3 * _b)))
               in
               _op (* @ *) (_k true _b) (_k false _b)
           end
