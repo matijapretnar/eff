@@ -10,7 +10,9 @@ type optimization_config = {
 }
 
 (* A top-level definition, as the paper's Inline-Top sees it. A [let rec] with
-   one definition is the paper's [let f = rec f x. M]. *)
+   one definition is the paper's [let f = rec f x. M]. Each member of a group
+   of several is recorded on its own: the other members are top-level names
+   in its body. The paper has no mutual recursion. *)
 type top_definition = TopValue of Term.expression | TopRec of Term.abstraction
 type specialisation_mode = Fixed | Varying
 
@@ -28,14 +30,37 @@ type cached_specialisation = {
 }
 
 and specialisation_result =
+  | Building of { name_var : Term.expression; mutable left : int }
+      (** Being built. A handled call of [original] inside it, possibly in the
+          body of another top-level function, goes to [name_var], which ties the
+          knot through mutually recursive top-level functions. In [Fixed] mode,
+          [left] counts the handled calls that could not go there. *)
   | Built of {
       name : Term.variable;
       name_var : Term.expression;
       definition : Term.abstraction;
+      group : Term.Variable.Set.t;
+          (** The names of the specialisations made together with it, which are
+              emitted together as one recursive definition *)
       mutable emitted : bool;
     }
   | FixedFails
       (** The [Fixed] mode leaves a handled call, so [Varying] is used. *)
+
+(* The specialisation of a group of top-level recursive functions under one
+   handler, being built. A handled call of another member under the same
+   operation clauses joins it: the member gets an entry that is being built,
+   so that all its calls go there, and its body is built after the current
+   one, in [pending]. *)
+type group_build = {
+  members : Term.Variable.Set.t;
+  group_handler : Term.handler_clauses;
+  group_mode : specialisation_mode;
+  group_instantiation : Substitution.t;
+  root : cached_specialisation;
+  pending :
+    (Term.variable * Term.abstraction * Term.variable * Term.expression) Queue.t;
+}
 
 type state = {
   fuel : int;
@@ -45,10 +70,17 @@ type state = {
           with one definition: [let rec f x = M in N] is the paper's
           [let f = rec f x. M in N], and a group of several mutually recursive
           definitions has no counterpart in the paper. *)
-  specialising : Term.variable list;
-      (** The functions whose body With-Rec-Fun is rewriting under a handler.
-          Inside, they are not specialised again, which is how the paper's
-          Termination paragraph stops specialisation from diverging. *)
+  specialising : (Term.variable * Term.effect_fingerprint) list;
+      (** The functions whose body With-Rec-Fun is rewriting under a handler, as
+          the source function and the fingerprint of the handler. Inside, a
+          function is not specialised again under a handler with the same
+          fingerprint, which comes from the same source handler. Under other
+          handlers it is. There are finitely many source functions and
+          fingerprints, so specialisations nest only finitely deep. The paper's
+          Termination paragraph does not specialise a specialised function at
+          all. *)
+  origins : Term.variable Term.Variable.Map.t ref;
+      (** The source function of each specialisation *)
   top_definitions : (Term.variable, top_definition) Assoc.t;
       (** The top-level definitions before the current one: the paper's [D],
           which only Inline-Top reads. *)
@@ -59,6 +91,10 @@ type state = {
           inside a term must be visible after it. *)
   specialisations : cached_specialisation list ref;
       (** The cache of specialisations, newest first *)
+  groups : Term.Variable.Set.t Term.Variable.Map.t ref;
+      (** The members of the recursive group of each top-level function,
+          including the groups of shared specialisations *)
+  building_group : group_build option;
 }
 
 let initial_state config =
@@ -67,9 +103,12 @@ let initial_state config =
     config;
     rec_functions = Assoc.empty;
     specialising = [];
+    origins = ref Term.Variable.Map.empty;
     top_definitions = Assoc.empty;
     top_names = ref Term.Variable.Set.empty;
     specialisations = ref [];
+    groups = ref Term.Variable.Map.empty;
+    building_group = None;
   }
 
 let add_top_name state x =
@@ -332,12 +371,96 @@ let extract mode hnd f g' ~left =
   in
   extract_comp
 
-(* A specialisation [rec g p. M] is closed if [M] mentions only [g] and
-   top-level names, and no type, dirt or skeleton parameters of the enclosing
+let origin state f =
+  Term.Variable.Map.find_opt f !(state.origins) |> Option.value ~default:f
+
+let may_specialise state f (hnd : Term.handler_clauses) =
+  not
+    (List.mem
+       (origin state f, hnd.term.effect_clauses.fingerprint)
+       state.specialising)
+
+let specialising_under state f (hnd : Term.handler_clauses) =
+  {
+    state with
+    specialising =
+      (origin state f, hnd.term.effect_clauses.fingerprint)
+      :: state.specialising;
+  }
+
+(* A top-level definition: a source one, or a shared specialisation, which
+   Inline-Top sees like any other. *)
+let top_definition state x =
+  match Assoc.lookup x state.top_definitions with
+  | Some def -> Some def
+  | None ->
+      List.find_map
+        (fun entry ->
+          match entry.result with
+          | Built { name; definition; _ } when name = x ->
+              Some (TopRec definition)
+          | _ -> None)
+        !(state.specialisations)
+
+(* The newest specialisation of the top-level [x] at [instantiation] that is
+   being built for a handler with the operation clauses of [hnd], if a handled
+   call [with hnd handle x v] can go to it. A call that could go to a [Fixed]
+   one only with another return clause marks it as [left] instead. *)
+let building_specialisation state hnd x instantiation comp =
+  let matching entry =
+    entry.original = x
+    && entry.instantiation = instantiation
+    && Term.same_operation_clauses entry.handler hnd
+    && match entry.result with Building _ -> true | _ -> false
+  in
+  match List.find_opt matching !(state.specialisations) with
+  | Some { mode; result = Building b; handler; _ } -> (
+      let arg_ty, out_ty =
+        match b.name_var.ty.term with
+        | Type.Arrow (ty, drty) -> (ty, drty)
+        | _ -> assert false
+      in
+      let v_ty =
+        match comp.term with Term.Apply (_, v) -> v.ty | _ -> assert false
+      in
+      let _, drty_out = hnd.ty in
+      let types_agree arg_ty' =
+        Type.equal_ty arg_ty arg_ty' && Type.equal_dirty out_ty drty_out
+      in
+      match mode with
+      | Fixed when Term.same_return_clause handler hnd ->
+          if types_agree v_ty then Some (Fixed, b.name_var) else None
+      | Fixed ->
+          b.left <- b.left + 1;
+          None
+      | Varying ->
+          let ty_in, _ = fst hnd.ty in
+          let k_ty = Type.arrow (ty_in, drty_out) in
+          if types_agree (Type.tuple [ v_ty; k_ty ]) then
+            Some (Varying, b.name_var)
+          else None)
+  | _ -> None
+
+(* The type of the specialisation of a function with argument type [ty_arg]
+   under a handler of type [hnd_ty]. In [Varying] mode, it also takes the
+   return clause. *)
+let specialisation_ty mode hnd_ty ty_arg =
+  let (ty_in, _), drty_out = hnd_ty in
+  match mode with
+  | Fixed -> Type.arrow (ty_arg, drty_out)
+  | Varying ->
+      Type.arrow (Type.tuple [ ty_arg; Type.arrow (ty_in, drty_out) ], drty_out)
+
+(* A specialisation [rec g p. M] in a group with [names] is closed if [M]
+   mentions only [names] and top-level names, and no type, dirt or skeleton
+   parameters of the enclosing
    definition. Coercion parameters have types, so they are covered too. *)
-let is_closed state g abs =
+let is_closed state names abs =
   Term.Variable.Map.for_all
-    (fun x n -> n = 0 || x = g || Term.Variable.Set.mem x !(state.top_names))
+    (fun x n ->
+      n = 0
+      || Term.Variable.Set.mem x names
+      || Term.Variable.Set.mem x !(state.top_names))
     (Term.free_vars_abs abs)
   && Type.Params.subset (Term.free_params_abstraction abs) Type.Params.empty
 
@@ -584,49 +707,50 @@ and bind_abstraction state { term = pat, comp; _ } bind =
 and handle_computation state hnd comp =
   match comp.term with
   | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
-    when state.fuel > 0
-         && (not (List.mem x state.specialising))
+    when building_specialisation state hnd x instantiation comp <> None -> (
+      match building_specialisation state hnd x instantiation comp with
+      | Some (Fixed, name_var) -> Term.apply (name_var, v)
+      | Some (Varying, name_var) ->
+          Term.apply
+            (name_var, Term.tuple [ v; Term.lambda hnd.term.value_clause ])
+      | None -> assert false)
+  | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
+    when state.fuel > 0 && may_specialise state x hnd
          &&
-         match Assoc.lookup x state.top_definitions with
+         match top_definition state x with
          | Some (TopValue _) -> state.config.handler_reductions
          | Some (TopRec _) ->
              state.config.specialize_functions
              && Type.equal_dirty comp.ty (fst hnd.ty)
          | None -> false -> (
-      (* Inline-Top, so that With-Fun or With-Rec-Fun applies. A top-level
-         name is not expanded again inside its own expansion: the guard of
-         With-Rec-Fun records local names, so it would not stop a cycle
-         through top-level definitions, such as [many1] calling [many many1].
-         The handler rules call each other without passing through
-         [reduce_if_fuel], so an expansion takes one unit of fuel: fuel bounds
-         how deeply expansions nest. *)
-      let state' =
-        {
-          state with
-          specialising = x :: state.specialising;
-          fuel = state.fuel - 1;
-        }
-      in
-      match Assoc.lookup x state.top_definitions with
+      (* Inline-Top, so that With-Fun or With-Rec-Fun applies. The guard is
+         that of With-Rec-Fun, also for a non-recursive [x], so that it stops
+         a cycle through top-level definitions, such as [many1] calling
+         [many many1]. *)
+      let state' = specialising_under state x hnd in
+      match top_definition state x with
       | Some (TopValue _) -> (
           match expand_top_application state x instantiation v with
           | Some comp' ->
               handle_computation state' hnd (optimize_computation state' comp')
           | None -> assert false)
-      | Some (TopRec abs) ->
-          with_rec_fun state' hnd x
-            (Term.apply_sub_abs instantiation abs)
-            v ~top:(Some instantiation)
+      | Some (TopRec abs) -> (
+          match join_group state hnd x instantiation abs comp with
+          | `Joined -> handle_computation state hnd comp
+          | `Abandoned -> Term.handle (Term.handler hnd, comp)
+          | `Other ->
+              with_rec_fun state' hnd x
+                (Term.apply_sub_abs instantiation abs)
+                v ~top:(Some instantiation))
       | None -> assert false)
   | Term.Apply ({ term = Term.Var { variable = f; instantiation; _ }; _ }, v)
-    when state.config.specialize_functions
-         && (not (List.mem f state.specialising))
+    when state.config.specialize_functions && may_specialise state f hnd
          && Assoc.lookup f state.rec_functions <> None
          && Type.equal_dirty comp.ty (fst hnd.ty) -> (
       match Assoc.lookup f state.rec_functions with
       | Some abs ->
           with_rec_fun
-            { state with specialising = f :: state.specialising }
+            (specialising_under state f hnd)
             hnd f
             (Term.apply_sub_abs instantiation abs)
             v ~top:None
@@ -707,26 +831,87 @@ and handle_computation state hnd comp =
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
 
+(* A handled call [with hnd handle x v] of a member [x] of the group whose
+   specialisation is being built joins it, if the operation clauses and the
+   instantiation are the same: [x] gets an entry that is being built, so that
+   the call, and all later ones, go to it, and its body is built later. In
+   [Fixed] mode, a call under another return clause cannot go to the group,
+   so the attempt fails. *)
+and join_group state hnd x instantiation abs comp =
+  match state.building_group with
+  | Some gb
+    when Term.Variable.Set.mem x gb.members
+         && gb.group_instantiation = instantiation
+         && Term.same_operation_clauses gb.group_handler hnd ->
+      if
+        gb.group_mode = Fixed
+        && not (Term.same_return_clause gb.group_handler hnd)
+      then (
+        (match gb.root.result with
+        | Building b -> b.left <- b.left + 1
+        | _ -> ());
+        `Abandoned)
+      else
+        let abs = Term.apply_sub_abs instantiation abs in
+        let { ty = ty_arg, _; _ } = abs in
+        let g = specialisation_name state x ~top:true in
+        let g_var =
+          Term.mono_var g
+            (specialisation_ty gb.group_mode gb.group_handler.ty ty_arg)
+        in
+        let entry =
+          {
+            original = x;
+            instantiation;
+            mode = gb.group_mode;
+            handler = gb.group_handler;
+            result = Building { name_var = g_var; left = 0 };
+          }
+        in
+        state.specialisations := entry :: !(state.specialisations);
+        if building_specialisation state hnd x instantiation comp <> None then (
+          Queue.add (x, abs, g, g_var) gb.pending;
+          `Joined)
+        else (
+          state.specialisations :=
+            List.filter (fun e -> e != entry) !(state.specialisations);
+          `Other)
+  | _ -> `Other
+
+(* A fresh name for a specialisation of [f]. A top-level one may become a
+   top-level definition, which needs a name that no source definition has. *)
+and specialisation_name state f ~top =
+  let g =
+    if top then
+      Term.Variable.fresh
+        ("$handled_" ^ Term.Variable.fold (fun desc _ -> desc) (origin state f))
+    else Term.Variable.refresh f
+  in
+  state.origins := Term.Variable.Map.add g (origin state f) !(state.origins);
+  g
+
 (* With-Rec-Fun; see the comment at [extract]. [f] is already in
-   [state.specialising].
+   [state.specialising] with the fingerprint of [hnd].
 
    For a top-level [f] at the instantiation [top], the paper first applies
    Inline-Top, which gives a local copy [rec f' x. M[η]]. We specialise [f]
    itself: the calls that [extract] leaves go to [f η], which Inline-Top would
-   turn into [f'] anyway. Then the specialisation is closed if the handler
-   mentions only top-level names, which is always the case for the operation
-   clauses in the tests, and the return clause too in [Fixed] mode. A closed
-   specialisation becomes a new top-level definition and is cached, so the
-   next call of [f] under an equal handler reuses it. *)
+   turn into [f'] anyway. If [f] belongs to a group of mutually recursive
+   top-level functions, the members that are called under the same operation
+   clauses are specialised together with it, one specialisation each, and the
+   group is specialised in one mode. Then the specialisations are closed if
+   the handler mentions only top-level names, which is always the case for the
+   operation clauses in the tests, and the return clause too in [Fixed] mode.
+   Closed specialisations become new top-level definitions, emitted together,
+   and are cached, so the next call of a member under an equal handler reuses
+   them. *)
 and with_rec_fun state hnd f abs v ~top =
-  let { term = pat, body; ty = ty_arg, _ } =
-    Term.refresh_abstraction Assoc.empty abs
-  in
   let (ty_in, _), drty_out = hnd.ty in
   let k_ty = Type.arrow (ty_in, drty_out) in
-  let g_ty = function
-    | Fixed -> Type.arrow (ty_arg, drty_out)
-    | Varying -> Type.arrow (Type.tuple [ ty_arg; k_ty ], drty_out)
+  let g_ty mode ty_arg = specialisation_ty mode hnd.ty ty_arg in
+  let f_ty_arg =
+    let { ty = ty_arg, _; _ } = abs in
+    ty_arg
   in
   let call mode g_var =
     match mode with
@@ -734,7 +919,9 @@ and with_rec_fun state hnd f abs v ~top =
     | Varying ->
         Term.apply (g_var, Term.tuple [ v; Term.lambda hnd.term.value_clause ])
   in
-  let build mode =
+  (* The body of the specialisation [g] of a member with [abs] *)
+  let build_member state mode abs =
+    let { term = pat, body; _ } = Term.refresh_abstraction Assoc.empty abs in
     let hnd_m, g_pat =
       match mode with
       | Fixed -> (hnd, pat)
@@ -747,21 +934,84 @@ and with_rec_fun state hnd f abs v ~top =
           in
           (hnd_k, Term.pTuple [ pat; k_pat ])
     in
-    let g =
-      match top with
-      | None -> Term.Variable.refresh f
-      | Some _ ->
-          (* It may become a top-level definition, which needs a name that
-             no source definition has. *)
-          Term.Variable.fresh
-            ("$handled_" ^ Term.Variable.fold (fun desc _ -> desc) f)
-    in
-    let g_var = Term.mono_var g (g_ty mode) in
+    (g_pat, handle_computation state hnd_m body)
+  in
+  let build mode =
+    let g = specialisation_name state f ~top:(top <> None) in
+    let g_var = Term.mono_var g (g_ty mode f_ty_arg) in
     let left = ref false in
-    let body' =
-      extract mode hnd f g_var ~left (handle_computation state hnd_m body)
-    in
-    (g, g_var, Term.abstraction (g_pat, body'), !left)
+    match top with
+    | None ->
+        let g_pat, body = build_member state mode abs in
+        let body' = extract mode hnd f g_var ~left body in
+        ([ (f, g, g_var, Term.abstraction (g_pat, body')) ], !left)
+    | Some instantiation ->
+        let root =
+          {
+            original = f;
+            instantiation;
+            mode;
+            handler = hnd;
+            result = Building { name_var = g_var; left = 0 };
+          }
+        in
+        state.specialisations := root :: !(state.specialisations);
+        let gb =
+          {
+            members =
+              Term.Variable.Map.find_opt f !(state.groups)
+              |> Option.value ~default:(Term.Variable.Set.singleton f);
+            group_handler = hnd;
+            group_mode = mode;
+            group_instantiation = instantiation;
+            root;
+            pending = Queue.create ();
+          }
+        in
+        let state_g = { state with building_group = Some gb } in
+        let first = (f, g, g_var, build_member state_g mode abs) in
+        let rec rest built =
+          match Queue.take_opt gb.pending with
+          | None -> List.rev built
+          | Some (x, abs_x, g_x, g_var_x) ->
+              rest ((x, g_x, g_var_x, build_member state_g mode abs_x) :: built)
+        in
+        let members = first :: rest [] in
+        let names =
+          List.fold_left
+            (fun names (_, g, _, _) -> Term.Variable.Set.add g names)
+            Term.Variable.Set.empty members
+        in
+        let extract_all body =
+          List.fold_left
+            (fun body (x, _, g_var, _) -> extract mode hnd x g_var ~left body)
+            body members
+        in
+        let entries =
+          List.filter
+            (fun e ->
+              match e.result with
+              | Building
+                  { name_var = { term = Term.Var { variable; _ }; _ }; _ } ->
+                  Term.Variable.Set.mem variable names
+              | _ -> false)
+            !(state.specialisations)
+        in
+        List.iter
+          (fun e ->
+            match e.result with
+            | Building b when b.left > 0 -> left := true
+            | _ -> ())
+          entries;
+        state.specialisations :=
+          List.filter
+            (fun e -> not (List.memq e entries))
+            !(state.specialisations);
+        ( List.map
+            (fun (x, g, g_var, (g_pat, body)) ->
+              (x, g, g_var, Term.abstraction (g_pat, extract_all body)))
+            members,
+          !left )
   in
   let lookup mode =
     match top with
@@ -775,43 +1025,85 @@ and with_rec_fun state hnd f abs v ~top =
             && (mode = Varying || Term.same_return_clause entry.handler hnd)
             &&
             match entry.result with
-            | Built { name_var; _ } -> Type.equal_ty name_var.ty (g_ty mode)
-            | FixedFails -> true)
+            | Built { name_var; _ } ->
+                Type.equal_ty name_var.ty (g_ty mode f_ty_arg)
+            | FixedFails -> true
+            | Building _ -> false)
           !(state.specialisations)
   in
-  let store mode result =
+  let store mode original result =
     match top with
     | None -> ()
     | Some instantiation ->
         state.specialisations :=
-          { original = f; instantiation; mode; handler = hnd; result }
+          { original; instantiation; mode; handler = hnd; result }
           :: !(state.specialisations)
   in
   let specialise mode =
     match lookup mode with
     | Some { result = Built { name_var; _ }; _ } -> `Shared name_var
     | Some { result = FixedFails; _ } -> `Fails
-    | None ->
-        let g, g_var, g_abs, left = build mode in
-        let closed = top <> None && is_closed state g g_abs in
+    | Some { result = Building _; _ } | None ->
+        (* If building leaves a handled call that an enclosing [Fixed]
+           attempt could not take, that attempt is discarded, and this
+           specialisation has a handled call that the next attempt would
+           replace. So it is not cached. *)
+        let enclosing = !(state.specialisations) in
+        let enclosing_left () =
+          List.fold_left
+            (fun n e -> match e.result with Building b -> n + b.left | _ -> n)
+            0 enclosing
+        in
+        let left_before = enclosing_left () in
+        let members, left = build mode in
+        let names =
+          List.fold_left
+            (fun names (_, g, _, _) -> Term.Variable.Set.add g names)
+            Term.Variable.Set.empty members
+        in
+        let closed =
+          top <> None
+          && enclosing_left () = left_before
+          && List.for_all
+               (fun (_, _, _, g_abs) -> is_closed state names g_abs)
+               members
+        in
+        let _, _, root_var, _ = List.hd members in
         if left then (
-          if closed then store mode FixedFails;
+          if closed then store mode f FixedFails;
           `Fails)
         else if closed then (
-          let definition = optimize_abstraction state g_abs in
-          add_top_name state g;
-          store mode
-            (Built { name = g; name_var = g_var; definition; emitted = false });
-          `Shared g_var)
-        else `Local (g, g_var, g_abs)
+          Term.Variable.Set.iter (add_top_name state) names;
+          List.iter
+            (fun (_, g, _, _) ->
+              state.groups := Term.Variable.Map.add g names !(state.groups))
+            members;
+          List.iter
+            (fun (x, g, g_var, g_abs) ->
+              let definition = optimize_abstraction state g_abs in
+              store mode x
+                (Built
+                   {
+                     name = g;
+                     name_var = g_var;
+                     definition;
+                     group = names;
+                     emitted = false;
+                   }))
+            members;
+          `Shared root_var)
+        else `Local (members, root_var)
   in
   let finish mode = function
     | `Shared g_var -> call mode g_var
-    | `Local (g, g_var, g_abs) ->
+    | `Local (members, root_var) ->
         (* Still with [f] in [specialising]: calls of [f] that [extract] has
-           left are not specialised again. *)
+           left are not specialised again under the same handler. *)
         optimize_computation state
-          (Term.letRec (Assoc.of_list [ (g, g_abs) ], call mode g_var))
+          (Term.letRec
+             ( Assoc.of_list
+                 (List.map (fun (_, g, _, g_abs) -> (g, g_abs)) members),
+               call mode root_var ))
     | `Fails -> assert false
   in
   (* For a top-level [f], a [Fixed] specialisation can be shared only if the
@@ -997,13 +1289,23 @@ let new_top_definitions state fvs =
   List.fold_left
     (fun defs entry ->
       match entry.result with
-      | Built ({ name; definition; emitted = false; _ } as b) when is_used name
-        ->
-          b.emitted <- true;
-          used := Term.( @@@ ) !used (Term.free_vars_abs definition);
-          Assoc.of_list
-            [ (name, (Type.Params.empty, Constraints.empty, definition)) ]
-          :: defs
+      | Built { name; group; emitted = false; _ } when is_used name ->
+          (* The whole group of [name], as one recursive definition *)
+          let members =
+            List.filter_map
+              (fun e ->
+                match e.result with
+                | Built ({ name; emitted = false; _ } as b)
+                  when Term.Variable.Set.mem name group ->
+                    b.emitted <- true;
+                    used := Term.( @@@ ) !used (Term.free_vars_abs b.definition);
+                    Some
+                      ( name,
+                        (Type.Params.empty, Constraints.empty, b.definition) )
+                | _ -> None)
+              !(state.specialisations)
+          in
+          Assoc.of_list (List.rev members) :: defs
       | _ -> defs)
     [] !(state.specialisations)
 
@@ -1055,6 +1357,12 @@ let optimize_top_rec_definitions state defs =
 
 let process_top_let_rec state defs =
   if !Config.enable_optimization then (
+    let members =
+      Assoc.to_list defs |> List.map fst |> Term.Variable.Set.of_list
+    in
+    Term.Variable.Set.iter
+      (fun f -> state.groups := Term.Variable.Map.add f members !(state.groups))
+      members;
     let defs' = optimize_top_rec_definitions state defs in
     (* A definition that does not mention itself is just a function, which
        Inline-Top can inline. *)
@@ -1062,13 +1370,13 @@ let process_top_let_rec state defs =
       non_recursive (Assoc.map (fun (_, _, abs) -> abs) defs')
     in
     let state' =
-      match Assoc.to_list defs' with
-      | [ (f, (_, _, abs)) ] ->
+      Assoc.fold_left
+        (fun state (f, (_, _, abs)) ->
           add_top_definition state f
             (match function_only with
             | Some _ -> TopValue (Term.lambda abs)
-            | None -> TopRec abs)
-      | _ -> state
+            | None -> TopRec abs))
+        state defs'
     in
     List.iter (fun (f, _) -> add_top_name state f) (Assoc.to_list defs);
     let fvs =

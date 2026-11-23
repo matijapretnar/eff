@@ -109,6 +109,11 @@ and handler_clauses' = {
 and effect_clauses = {
   effect_part : (eff, abstraction2) Assoc.t;
   fingerprint : effect_fingerprint;
+      (** Names the source handler that these clauses come from. Elaboration
+          gives a fresh one, and every rewrite keeps it: substitution, a new
+          return clause (With-Do) and dropping clauses (With-Cast,
+          Handler-Subsume). So there are only as many fingerprints as handlers
+          in the source, which is what the guard of With-Rec-Fun relies on. *)
 }
 
 and abstraction = (pattern * computation, Type.ty * Type.dirty) typed
@@ -216,8 +221,7 @@ let handler_with_smaller_input_dirt hnd dcoer =
         term =
           {
             hnd.term with
-            effect_clauses =
-              { effect_part; fingerprint = EffectFingerprint.fresh () };
+            effect_clauses = { hnd.term.effect_clauses with effect_part };
           };
         ty = ((ty_in, drt), drty_out);
       }
@@ -848,9 +852,8 @@ and subst_comp' sbst = function
 
 and substitute_effect_clauses sbst effect_clauses =
   {
+    effect_clauses with
     effect_part = Assoc.map (subst_abs2 sbst) effect_clauses.effect_part;
-    (* We refresh the fingerprint because the meaning of effect clauses changes *)
-    fingerprint = EffectFingerprint.refresh effect_clauses.fingerprint;
   }
 
 and subst_handler sbst h =
@@ -870,12 +873,6 @@ and subst_abs sbst { term = p, c; ty = absty } =
 and subst_abs2 sbst { term = p1, p2, c; ty = absty } =
   (* XXX We should assert that p1, p2 & sbst have disjoint variables *)
   { term = (p1, p2, subst_comp sbst c); ty = absty }
-
-(* Checks if the effect handling part of handlers is the same *)
-let effect_part_identical h1 h2 =
-  EffectFingerprint.compare h1.effect_clauses.fingerprint
-    h2.effect_clauses.fingerprint
-  = 0
 
 let pattern_match p e =
   assert (Type.equal_ty p.ty e.ty);
