@@ -641,39 +641,36 @@
      fun (_s : int) ->
       if _x = 0 then _s
       else
-        _looper (_x - 1)
-          (_s
-          +
-          let rec _interp (_x, _k) =
-            begin match _x with
-            | Num _b -> _k _b
-            | Add (_l, _r) ->
-                _interp
-                  ( _l,
-                    fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x + _y))
-                  )
-            | Mul (_l, _r) ->
-                _interp
-                  ( _l,
-                    fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x * _y))
-                  )
-            | Sub (_l, _r) ->
-                _interp
-                  ( _l,
-                    fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x - _y))
-                  )
-            | Div (_l, _r) ->
-                _interp
-                  ( _r,
-                    fun (_y : int) ->
-                      _interp
-                        ( _l,
-                          fun (_x : int) ->
-                            begin match _y with 0 -> ( ~- ) 1 | _ -> _k (_x / _y)
-                            end ) )
-            end
-          in
-          _interp (____finalCase, fun (_id : int) -> _id))
+        let rec _interp (_x, _k) =
+          begin match _x with
+          | Num _b -> _k _b
+          | Add (_l, _r) ->
+              _interp
+                ( _l,
+                  fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x + _y))
+                )
+          | Mul (_l, _r) ->
+              _interp
+                ( _l,
+                  fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x * _y))
+                )
+          | Sub (_l, _r) ->
+              _interp
+                ( _l,
+                  fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x - _y))
+                )
+          | Div (_l, _r) ->
+              _interp
+                ( _r,
+                  fun (_y : int) ->
+                    _interp
+                      ( _l,
+                        fun (_x : int) ->
+                          begin match _y with 0 -> ( ~- ) 1 | _ -> _k (_x / _y)
+                          end ) )
+          end
+        in
+        _looper (_x - 1) (_s + _interp (____finalCase, fun (_id : int) -> _id))
     in
     _looper 100 0
   
@@ -737,41 +734,39 @@
      fun (_s : int) ->
       if _x = 0 then _s
       else
+        let rec _interp (_x, _k) =
+          begin match _x with
+          | Num _b -> fun (_ : int) -> _k _b (_b * _b)
+          | Add (_l, _r) ->
+              _interp
+                ( _l,
+                  fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x + _y))
+                )
+          | Mul (_l, _r) ->
+              _interp
+                ( _l,
+                  fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x * _y))
+                )
+          | Sub (_l, _r) ->
+              _interp
+                ( _l,
+                  fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x - _y))
+                )
+          | Div (_l, _r) ->
+              _interp
+                ( _r,
+                  fun (_y : int) ->
+                    _interp
+                      ( _l,
+                        fun (_x : int) ->
+                          begin match _y with
+                          | 0 -> fun (_s : int) -> _k _s _s
+                          | _ -> _k (_x / _y)
+                          end ) )
+          end
+        in
         _looper (_x - 1)
-          (_s
-          +
-          let rec _interp (_x, _k) =
-            begin match _x with
-            | Num _b -> fun (_ : int) -> _k _b (_b * _b)
-            | Add (_l, _r) ->
-                _interp
-                  ( _l,
-                    fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x + _y))
-                  )
-            | Mul (_l, _r) ->
-                _interp
-                  ( _l,
-                    fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x * _y))
-                  )
-            | Sub (_l, _r) ->
-                _interp
-                  ( _l,
-                    fun (_x : int) -> _interp (_r, fun (_y : int) -> _k (_x - _y))
-                  )
-            | Div (_l, _r) ->
-                _interp
-                  ( _r,
-                    fun (_y : int) ->
-                      _interp
-                        ( _l,
-                          fun (_x : int) ->
-                            begin match _y with
-                            | 0 -> fun (_s : int) -> _k _s _s
-                            | _ -> _k (_x / _y)
-                            end ) )
-            end
-          in
-          _interp (____finalCase, fun (_x : int) -> fun (_ : int) -> _x) _n)
+          (_s + _interp (____finalCase, fun (_x : int) -> fun (_ : int) -> _x) _n)
     in
     _looper 100 0
   
@@ -1598,38 +1593,20 @@
   
   type intlist = IntNil | IntCons of (int * intlist);;
   
-  force_unsafe
-    ((let rec _concat _x =
-       fun (_x : intlist) ->
-        begin match _x with
-        | IntNil -> _x
-        | IntCons (_z, _zs) -> IntCons (_z, _concat _zs _x)
-        end
-      in
-      handler
-        {
-          value_clause = (fun (_x : int) -> Value (IntCons (_x, IntNil)));
-          effect_clauses =
-            (fun (type a)
-              (type b)
-              (eff : (a, b) eff_internal_effect)
-              :
-              (a -> (b -> _) -> _)
-            ->
-              match eff with
-              | Decide ->
-                  fun (() : unit) _k ->
-                    Value
-                      (_concat
-                         (coer_arrow coer_refl_ty force_unsafe _k true)
-                         (coer_arrow coer_refl_ty force_unsafe _k false))
-              | eff' -> fun arg k -> Call (eff', arg, k));
-        }
-        (fun (_x : intlist) -> Value _x))
-       (let rec _f _x =
-          Call (Decide, (), fun (_y : bool) -> Value (if _y then 2 else 3))
-        in
-        _f ()))
+  let rec _concat _x =
+   fun (_x : intlist) ->
+    begin match _x with
+    | IntNil -> _x
+    | IntCons (_z, _zs) -> IntCons (_z, _concat _zs _x)
+    end
+  in
+  let rec _f _x =
+    let _k =
+     fun (_y : bool) -> if _y then IntCons (2, IntNil) else IntCons (3, IntNil)
+    in
+    _concat (_k true) (_k false)
+  in
+  _f ()
   ======================================================================
   codegen/pm-2_passes.eff
   ----------------------------------------------------------------------
@@ -2894,20 +2871,19 @@
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
-    _maxl 0
-      (let rec _explore (_x, _k) =
-         begin match _x with
-         | Empty -> _k 0
-         | Node (_left, _x, _right) ->
-             let _k =
-              fun (_y : bool) ->
-               if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-               else _explore (_right, fun (_b : int) -> _k (_op _x _b))
-             in
-             _op (* @ *) (_k true) (_k false)
-         end
-       in
-       _explore (_tester _m, fun (_x : int) -> Cons (_x, Nil)))
+    let rec _explore (_x, _k) =
+      begin match _x with
+      | Empty -> _k 0
+      | Node (_left, _x, _right) ->
+          let _k =
+           fun (_y : bool) ->
+            if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+            else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+          in
+          _op (* @ *) (_k true) (_k false)
+      end
+    in
+    _maxl 0 (_explore (_tester _m, fun (_x : int) -> Cons (_x, Nil)))
   
   let test_general = _test_general
   
@@ -2923,23 +2899,20 @@
      fun (_s : int) ->
       if _x = 0 then _s
       else
+        let rec _explore (_x, _k) =
+          begin match _x with
+          | Empty -> _k 0
+          | Node (_left, _x, _right) ->
+              let _k =
+               fun (_y : bool) ->
+                if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+                else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+              in
+              _op (* @ *) (_k true) (_k false)
+          end
+        in
         _looper (_x - 1)
-          (_s
-          + _maxl 0
-              (let rec _explore (_x, _k) =
-                 begin match _x with
-                 | Empty -> _k 0
-                 | Node (_left, _x, _right) ->
-                     let _k =
-                      fun (_y : bool) ->
-                       if _y then
-                         _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                       else _explore (_right, fun (_b : int) -> _k (_op _x _b))
-                     in
-                     _op (* @ *) (_k true) (_k false)
-                 end
-               in
-               _explore (____t, fun (_x : int) -> Cons (_x, Nil))))
+          (_s + _maxl 0 (_explore (____t, fun (_x : int) -> Cons (_x, Nil))))
     in
     _looper 100 0
   
@@ -2961,123 +2934,122 @@
      fun (_n : int) ->
       if _x = _n then Nil else Cons (_x * 3, _populate_leafs (_x + 1) _n)
     in
-    _maxl 0
-      (let rec _explore (_x, _k) =
-         begin match _x with
-         | Empty -> Call (Get, (), fun (_y : int) -> _k _y)
-         | Node (_left, _x, _right) ->
-             let _k =
-              fun (_y : bool) ->
-               if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-               else _explore (_right, fun (_b : int) -> _k (_op _x _b))
-             in
-             _k true >>= fun _b ->
-             _k false >>= fun _b -> Value (_op (* @ *) _b _b)
-         end
-       in
-       let rec _explore (_x, _k) =
-         begin match _x with
-         | Empty ->
-             fun (_s : intlist) ->
-               begin match _s with
-               | Cons (_x, _rest) ->
-                   force_unsafe
-                     ((handler
-                         {
-                           value_clause =
-                             (fun (_x : intlist) ->
-                               Value (fun (_ : intlist) -> _x));
-                           effect_clauses =
-                             (fun (type a)
-                               (type b)
-                               (eff : (a, b) eff_internal_effect)
-                               :
-                               (a -> (b -> _) -> _)
-                             ->
-                               match eff with
-                               | Get ->
-                                   fun (() : unit) _k ->
+    let rec _explore (_x, _k) =
+      begin match _x with
+      | Empty -> Call (Get, (), fun (_y : int) -> _k _y)
+      | Node (_left, _x, _right) ->
+          let _k =
+           fun (_y : bool) ->
+            if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+            else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+          in
+          _k true >>= fun _b ->
+          _k false >>= fun _b -> Value (_op (* @ *) _b _b)
+      end
+    in
+    let rec _explore (_x, _k) =
+      begin match _x with
+      | Empty ->
+          fun (_s : intlist) ->
+            begin match _s with
+            | Cons (_x, _rest) ->
+                force_unsafe
+                  ((handler
+                      {
+                        value_clause =
+                          (fun (_x : intlist) -> Value (fun (_ : intlist) -> _x));
+                        effect_clauses =
+                          (fun (type a)
+                            (type b)
+                            (eff : (a, b) eff_internal_effect)
+                            :
+                            (a -> (b -> _) -> _)
+                          ->
+                            match eff with
+                            | Get ->
+                                fun (() : unit) _k ->
+                                  Value
+                                    (fun (_s : intlist) ->
+                                      begin match _s with
+                                      | Cons (_x, _rest) ->
+                                          coer_arrow coer_refl_ty force_unsafe _k
+                                            _x _rest
+                                      | Nil -> Nil
+                                      end)
+                            | eff' -> fun arg k -> Call (eff', arg, k));
+                      }
+                      (fun (_x : intlist -> intlist) -> Value _x))
+                     (_k _x))
+                  _rest
+            | Nil -> Nil
+            end
+      | Node (_left, _x, _right) ->
+          let _k =
+           fun (_y : bool) ->
+            if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+            else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+          in
+          force_unsafe
+            ((handler
+                {
+                  value_clause =
+                    (fun (_b : intlist) ->
+                      Value
+                        (force_unsafe
+                           ((handler
+                               {
+                                 value_clause =
+                                   (fun (_b : intlist) ->
                                      Value
-                                       (fun (_s : intlist) ->
-                                         begin match _s with
-                                         | Cons (_x, _rest) ->
-                                             coer_arrow coer_refl_ty force_unsafe
-                                               _k _x _rest
-                                         | Nil -> Nil
-                                         end)
-                               | eff' -> fun arg k -> Call (eff', arg, k));
-                         }
-                         (fun (_x : intlist -> intlist) -> Value _x))
-                        (_k _x))
-                     _rest
-               | Nil -> Nil
-               end
-         | Node (_left, _x, _right) ->
-             let _k =
-              fun (_y : bool) ->
-               if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-               else _explore (_right, fun (_b : int) -> _k (_op _x _b))
-             in
-             force_unsafe
-               ((handler
-                   {
-                     value_clause =
-                       (fun (_b : intlist) ->
-                         Value
-                           (force_unsafe
-                              ((handler
-                                  {
-                                    value_clause =
-                                      (fun (_b : intlist) ->
-                                        Value
-                                          (fun (_ : intlist) -> _op (* @ *) _b _b));
-                                    effect_clauses =
-                                      (fun (type a)
-                                        (type b)
-                                        (eff : (a, b) eff_internal_effect)
-                                        :
-                                        (a -> (b -> _) -> _)
-                                      ->
-                                        match eff with
-                                        | Get ->
-                                            fun (() : unit) _k ->
-                                              Value
-                                                (fun (_s : intlist) ->
-                                                  begin match _s with
-                                                  | Cons (_x, _rest) ->
-                                                      coer_arrow coer_refl_ty
-                                                        force_unsafe _k _x _rest
-                                                  | Nil -> Nil
-                                                  end)
-                                        | eff' -> fun arg k -> Call (eff', arg, k));
-                                  }
-                                  (fun (_x : intlist -> intlist) -> Value _x))
-                                 (_k false))));
-                     effect_clauses =
-                       (fun (type a)
-                         (type b)
-                         (eff : (a, b) eff_internal_effect)
-                         :
-                         (a -> (b -> _) -> _)
-                       ->
-                         match eff with
-                         | Get ->
-                             fun (() : unit) _k ->
-                               Value
-                                 (fun (_s : intlist) ->
-                                   begin match _s with
-                                   | Cons (_x, _rest) ->
-                                       coer_arrow coer_refl_ty force_unsafe _k _x
-                                         _rest
-                                   | Nil -> Nil
-                                   end)
-                         | eff' -> fun arg k -> Call (eff', arg, k));
-                   }
-                   (fun (_x : intlist -> intlist) -> Value _x))
-                  (_k true))
-         end
-       in
-       _explore
+                                       (fun (_ : intlist) -> _op (* @ *) _b _b));
+                                 effect_clauses =
+                                   (fun (type a)
+                                     (type b)
+                                     (eff : (a, b) eff_internal_effect)
+                                     :
+                                     (a -> (b -> _) -> _)
+                                   ->
+                                     match eff with
+                                     | Get ->
+                                         fun (() : unit) _k ->
+                                           Value
+                                             (fun (_s : intlist) ->
+                                               begin match _s with
+                                               | Cons (_x, _rest) ->
+                                                   coer_arrow coer_refl_ty
+                                                     force_unsafe _k _x _rest
+                                               | Nil -> Nil
+                                               end)
+                                     | eff' -> fun arg k -> Call (eff', arg, k));
+                               }
+                               (fun (_x : intlist -> intlist) -> Value _x))
+                              (_k false))));
+                  effect_clauses =
+                    (fun (type a)
+                      (type b)
+                      (eff : (a, b) eff_internal_effect)
+                      :
+                      (a -> (b -> _) -> _)
+                    ->
+                      match eff with
+                      | Get ->
+                          fun (() : unit) _k ->
+                            Value
+                              (fun (_s : intlist) ->
+                                begin match _s with
+                                | Cons (_x, _rest) ->
+                                    coer_arrow coer_refl_ty force_unsafe _k _x
+                                      _rest
+                                | Nil -> Nil
+                                end)
+                      | eff' -> fun arg k -> Call (eff', arg, k));
+                }
+                (fun (_x : intlist -> intlist) -> Value _x))
+               (_k true))
+      end
+    in
+    _maxl 0
+      (_explore
          (_tester _m, fun (_x : int) -> Value (Cons (_x, Nil)))
          (_populate_leafs 0 154))
   
@@ -3100,201 +3072,58 @@
      fun (_s : int) ->
       if _x = 0 then _s
       else
-        _looper (_x - 1)
-          (_s
-          + _maxl 0
-              (let rec _explore (_x, _k) =
-                 begin match _x with
-                 | Empty -> Call (Get, (), fun (_y : int) -> _k _y)
-                 | Node (_left, _x, _right) ->
-                     let _k =
-                      fun (_y : bool) ->
-                       if _y then
-                         _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                       else _explore (_right, fun (_b : int) -> _k (_op _x _b))
-                     in
-                     _k true >>= fun _b ->
-                     _k false >>= fun _b -> Value (_op (* @ *) _b _b)
-                 end
-               in
-               let rec _explore (_x, _k) =
-                 begin match _x with
-                 | Empty ->
-                     fun (_s : intlist) ->
-                       begin match _s with
-                       | Cons (_x, _rest) ->
-                           force_unsafe
-                             ((handler
-                                 {
-                                   value_clause =
-                                     (fun (_x : intlist) ->
-                                       Value (fun (_ : intlist) -> _x));
-                                   effect_clauses =
-                                     (fun (type a)
-                                       (type b)
-                                       (eff : (a, b) eff_internal_effect)
-                                       :
-                                       (a -> (b -> _) -> _)
-                                     ->
-                                       match eff with
-                                       | Get ->
-                                           fun (() : unit) _k ->
-                                             Value
-                                               (fun (_s : intlist) ->
-                                                 begin match _s with
-                                                 | Cons (_x, _rest) ->
-                                                     coer_arrow coer_refl_ty
-                                                       force_unsafe _k _x _rest
-                                                 | Nil -> Nil
-                                                 end)
-                                       | eff' -> fun arg k -> Call (eff', arg, k));
-                                 }
-                                 (fun (_x : intlist -> intlist) -> Value _x))
-                                (_k _x))
-                             _rest
-                       | Nil -> Nil
-                       end
-                 | Node (_left, _x, _right) ->
-                     let _k =
-                      fun (_y : bool) ->
-                       if _y then
-                         _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                       else _explore (_right, fun (_b : int) -> _k (_op _x _b))
-                     in
-                     force_unsafe
-                       ((handler
-                           {
-                             value_clause =
-                               (fun (_b : intlist) ->
-                                 Value
-                                   (force_unsafe
-                                      ((handler
-                                          {
-                                            value_clause =
-                                              (fun (_b : intlist) ->
-                                                Value
-                                                  (fun (_ : intlist) ->
-                                                    _op (* @ *) _b _b));
-                                            effect_clauses =
-                                              (fun (type a)
-                                                (type b)
-                                                (eff : (a, b) eff_internal_effect)
-                                                :
-                                                (a -> (b -> _) -> _)
-                                              ->
-                                                match eff with
-                                                | Get ->
-                                                    fun (() : unit) _k ->
-                                                      Value
-                                                        (fun (_s : intlist) ->
-                                                          begin match _s with
-                                                          | Cons (_x, _rest) ->
-                                                              coer_arrow
-                                                                coer_refl_ty
-                                                                force_unsafe _k _x
-                                                                _rest
-                                                          | Nil -> Nil
-                                                          end)
-                                                | eff' ->
-                                                    fun arg k ->
-                                                      Call (eff', arg, k));
-                                          }
-                                          (fun (_x : intlist -> intlist) ->
-                                            Value _x))
-                                         (_k false))));
-                             effect_clauses =
-                               (fun (type a)
-                                 (type b)
-                                 (eff : (a, b) eff_internal_effect)
-                                 :
-                                 (a -> (b -> _) -> _)
-                               ->
-                                 match eff with
-                                 | Get ->
-                                     fun (() : unit) _k ->
-                                       Value
-                                         (fun (_s : intlist) ->
-                                           begin match _s with
-                                           | Cons (_x, _rest) ->
-                                               coer_arrow coer_refl_ty
-                                                 force_unsafe _k _x _rest
-                                           | Nil -> Nil
-                                           end)
-                                 | eff' -> fun arg k -> Call (eff', arg, k));
-                           }
-                           (fun (_x : intlist -> intlist) -> Value _x))
-                          (_k true))
-                 end
-               in
-               _explore
-                 (____t, fun (_x : int) -> Value (Cons (_x, Nil)))
-                 ____leafs))
-    in
-    _looper 100 0
-  
-  let test_leaf_state_loop = _test_leaf_state_loop
-  
-  type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
-  
-  let _test_leaf_state_update =
-   fun (_m : int) ->
-    let rec _maxl _x =
-     fun (_x : intlist) ->
-      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
-      end
-    in
-    _maxl 0
-      (let rec _explore (_x, _k) =
-         begin match _x with
-         | Empty -> Call (Get, (), fun (_y : int) -> _k _y)
-         | Node (_left, _x, _right) ->
-             Call
-               ( Set,
-                 _x * _x,
-                 fun (_y : unit) ->
-                   let _k =
-                    fun (_y : bool) ->
-                     if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                     else _explore (_right, fun (_b : int) -> _k (_op _x _b))
-                   in
-                   _k true >>= fun _b ->
-                   _k false >>= fun _b -> Value (_op (* @ *) _b _b) )
-         end
-       in
-       let rec _explore (_x, _k) =
-        fun (_x : int) ->
-         begin match _x with
-         | Empty ->
-             force_unsafe
-               ((handler
-                   {
-                     value_clause =
-                       (fun (_x : intlist) -> Value (fun (_ : int) -> _x));
-                     effect_clauses =
-                       (fun (type a)
-                         (type b)
-                         (eff : (a, b) eff_internal_effect)
-                         :
-                         (a -> (b -> _) -> _)
-                       ->
-                         match eff with
-                         | Get ->
-                             fun (() : unit) _k ->
-                               Value
-                                 (fun (_s : int) ->
-                                   coer_arrow coer_refl_ty force_unsafe _k _s _s)
-                         | Set ->
-                             fun (_s : int) _k ->
-                               Value
-                                 (fun (_ : int) ->
-                                   coer_arrow coer_refl_ty force_unsafe _k () _s)
-                         | eff' -> fun arg k -> Call (eff', arg, k));
-                   }
-                   (fun (_x : int -> intlist) -> Value _x))
-                  (_k _x))
-               _x
-         | Node (_left, _x, _right) ->
-             (let _k =
+        let rec _explore (_x, _k) =
+          begin match _x with
+          | Empty -> Call (Get, (), fun (_y : int) -> _k _y)
+          | Node (_left, _x, _right) ->
+              let _k =
+               fun (_y : bool) ->
+                if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+                else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+              in
+              _k true >>= fun _b ->
+              _k false >>= fun _b -> Value (_op (* @ *) _b _b)
+          end
+        in
+        let rec _explore (_x, _k) =
+          begin match _x with
+          | Empty ->
+              fun (_s : intlist) ->
+                begin match _s with
+                | Cons (_x, _rest) ->
+                    force_unsafe
+                      ((handler
+                          {
+                            value_clause =
+                              (fun (_x : intlist) ->
+                                Value (fun (_ : intlist) -> _x));
+                            effect_clauses =
+                              (fun (type a)
+                                (type b)
+                                (eff : (a, b) eff_internal_effect)
+                                :
+                                (a -> (b -> _) -> _)
+                              ->
+                                match eff with
+                                | Get ->
+                                    fun (() : unit) _k ->
+                                      Value
+                                        (fun (_s : intlist) ->
+                                          begin match _s with
+                                          | Cons (_x, _rest) ->
+                                              coer_arrow coer_refl_ty force_unsafe
+                                                _k _x _rest
+                                          | Nil -> Nil
+                                          end)
+                                | eff' -> fun arg k -> Call (eff', arg, k));
+                          }
+                          (fun (_x : intlist -> intlist) -> Value _x))
+                         (_k _x))
+                      _rest
+                | Nil -> Nil
+                end
+          | Node (_left, _x, _right) ->
+              let _k =
                fun (_y : bool) ->
                 if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
                 else _explore (_right, fun (_b : int) -> _k (_op _x _b))
@@ -3311,7 +3140,8 @@
                                      value_clause =
                                        (fun (_b : intlist) ->
                                          Value
-                                           (fun (_ : int) -> _op (* @ *) _b _b));
+                                           (fun (_ : intlist) ->
+                                             _op (* @ *) _b _b));
                                      effect_clauses =
                                        (fun (type a)
                                          (type b)
@@ -3323,19 +3153,220 @@
                                          | Get ->
                                              fun (() : unit) _k ->
                                                Value
-                                                 (fun (_s : int) ->
-                                                   coer_arrow coer_refl_ty
-                                                     force_unsafe _k _s _s)
-                                         | Set ->
-                                             fun (_s : int) _k ->
-                                               Value
-                                                 (fun (_ : int) ->
-                                                   coer_arrow coer_refl_ty
-                                                     force_unsafe _k () _s)
+                                                 (fun (_s : intlist) ->
+                                                   begin match _s with
+                                                   | Cons (_x, _rest) ->
+                                                       coer_arrow coer_refl_ty
+                                                         force_unsafe _k _x _rest
+                                                   | Nil -> Nil
+                                                   end)
                                          | eff' -> fun arg k -> Call (eff', arg, k));
                                    }
-                                   (fun (_x : int -> intlist) -> Value _x))
+                                   (fun (_x : intlist -> intlist) -> Value _x))
                                   (_k false))));
+                      effect_clauses =
+                        (fun (type a)
+                          (type b)
+                          (eff : (a, b) eff_internal_effect)
+                          :
+                          (a -> (b -> _) -> _)
+                        ->
+                          match eff with
+                          | Get ->
+                              fun (() : unit) _k ->
+                                Value
+                                  (fun (_s : intlist) ->
+                                    begin match _s with
+                                    | Cons (_x, _rest) ->
+                                        coer_arrow coer_refl_ty force_unsafe _k _x
+                                          _rest
+                                    | Nil -> Nil
+                                    end)
+                          | eff' -> fun arg k -> Call (eff', arg, k));
+                    }
+                    (fun (_x : intlist -> intlist) -> Value _x))
+                   (_k true))
+          end
+        in
+        _looper (_x - 1)
+          (_s
+          + _maxl 0
+              (_explore
+                 (____t, fun (_x : int) -> Value (Cons (_x, Nil)))
+                 ____leafs))
+    in
+    _looper 100 0
+  
+  let test_leaf_state_loop = _test_leaf_state_loop
+  
+  type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
+  
+  let _test_leaf_state_update =
+   fun (_m : int) ->
+    let rec _maxl _x =
+     fun (_x : intlist) ->
+      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
+      end
+    in
+    let rec _explore (_x, _k) =
+      begin match _x with
+      | Empty -> Call (Get, (), fun (_y : int) -> _k _y)
+      | Node (_left, _x, _right) ->
+          Call
+            ( Set,
+              _x * _x,
+              fun (_y : unit) ->
+                let _k =
+                 fun (_y : bool) ->
+                  if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+                  else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+                in
+                _k true >>= fun _b ->
+                _k false >>= fun _b -> Value (_op (* @ *) _b _b) )
+      end
+    in
+    let rec _explore (_x, _k) =
+     fun (_x : int) ->
+      begin match _x with
+      | Empty ->
+          force_unsafe
+            ((handler
+                {
+                  value_clause =
+                    (fun (_x : intlist) -> Value (fun (_ : int) -> _x));
+                  effect_clauses =
+                    (fun (type a)
+                      (type b)
+                      (eff : (a, b) eff_internal_effect)
+                      :
+                      (a -> (b -> _) -> _)
+                    ->
+                      match eff with
+                      | Get ->
+                          fun (() : unit) _k ->
+                            Value
+                              (fun (_s : int) ->
+                                coer_arrow coer_refl_ty force_unsafe _k _s _s)
+                      | Set ->
+                          fun (_s : int) _k ->
+                            Value
+                              (fun (_ : int) ->
+                                coer_arrow coer_refl_ty force_unsafe _k () _s)
+                      | eff' -> fun arg k -> Call (eff', arg, k));
+                }
+                (fun (_x : int -> intlist) -> Value _x))
+               (_k _x))
+            _x
+      | Node (_left, _x, _right) ->
+          (let _k =
+            fun (_y : bool) ->
+             if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+             else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+           in
+           force_unsafe
+             ((handler
+                 {
+                   value_clause =
+                     (fun (_b : intlist) ->
+                       Value
+                         (force_unsafe
+                            ((handler
+                                {
+                                  value_clause =
+                                    (fun (_b : intlist) ->
+                                      Value (fun (_ : int) -> _op (* @ *) _b _b));
+                                  effect_clauses =
+                                    (fun (type a)
+                                      (type b)
+                                      (eff : (a, b) eff_internal_effect)
+                                      :
+                                      (a -> (b -> _) -> _)
+                                    ->
+                                      match eff with
+                                      | Get ->
+                                          fun (() : unit) _k ->
+                                            Value
+                                              (fun (_s : int) ->
+                                                coer_arrow coer_refl_ty
+                                                  force_unsafe _k _s _s)
+                                      | Set ->
+                                          fun (_s : int) _k ->
+                                            Value
+                                              (fun (_ : int) ->
+                                                coer_arrow coer_refl_ty
+                                                  force_unsafe _k () _s)
+                                      | eff' -> fun arg k -> Call (eff', arg, k));
+                                }
+                                (fun (_x : int -> intlist) -> Value _x))
+                               (_k false))));
+                   effect_clauses =
+                     (fun (type a)
+                       (type b)
+                       (eff : (a, b) eff_internal_effect)
+                       :
+                       (a -> (b -> _) -> _)
+                     ->
+                       match eff with
+                       | Get ->
+                           fun (() : unit) _k ->
+                             Value
+                               (fun (_s : int) ->
+                                 coer_arrow coer_refl_ty force_unsafe _k _s _s)
+                       | Set ->
+                           fun (_s : int) _k ->
+                             Value
+                               (fun (_ : int) ->
+                                 coer_arrow coer_refl_ty force_unsafe _k () _s)
+                       | eff' -> fun arg k -> Call (eff', arg, k));
+                 }
+                 (fun (_x : int -> intlist) -> Value _x))
+                (_k true)))
+            (_x * _x)
+      end
+    in
+    _maxl 0
+      (_explore (_tester _m, fun (_x : int) -> Value (Cons (_x, Nil))) (( ~- ) 1))
+  
+  let test_leaf_state_update = _test_leaf_state_update
+  
+  let _test_leaf_state_update_loop =
+   fun (_m : int) ->
+    let rec _maxl _x =
+     fun (_x : intlist) ->
+      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
+      end
+    in
+    let ____t = _tester _m in
+    let rec _looper _x =
+     fun (_s : int) ->
+      if _x = 0 then _s
+      else
+        let rec _explore (_x, _k) =
+          begin match _x with
+          | Empty -> Call (Get, (), fun (_y : int) -> _k _y)
+          | Node (_left, _x, _right) ->
+              Call
+                ( Set,
+                  _x * _x,
+                  fun (_y : unit) ->
+                    let _k =
+                     fun (_y : bool) ->
+                      if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+                      else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+                    in
+                    _k true >>= fun _b ->
+                    _k false >>= fun _b -> Value (_op (* @ *) _b _b) )
+          end
+        in
+        let rec _explore (_x, _k) =
+         fun (_x : int) ->
+          begin match _x with
+          | Empty ->
+              force_unsafe
+                ((handler
+                    {
+                      value_clause =
+                        (fun (_x : intlist) -> Value (fun (_ : int) -> _x));
                       effect_clauses =
                         (fun (type a)
                           (type b)
@@ -3357,158 +3388,81 @@
                           | eff' -> fun arg k -> Call (eff', arg, k));
                     }
                     (fun (_x : int -> intlist) -> Value _x))
-                   (_k true)))
-               (_x * _x)
-         end
-       in
-       _explore (_tester _m, fun (_x : int) -> Value (Cons (_x, Nil))) (( ~- ) 1))
-  
-  let test_leaf_state_update = _test_leaf_state_update
-  
-  let _test_leaf_state_update_loop =
-   fun (_m : int) ->
-    let rec _maxl _x =
-     fun (_x : intlist) ->
-      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
-      end
-    in
-    let ____t = _tester _m in
-    let rec _looper _x =
-     fun (_s : int) ->
-      if _x = 0 then _s
-      else
+                   (_k _x))
+                _x
+          | Node (_left, _x, _right) ->
+              (let _k =
+                fun (_y : bool) ->
+                 if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+                 else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+               in
+               force_unsafe
+                 ((handler
+                     {
+                       value_clause =
+                         (fun (_b : intlist) ->
+                           Value
+                             (force_unsafe
+                                ((handler
+                                    {
+                                      value_clause =
+                                        (fun (_b : intlist) ->
+                                          Value
+                                            (fun (_ : int) -> _op (* @ *) _b _b));
+                                      effect_clauses =
+                                        (fun (type a)
+                                          (type b)
+                                          (eff : (a, b) eff_internal_effect)
+                                          :
+                                          (a -> (b -> _) -> _)
+                                        ->
+                                          match eff with
+                                          | Get ->
+                                              fun (() : unit) _k ->
+                                                Value
+                                                  (fun (_s : int) ->
+                                                    coer_arrow coer_refl_ty
+                                                      force_unsafe _k _s _s)
+                                          | Set ->
+                                              fun (_s : int) _k ->
+                                                Value
+                                                  (fun (_ : int) ->
+                                                    coer_arrow coer_refl_ty
+                                                      force_unsafe _k () _s)
+                                          | eff' ->
+                                              fun arg k -> Call (eff', arg, k));
+                                    }
+                                    (fun (_x : int -> intlist) -> Value _x))
+                                   (_k false))));
+                       effect_clauses =
+                         (fun (type a)
+                           (type b)
+                           (eff : (a, b) eff_internal_effect)
+                           :
+                           (a -> (b -> _) -> _)
+                         ->
+                           match eff with
+                           | Get ->
+                               fun (() : unit) _k ->
+                                 Value
+                                   (fun (_s : int) ->
+                                     coer_arrow coer_refl_ty force_unsafe _k _s _s)
+                           | Set ->
+                               fun (_s : int) _k ->
+                                 Value
+                                   (fun (_ : int) ->
+                                     coer_arrow coer_refl_ty force_unsafe _k () _s)
+                           | eff' -> fun arg k -> Call (eff', arg, k));
+                     }
+                     (fun (_x : int -> intlist) -> Value _x))
+                    (_k true)))
+                (_x * _x)
+          end
+        in
         _looper (_x - 1)
           (_s
           + _maxl 0
-              (let rec _explore (_x, _k) =
-                 begin match _x with
-                 | Empty -> Call (Get, (), fun (_y : int) -> _k _y)
-                 | Node (_left, _x, _right) ->
-                     Call
-                       ( Set,
-                         _x * _x,
-                         fun (_y : unit) ->
-                           let _k =
-                            fun (_y : bool) ->
-                             if _y then
-                               _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                             else
-                               _explore (_right, fun (_b : int) -> _k (_op _x _b))
-                           in
-                           _k true >>= fun _b ->
-                           _k false >>= fun _b -> Value (_op (* @ *) _b _b) )
-                 end
-               in
-               let rec _explore (_x, _k) =
-                fun (_x : int) ->
-                 begin match _x with
-                 | Empty ->
-                     force_unsafe
-                       ((handler
-                           {
-                             value_clause =
-                               (fun (_x : intlist) -> Value (fun (_ : int) -> _x));
-                             effect_clauses =
-                               (fun (type a)
-                                 (type b)
-                                 (eff : (a, b) eff_internal_effect)
-                                 :
-                                 (a -> (b -> _) -> _)
-                               ->
-                                 match eff with
-                                 | Get ->
-                                     fun (() : unit) _k ->
-                                       Value
-                                         (fun (_s : int) ->
-                                           coer_arrow coer_refl_ty force_unsafe _k
-                                             _s _s)
-                                 | Set ->
-                                     fun (_s : int) _k ->
-                                       Value
-                                         (fun (_ : int) ->
-                                           coer_arrow coer_refl_ty force_unsafe _k
-                                             () _s)
-                                 | eff' -> fun arg k -> Call (eff', arg, k));
-                           }
-                           (fun (_x : int -> intlist) -> Value _x))
-                          (_k _x))
-                       _x
-                 | Node (_left, _x, _right) ->
-                     (let _k =
-                       fun (_y : bool) ->
-                        if _y then
-                          _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                        else _explore (_right, fun (_b : int) -> _k (_op _x _b))
-                      in
-                      force_unsafe
-                        ((handler
-                            {
-                              value_clause =
-                                (fun (_b : intlist) ->
-                                  Value
-                                    (force_unsafe
-                                       ((handler
-                                           {
-                                             value_clause =
-                                               (fun (_b : intlist) ->
-                                                 Value
-                                                   (fun (_ : int) ->
-                                                     _op (* @ *) _b _b));
-                                             effect_clauses =
-                                               (fun (type a)
-                                                 (type b)
-                                                 (eff :
-                                                   (a, b) eff_internal_effect)
-                                                 :
-                                                 (a -> (b -> _) -> _)
-                                               ->
-                                                 match eff with
-                                                 | Get ->
-                                                     fun (() : unit) _k ->
-                                                       Value
-                                                         (fun (_s : int) ->
-                                                           coer_arrow coer_refl_ty
-                                                             force_unsafe _k _s _s)
-                                                 | Set ->
-                                                     fun (_s : int) _k ->
-                                                       Value
-                                                         (fun (_ : int) ->
-                                                           coer_arrow coer_refl_ty
-                                                             force_unsafe _k () _s)
-                                                 | eff' ->
-                                                     fun arg k ->
-                                                       Call (eff', arg, k));
-                                           }
-                                           (fun (_x : int -> intlist) -> Value _x))
-                                          (_k false))));
-                              effect_clauses =
-                                (fun (type a)
-                                  (type b)
-                                  (eff : (a, b) eff_internal_effect)
-                                  :
-                                  (a -> (b -> _) -> _)
-                                ->
-                                  match eff with
-                                  | Get ->
-                                      fun (() : unit) _k ->
-                                        Value
-                                          (fun (_s : int) ->
-                                            coer_arrow coer_refl_ty force_unsafe
-                                              _k _s _s)
-                                  | Set ->
-                                      fun (_s : int) _k ->
-                                        Value
-                                          (fun (_ : int) ->
-                                            coer_arrow coer_refl_ty force_unsafe
-                                              _k () _s)
-                                  | eff' -> fun arg k -> Call (eff', arg, k));
-                            }
-                            (fun (_x : int -> intlist) -> Value _x))
-                           (_k true)))
-                       (_x * _x)
-                 end
-               in
-               _explore
+              (_explore
                  (____t, fun (_x : int) -> Value (Cons (_x, Nil)))
                  (( ~- ) 1)))
     in
@@ -3523,22 +3477,22 @@
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
+    let rec _explore (_x, _k) =
+     fun (_x : int) ->
+      begin match _x with
+      | Empty -> _k _x _x
+      | Node (_left, _x, _right) ->
+          (let _k =
+            fun (_y : bool) ->
+             if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+             else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+           in
+           fun (_s : int) -> _op (* @ *) (_k true _s) (_k false _s))
+            (_x * _x)
+      end
+    in
     _maxl 0
-      (let rec _explore (_x, _k) =
-        fun (_x : int) ->
-         begin match _x with
-         | Empty -> _k _x _x
-         | Node (_left, _x, _right) ->
-             (let _k =
-               fun (_y : bool) ->
-                if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                else _explore (_right, fun (_b : int) -> _k (_op _x _b))
-              in
-              fun (_s : int) -> _op (* @ *) (_k true _s) (_k false _s))
-               (_x * _x)
-         end
-       in
-       _explore
+      (_explore
          (_tester _m, fun (_x : int) -> fun (_ : int) -> Cons (_x, Nil))
          (( ~- ) 1))
   
@@ -3557,25 +3511,24 @@
      fun (_s : int) ->
       if _x = 0 then _s
       else
+        let rec _explore (_x, _k) =
+         fun (_x : int) ->
+          begin match _x with
+          | Empty -> _k _x _x
+          | Node (_left, _x, _right) ->
+              (let _k =
+                fun (_y : bool) ->
+                 if _y then _explore (_left, fun (_b : int) -> _k (_op _x _b))
+                 else _explore (_right, fun (_b : int) -> _k (_op _x _b))
+               in
+               fun (_s : int) -> _op (* @ *) (_k true _s) (_k false _s))
+                (_x * _x)
+          end
+        in
         _looper (_x - 1)
           (_s
           + _maxl 0
-              (let rec _explore (_x, _k) =
-                fun (_x : int) ->
-                 begin match _x with
-                 | Empty -> _k _x _x
-                 | Node (_left, _x, _right) ->
-                     (let _k =
-                       fun (_y : bool) ->
-                        if _y then
-                          _explore (_left, fun (_b : int) -> _k (_op _x _b))
-                        else _explore (_right, fun (_b : int) -> _k (_op _x _b))
-                      in
-                      fun (_s : int) -> _op (* @ *) (_k true _s) (_k false _s))
-                       (_x * _x)
-                 end
-               in
-               _explore
+              (_explore
                  (____t, fun (_x : int) -> fun (_ : int) -> Cons (_x, Nil))
                  (( ~- ) 1)))
     in
