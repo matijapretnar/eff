@@ -88,6 +88,20 @@ let keep_used_bindings defs comp =
     (fun (x, _) -> not (Term.does_not_occur x free_vars))
     (Assoc.to_list defs)
 
+(* [x ↦ ret x], possibly cast into a larger dirt, which elaboration gives as
+   the finally clause of a handler that has none in the source *)
+let is_identity_abstraction { term = pat, comp; ty = ty_in, (ty_out, _) } =
+  let rec is_return_of x comp =
+    match comp.term with
+    | Term.Value { term = Term.Var v; _ } ->
+        x = v.variable && Substitution.is_empty v.instantiation
+    | Term.CastComp (comp, { term = tcoer, _; _ }) ->
+        TyCoercion.is_trivial_ty_coercion tcoer && is_return_of x comp
+    | _ -> false
+  in
+  Type.equal_ty ty_in ty_out
+  && match pat.term with Term.PVar x -> is_return_of x comp | _ -> false
+
 let rec extract_cast_value comp =
   match comp.term with
   | Term.Value expr -> Some expr
@@ -531,6 +545,18 @@ and reduce_computation' state comp =
       | defs' ->
           Term.letRec (Assoc.of_list defs', comp')
           |> optimize_computation state')
+  | Term.Handle
+      ( { term = Term.HandlerWithFinally { handler_clauses; finally_clause }; _ },
+        comp ) ->
+      (* The paper's handlers have no finally clause, and
+         [with {H; finally f} handle M] means [do x <- with H handle M in f x],
+         so we expand it before the handler rules apply. *)
+      let comp' =
+        reduce_computation' state
+          (Term.handle (Term.handler handler_clauses, comp))
+      in
+      if is_identity_abstraction finally_clause then comp'
+      else bind_computation state comp' finally_clause
   | Term.Handle
       ( {
           term =

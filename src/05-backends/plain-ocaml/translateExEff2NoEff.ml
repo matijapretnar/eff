@@ -281,11 +281,17 @@ and elab_expression' state expr =
   | ExEff.Tuple vs -> NoEff.NTuple (List.map (elab_expression state) vs)
   | ExEff.Lambda abs -> NoEff.NFun (elab_abstraction_with_param_ty state abs)
   | ExEff.Handler h ->
-      let _, (ty, _) = h.ty in
+      let (_, drt_in), (ty, drt_out) = h.ty in
       let x = Variable.fresh "$finally" in
-      let finally_clause =
-        (NoEff.PNVar x, elab_ty ty, NoEff.NVar { variable = x; coercions = [] })
+      let x_var = NoEff.NVar { variable = x; coercions = [] } in
+      (* The identity finally clause. In Case 3 of [elab_handler], the runtime
+         [handler] binds the finally clause with [>>=], so it must return a
+         computation; in Cases 1 and 2 it is used as a pure function. *)
+      let body =
+        if Dirt.is_empty drt_in || Dirt.is_empty drt_out then x_var
+        else NoEff.NReturn x_var
       in
+      let finally_clause = (NoEff.PNVar x, elab_ty ty, body) in
       elab_handler state h finally_clause
   | ExEff.HandlerWithFinally h ->
       elab_handler state h.handler_clauses
