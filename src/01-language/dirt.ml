@@ -29,3 +29,14 @@ let is_empty drt = Effect.Set.is_empty drt.effect_set && drt.row = Empty
 
 let add_effects effect_set drt =
   { drt with effect_set = Effect.Set.union drt.effect_set effect_set }
+
+let remove_effects effect_set drt =
+  { drt with effect_set = Effect.Set.diff drt.effect_set effect_set }
+
+(* A syntactic test: every effect of [drt1] is in [drt2], and the row of
+   [drt1] is empty or is the row of [drt2]. *)
+let is_subset drt1 drt2 =
+  Effect.Set.subset drt1.effect_set drt2.effect_set
+  && (drt1.row = Empty || drt1.row = drt2.row)
+
+let is_closed drt = drt.row = Empty

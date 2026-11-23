@@ -111,31 +111,6 @@ let rec extract_cast_value comp =
         (extract_cast_value comp)
   | _ -> None
 
-let recast_computation hnd comp =
-  match comp.ty with
-  | ty, { Dirt.effect_set = effs; Dirt.row = Dirt.Row.Empty } ->
-      let handled_effs =
-        Effect.Set.of_list
-          (List.map
-             (fun (eff, _) -> eff.term)
-             (Assoc.to_list hnd.term.Term.effect_clauses.effect_part))
-      in
-      if Effect.Set.disjoint effs handled_effs then
-        let _, (_, drt_out) = hnd.ty in
-        let drt_diff =
-          {
-            Dirt.effect_set = Effect.Set.diff drt_out.Dirt.effect_set effs;
-            Dirt.row = drt_out.Dirt.row;
-          }
-        in
-        let ty_coer = TyCoercion.reflTy ty
-        and drt_coer =
-          DirtCoercion.unionDirt (effs, DirtCoercion.empty drt_diff)
-        in
-        Some (Term.castComp (comp, TyCoercion.bangCoercion (ty_coer, drt_coer)))
-      else None
-  | _ -> None
-
 let rec optimize_expression state expr =
   (* Print.debug "Optimizing expression: %t" (Term.print_expression expr); *)
   let expr' = optimize_expression' state expr in
@@ -267,6 +242,44 @@ and cast_expression state expr coer =
          have no counterpart yet: Eff's variants belong to named types, and the
          coercion on a constructor's argument needs the type definition. *)
       Term.tuple (List.map2 (cast_expression state) exprs coers)
+  | ( (Term.Handler _ | Term.HandlerWithFinally _),
+      TyCoercion.HandlerCoercion
+        (({ term = tcoer, dcoer; _ } as dtcoer1), dtcoer2) )
+    when state.config.push_coercions
+         && Dirt.is_closed (fst dcoer.ty)
+         && not (TyCoercion.is_trivial_dirty_coercion dtcoer1) ->
+      (* Handler-Subsume. The input part of the coercion moves into the
+         handler: the type coercion into the return clause, and the dirt
+         coercion narrows the input dirt, which drops the clauses for the
+         operations outside it (see With-Cast). The output part stays. The
+         finally clause is outside the paper and stays as it is. *)
+      let subsume hnd =
+        let hnd' =
+          if TyCoercion.is_trivial_ty_coercion tcoer then hnd
+          else
+            let ty, _ = tcoer.ty in
+            let x_pat, x_var = Term.fresh_variable "x" ty in
+            Term.handler_with_new_value_clause hnd
+              (Term.abstraction
+                 ( x_pat,
+                   Term.letVal
+                     (cast_expression state x_var tcoer, hnd.term.value_clause)
+                 ))
+        in
+        match Term.handler_with_smaller_input_dirt hnd' dcoer with
+        | Some hnd'' -> hnd''
+        | None -> assert false
+      in
+      let expr' =
+        match expr.term with
+        | Term.Handler hnd -> Term.handler (subsume hnd)
+        | Term.HandlerWithFinally { handler_clauses; finally_clause } ->
+            Term.handlerWithFinally (subsume handler_clauses) finally_clause
+        | _ -> assert false
+      in
+      let drty_in, _ = dtcoer1.ty in
+      cast_expression state expr'
+        (TyCoercion.handlerCoercion (TyCoercion.reflDirty drty_in, dtcoer2))
   | _, _ -> Term.castExp (expr, coer)
 
 and cast_computation state comp coer =
@@ -339,6 +352,20 @@ and handle_computation state hnd comp =
       | None -> assert false)
   | _ when not state.config.handler_reductions ->
       Term.handle (Term.handler hnd, comp)
+  | _ when Assoc.is_empty hnd.term.Term.effect_clauses.effect_part ->
+      (* With-Fwd: a handler with no operation clauses only forwards, so it
+         becomes a sequence with its return clause. *)
+      let ty, drt_in = comp.ty and _, (_, drt_out) = hnd.ty in
+      let coer =
+        TyCoercion.bangCoercion
+          (TyCoercion.reflTy ty, DirtCoercion.subset drt_in drt_out)
+      in
+      bind_computation state
+        (cast_computation state comp coer)
+        hnd.term.Term.value_clause
+  | Term.Value expr ->
+      (* With-Ret *)
+      beta_reduce state hnd.term.Term.value_clause expr
   | Term.Match (expr, cases) ->
       let _, drty_out = hnd.ty in
       Term.match_ (expr, List.map (handle_abstraction state hnd) cases) drty_out
@@ -366,26 +393,26 @@ and handle_computation state hnd comp =
           (handle_abstraction state hnd abs)
       in
       handle_computation state hnd' comp
-  | CastComp (comp, { term = tcoer, dcoer; _ })
-    when TyCoercion.is_trivial_ty_coercion tcoer ->
-      let hnd' = Term.handler_with_smaller_input_dirt hnd dcoer in
-      handle_computation state hnd' comp
-  | CastComp (comp, { term = tcoer, dcoer; _ }) ->
-      let ty, _ = comp.ty in
-      let x_pat, x_var = Term.fresh_variable "x" ty in
+  | CastComp (comp', { term = tcoer, dcoer; _ })
+    when Dirt.is_closed (fst dcoer.ty) -> (
+      (* With-Cast. The type coercion moves into the return clause, and the
+         dirt coercion narrows the handler, which drops the clauses for the
+         operations that [comp'] does not call. *)
       let hnd' =
-        Term.handler_with_new_value_clause hnd
-          (Term.abstraction
-             ( x_pat,
-               Term.letVal
-                 (cast_expression state x_var tcoer, hnd.term.value_clause) ))
+        if TyCoercion.is_trivial_ty_coercion tcoer then hnd
+        else
+          let ty, _ = comp'.ty in
+          let x_pat, x_var = Term.fresh_variable "x" ty in
+          Term.handler_with_new_value_clause hnd
+            (Term.abstraction
+               ( x_pat,
+                 Term.letVal
+                   (cast_expression state x_var tcoer, hnd.term.value_clause) ))
       in
-      let hnd'' = Term.handler_with_smaller_input_dirt hnd' dcoer in
-      handle_computation state hnd'' comp
-  | _ -> (
-      match recast_computation hnd comp with
-      | Some comp' -> bind_computation state comp' hnd.term.Term.value_clause
-      | None -> Term.handle (Term.handler hnd, comp))
+      match Term.handler_with_smaller_input_dirt hnd' dcoer with
+      | Some hnd'' -> handle_computation state hnd'' comp'
+      | None -> assert false)
+  | _ -> Term.handle (Term.handler hnd, comp)
 
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)

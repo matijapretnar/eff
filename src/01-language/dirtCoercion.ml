@@ -36,3 +36,14 @@ let rec equal_dirt_coercion dc1 dc2 =
   | UnionRight (es1, dc1), UnionRight (es2, dc2) ->
       Effect.Set.equal es1 es2 && equal_dirt_coercion dc1 dc2
   | _ -> false
+
+(* The coercion [drt ≤ drt'] for a [drt] that is syntactically in [drt'] (see
+   [Dirt.is_subset]). *)
+let subset drt drt' =
+  assert (Dirt.is_subset drt drt');
+  let rest = Effect.Set.diff drt'.Dirt.effect_set drt.Dirt.effect_set in
+  match drt.Dirt.row with
+  | Dirt.Row.Empty ->
+      unionDirt (drt.effect_set, empty { drt' with effect_set = rest })
+  | Dirt.Row.Param p ->
+      unionDirt (drt.effect_set, unionRight (rest, reflDirt (Dirt.no_effect p)))
