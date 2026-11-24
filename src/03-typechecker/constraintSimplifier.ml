@@ -8,7 +8,6 @@ Configuration for partial optimizations
 *)
 
 let simplify_type_params = true
-let simplify_type_params_full = true
 let simplify_dirt_params = true
 let simplify_dirt_params_full = false
 
@@ -28,31 +27,6 @@ let print_reduction_candidate pn pe
   Format.fprintf ppf "{ %t-[%t]->%t; %s }" (pn source_node) (pe edge)
     (pn sink_node)
     (string_of_mode graph_direction)
-
-(** Add constraints for all cycles in type constraints *)
-let contract_type_cycles ty_constraints unresolved =
-  let contract_edge skeleton_param ty_param1 ty_param2 unresolved =
-    UnresolvedConstraints.add_ty_equality
-      ( { term = TyParam ty_param1; ty = Skeleton.Param skeleton_param },
-        { term = TyParam ty_param2; ty = Skeleton.Param skeleton_param } )
-      unresolved
-  in
-
-  let contract_component skeleton_param component unresolved =
-    let representative = TyParam.Set.choose component in
-    TyParam.Set.fold
-      (contract_edge skeleton_param representative)
-      component unresolved
-  in
-
-  let contract_skeleton skeleton_param skeleton_graph unresolved =
-    let components =
-      Constraints.TyConstraints.TyParamGraph.scc skeleton_graph
-    in
-    List.fold_right (contract_component skeleton_param) components unresolved
-  in
-
-  Skeleton.Param.Map.fold contract_skeleton ty_constraints unresolved
 
 (** Add constraints for all suitable cycles in dirt constraints *)
 let contract_dirt_cycles (dirt_constraints : Constraints.DirtConstraints.t)
@@ -92,174 +66,84 @@ let contract_dirt_cycles (dirt_constraints : Constraints.DirtConstraints.t)
   in
   List.fold_right contract_component components unresolved
 
-let graph_to_constraints skel_param graph =
-  let open Language.Constraints in
-  let module G = TyConstraints.TyParamGraph in
-  G.fold (add_ty_constraint skel_param) graph empty
+(* Merge a type parameter [gamma] into another type parameter [rho] of the
+   same skeleton. Writing [x ~> y] when the constraints give a path, possibly
+   empty, from [x] to [y], the merge [gamma |-> rho] is complete if:
+   - (L) [pi ~> rho] for every lower bound [pi <= gamma],
+   - (U) [rho ~> beta] for every upper bound [gamma <= beta],
+   - (P+) [rho ~> gamma] if [gamma] is positive,
+   - (P-) [gamma ~> rho] if [gamma] is negative.
+   The constraints still hold after the merge because of (L) and (U), and the
+   simplified type is a subtype of the original because of (P+) and (P-). The
+   rule covers both kinds of bridges: if [alpha <= alpha'] is the only lower
+   bound of a non-negative [alpha'], take [gamma = alpha'] and [rho = alpha],
+   and dually for the only upper bound of a non-positive parameter. It also
+   merges a neutral parameter with any parameter between its bounds.
 
-type graph = Language.Constraints.TyConstraints.TyParamGraph.t
-
-type simple_node_constraction_state = {
-  base_graph : graph;
-  reversed_graph : graph;
-  free_parameters : Type.FreeParams.params;
-  collected_constraints : UnresolvedConstraints.t;
-}
-
-(* Joins simple type coercions to a reflexive coercion *)
-let remove_type_bridges ({ Language.Constraints.ty_constraints; _ } as resolved)
+   It also contracts cycles: if [gamma] and [rho] lie on a common cycle, all
+   four conditions hold. A bipolar [gamma] can satisfy both (P+) and (P-) only
+   on a cycle, and then its instances are coercible both ways, which is the
+   same assumption the paper makes for contracting cycles. Each merge removes
+   a node, so the loop ends. *)
+let merge_type_params ({ Language.Constraints.ty_constraints; _ } as resolved)
     (params : FreeParams.params) =
-  let open Language.Constraints in
-  let join_skeleton_component skel add_constraint graph new_constr =
-    Print.debug "Joining simple nodes in %t" (Skeleton.Param.print skel);
-    Print.debug "Graph: %t"
-      (graph |> graph_to_constraints skel |> Constraints.print_dot);
-    let module BaseSym = TyParam in
-    let module EdgeSym = TyCoercionParam in
-    let module G = TyConstraints.TyParamGraph in
-    (* We can assume that the graph is a DAG *)
-    let inverse_graph = G.reverse graph in
-    let process_part_general
-        ({ source_node; sink_node; graph_direction; edge } :
-          (BaseSym.t, EdgeSym.t) reduction_candidate)
-        ({ base_graph; reversed_graph; free_parameters; _ } as state) =
-      (*
-     Imagine a local part of graph of the form:
-     (source)-[edge]->(sink)
-     where the the source has an outdegree of 1.
-     We exiplicitly make the edge reflexive and remove the source node (as it needs fewer rewirings)
-     In essence, this methods contracts reduction candidate under the assumption, 
-     that is has an outdegree of 1 in base_graph. 
-
-     Every node with an indegree 1 is also a node with an outdegree of 1 in the reversed graph.
-     This is handeled by the graph_direction parameter.
-  *)
-      Print.debug "Removing %t-[%t]->%t %s"
-        (BaseSym.print source_node)
-        (EdgeSym.print edge) (BaseSym.print sink_node)
-        (string_of_mode graph_direction);
-      let reversal =
-        match graph_direction with
-        | Direct -> fun (x, y) -> (x, y)
-        | Reverse -> fun (x, y) -> (y, x)
-      in
-      (* We can't contract edges between (+)->(-) nodes *)
-      (* We need to take into the account possible reversal *)
-      let can_collapse =
-        match graph_direction with
-        | Direct ->
-            FreeParams.TypeParams.can_be_negative source_node
-              free_parameters.type_params
-            || G.get_edges sink_node reversed_graph |> G.Edges.cardinal = 1
-               && FreeParams.TypeParams.can_be_positive sink_node
-                    free_parameters.type_params
-        | Reverse ->
-            FreeParams.TypeParams.can_be_positive source_node
-              free_parameters.type_params
-            || G.get_edges sink_node base_graph |> G.Edges.cardinal = 1
-               && FreeParams.TypeParams.can_be_negative sink_node
-                    free_parameters.type_params
-      in
-      Print.debug "Can collapse: %b" can_collapse;
-      (* Update according to the direction *)
-      let base_graph, reversed_graph = reversal (base_graph, reversed_graph) in
-      (* Sanity check for the constraint we are contracting *)
-      let connecting_edge = G.get_edges source_node base_graph in
-      assert (G.Edges.cardinal connecting_edge = 1);
-      let possible_sink, _edge' = G.Vertex.Map.choose connecting_edge in
-      assert (BaseSym.compare possible_sink sink_node = 0);
-
-      let previous = G.get_edges source_node reversed_graph in
-
-      if can_collapse then
-        (* We need to rewire previous from source to sink *)
-        let base_graph =
-          base_graph
-          |> G.remove_edge source_node sink_node (* remove this edge *)
-          |> G.Edges.fold (* remove edges incoming to source *)
-               (fun prev e acc ->
-                 acc
-                 |> G.remove_edge prev source_node
-                 |> G.add_edge (* Triangles can produce duplicate edges *)
-                      ~allow_duplicate:true prev sink_node e)
-               previous
-          |> G.remove_vertex_unsafe source_node
-        in
-        let reversed_graph =
-          reversed_graph
-          |> G.remove_edge sink_node source_node
-          |> G.Edges.fold (* rewire other edges *)
-               (fun prev e acc ->
-                 acc
-                 |> G.remove_edge source_node prev
-                 |> G.add_edge ~allow_duplicate:true sink_node prev e)
-               previous
-          |> G.remove_vertex_unsafe source_node
-        in
-        let base_graph, reversed_graph =
-          reversal (base_graph, reversed_graph)
-        in
-        ( {
-            base_graph;
-            reversed_graph;
-            collected_constraints =
-              add_constraint sink_node source_node state.collected_constraints;
-            free_parameters =
-              {
-                free_parameters with
-                type_params =
-                  Type.FreeParams.TypeParams.combine_polarity sink_node
-                    source_node state.free_parameters.type_params;
-              };
-          },
-          can_collapse )
-      else (state, can_collapse)
+  let module G = Language.Constraints.TyConstraints.TyParamGraph in
+  let module P = FreeParams.TypeParams in
+  let merge gamma rho graph =
+    let rename v = if TyParam.compare v gamma = 0 then rho else v in
+    G.fold
+      (fun v1 v2 edge acc ->
+        let v1 = rename v1 and v2 = rename v2 in
+        if TyParam.compare v1 v2 = 0 then acc
+        else G.add_edge ~allow_duplicate:true v1 v2 edge acc)
+      graph G.empty
+  in
+  let can_merge graph reversed reach type_params gamma rho =
+    let reaches x y = TyParam.Set.mem y (TyParam.Map.find x reach) in
+    TyParam.compare gamma rho <> 0
+    && (P.can_be_negative gamma type_params || reaches rho gamma)
+    && (P.can_be_positive gamma type_params || reaches gamma rho)
+    && TyParam.Map.for_all
+         (fun pi _ -> reaches pi rho)
+         (G.get_edges gamma reversed)
+    && TyParam.Map.for_all
+         (fun beta _ -> reaches rho beta)
+         (G.get_edges gamma graph)
+  in
+  let rec merge_all skel graph type_params constraints =
+    let vertices = G.vertices graph |> TyParam.Set.elements in
+    let reversed = G.reverse graph in
+    let reach =
+      List.fold_left
+        (fun reach v -> TyParam.Map.add v (G.traverse v graph) reach)
+        TyParam.Map.empty vertices
     in
-    (* Nodes with exactly one outgoing edge in [core_graph]. We recompute them
-       from the current graphs at each step, because every contraction changes
-       the degrees of the neighbouring nodes. *)
-    let candidates direction core_graph =
-      BaseSym.Map.bindings core_graph
-      |> List.filter_map (fun (source_node, edges) ->
-          match G.Edges.bindings edges with
-          | [ (sink_node, edge) ] ->
-              Some { graph_direction = direction; sink_node; edge; source_node }
-          | _ -> None)
+    let candidate =
+      List.find_map
+        (fun gamma ->
+          List.find_opt
+            (can_merge graph reversed reach type_params gamma)
+            vertices
+          |> Option.map (fun rho -> (gamma, rho)))
+        vertices
     in
-    (* Contract the first candidate that can be contracted, and repeat until
-       no candidate can be. Each contraction removes a node, so this ends. *)
-    let rec process state =
-      let try_candidate candidate =
-        match process_part_general candidate state with
-        | state, true -> Some state
-        | _, false -> None
-      in
-      candidates Reverse state.reversed_graph
-      @ candidates Direct state.base_graph
-      |> List.find_map try_candidate
-      |> function
-      | Some state -> process state
-      | None -> state.collected_constraints
-    in
-    process
-      {
-        base_graph = graph;
-        reversed_graph = inverse_graph;
-        free_parameters = params;
-        collected_constraints = new_constr;
-      }
+    match candidate with
+    | None -> constraints
+    | Some (gamma, rho) ->
+        Print.debug "Merging %t into %t" (TyParam.print gamma)
+          (TyParam.print rho);
+        let pack ty_param =
+          { term = TyParam ty_param; ty = Skeleton.Param skel }
+        in
+        merge_all skel (merge gamma rho graph)
+          (P.combine_polarity rho gamma type_params)
+          (UnresolvedConstraints.add_ty_equality
+             (pack gamma, pack rho)
+             constraints)
   in
   Skeleton.Param.Map.fold
-    (fun skel graph acc ->
-      let pack ty_param =
-        { term = TyParam ty_param; ty = Skeleton.Param skel }
-      in
-      let add_constraint source target constraints =
-        UnresolvedConstraints.add_ty_equality
-          (pack source, pack target)
-          constraints
-      in
-      join_skeleton_component skel add_constraint graph acc)
+    (fun skel graph constraints ->
+      merge_all skel graph params.type_params constraints)
     ty_constraints
     (UnresolvedConstraints.from_resolved resolved)
 
@@ -538,29 +422,13 @@ let remove_dirt_bridges
     (UnresolvedConstraints.from_resolved resolved)
 
 let simplify_type_constraints ~loc type_definitions constraints get_params =
-  let unresolved = UnresolvedConstraints.from_resolved constraints in
-  let cycle_constraints =
-    contract_type_cycles constraints.ty_constraints unresolved
-  in
   Print.debug "Full constraints: %t"
     (Language.Constraints.print_dot
-       ~param_polarity:(get_params constraints.substitution)
+       ~param_polarity:(get_params constraints.Constraints.substitution)
        constraints);
-  (* We don't really need the free parameters yet, as we do another unification pass *)
-  let constraints = Unification.unify ~loc type_definitions cycle_constraints in
   let constraints = Constraints.remove_loops constraints in
-  let constraints =
-    if simplify_type_params_full then
-      let simple_one_constraints =
-        remove_type_bridges constraints (get_params constraints.substitution)
-      in
-      let simple_one_constraints' =
-        Unification.unify ~loc type_definitions simple_one_constraints
-      in
-      simple_one_constraints'
-    else constraints
-  in
-  constraints
+  merge_type_params constraints (get_params constraints.substitution)
+  |> Unification.unify ~loc type_definitions
 
 let simplify_dirt_contraints ~loc type_definitions constraints get_params =
   Print.debug "Full constraints: %t"

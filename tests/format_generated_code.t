@@ -3559,13 +3559,7 @@
          (_leaf 10))
   
   let tester = _tester
-  
-  let _max _tycoer _tycoer _tycoer _tycoer =
-   fun (_a : 'ty) ->
-    fun (_b : 'ty) ->
-     if coer_arrow _tycoer coer_refl_ty (( > ) (_tycoer _a)) _b then _tycoer _a
-     else _tycoer _b
-  
+  let _max = fun (_a : 'ty) -> fun (_b : 'ty) -> if _a > _b then _a else _b
   let max = _max
   
   let _effect_max =
@@ -3598,7 +3592,7 @@
                 | Choose ->
                     fun (() : unit) _k ->
                       Value
-                        (_max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty
+                        (_max
                            (coer_arrow coer_refl_ty force_unsafe _k true)
                            (coer_arrow coer_refl_ty force_unsafe _k false))
                 | eff' -> fun arg k -> Call (eff', arg, k));
@@ -3611,13 +3605,7 @@
   let test_max = _test_max
   let _op = fun (_x : int) -> fun (_y : int) -> _x - (3 * _y)
   let op = _op
-  
-  let _max _tycoer _tycoer _tycoer _tycoer =
-   fun (_a : 'ty) ->
-    fun (_b : 'ty) ->
-     if coer_arrow _tycoer coer_refl_ty (( > ) (_tycoer _a)) _b then _tycoer _a
-     else _tycoer _b
-  
+  let _max = fun (_a : 'ty) -> fun (_b : 'ty) -> if _a > _b then _a else _b
   let max = _max
   
   type intlist = Nil | Cons of (int * intlist)
@@ -3635,12 +3623,7 @@
    fun (_m : int) ->
     let rec _maxl _x =
      fun (_x : intlist) ->
-      begin match _x with
-      | Nil -> _x
-      | Cons (_x, _xs) ->
-          _maxl
-            (_max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x)
-            _xs
+      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let rec _explore _x =
@@ -3686,12 +3669,7 @@
    fun (_m : int) ->
     let rec _maxl _x =
      fun (_x : intlist) ->
-      begin match _x with
-      | Nil -> _x
-      | Cons (_x, _xs) ->
-          _maxl
-            (_max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x)
-            _xs
+      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let ____t = _tester _m in
@@ -3753,12 +3731,7 @@
    fun (_m : int) ->
     let rec _maxl _x =
      fun (_x : intlist) ->
-      begin match _x with
-      | Nil -> _x
-      | Cons (_x, _xs) ->
-          _maxl
-            (_max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x)
-            _xs
+      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let rec _populate_leafs _x =
@@ -3830,12 +3803,7 @@
    fun (_m : int) ->
     let rec _maxl _x =
      fun (_x : intlist) ->
-      begin match _x with
-      | Nil -> _x
-      | Cons (_x, _xs) ->
-          _maxl
-            (_max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x)
-            _xs
+      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let rec _populate_leafs _x =
@@ -3922,12 +3890,7 @@
    fun (_m : int) ->
     let rec _maxl _x =
      fun (_x : intlist) ->
-      begin match _x with
-      | Nil -> _x
-      | Cons (_x, _xs) ->
-          _maxl
-            (_max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x)
-            _xs
+      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let rec _explore _x =
@@ -3999,12 +3962,7 @@
    fun (_m : int) ->
     let rec _maxl _x =
      fun (_x : intlist) ->
-      begin match _x with
-      | Nil -> _x
-      | Cons (_x, _xs) ->
-          _maxl
-            (_max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x)
-            _xs
+      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let ____t = _tester _m in
@@ -4088,12 +4046,7 @@
    fun (_m : int) ->
     let rec _maxl _x =
      fun (_x : intlist) ->
-      begin match _x with
-      | Nil -> _x
-      | Cons (_x, _xs) ->
-          _maxl
-            (_max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x)
-            _xs
+      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let rec _explore _x =
@@ -4156,12 +4109,7 @@
    fun (_m : int) ->
     let rec _maxl _x =
      fun (_x : intlist) ->
-      begin match _x with
-      | Nil -> _x
-      | Cons (_x, _xs) ->
-          _maxl
-            (_max coer_refl_ty coer_refl_ty coer_refl_ty coer_refl_ty _x _x)
-            _xs
+      begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let ____t = _tester _m in
