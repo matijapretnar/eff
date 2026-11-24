@@ -9,62 +9,6 @@ Configuration for partial optimizations
 
 let simplify_type_params = true
 let simplify_dirt_params = true
-let simplify_dirt_params_full = false
-
-type contraction_mode = Direct | Reverse
-
-let string_of_mode = function Direct -> "Direct" | Reverse -> "Reverse"
-
-type ('a, 'b) reduction_candidate = {
-  source_node : 'a;
-  sink_node : 'a;
-  edge : 'b;
-  graph_direction : contraction_mode;
-}
-
-let print_reduction_candidate pn pe
-    { source_node; sink_node; edge; graph_direction } ppf =
-  Format.fprintf ppf "{ %t-[%t]->%t; %s }" (pn source_node) (pe edge)
-    (pn sink_node)
-    (string_of_mode graph_direction)
-
-(** Add constraints for all suitable cycles in dirt constraints *)
-let contract_dirt_cycles (dirt_constraints : Constraints.DirtConstraints.t)
-    unresolved =
-  let contract_edge dirt_param1 dirt_param2 unresolved =
-    UnresolvedConstraints.add_dirt_equality
-      (Dirt.no_effect dirt_param1, Dirt.no_effect dirt_param2)
-      unresolved
-  in
-
-  (* We collapse only the components where all internal dirt coercions
-     are of the form d1 <= d2, so without additional effects on
-     the right-hand side *)
-  let is_collapsible component =
-    let check_param param =
-      let neighbours =
-        Constraints.DirtConstraints.DirtParamGraph.get_edges param
-          dirt_constraints
-      in
-      let trivial_neighbour neighbour (_w, effs) =
-        (not (Dirt.Param.Set.mem neighbour component))
-        || Effect.Set.is_empty effs
-      in
-      Dirt.Param.Map.for_all trivial_neighbour neighbours
-    in
-    Dirt.Param.Set.for_all check_param component
-  in
-
-  let contract_component component unresolved =
-    let representative = Dirt.Param.Set.choose component in
-    Dirt.Param.Set.fold (contract_edge representative) component unresolved
-  in
-
-  let components =
-    Constraints.DirtConstraints.DirtParamGraph.scc dirt_constraints
-    |> List.filter is_collapsible
-  in
-  List.fold_right contract_component components unresolved
 
 (* Merge a type parameter [gamma] into another type parameter [rho] of the
    same skeleton. Writing [x ~> y] when the constraints give a path, possibly
@@ -147,278 +91,172 @@ let merge_type_params ({ Language.Constraints.ty_constraints; _ } as resolved)
     ty_constraints
     (UnresolvedConstraints.from_resolved resolved)
 
-let add_empty_constraint p1 =
-  UnresolvedConstraints.add_dirt_equality (Dirt.no_effect p1, Dirt.empty)
+(* Merge a dirt parameter [gamma] into another dirt parameter [rho], or into
+   the empty dirt. An edge [pi -O-> delta] stands for [pi <= O \cup delta].
+   Writing [x ~>O y] when there is a path, possibly empty, from [x] to [y]
+   whose edges have operations within [O], the merge [gamma |-> rho] is
+   complete if:
+   - (L) [pi ~>O rho] for every other edge [pi -O-> gamma],
+   - (U) [rho ~>O beta] for every other edge [gamma -O-> beta],
+   - (P+) [rho ~>{} gamma] if [gamma] is positive,
+   - (P-) [gamma ~>{} rho] if [gamma] is negative.
+   This is the rule of [merge_type_params], where all operation sets are
+   empty, and the proof is the same: a path [pi ~>O rho] composes to
+   [pi <= O \cup rho], and (P+) and (P-) need coercions with no additional
+   operations. Loops [gamma -O-> gamma] become [rho -O-> rho], which hold
+   trivially.
 
-let contract_source_dirt_nodes
-    ({ Language.Constraints.dirt_constraints; _ } as resolved)
+   The empty dirt is a node [bot] with an edge [bot -{}-> delta] to every
+   [delta], and nothing reaches it, because the constraints have no closed
+   upper bounds. Merging [gamma] into [bot] is thus allowed when [gamma] is
+   not negative and has no lower bounds. As in the paper's emptyDirt, we
+   merge a whole set of such parameters at once, where the lower bounds may
+   also come from the set itself: the parameters on a cycle whose edges have
+   operations can be emptied only together. The largest such set consists of
+   the parameters that cannot be reached from a negative one. We prefer these
+   merges, because the empty dirt allows purity-based optimisations.
+
+   The rule covers contracting cycles without operations, bridges whose edge
+   has no operations, and setting non-negative dirt parameters without lower
+   bounds to the empty dirt, including the ones that appear in no constraint.
+   Each merge removes a parameter, so the loop ends. *)
+let merge_dirt_params ({ Language.Constraints.dirt_constraints; _ } as resolved)
     (params : FreeParams.params) =
-  let open Language.Constraints in
-  let module BaseSym = Dirt.Param in
-  let module G = DirtConstraints.DirtParamGraph in
-  let components, quotient_graph, representatives =
-    Language.Constraints.DirtConstraints.DirtParamGraph.scc_tarjan
-      dirt_constraints
-  in
-  List.iter
-    (fun dl ->
-      Print.debug "Component:";
-      Print.debug "%d %t\n reps:%t" (List.length dl)
-        (Print.sequence "," BaseSym.print dl)
-        (Print.sequence "," BaseSym.print
-           (List.map (fun x -> BaseSym.Map.find x representatives) dl)))
-    components;
-  Print.debug "Representatives: %t"
-    (BaseSym.Map.print BaseSym.print representatives);
-  let indegs, _ = G.degrees ~ignore_loops:true quotient_graph in
-  let indegs =
-    let vs = G.vertices quotient_graph in
-    BaseSym.Set.fold
-      (fun v ->
-        BaseSym.Map.update v (function None -> Some 0 | Some deg -> Some deg))
-      vs indegs
-  in
-  let can_contract_component component =
-    List.for_all
-      (fun node ->
-        Type.FreeParams.DirtParams.can_be_positive node params.dirt_params)
-      component
-  in
-  let _, new_constraints =
-    List.fold_left
-      (fun (indegs, constraints) component ->
-        Print.debug "Indeg: %t"
-          (BaseSym.Map.print (fun n ppf -> Print.print ppf "%d" n) indegs);
-        let rep =
-          match component with
-          | [] -> assert false
-          | x :: _ -> BaseSym.Map.find x representatives
-        in
-        if can_contract_component component && BaseSym.Map.find rep indegs = 0
-        then (
-          Print.debug "Contracting component of %t: %t" (BaseSym.print rep)
-            (Print.sequence "," BaseSym.print component);
-          let outgoing = BaseSym.Map.find rep quotient_graph in
-          let indegs =
-            indegs
-            |> BaseSym.Map.fold
-                 (fun sink _ indegs ->
-                   indegs
-                   |> BaseSym.Map.update sink (function
-                     | Some x -> Some (x - 1)
-                     | None -> assert false))
-                 outgoing
+  let module G = Language.Constraints.DirtConstraints.DirtParamGraph in
+  let module P = FreeParams.DirtParams in
+  let module S = Dirt.Param.Set in
+  let other gamma pi = Dirt.Param.compare pi gamma <> 0 in
+  (* Parameters reachable from [x] along edges with operations within [ops],
+     remembered for the current graph *)
+  let reach graph =
+    let memo = ref Dirt.Param.Map.empty in
+    fun ops x ->
+      let known = Dirt.Param.Map.find_opt x !memo |> Option.value ~default:[] in
+      match
+        List.find_opt (fun (ops', _) -> Effect.Set.equal ops ops') known
+      with
+      | Some (_, reached) -> reached
+      | None ->
+          let rec visit reached v =
+            if S.mem v reached then reached
+            else
+              G.Edges.fold
+                (fun w (_, effs) reached ->
+                  if Effect.Set.subset effs ops then visit reached w
+                  else reached)
+                (G.get_edges v graph) (S.add v reached)
           in
-          (indegs, constraints |> List.fold_right add_empty_constraint component))
-        else (indegs, constraints))
-      (indegs, UnresolvedConstraints.from_resolved resolved)
-      components
+          let reached = visit S.empty x in
+          memo := Dirt.Param.Map.add x ((ops, reached) :: known) !memo;
+          reached
   in
-  new_constraints
-
-let contract_unreachable_dirt_nodes { Language.Constraints.dirt_constraints; _ }
-    (params : FreeParams.params) =
-  let open Language.Constraints in
-  let module BaseSym = Dirt.Param in
-  let module G = DirtConstraints.DirtParamGraph in
-  let sources =
-    BaseSym.Set.union params.dirt_params.positive params.dirt_params.negative
+  let lower_bounds reversed gamma =
+    G.get_edges gamma reversed
+    |> Dirt.Param.Map.filter (fun pi _ -> other gamma pi)
   in
-
-  let vertices = G.vertices dirt_constraints in
-
-  let rec dfs node visited =
-    if BaseSym.Set.mem node visited then visited
+  let upper_bounds graph gamma =
+    G.get_edges gamma graph
+    |> Dirt.Param.Map.filter (fun beta _ -> other gamma beta)
+  in
+  (* The parameters that can be emptied together: those that cannot be
+     reached from a negative parameter along any edges *)
+  let emptiable graph dirt_params alive =
+    let rec visit reached v =
+      if S.mem v reached then reached
+      else
+        G.Edges.fold
+          (fun w _ reached -> visit reached w)
+          (G.get_edges v graph) (S.add v reached)
+    in
+    let negative =
+      S.filter (fun d -> not (P.can_be_positive d dirt_params)) alive
+    in
+    S.diff alive (S.fold (fun d reached -> visit reached d) negative S.empty)
+  in
+  let merge_target graph reversed reach dirt_params gamma =
+    let lower = lower_bounds reversed gamma in
+    let candidates =
+      if Dirt.Param.Map.is_empty lower then reach Effect.Set.empty gamma
+      else
+        Dirt.Param.Map.fold
+          (fun pi (_, ops) candidates -> S.inter candidates (reach ops pi))
+          lower (G.vertices graph)
+    in
+    let can_merge rho =
+      other gamma rho
+      && (P.can_be_negative gamma dirt_params
+         || S.mem gamma (reach Effect.Set.empty rho))
+      && (P.can_be_positive gamma dirt_params
+         || S.mem rho (reach Effect.Set.empty gamma))
+      && Dirt.Param.Map.for_all
+           (fun pi (_, ops) -> S.mem rho (reach ops pi))
+           lower
+      && Dirt.Param.Map.for_all
+           (fun beta (_, ops) -> S.mem beta (reach ops rho))
+           (upper_bounds graph gamma)
+    in
+    S.elements candidates |> List.find_opt can_merge
+  in
+  (* Replace [gamma] by [rho] in all edges, dropping loops and intersecting
+     the operations of parallel edges, as unification does. *)
+  let rename gamma rho graph =
+    let rename v = if Dirt.Param.compare v gamma = 0 then rho else v in
+    G.fold
+      (fun v1 v2 (w, effs) graph ->
+        let v1 = rename v1 and v2 = rename v2 in
+        if Dirt.Param.compare v1 v2 = 0 then graph
+        else
+          match Dirt.Param.Map.find_opt v2 (G.get_edges v1 graph) with
+          | Some (w', effs') ->
+              graph |> G.remove_edge v1 v2
+              |> G.add_edge v1 v2 (w', Effect.Set.inter effs effs')
+          | None -> G.add_edge v1 v2 (w, effs) graph)
+      graph G.empty
+  in
+  let remove removed graph =
+    G.fold
+      (fun v1 v2 edge graph ->
+        if S.mem v1 removed || S.mem v2 removed then graph
+        else G.add_edge v1 v2 edge graph)
+      graph G.empty
+  in
+  let rec merge_all graph dirt_params alive constraints =
+    let reversed = G.reverse graph in
+    let reach = reach graph in
+    let alive_list = S.elements alive in
+    let empty = emptiable graph dirt_params alive in
+    if not (S.is_empty empty) then (
+      Print.debug "Emptying %t"
+        (Print.sequence "," Dirt.Param.print (S.elements empty));
+      merge_all (remove empty graph) dirt_params (S.diff alive empty)
+        (S.fold
+           (fun gamma ->
+             UnresolvedConstraints.add_dirt_equality
+               (Dirt.no_effect gamma, Dirt.empty))
+           empty constraints))
     else
-      let visited = BaseSym.Set.add node visited in
-      let edges = G.get_edges node dirt_constraints in
-      G.Edges.fold
-        (fun sink _ acc ->
-          if BaseSym.Set.mem sink visited then acc else dfs sink acc)
-        edges visited
-  in
-  let visited = BaseSym.Set.fold dfs sources BaseSym.Set.empty in
-
-  let constraints =
-    BaseSym.Set.fold add_empty_constraint
-      (BaseSym.Set.diff vertices visited)
-      UnresolvedConstraints.empty
-  in
-  constraints
-
-type dirt_graph = Language.Constraints.DirtConstraints.DirtParamGraph.t
-
-type simple_dirt_node_constraction_state = {
-  base_graph : dirt_graph;
-  reversed_graph : dirt_graph;
-  free_parameters : Type.FreeParams.params;
-  collected_constraints : UnresolvedConstraints.t;
-}
-
-let remove_dirt_bridges
-    ({ Language.Constraints.dirt_constraints; _ } as resolved)
-    (params : FreeParams.params) =
-  let open Language.Constraints in
-  let add_constraint source target constraints =
-    UnresolvedConstraints.add_dirt_equality
-      (Dirt.no_effect source, Dirt.no_effect target)
-      constraints
-  in
-  let join_dirt_component
-      (graph :
-        (DirtCoercionParam.t * Label.Set.t) Dirt.Param.Map.t Dirt.Param.Map.t)
-      new_constr =
-    let module BaseSym = Dirt.Param in
-    let module EdgeSym = DirtCoercionParam in
-    let module D = Label.Set in
-    let module G = DirtConstraints.DirtParamGraph in
-    (* We can assume that the graph is a DAG *)
-    let inverse_graph = G.reverse graph in
-
-    let process_part_general
-        ({ source_node; sink_node; graph_direction; edge } :
-          (BaseSym.t, EdgeSym.t) reduction_candidate)
-        ({ base_graph; reversed_graph; _ } as state :
-          simple_dirt_node_constraction_state) =
-      (*
-     Imagine a local part of graph of the form:
-     (source)-[edge U dirtSet]->(sink)
-     where the the source has an outdegree of 1.
-     We exiplicitly make the edge reflexive and remove the source node (as it needs fewer rewirings)
-     In essence, this methods contracts reduction candidate under the assumption, 
-     that is has an outdegree of 1 in base_graph. 
-
-     Every node with an indegree 1 is also a node with an outdegree of 1 in the reversed graph.
-     This is handeled by the graph_direction parameter.
-  *)
-      Print.debug "Removing %t-[%t]->%t %s"
-        (BaseSym.print source_node)
-        (EdgeSym.print edge) (BaseSym.print sink_node)
-        (string_of_mode graph_direction);
-
-      let reversal =
-        match graph_direction with
-        | Direct -> fun (x, y) -> (x, y)
-        | Reverse -> fun (x, y) -> (y, x)
+      let target gamma =
+        merge_target graph reversed reach dirt_params gamma
+        |> Option.map (fun rho -> (gamma, rho))
       in
-      (* Update according to the direction *)
-      let base_graph, reversed_graph = reversal (base_graph, reversed_graph) in
-
-      (* Sanity check for the constraint we are contracting *)
-      let connecting_edge = G.get_edges source_node base_graph in
-      assert (G.Edges.cardinal connecting_edge = 1);
-      let possible_sink, (_, edge_dirt) = G.Vertex.Map.choose connecting_edge in
-      assert (BaseSym.compare possible_sink sink_node = 0);
-      assert (possible_sink = sink_node);
-
-      let previous = G.get_edges source_node reversed_graph in
-
-      (* We can't contract edges between (+)->(-) nodes *)
-      (* We need to take into the account possible reversal *)
-      (* As for types: the source, whose only bound is the sink, may take the
-         value of the sink if the polarity of the source allows it. The sink
-         may take the value of the source only if the source is the only
-         bound of the sink, and the polarity of the sink allows it. *)
-      let can_collapse =
-        let params = state.free_parameters.dirt_params in
-        let sink_has_one_edge =
-          G.get_edges sink_node reversed_graph |> G.Edges.cardinal = 1
-        in
-        let polarity_condition =
-          match graph_direction with
-          | Direct ->
-              FreeParams.DirtParams.can_be_negative source_node params
-              || sink_has_one_edge
-                 && FreeParams.DirtParams.can_be_positive sink_node params
-          | Reverse ->
-              FreeParams.DirtParams.can_be_positive source_node params
-              || sink_has_one_edge
-                 && FreeParams.DirtParams.can_be_negative sink_node params
-        in
-        let is_self_loop = BaseSym.compare source_node sink_node = 0 in
-        polarity_condition && Effect.Set.is_empty edge_dirt && not is_self_loop
-      in
-
-      if can_collapse then
-        (* We need to rewire previous from source to sink *)
-        let base_graph =
-          base_graph
-          |> G.remove_edge source_node sink_node (* remove this edge *)
-          |> G.Edges.fold (* remove edges incoming to source *)
-               (fun prev e acc ->
-                 acc
-                 |> G.remove_edge prev source_node
-                 |> G.add_edge (* Triangles can produce duplicate edges *)
-                      ~allow_duplicate:true prev sink_node e)
-               previous
-          |> G.remove_vertex_unsafe source_node
-        in
-        let reversed_graph =
-          reversed_graph
-          |> G.remove_edge sink_node source_node
-          |> G.Edges.fold (* rewire other edges *)
-               (fun prev e acc ->
-                 acc
-                 |> G.remove_edge source_node prev
-                 |> G.add_edge ~allow_duplicate:true sink_node prev e)
-               previous
-          |> G.remove_vertex_unsafe source_node
-        in
-        let base_graph, reversed_graph =
-          reversal (base_graph, reversed_graph)
-        in
-        ( {
-            base_graph;
-            reversed_graph;
-            collected_constraints =
-              add_constraint sink_node source_node state.collected_constraints;
-            free_parameters =
-              {
-                state.free_parameters with
-                dirt_params =
-                  Type.FreeParams.DirtParams.combine_polarity sink_node
-                    source_node state.free_parameters.dirt_params;
-              };
-          },
-          Some source_node )
-      else (state, None)
-    in
-    (* Nodes with exactly one outgoing edge in [core_graph], recomputed from
-       the current graphs at each step, because every contraction changes the
-       degrees of the neighbouring nodes. *)
-    let candidates direction core_graph =
-      BaseSym.Map.bindings core_graph
-      |> List.filter_map (fun (source_node, edges) ->
-          match G.Edges.bindings edges with
-          | [ (sink_node, (edge, _)) ] ->
-              Some { graph_direction = direction; sink_node; edge; source_node }
-          | _ -> None)
-    in
-    (* Contract the first candidate that can be contracted, and repeat until
-       no candidate can be. Each contraction removes a node, so this ends. *)
-    let rec process state touched =
-      let try_candidate candidate =
-        match process_part_general candidate state with
-        | state, Some node -> Some (state, node)
-        | _, None -> None
-      in
-      candidates Reverse state.reversed_graph
-      @ candidates Direct state.base_graph
-      |> List.find_map try_candidate
-      |> function
-      | Some (state, node) -> process state (node :: touched)
-      | None -> (state.collected_constraints, touched)
-    in
-    process
-      {
-        base_graph = graph;
-        reversed_graph = inverse_graph;
-        free_parameters = params;
-        collected_constraints = new_constr;
-      }
-      []
+      match List.find_map target alive_list with
+      | None -> constraints
+      | Some (gamma, rho) ->
+          Print.debug "Merging %t into %t" (Dirt.Param.print gamma)
+            (Dirt.Param.print rho);
+          merge_all (rename gamma rho graph)
+            (P.combine_polarity rho gamma dirt_params)
+            (S.remove gamma alive)
+            (UnresolvedConstraints.add_dirt_equality
+               (Dirt.no_effect gamma, Dirt.no_effect rho)
+               constraints)
   in
-  join_dirt_component dirt_constraints
+  let alive =
+    S.union
+      (G.vertices dirt_constraints)
+      (S.union params.dirt_params.positive params.dirt_params.negative)
+  in
+  merge_all dirt_constraints params.dirt_params alive
     (UnresolvedConstraints.from_resolved resolved)
 
 let simplify_type_constraints ~loc type_definitions constraints get_params =
@@ -435,67 +273,10 @@ let simplify_dirt_contraints ~loc type_definitions constraints get_params =
     (Language.Constraints.print_dot
        ~param_polarity:(get_params constraints.Constraints.substitution)
        constraints);
-  let unresolved = UnresolvedConstraints.from_resolved constraints in
-  let new_constraints =
-    contract_dirt_cycles constraints.dirt_constraints unresolved
-  in
-  let constraints = Unification.unify ~loc type_definitions new_constraints in
-  let constraints =
-    if simplify_dirt_params_full then
-      let new_constraints =
-        contract_source_dirt_nodes constraints
-          (get_params constraints.substitution)
-      in
-      Unification.unify ~loc type_definitions new_constraints
-    else constraints
-  in
-  Print.debug "Full constraints after source contraction: %t"
-    (Language.Constraints.print_dot
-       ~param_polarity:(get_params constraints.substitution)
-       constraints);
-  let rec runner level cons_state =
-    Print.debug "Full constraints in runner %d: %t" level
-      (Language.Constraints.print_dot
-         ~param_polarity:(get_params constraints.substitution)
-         constraints);
-    let new_constraints, touched =
-      remove_dirt_bridges cons_state (get_params cons_state.substitution)
-    in
-    let cons_state = Unification.unify ~loc type_definitions new_constraints in
-    let cons_state = Constraints.remove_loops cons_state in
-    Print.debug "Touched: %d %t" (List.length touched)
-      (Print.sequence "," Dirt.Param.print touched);
-    if List.length touched > 0 then runner (level + 1) cons_state
-    else cons_state
-  in
-  let constraints =
-    if simplify_dirt_params_full then runner 0 constraints else constraints
-  in
-
-  (* Optimize possible empty dirts  *)
-  let new_constraints =
-    contract_source_dirt_nodes constraints (get_params constraints.substitution)
-  in
-  let constraints = Unification.unify ~loc type_definitions new_constraints in
-  (* Some parameters are present in the type, but not in constrains *)
-  let present =
-    Language.Constraints.DirtConstraints.DirtParamGraph.vertices
-      constraints.dirt_constraints
-  in
-  let params = (get_params constraints.substitution).dirt_params in
-  let new_constraints =
-    Dirt.Param.Set.fold
-      (fun p acc ->
-        if not (Dirt.Param.Set.mem p present) then
-          acc
-          |> UnresolvedConstraints.add_dirt_equality
-               (Dirt.no_effect p, Dirt.empty)
-        else acc)
-      (Dirt.Param.Set.diff params.positive params.negative)
-      (UnresolvedConstraints.from_resolved constraints)
-  in
-  let constraints = Unification.unify ~loc type_definitions new_constraints in
-  constraints
+  let constraints = Constraints.remove_loops constraints in
+  merge_dirt_params constraints (get_params constraints.substitution)
+  |> Unification.unify ~loc type_definitions
+  |> Constraints.remove_loops
 
 let simplify_constraints ~loc type_definitions constraints get_params =
   let constraints =
