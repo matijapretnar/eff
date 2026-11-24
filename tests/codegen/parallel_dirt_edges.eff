@@ -1,0 +1,15 @@
+(* With dirt bridges, [c] gets two parallel bounds [δ ≤ {A} ∪ δ'] and
+   [δ ≤ {B} ∪ δ']. Both must be kept, as [δ ≤ δ'], or the call below that
+   performs [A] in the branch handling only [B] is typed as pure. *)
+
+effect A : unit -> unit
+effect B : unit -> unit
+
+let g c b =
+  if b then handle c () with effect (A ()) k -> k ()
+  else handle c () with effect (B ()) k -> k ()
+
+let test () =
+  handle g (fun () -> perform (A ()); 1) false with effect (A ()) _ -> 42
+
+let x = test ()

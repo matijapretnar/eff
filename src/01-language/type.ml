@@ -509,7 +509,9 @@ let rec calculate_polarity_type (ty : ty) =
             (match variance with
             | Covariant -> down
             | Contravariant -> FreeParams.switch down
-            | Invariant -> down (* failwith "Not implemented yet" *)))
+            | Invariant ->
+                (* Simplifications must keep both directions of subtyping *)
+                FreeParams.union down (FreeParams.switch down)))
         ty_args FreeParams.empty
   | { term = Arrow abs_ty; _ } -> calculate_polarity_abs_ty abs_ty
   | { term = Tuple tys; _ } ->

@@ -32,6 +32,7 @@ let rec equal_dirt_coercion dc1 dc2 =
   | ReflDirt, ReflDirt -> true
   | Empty, Empty -> true
   | DirtCoercionVar dv1, DirtCoercionVar dv2 -> dv1 = dv2
-  | UnionDirt (es1, dc1), UnionDirt (es2, dc2) ->
+  | UnionDirt (es1, dc1), UnionDirt (es2, dc2)
+  | UnionRight (es1, dc1), UnionRight (es2, dc2) ->
       Effect.Set.equal es1 es2 && equal_dirt_coercion dc1 dc2
   | _ -> false

@@ -253,7 +253,7 @@ and dirt_omega_step ~loc unresolved w dcons =
         unresolved
   (* ω : δ₁ <= O₂ ∪ δ₂ *)
   | ( ({ Dirt.effect_set = ops1; row = Dirt.Row.Param d1 } as ty1),
-      ({ Dirt.effect_set = ops2; row = Dirt.Row.Param d2 } as ty2) )
+      { Dirt.effect_set = ops2; row = Dirt.Row.Param d2 } )
     when Effect.Set.is_empty ops1 -> (
       let dirt_edges =
         Constraints.DirtConstraints.DirtParamGraph.get_edges d1
@@ -264,12 +264,57 @@ and dirt_omega_step ~loc unresolved w dcons =
           UnresolvedConstraints.change_resolved
             (Constraints.add_dirt_constraint d1 d2 w ops2)
             unresolved
-      | Some (d, _) ->
-          UnresolvedConstraints.change_subst
-            (Substitution.add_dirt_var_coercion w
-               { term = DirtCoercion.DirtCoercionVar d; ty = (ty1, ty2) })
-            unresolved)
-  (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ *)
+      | Some (w_old, ops_old) ->
+          (* A parallel edge [w_old : δ₁ <= O_old ∪ δ₂]. Both edges hold iff
+             [δ₁ <= (O_old ∩ O₂) ∪ δ₂] holds, so we keep one edge with the
+             intersection, and widen it back for [w_old] and [w]. *)
+          let common = Effect.Set.inter ops_old ops2 in
+          let widen ops dcoer =
+            let extra = Effect.Set.diff ops common in
+            if Effect.Set.is_empty extra then dcoer
+            else DirtCoercion.unionRight (extra, dcoer)
+          in
+          let edge w ops =
+            DirtCoercion.dirtCoercionVar w
+              (ty1, { Dirt.effect_set = ops; row = Dirt.Row.Param d2 })
+          in
+          if Effect.Set.equal common ops_old then
+            (* [O_old ⊆ O₂], so the existing edge is the stronger one *)
+            UnresolvedConstraints.change_subst
+              (Substitution.add_dirt_var_coercion w
+                 (widen ops2 (edge w_old ops_old)))
+              unresolved
+          else
+            let w_new = DirtCoercionParam.refresh w in
+            let new_edge = edge w_new common in
+            unresolved
+            |> UnresolvedConstraints.change_resolved (fun resolved ->
+                {
+                  resolved with
+                  dirt_constraints =
+                    resolved.dirt_constraints
+                    |> Constraints.DirtConstraints.DirtParamGraph.remove_edge d1
+                         d2
+                    |> Constraints.DirtConstraints.add_edge d1 d2 w_new common;
+                })
+            |> UnresolvedConstraints.change_subst (fun sub ->
+                sub
+                |> Substitution.add_dirt_var_coercion w_old
+                     (widen ops_old new_edge)
+                |> Substitution.add_dirt_var_coercion w (widen ops2 new_edge)))
+  (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ for O₁ ⊆ O₂ *)
+  | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
+      ({ effect_set = ops2; row = Dirt.Row.Param _ } as drt2) )
+    when Effect.Set.subset ops1 ops2 ->
+      (* The constraint holds iff δ₁ <= O₂ ∪ δ₂ does, so δ₂ stays as it is *)
+      let w' = DirtCoercionParam.refresh w in
+      let w_ty' = (Dirt.no_effect d1, drt2) in
+      UnresolvedConstraints.apply_substitution
+        (Substitution.add_dirt_var_coercion_e w
+           (DirtCoercion.unionDirt
+              (ops1, DirtCoercion.dirtCoercionVar w' w_ty')))
+        (UnresolvedConstraints.add_dirt_inequality (w', w_ty') unresolved)
+  (* ω : O₁ ∪ δ₁ <= O₂ ∪ δ₂ for O₁ ⊄ O₂ *)
   | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
       { effect_set = ops2; row = Dirt.Row.Param d2 } ) ->
       let w' = DirtCoercionParam.refresh w in
@@ -310,7 +355,7 @@ and dirt_omega_step ~loc unresolved w dcons =
         UnresolvedConstraints.change_subst
           (Substitution.add_dirt_var_coercion w
              (DirtCoercion.unionDirt
-                ( ops2,
+                ( ops1,
                   DirtCoercion.empty (Dirt.closed (Effect.Set.diff ops2 ops1))
                 )))
           unresolved
