@@ -625,6 +625,27 @@ and handle_computation state hnd comp =
       | None -> assert false)
   | _ when not state.config.handler_reductions ->
       Term.handle (Term.handler hnd, comp)
+  | CastComp (comp', { term = tcoer, dcoer; _ })
+    when Dirt.is_closed (fst dcoer.ty) -> (
+      (* With-Cast. The type coercion moves into the return clause, and the
+         dirt coercion narrows the handler, which drops the clauses for the
+         operations that [comp'] does not call. It comes before With-Fwd, so
+         that a cast does not hide [comp'] from the rules above, such as
+         Inline-Top for a handled call of a top-level function. *)
+      let hnd' =
+        if TyCoercion.is_trivial_ty_coercion tcoer then hnd
+        else
+          let ty, _ = comp'.ty in
+          let x_pat, x_var = Term.fresh_variable "x" ty in
+          Term.handler_with_new_value_clause hnd
+            (Term.abstraction
+               ( x_pat,
+                 Term.letVal
+                   (cast_expression state x_var tcoer, hnd.term.value_clause) ))
+      in
+      match Term.handler_with_smaller_input_dirt hnd' dcoer with
+      | Some hnd'' -> handle_computation state hnd'' comp'
+      | None -> assert false)
   | _ when Assoc.is_empty hnd.term.Term.effect_clauses.effect_part ->
       (* With-Fwd: a handler with no operation clauses only forwards, so it
          becomes a sequence with its return clause. *)
@@ -673,25 +694,6 @@ and handle_computation state hnd comp =
           (handle_abstraction state hnd abs)
       in
       handle_computation state hnd' comp
-  | CastComp (comp', { term = tcoer, dcoer; _ })
-    when Dirt.is_closed (fst dcoer.ty) -> (
-      (* With-Cast. The type coercion moves into the return clause, and the
-         dirt coercion narrows the handler, which drops the clauses for the
-         operations that [comp'] does not call. *)
-      let hnd' =
-        if TyCoercion.is_trivial_ty_coercion tcoer then hnd
-        else
-          let ty, _ = comp'.ty in
-          let x_pat, x_var = Term.fresh_variable "x" ty in
-          Term.handler_with_new_value_clause hnd
-            (Term.abstraction
-               ( x_pat,
-                 Term.letVal
-                   (cast_expression state x_var tcoer, hnd.term.value_clause) ))
-      in
-      match Term.handler_with_smaller_input_dirt hnd' dcoer with
-      | Some hnd'' -> handle_computation state hnd'' comp'
-      | None -> assert false)
   | _ -> Term.handle (Term.handler hnd, comp)
 
 and handle_abstraction state hnd { term = p, c; _ } =

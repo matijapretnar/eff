@@ -358,32 +358,7 @@
     _g _x >>= fun _b -> _f _b
   
   let compose = _compose
-  
-  let _test =
-   fun (() : unit) ->
-    (closed_handler
-       {
-         value_clause = (fun (_id : int) -> _id);
-         effect_clauses =
-           (fun (type a)
-             (type b)
-             (eff : (a, b) eff_internal_effect)
-             :
-             (a -> (b -> _) -> _)
-           ->
-             match eff with
-             | Tick -> fun (() : unit) _k -> 10 + _k ()
-             | _ -> fun _ _ -> assert false);
-       }
-       (fun (_x : int) -> _x))
-      (coer_arrow
-         (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
-         coer_refl_ty
-         (_compose (fun (_h : int -> int) ->
-              Call (Tick, (), fun (_y : unit) -> Value (_h 1))))
-         (fun (_x : int) (_y : int) -> _x + _y)
-         2)
-  
+  let _test = fun (() : unit) -> 10 + (2 + 1)
   let test = _test
   ======================================================================
   codegen/compose.eff
