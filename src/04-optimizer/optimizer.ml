@@ -273,6 +273,66 @@ let is_application_abs (abs : Term.abstraction) =
       | _ -> false)
   | _ -> false
 
+(* Rewrite the computations in [comp] with [f], from the root down: where [f]
+   gives a computation, it replaces the subterm, and elsewhere the rewrite
+   goes into the subterms, values included. *)
+let rewrite f =
+  let rec rewrite_comp comp =
+    match f comp with
+    | Some comp' -> comp'
+    | None -> (
+        match comp.term with
+        | Term.Value e -> { comp with term = Term.Value (rewrite_expr e) }
+        | Term.LetVal (e, abs) -> Term.letVal (rewrite_expr e, rewrite_abs abs)
+        | Term.LetRec (defs, c) ->
+            Term.letRec (Assoc.map rewrite_abs defs, rewrite_comp c)
+        | Term.Match (e, cases) ->
+            Term.match_ (rewrite_expr e, List.map rewrite_abs cases) comp.ty
+        | Term.Apply (e1, e2) -> Term.apply (rewrite_expr e1, rewrite_expr e2)
+        | Term.Handle (e, c) -> Term.handle (rewrite_expr e, rewrite_comp c)
+        | Term.Call (eff, e, abs) ->
+            Term.call (eff, rewrite_expr e, rewrite_abs abs)
+        | Term.Bind (c, abs) -> Term.bind (rewrite_comp c, rewrite_abs abs)
+        | Term.CastComp (c, coer) -> Term.castComp (rewrite_comp c, coer)
+        | Term.Check (loc, c) -> Term.check (loc, rewrite_comp c))
+  and rewrite_expr expr =
+    match expr.term with
+    | Term.Var _ | Term.Const _ -> expr
+    | Term.Tuple es -> Term.tuple (List.map rewrite_expr es)
+    | Term.Record flds ->
+        Term.record expr.ty (Type.Field.Map.map rewrite_expr flds)
+    | Term.Variant (lbl, e) ->
+        Term.variant (lbl, Option.map rewrite_expr e) expr.ty
+    | Term.Lambda abs -> Term.lambda (rewrite_abs abs)
+    | Term.Handler h -> Term.handler (rewrite_handler h)
+    | Term.HandlerWithFinally { handler_clauses; finally_clause } ->
+        Term.handlerWithFinally
+          (rewrite_handler handler_clauses)
+          (rewrite_abs finally_clause)
+    | Term.CastExp (e, coer) -> Term.castExp (rewrite_expr e, coer)
+  and rewrite_abs abs =
+    let pat, comp = abs.term in
+    Term.abstraction (pat, rewrite_comp comp)
+  and rewrite_abs2 abs2 =
+    let pat1, pat2, comp = abs2.term in
+    Term.abstraction2 (pat1, pat2, rewrite_comp comp)
+  and rewrite_handler h =
+    {
+      h with
+      term =
+        {
+          Term.value_clause = rewrite_abs h.term.value_clause;
+          Term.effect_clauses =
+            {
+              h.term.effect_clauses with
+              effect_part =
+                Assoc.map rewrite_abs2 h.term.effect_clauses.effect_part;
+            };
+        };
+    }
+  in
+  rewrite_comp
+
 (* Function specialisation, With-Rec-Fun
 
    For a handled call [with H handle f v] of a local recursive function
@@ -408,7 +468,8 @@ let extract mode hnd f g' ~left =
         Some ws
     | _ -> None
   in
-  let rec extract_comp comp =
+  let rec extract_comp comp = rewrite replace comp
+  and replace comp =
     match comp.term with
     | Term.Handle ({ term = Term.Handler h'; _ }, c)
       when Term.same_operation_clauses h' hnd && call_of_f c <> None -> (
@@ -420,62 +481,19 @@ let extract mode hnd f g' ~left =
         in
         match mode with
         | Fixed when Term.same_return_clause h' hnd && fits Fixed ->
-            specialised_call Fixed g' ws g'
+            Some (specialised_call Fixed g' ws g')
         | Varying ->
             if fits Varying then
-              specialised_call Varying g' ws
-                (Term.lambda (extract_abs h'.term.value_clause))
-            else comp
+              let value_clause =
+                let pat, c = h'.term.value_clause.term in
+                Term.abstraction (pat, extract_comp c)
+              in
+              Some (specialised_call Varying g' ws (Term.lambda value_clause))
+            else Some comp
         | Fixed ->
             left := true;
-            comp)
-    | Term.Value e -> { comp with term = Term.Value (extract_expr e) }
-    | Term.LetVal (e, abs) -> Term.letVal (extract_expr e, extract_abs abs)
-    | Term.LetRec (defs, c) ->
-        Term.letRec (Assoc.map extract_abs defs, extract_comp c)
-    | Term.Match (e, cases) ->
-        Term.match_ (extract_expr e, List.map extract_abs cases) comp.ty
-    | Term.Apply (e1, e2) -> Term.apply (extract_expr e1, extract_expr e2)
-    | Term.Handle (e, c) -> Term.handle (extract_expr e, extract_comp c)
-    | Term.Call (eff, e, abs) -> Term.call (eff, extract_expr e, extract_abs abs)
-    | Term.Bind (c, abs) -> Term.bind (extract_comp c, extract_abs abs)
-    | Term.CastComp (c, coer) -> Term.castComp (extract_comp c, coer)
-    | Term.Check (loc, c) -> Term.check (loc, extract_comp c)
-  and extract_expr expr =
-    match expr.term with
-    | Term.Var _ | Term.Const _ -> expr
-    | Term.Tuple es -> Term.tuple (List.map extract_expr es)
-    | Term.Record flds ->
-        Term.record expr.ty (Type.Field.Map.map extract_expr flds)
-    | Term.Variant (lbl, e) ->
-        Term.variant (lbl, Option.map extract_expr e) expr.ty
-    | Term.Lambda abs -> Term.lambda (extract_abs abs)
-    | Term.Handler h -> Term.handler (extract_handler h)
-    | Term.HandlerWithFinally { handler_clauses; finally_clause } ->
-        Term.handlerWithFinally
-          (extract_handler handler_clauses)
-          (extract_abs finally_clause)
-    | Term.CastExp (e, coer) -> Term.castExp (extract_expr e, coer)
-  and extract_abs abs =
-    let pat, comp = abs.term in
-    Term.abstraction (pat, extract_comp comp)
-  and extract_abs2 abs2 =
-    let pat1, pat2, comp = abs2.term in
-    Term.abstraction2 (pat1, pat2, extract_comp comp)
-  and extract_handler h =
-    {
-      h with
-      term =
-        {
-          Term.value_clause = extract_abs h.term.value_clause;
-          Term.effect_clauses =
-            {
-              h.term.effect_clauses with
-              effect_part =
-                Assoc.map extract_abs2 h.term.effect_clauses.effect_part;
-            };
-        };
-    }
+            Some comp)
+    | _ -> None
   in
   extract_comp
 
