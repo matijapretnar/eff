@@ -1,37 +1,29 @@
-open Utils
 open Language
 
-let protected =
-  [ "and"; "as"; "assert"; "asr"; "begin"; "class"; "constraint"; "do"; "done" ]
-  @ [ "downto"; "else"; "end"; "exception"; "false"; "for"; "fun" ]
-  @ [ "function"; "functor"; "if"; "in"; "include"; "inherit"; "initializer" ]
-  @ [ "land"; "lazy"; "let"; "lor"; "lsl"; "lsr"; "lxor"; "match"; "method" ]
-  @ [
-      "mod"; "module"; "mutable"; "new"; "nonrec"; "object"; "of"; "open"; "or";
-    ]
-  @ [ "private"; "rec"; "sig"; "struct"; "then"; "to"; "true"; "try"; "type" ]
-  @ [ "val"; "virtual"; "when"; "while"; "with"; "continue" ]
-
+(* A variable gets its number, so that two variables with the same name
+   never capture each other, and no name is an OCaml keyword. *)
 let print_variable var ppf =
   let printer desc n =
-    (* [mod] has privileges because otherwise it's stupid *)
-    if desc = "mod" then Format.fprintf ppf "_op_%d (* %s *)" n desc
-    else (
-      if List.mem desc protected then
-        Print.warning
-          "Warning: Protected keyword [%s]. Must be fixed by hand!@." desc;
-      match desc.[0] with
-      | 'a' .. 'z' | '_' -> Format.fprintf ppf "%s" desc
-      | '$' -> (
-          match desc with
-          | "$c_thunk" -> Format.fprintf ppf "_comp_%d" n
-          | "$id_par" -> Format.fprintf ppf "_id_%d" n
-          | "$anon" -> Format.fprintf ppf "_anon_%d" n
-          | "$bind" -> Format.fprintf ppf "_b_%d" n
-          | _ -> Format.fprintf ppf "_x_%d" n)
-      | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc)
+    match desc.[0] with
+    | 'a' .. 'z' | '_' -> Format.fprintf ppf "_%s_%d" desc n
+    | '$' -> (
+        match desc with
+        | "$c_thunk" -> Format.fprintf ppf "_comp_%d" n
+        | "$id_par" -> Format.fprintf ppf "_id_%d" n
+        | "$anon" -> Format.fprintf ppf "_anon_%d" n
+        | "$bind" -> Format.fprintf ppf "_b_%d" n
+        | _ -> Format.fprintf ppf "_x_%d" n)
+    | _ -> Format.fprintf ppf "_op_%d (* %s *)" n desc
   in
   Term.Variable.fold printer var
+
+(* The name of a top-level variable as other OCaml code refers to it, if it
+   has one *)
+let source_name var =
+  Term.Variable.fold
+    (fun desc _ ->
+      match desc.[0] with 'a' .. 'z' | '_' -> Some desc | _ -> None)
+    var
 
 let print_effect eff ppf = Effect.print eff ppf
 let print_label lbl ppf = Type.Label.print lbl ppf

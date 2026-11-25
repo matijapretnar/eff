@@ -113,9 +113,10 @@ let rec print_term ?max_level t ppf =
       print ~at_level:1 "%t @[<hov>%t@]" (Symbol.print_label lbl)
         (print_term ~max_level:0 t)
   | Lambda a -> print ~at_level:1 "@[<hv 2>fun %t@]" (print_abstraction a)
+  (* A match or a function always gets parentheses: in a case of another
+     match, its cases would otherwise take the cases that follow. *)
   | Function lst ->
-      print ~at_level:1 "@[<hv>function @, | %t@]"
-        (print_sequence "@, | " print_case lst)
+      print "@[<hv>(function @, | %t)@]" (print_sequence "@, | " print_case lst)
   | Effect eff -> print "%t" (Symbol.print_effect eff)
   | Let (lst, t) ->
       print ~at_level:1 "@[<hv>@[<hv>%tin@] @,%t@]" (print_let lst)
@@ -125,10 +126,9 @@ let rec print_term ?max_level t ppf =
         (print_term t)
   | Match (t, []) ->
       (* Absurd case *)
-      print ~at_level:1 "@[<hv>match %t with | _ -> assert false@]"
-        (print_term t)
+      print "@[<hv>(match %t with | _ -> assert false)@]" (print_term t)
   | Match (t, lst) ->
-      print ~at_level:1 "@[<hv>match %t with@, | %t@]" (print_term t)
+      print "@[<hv>(match %t with@, | %t)@]" (print_term t)
         (print_sequence "@, | " print_case lst)
   | Apply (Effect eff, t2) ->
       print ~at_level:1 "perform (%t %t)" (Symbol.print_effect eff)
@@ -189,11 +189,9 @@ and print_tydef (name, (params, tydef)) ppf =
     | TyDefInline ty -> print ppf "%t" (print_type ty)
   in
   match params with
-  | [] ->
-      print ppf "@[type %t = %t@]@." (Symbol.print_tyname name)
-        (print_def tydef)
+  | [] -> print ppf "@[%t = %t@]" (Symbol.print_tyname name) (print_def tydef)
   | _lst ->
-      print ppf "@[type (%t) %t = %t@]@."
+      print ppf "@[(%t) %t = %t@]"
         (print_sequence ", " Symbol.print_typaram params)
         (Symbol.print_tyname name) (print_def tydef)
 
@@ -205,7 +203,7 @@ and print_top_let defs ppf = print ppf "@[<hv>%t@]@." (print_let defs)
 and print_top_let_rec defs ppf = print ppf "@[<hv>%t@]@." (print_let_rec defs)
 
 and print_tydefs tydefs ppf =
-  print ppf "%t@." (print_sequence "@, and " print_tydef tydefs)
+  print ppf "type %t@." (print_sequence "@\nand " print_tydef tydefs)
 
 and print_abstraction (p, t) ppf =
   print ppf "%t ->@ %t" (print_pattern p) (print_term t)
@@ -289,14 +287,38 @@ let print_header effects ppf =
     effects;
   print_top_handler effects ppf
 
+let rec pattern_vars = function
+  | PVar x -> [ x ]
+  | PAs (p, x) -> x :: pattern_vars p
+  | PAnnotated (p, _) | PVariant (_, Some p) -> pattern_vars p
+  | PTuple ps -> List.concat_map pattern_vars ps
+  | PRecord ps -> List.concat_map pattern_vars (Type.Field.Map.values ps)
+  | PVariant (_, None) | PConst _ | PNonbinding -> []
+
+(* Binds the names under which other OCaml code refers to top-level
+   variables, such as [run] in the wrappers of the benchmarks *)
+let print_source_names vars ppf =
+  List.iter
+    (fun x ->
+      match Symbol.source_name x with
+      | Some name -> print ppf "let %s = %t@." name (Symbol.print_variable x)
+      | None -> ())
+    vars
+
 let print_cmd cmd ppf =
   match cmd with
   | Term t ->
       print ppf "let _ = @.@[<hv>(_ocaml_tophandler) (fun _ -> @,%t@,)@];;@."
         (print_term ~max_level:1 t)
   | DefEffect (eff, (ty1, ty2)) -> print_def_effect (eff, (ty1, ty2)) ppf
-  | TopLet defs -> print_top_let defs ppf
-  | TopLetRec defs -> print_top_let_rec defs ppf
+  | TopLet defs ->
+      print_top_let defs ppf;
+      print_source_names
+        (List.concat_map (fun (p, _) -> pattern_vars p) defs)
+        ppf
+  | TopLetRec defs ->
+      print_top_let_rec defs ppf;
+      print_source_names (List.map fst defs) ppf
   | TyDef tydefs -> print_tydefs tydefs ppf
   | RawSource (x, source) ->
       print ppf "let %t = %s@." (Symbol.print_variable x) source

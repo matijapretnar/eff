@@ -33,12 +33,24 @@ and of_expression expr =
                  && Term.Variable.fold (fun desc _ -> desc = "$function") v1 ->
               let converter abs = ValueClause (of_abstraction abs) in
               Function (List.map converter abs_lst)
-          | _ -> Lambda (of_abstraction abs))
-      | _ -> Lambda (of_abstraction abs))
+          | _ -> of_lambda abs)
+      | _ -> of_lambda abs)
   | Term.Handler h -> of_handler h None
   | Term.HandlerWithFinally h ->
       of_handler h.handler_clauses (Some h.finally_clause)
   | Term.CastExp (expr, _) -> of_expression expr
+
+(* The parameter of a function gets its type when the type has no type
+   parameters. In an effect clause, OCaml knows the type of the result of the
+   operation only inside the clause, so it cannot infer the type of a
+   parameter that is passed to the continuation in a function that the clause
+   returns. A type parameter would be bound in the whole top-level
+   definition, so it is left out. *)
+and of_lambda abs =
+  let p, c = of_abstraction abs in
+  let pat, _ = abs.term in
+  let ty = of_type pat.ty in
+  if is_ground ty then Lambda (PAnnotated (p, ty), c) else Lambda (p, c)
 
 and of_handler
     ({ term = { value_clause; effect_clauses = { effect_part; _ } }; _ } :
@@ -116,6 +128,12 @@ and of_type ty =
       TyArrow (TyArrow (of_type Type.unit_ty, of_dirty drty1), of_dirty drty2)
 
 and of_dirty (ty, _) = of_type ty
+
+and is_ground = function
+  | TyParam _ -> false
+  | TyBasic _ -> true
+  | TyApply (_, tys) | TyTuple tys -> List.for_all is_ground tys
+  | TyArrow (ty1, ty2) -> is_ground ty1 && is_ground ty2
 
 and of_tydef = function
   | Type.Record assoc -> TyDefRecord (Type.Field.Map.map of_type assoc)
