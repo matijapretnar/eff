@@ -1,0 +1,46 @@
+; Native OCaml baselines for the benchmarks of
+; https://github.com/effect-handlers/effect-handlers-bench, written without
+; effect handlers. Each benchmark has a pure variant. Where the effect has a
+; natural OCaml counterpart, it also has a variant with it: ref for state, exn
+; for an early exit, and seq for a generator.
+
+(executables
+ (names
+  countdown_pure
+  countdown_ref
+  fibonacci_recursive_pure
+  generator_pure
+  generator_seq
+  handler_sieve_pure
+  iterator_pure
+  iterator_ref
+  nqueens_pure
+  parsing_dollars_exn
+  parsing_dollars_pure
+  product_early_exn
+  product_early_pure
+  resume_nontail_pure
+  tree_explore_pure
+  tree_explore_ref
+  triples_pure)
+ (modes native))
+
+(cram
+ (deps
+  countdown_pure.exe
+  countdown_ref.exe
+  fibonacci_recursive_pure.exe
+  generator_pure.exe
+  generator_seq.exe
+  handler_sieve_pure.exe
+  iterator_pure.exe
+  iterator_ref.exe
+  nqueens_pure.exe
+  parsing_dollars_exn.exe
+  parsing_dollars_pure.exe
+  product_early_exn.exe
+  product_early_pure.exe
+  resume_nontail_pure.exe
+  tree_explore_pure.exe
+  tree_explore_ref.exe
+  triples_pure.exe))
