@@ -232,10 +232,7 @@
     _place (1, Nil)
   
   let find_solution = _find_solution
-  
-  let _queens_all =
-   fun (_number_of_queens : int) -> _find_solution _number_of_queens
-  
+  let _queens_all = _find_solution
   let queens_all = _queens_all
   
   type (_, _) eff_internal_effect += CountPut : (int, unit) eff_internal_effect
@@ -849,7 +846,7 @@
   
   let rec _loop_pure _x = if _x = 0 then () else _loop_pure (_x - 1)
   let loop_pure = _loop_pure
-  let _test_pure = fun (_n : int) -> _loop_pure _n
+  let _test_pure = _loop_pure
   let test_pure = _test_pure
   
   type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
@@ -861,7 +858,7 @@
     else _loop_latent (_x - 1)
   
   let loop_latent = _loop_latent
-  let _test_latent = fun (_n : int) -> _loop_latent _n
+  let _test_latent = _loop_latent
   let test_latent = _test_latent
   
   type (_, _) eff_internal_effect += Incr : (unit, unit) eff_internal_effect
@@ -2842,7 +2839,7 @@
     _find_max (_tester _m, fun (_x : int) -> _x)
   
   let effect_max = _effect_max
-  let _test_max = fun (_m : int) -> _effect_max _m
+  let _test_max = _effect_max
   let test_max = _test_max
   let _op = fun (_x : int) -> fun (_y : int) -> _x - (3 * _y)
   let op = _op

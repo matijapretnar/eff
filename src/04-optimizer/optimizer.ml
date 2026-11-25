@@ -490,6 +490,22 @@ and reduce_expression state expr = reduce_if_fuel reduce_expression' state expr
 and reduce_expression' state expr =
   match expr.term with
   | Term.CastExp (expr, tcoer) -> cast_expression state expr tcoer
+  | Term.Lambda
+      {
+        term =
+          ( { term = Term.PVar x; _ },
+            {
+              term =
+                Term.Apply
+                  ( ({ term = Term.Var { variable = f; _ }; _ } as f_var),
+                    { term = Term.Var { variable = x'; _ }; _ } );
+              _;
+            } );
+        _;
+      }
+    when x = x' && f <> x && Type.equal_ty f_var.ty expr.ty ->
+      (* Eta: [fun x -> f x] is [f], as [f] is a variable, so a value. *)
+      f_var
   | _ -> expr
 
 and reduce_computation state comp =
