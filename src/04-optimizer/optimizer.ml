@@ -282,7 +282,9 @@ let is_application_abs (abs : Term.abstraction) =
    - [Varying]: [g'] is specialised for the operation clauses of [H] only, and
      takes the return clause as an extra argument [k]. It ties the knot also
      where With-Do has moved a continuation into the return clause, but [g']
-     then carries [k] at run time.
+     then carries [k] at run time. [g'] takes [k] after [x], curried, so that
+     with a return clause that gives a function, as in a state handler, the
+     generated OCaml function takes all its arguments at once.
 
    Both are correct, so choosing between them is strategy: we use [Fixed]
    unless it leaves a handled call of [f] that [Varying] would replace.
@@ -298,6 +300,36 @@ let is_application_abs (abs : Term.abstraction) =
    inside a function body. Replacing [with H handle f w] by [g' w] is correct
    in any context where [g'] is in scope. *)
 
+(* The type of a specialisation of a function with argument type [ty_arg]
+   under a handler of type [hnd_ty]. In [Varying] mode, it also takes the
+   return clause. *)
+let specialisation_ty mode hnd_ty ty_arg =
+  let (ty_in, _), drty_out = hnd_ty in
+  match mode with
+  | Fixed -> Type.arrow (ty_arg, drty_out)
+  | Varying ->
+      Type.arrow
+        ( ty_arg,
+          Type.pure_ty (Type.arrow (Type.arrow (ty_in, drty_out), drty_out)) )
+
+(* The call [g' w k] of a [Varying] specialisation. [g' w] is pure, so it gets
+   the dirt of the call before the sequence. *)
+let varying_call g' w k =
+  match g'.ty.term with
+  | Type.Arrow (_, (ty_h, _)) -> (
+      match ty_h.term with
+      | Type.Arrow (_, (_, drt)) ->
+          let h_pat, h_var = Term.fresh_variable "h" ty_h in
+          let coer =
+            TyCoercion.bangCoercion
+              (TyCoercion.reflTy ty_h, DirtCoercion.empty drt)
+          in
+          Term.bind
+            ( Term.castComp (Term.apply (g', w), coer),
+              Term.abstraction (h_pat, Term.apply (h_var, k)) )
+      | _ -> assert false)
+  | _ -> assert false
+
 let extract mode hnd f g' ~left =
   let rec extract_comp comp =
     match comp.term with
@@ -306,24 +338,15 @@ let extract mode hnd f g' ~left =
           { term = Term.Apply ({ term = Term.Var { variable; _ }; _ }, w); _ }
         )
       when variable = f && Term.same_operation_clauses h' hnd -> (
-        let g_arg_ty, g_out_ty =
-          match g'.ty.term with
-          | Type.Arrow (ty, drty) -> (ty, drty)
-          | _ -> assert false
+        let fits mode =
+          Type.equal_ty g'.ty (specialisation_ty mode h'.ty w.ty)
         in
         match mode with
-        | Fixed
-          when Term.same_return_clause h' hnd
-               && Type.equal_ty w.ty g_arg_ty
-               && Type.equal_dirty comp.ty g_out_ty ->
+        | Fixed when Term.same_return_clause h' hnd && fits Fixed ->
             Term.apply (g', w)
         | Varying ->
-            let arg =
-              Term.tuple [ w; Term.lambda (extract_abs h'.term.value_clause) ]
-            in
-            if
-              Type.equal_ty arg.ty g_arg_ty && Type.equal_dirty comp.ty g_out_ty
-            then Term.apply (g', arg)
+            if fits Varying then
+              varying_call g' w (Term.lambda (extract_abs h'.term.value_clause))
             else comp
         | Fixed ->
             left := true;
@@ -422,41 +445,20 @@ let building_specialisation state hnd x instantiation comp =
   in
   match List.find_opt matching !(state.specialisations) with
   | Some { mode; result = Building b; handler; _ } -> (
-      let arg_ty, out_ty =
-        match b.name_var.ty.term with
-        | Type.Arrow (ty, drty) -> (ty, drty)
-        | _ -> assert false
-      in
       let v_ty =
         match comp.term with Term.Apply (_, v) -> v.ty | _ -> assert false
       in
-      let _, drty_out = hnd.ty in
-      let types_agree arg_ty' =
-        Type.equal_ty arg_ty arg_ty' && Type.equal_dirty out_ty drty_out
+      let fits mode =
+        Type.equal_ty b.name_var.ty (specialisation_ty mode hnd.ty v_ty)
       in
       match mode with
       | Fixed when Term.same_return_clause handler hnd ->
-          if types_agree v_ty then Some (Fixed, b.name_var) else None
+          if fits Fixed then Some (Fixed, b.name_var) else None
       | Fixed ->
           b.left <- b.left + 1;
           None
-      | Varying ->
-          let ty_in, _ = fst hnd.ty in
-          let k_ty = Type.arrow (ty_in, drty_out) in
-          if types_agree (Type.tuple [ v_ty; k_ty ]) then
-            Some (Varying, b.name_var)
-          else None)
+      | Varying -> if fits Varying then Some (Varying, b.name_var) else None)
   | _ -> None
-
-(* The type of the specialisation of a function with argument type [ty_arg]
-   under a handler of type [hnd_ty]. In [Varying] mode, it also takes the
-   return clause. *)
-let specialisation_ty mode hnd_ty ty_arg =
-  let (ty_in, _), drty_out = hnd_ty in
-  match mode with
-  | Fixed -> Type.arrow (ty_arg, drty_out)
-  | Varying ->
-      Type.arrow (Type.tuple [ ty_arg; Type.arrow (ty_in, drty_out) ], drty_out)
 
 (* A specialisation [rec g p. M] in a group with [names] is closed if [M]
    mentions only [names] and top-level names, and no type, dirt or skeleton
@@ -718,8 +720,7 @@ and handle_computation state hnd comp =
       match building_specialisation state hnd x instantiation comp with
       | Some (Fixed, name_var) -> Term.apply (name_var, v)
       | Some (Varying, name_var) ->
-          Term.apply
-            (name_var, Term.tuple [ v; Term.lambda hnd.term.value_clause ])
+          varying_call name_var v (Term.lambda hnd.term.value_clause)
       | None -> assert false)
   | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
     when state.fuel > 0 && may_specialise state x hnd
@@ -924,15 +925,16 @@ and with_rec_fun state hnd f abs v ~top =
   let call mode g_var =
     match mode with
     | Fixed -> Term.apply (g_var, v)
-    | Varying ->
-        Term.apply (g_var, Term.tuple [ v; Term.lambda hnd.term.value_clause ])
+    | Varying -> varying_call g_var v (Term.lambda hnd.term.value_clause)
   in
-  (* The body of the specialisation [g] of a member with [abs] *)
+  (* The body of the specialisation [g] of a member with [abs], and how to
+     make the definition of [g] from the body once [extract] has rewritten
+     it *)
   let build_member state mode abs =
     let { term = pat, body; _ } = Term.refresh_abstraction Assoc.empty abs in
-    let hnd_m, g_pat =
+    let hnd_m, define =
       match mode with
-      | Fixed -> (hnd, pat)
+      | Fixed -> (hnd, fun body -> Term.abstraction (pat, body))
       | Varying ->
           let k_pat, k_var = Term.fresh_variable "k" k_ty in
           let y_pat, y_var = Term.fresh_variable "y" ty_in in
@@ -940,9 +942,13 @@ and with_rec_fun state hnd f abs v ~top =
             Term.handler_with_new_value_clause hnd
               (Term.abstraction (y_pat, Term.apply (k_var, y_var)))
           in
-          (hnd_k, Term.pTuple [ pat; k_pat ])
+          ( hnd_k,
+            fun body ->
+              Term.abstraction
+                (pat, Term.value (Term.lambda (Term.abstraction (k_pat, body))))
+          )
     in
-    (g_pat, handle_computation state hnd_m body)
+    (define, handle_computation state hnd_m body)
   in
   let build mode =
     let g = specialisation_name state f ~top:(top <> None) in
@@ -950,9 +956,9 @@ and with_rec_fun state hnd f abs v ~top =
     let left = ref false in
     match top with
     | None ->
-        let g_pat, body = build_member state mode abs in
+        let define, body = build_member state mode abs in
         let body' = extract mode hnd f g_var ~left body in
-        ([ (f, g, g_var, Term.abstraction (g_pat, body')) ], !left)
+        ([ (f, g, g_var, define body') ], !left)
     | Some instantiation ->
         let root =
           {
@@ -1016,8 +1022,8 @@ and with_rec_fun state hnd f abs v ~top =
             (fun e -> not (List.memq e entries))
             !(state.specialisations);
         ( List.map
-            (fun (x, g, g_var, (g_pat, body)) ->
-              (x, g, g_var, Term.abstraction (g_pat, extract_all body)))
+            (fun (x, g, g_var, (define, body)) ->
+              (x, g, g_var, define (extract_all body)))
             members,
           !left )
   in
