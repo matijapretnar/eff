@@ -3,7 +3,7 @@
 effect A : unit
 effect B : unit
 
-type 'a testtype = T of (('a testtype -> 'a) list)
+type 'a testtype = T of (('a testtype -> 'a ! {Print}) list)
 
 let testbug = handler 
   | effect A k -> fun (T ks) -> continue k () (T ((k ()) :: ks))

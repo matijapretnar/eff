@@ -18,7 +18,8 @@ type ty = plain_ty located
 and plain_ty =
   | TyApply of tyname * ty list  (** [(ty1, ty2, ..., tyn) type_name] *)
   | TyParam of typaram  (** ['a] *)
-  | TyArrow of ty * ty  (** [ty1 -> ty2] *)
+  | TyArrow of ty * ty * eff list option
+      (** [ty1 -> ty2] or [ty1 -> ty2 ! {eff1, ..., effn}] *)
   | TyTuple of ty list  (** [ty1 * ty2 * ... * tyn] *)
   | TyHandler of ty * ty  (** [ty1 => ty2] *)
 

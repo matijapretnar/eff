@@ -478,6 +478,89 @@
   
   let g = _g
   ======================================================================
+  codegen/generator.eff
+  ----------------------------------------------------------------------
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | RandomFloat : (float, float) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | Write : (string * string, unit) eff_internal_effect
+  
+  type (_, _) eff_internal_effect += Yield : (int, unit) eff_internal_effect
+  type tree = Leaf | Node of (tree * int * tree)
+  type generator = Empty | Thunk of (int * (unit -> generator))
+  
+  let rec _make _x =
+    begin match _x with
+    | 0 -> Leaf
+    | _n ->
+        let _t = _make (_n - 1) in
+        Node (_t, _n, _t)
+    end
+  
+  let make = _make
+  
+  let rec _iterate _x =
+    begin match _x with
+    | Leaf -> Value ()
+    | Node (_l, _v, _r) ->
+        _iterate _l >>= fun _ -> Call (Yield, _v, fun (_y : unit) -> _iterate _r)
+    end
+  
+  let iterate = _iterate
+  
+  let _generate _tycoer _tycoer _tycoer =
+   fun (_f : unit -> 'ty computation) ->
+    force_unsafe
+      ((handler
+          {
+            value_clause = (fun (_x : 'ty) -> Value Empty);
+            effect_clauses =
+              (fun (type a)
+                (type b)
+                (eff : (a, b) eff_internal_effect)
+                :
+                (a -> (b -> _) -> _)
+              ->
+                match eff with
+                | Yield ->
+                    fun (_x : int) _k ->
+                      Value (Thunk (_x, coer_arrow coer_refl_ty force_unsafe _k))
+                | eff' -> fun arg k -> Call (eff', arg, k));
+          }
+          (fun (_x : generator) -> Value _x))
+         (coer_computation _tycoer (coer_computation _tycoer (_f ()))))
+  
+  let generate = _generate
+  
+  let rec _sum _x =
+   fun (_x : generator) ->
+    begin match _x with Empty -> _x | Thunk (_v, _f) -> _sum (_v + _x) (_f ())
+    end
+  
+  let sum = _sum
+  
+  let _x =
+    _sum 0
+      (_generate coer_refl_ty coer_refl_ty coer_refl_ty (fun (() : unit) ->
+           _iterate (_make 5)))
+  
+  let x = _x
+  ======================================================================
   codegen/handle_match.eff
   ----------------------------------------------------------------------
   (* primitive effect *)

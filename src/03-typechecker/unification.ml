@@ -2,6 +2,14 @@ open Utils
 open Language
 open Type
 
+(* A closed dirt comes from a function type in a type or effect definition, or
+   from a type annotation that lists the effects. *)
+let effects_not_allowed ~loc ops =
+  Error.typing ~loc
+    "The effects %t are not allowed here. A function type in a type or effect \
+     definition is pure unless it lists its effects, as in [a -> b ! {E}]."
+    (Effect.Set.print ops)
+
 let expand_row ~loc sub row ops =
   match row with
   | _ when Effect.Set.is_empty ops -> (sub, row)
@@ -14,7 +22,7 @@ let expand_row ~loc sub row ops =
           sub
       in
       (sub', row')
-  | Dirt.Row.Empty -> Error.typing ~loc "Cannot extend an empty row."
+  | Dirt.Row.Empty -> effects_not_allowed ~loc ops
 
 let skel_eq_step ~loc unresolved sk1 sk2 =
   match (sk1, sk2) with
@@ -297,8 +305,7 @@ and dirt_omega_step ~loc unresolved w dcons =
   | ( { effect_set = ops1; row = Dirt.Row.Empty },
       { effect_set = ops2; row = Dirt.Row.Empty } ) ->
       if not (Effect.Set.subset ops1 ops2) then
-        Error.typing ~loc "Effects %t are not a subset of %t"
-          (Effect.Set.print ops1) (Effect.Set.print ops2);
+        effects_not_allowed ~loc (Effect.Set.diff ops1 ops2);
       let unresolved' =
         UnresolvedConstraints.change_subst
           (Substitution.add_dirt_var_coercion w
@@ -333,8 +340,7 @@ and dirt_omega_step ~loc unresolved w dcons =
   | ( { effect_set = ops1; row = Dirt.Row.Param d1 },
       { effect_set = ops2; row = Dirt.Row.Empty } ) ->
       if not (Effect.Set.subset ops1 ops2) then
-        Error.typing ~loc "Effects %t are not a subset of %t"
-          (Effect.Set.print ops1) (Effect.Set.print ops2);
+        effects_not_allowed ~loc (Effect.Set.diff ops1 ops2);
       let unresolved' =
         UnresolvedConstraints.change_subst
           (Substitution.add_dirt_substitution d1

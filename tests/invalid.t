@@ -31,6 +31,11 @@
   Syntax error (file "invalid/duplicate_variant_tydef_sum.eff", line 2, char 1):
   Constructor Horn defined multiple times.
   ======================================================================
+  invalid/effectful_function_in_tydef.eff
+  ----------------------------------------------------------------------
+  Typing error (file "invalid/effectful_function_in_tydef.eff", line 3, char 9):
+  The effects Print are not allowed here. A function type in a type or effect definition is pure unless it lists its effects, as in [a -> b ! {E}].
+  ======================================================================
   invalid/invalid_match_type.eff
   ----------------------------------------------------------------------
   Typing error (file "invalid/invalid_match_type.eff", line 4, char 1):

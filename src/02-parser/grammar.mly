@@ -485,7 +485,13 @@ defined_ty:
 ty: mark_position(plain_ty) { $1 }
 plain_ty:
   | t1 = ty_apply ARROW t2 = ty
-    { TyArrow (t1, t2) }
+    { TyArrow (t1, t2, None) }
+  | t1 = ty_apply ARROW t2 = prod_ty op = PREFIXOP
+    LBRACE effs = separated_list(COMMA, effect_sym) RBRACE
+    { if op <> "!" then
+        Error.syntax ~loc:(Location.make $startpos(op) $endpos(op))
+          "Expected ! before the effects of a function type";
+      TyArrow (t1, t2, Some effs) }
   | t1 = ty_apply HARROW t2 = ty
     { TyHandler (t1, t2) }
   | t = plain_prod_ty

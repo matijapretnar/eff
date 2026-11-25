@@ -1,0 +1,23 @@
+(* A function type in a type or effect definition is pure unless it lists its
+   effects. An effect definition may list the effect it defines. *)
+effect Fork : (unit -> unit ! {Fork, Print}) -> unit
+
+type pure_box = PBox of (unit -> int)
+type box = Box of (unit -> int ! {Print})
+
+let run (PBox f) (Box g) = f () + g ()
+;;
+
+run (PBox (fun () -> 1)) (Box (fun () -> perform (Print "two\n"); 2))
+;;
+
+let rec forks () =
+  handler
+  | effect (Fork t) k -> (with forks () handle t ()); k ()
+;;
+
+with forks () handle
+  perform (Fork (fun () ->
+    perform (Print "child\n");
+    perform (Fork (fun () -> perform (Print "grandchild\n")))));
+  perform (Print "parent\n")

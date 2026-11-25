@@ -101,7 +101,7 @@ let force_param ty =
    an application applies to an effect type. So, it is prudent to call [fill_args] before
    calling [ty].
 *)
-let desugar_type type_sbst state =
+let desugar_type ?(make_dirty = T.make_dirty) type_sbst state =
   let rec desugar_type state { it = t; at = loc } =
     match t with
     | Sugared.TyApply (t, tys) -> (
@@ -130,10 +130,17 @@ let desugar_type type_sbst state =
         match StringMap.find_opt t type_sbst with
         | None -> Error.syntax ~loc "Unbound type parameter '%s" t
         | Some (_, ty, _) -> (state, ty))
-    | Sugared.TyArrow (t1, t2) ->
+    | Sugared.TyArrow (t1, t2, None) ->
         let state', t1' = desugar_type state t1 in
         let state'', t2' = desugar_dirty_type state' t2 in
         (state'', T.arrow (t1', t2'))
+    | Sugared.TyArrow (t1, t2, Some effs) ->
+        let state', t1' = desugar_type state t1 in
+        let state'', t2' = desugar_type state' t2 in
+        let effs' =
+          List.map (fun eff -> snd (effect_to_symbol ~loc state eff)) effs
+        in
+        (state'', T.arrow (t1', (t2', Dirt.closed (Effect.Set.of_list effs'))))
     | Sugared.TyTuple lst ->
         let state', lst' = List.fold_map desugar_type state lst in
         (state', T.tuple lst')
@@ -143,7 +150,7 @@ let desugar_type type_sbst state =
         (state'', T.handler (t1', t2'))
   and desugar_dirty_type state ty =
     let state', ty' = desugar_type state ty in
-    (state', T.make_dirty ty')
+    (state', make_dirty ty')
   in
   desugar_type state
 
@@ -153,7 +160,7 @@ let free_type_params t =
     match t with
     | Sugared.TyApply (_, tys) -> List.map ty_params tys |> List.flatten
     | Sugared.TyParam s -> [ s ]
-    | Sugared.TyArrow (t1, t2) -> ty_params t1 @ ty_params t2
+    | Sugared.TyArrow (t1, t2, _) -> ty_params t1 @ ty_params t2
     | Sugared.TyTuple lst -> List.map ty_params lst |> List.flatten
     | Sugared.TyHandler (t1, t2) -> ty_params t1 @ ty_params t2
   in
@@ -173,6 +180,12 @@ let syntax_to_core_params ts =
   in
   core_params |> List.to_seq |> StringMap.of_seq
 
+(* A function type in a type or effect definition is pure, unless it lists
+   its effects, as in [a -> b ! {E}]. Its dirt cannot be a fresh variable: the
+   definition is shared by all its uses, while each top-level definition would
+   solve the variable on its own. *)
+let desugar_declared_type = desugar_type ~make_dirty:T.pure_ty
+
 (** [desugar_tydef state params def] desugars the type definition with
     parameters [params] and definition [def]. *)
 let desugar_tydef ~loc state
@@ -182,7 +195,7 @@ let desugar_tydef ~loc state
     | Sugared.TyRecord flds ->
         let field_desugar st (f, t) =
           let f' = Type.Field.fresh f in
-          let st', t' = desugar_type ty_sbst st t in
+          let st', t' = desugar_declared_type ty_sbst st t in
           let st'' =
             {
               st' with
@@ -201,7 +214,7 @@ let desugar_tydef ~loc state
             match ty with
             | None -> (st, None, Variant false)
             | Some ty ->
-                let st, ty = desugar_type ty_sbst st ty in
+                let st, ty = desugar_declared_type ty_sbst st ty in
                 (st, Some ty, Variant true)
           in
           let st'' =
@@ -219,7 +232,7 @@ let desugar_tydef ~loc state
         in
         (state', Type.Sum sum_def')
     | Sugared.TyInline t ->
-        let state', t' = desugar_type ty_sbst state t in
+        let state', t' = desugar_declared_type ty_sbst state t in
         let state'' =
           {
             state' with
@@ -742,6 +755,6 @@ let desugar_def_effect ~loc state (eff, (ty1, ty2)) =
       effect_symbols = add_unique ~loc "Effect" eff eff' state.effect_symbols;
     }
   in
-  let state'', ty1' = desugar_type StringMap.empty state' ty1 in
-  let state''', ty2' = desugar_type StringMap.empty state'' ty2 in
+  let state'', ty1' = desugar_declared_type StringMap.empty state' ty1 in
+  let state''', ty2' = desugar_declared_type StringMap.empty state'' ty2 in
   (state''', (eff', (ty1', ty2')))

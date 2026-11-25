@@ -1,0 +1,26 @@
+(* A handler that stores its continuation in a data type. The function type in
+   the definition of generator is pure, and the continuation is pure once the
+   handler handles all of Yield. *)
+effect Yield : int -> unit
+
+type tree = Leaf | Node of tree * int * tree
+type generator = Empty | Thunk of int * (unit -> generator)
+
+let rec make = function
+  | 0 -> Leaf
+  | n -> let t = make (n - 1) in Node (t, n, t)
+
+let rec iterate = function
+  | Leaf -> ()
+  | Node (l, v, r) -> iterate l; perform (Yield v); iterate r
+
+let generate f =
+  handle f () with
+  | _ -> Empty
+  | effect (Yield x) k -> Thunk (x, k)
+
+let rec sum a = function
+  | Empty -> a
+  | Thunk (v, f) -> sum (v + a) (f ())
+
+let x = sum 0 (generate (fun () -> iterate (make 5)))
