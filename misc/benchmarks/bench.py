@@ -56,6 +56,10 @@ SIZES = {
 
 BASELINE = "native-pure"
 
+# Seconds for the first start of an executable, which waits for the check of
+# macOS
+WARM_UP_TIMEOUT = 120
+
 # quick shows the trends in about a minute: the single timed run of the
 # check, at the 5 smallest sizes, with a limit of 1 s. full is for the final
 # graphs: all sizes, measured by hyperfine with repetitions, which takes
@@ -241,12 +245,15 @@ def main():
         return variants
 
     def build_and_start(job):
-        # The first start of a new executable is slow on macOS, so each one
-        # runs once here, where its time does not count.
+        # macOS checks a new executable at its first start, about 200 ms for
+        # each, one executable after another, so after many builds the last
+        # ones wait for seconds. Each executable runs once here, where its
+        # time does not count, with the input 1, which takes no time, and
+        # without the usual limit, so that the check is finished.
         benchmark, variant = job
         exe, error = build(benchmark, variant, args, build_dir)
         if exe:
-            run_once(exe, SIZES[benchmark][0], args.timeout)
+            run_once(exe, 1, WARM_UP_TIMEOUT)
         return exe, error
 
     # The builds are independent, so they run in parallel. The measurements
