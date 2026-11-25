@@ -79,6 +79,14 @@ let load_primitive_value state x =
   add_top_name state x;
   state
 
+(* The single definition of a [let rec] that does not mention itself, which
+   is just a function *)
+let non_recursive defs =
+  match Assoc.to_list defs with
+  | [ (f, abs) ] when Term.does_not_occur f (Term.free_vars_abs abs) ->
+      Some (f, abs)
+  | _ -> None
+
 let add_rec_definitions state defs =
   match Assoc.to_list defs with
   | [ (f, abs) ] ->
@@ -921,6 +929,15 @@ and reduce_computation' state comp =
         (optimize_computation state
            (Term.apply (expr, cast_expression state e ty_coer)))
         drty_coer
+  | Term.LetRec (defs, c) when non_recursive defs <> None -> (
+      (* [let rec f x = M in N] where [M] does not mention [f] is
+         [let f = fun x -> M in N], which the other rules then reduce. *)
+      match non_recursive defs with
+      | Some (f, abs) ->
+          let fn = Term.lambda abs in
+          reduce_computation state
+            (Term.letVal (fn, Term.abstraction (Term.pVar f fn.ty, c)))
+      | None -> assert false)
   | Term.LetRec (defs, c) -> (
       let c' = optimize_computation state c in
       match keep_used_bindings defs c' with
@@ -1039,9 +1056,18 @@ let optimize_top_rec_definitions state defs =
 let process_top_let_rec state defs =
   if !Config.enable_optimization then (
     let defs' = optimize_top_rec_definitions state defs in
+    (* A definition that does not mention itself is just a function, which
+       Inline-Top can inline. *)
+    let function_only =
+      non_recursive (Assoc.map (fun (_, _, abs) -> abs) defs')
+    in
     let state' =
       match Assoc.to_list defs' with
-      | [ (f, (_, _, abs)) ] -> add_top_definition state f (TopRec abs)
+      | [ (f, (_, _, abs)) ] ->
+          add_top_definition state f
+            (match function_only with
+            | Some _ -> TopValue (Term.lambda abs)
+            | None -> TopRec abs)
       | _ -> state
     in
     List.iter (fun (f, _) -> add_top_name state f) (Assoc.to_list defs);
