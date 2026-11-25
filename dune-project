@@ -18,5 +18,7 @@
   js_of_ocaml
   js_of_ocaml-ppx
   menhir
-  (ocaml (>= 4.14.1))
+  (multicont :with-test)
+  (ocaml (>= 5.0))
+  (ocamlfind :with-test)
   (ocamlformat (= 0.29.0))))
