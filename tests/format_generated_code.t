@@ -98,8 +98,7 @@
     | TripleCons of ((int * int * int) * triple_int_list)
     | TripleNil
   
-  let rec _op (* @ *) _x =
-   fun (_ys : triple_int_list) ->
+  let rec _op (* @ *) _x (_ys : triple_int_list) =
     begin match _x with
     | TripleNil -> _ys
     | TripleCons (_x, _xs) -> TripleCons (_x, _op (* @ *) _xs _ys)
@@ -108,44 +107,43 @@
   let _op (* @ *) = _op (* @ *)
   
   let _testTriple =
-   fun (_n : int) ->
-    fun (_s : int) ->
-     let rec _choice _x =
-       if _x < 1 then TripleNil
-       else
-         let _k =
-          fun (_y : bool) ->
-           if _y then
-             let rec _choice _x =
-               if _x < 1 then TripleNil
-               else
-                 let _k =
-                  fun (_y : bool) ->
-                   if _y then
-                     let rec _choice _x =
-                       if _x < 1 then TripleNil
-                       else
-                         let _k =
-                          fun (_y : bool) ->
-                           if _y then
-                             if _x + _x + _x = _s then
-                               TripleCons ((_x, _x, _x), TripleNil)
-                             else TripleNil
-                           else _choice (_x - 1)
-                         in
-                         _op (* @ *) (_k true) (_k false)
-                     in
-                     _choice (_x - 1)
-                   else _choice (_x - 1)
-                 in
-                 _op (* @ *) (_k true) (_k false)
-             in
-             _choice (_x - 1)
-           else _choice (_x - 1)
-         in
-         _op (* @ *) (_k true) (_k false)
-     in
-     _choice _n
+   fun (_n : int) (_s : int) ->
+    let rec _choice _x =
+      if _x < 1 then TripleNil
+      else
+        let _k =
+         fun (_y : bool) ->
+          if _y then
+            let rec _choice _x =
+              if _x < 1 then TripleNil
+              else
+                let _k =
+                 fun (_y : bool) ->
+                  if _y then
+                    let rec _choice _x =
+                      if _x < 1 then TripleNil
+                      else
+                        let _k =
+                         fun (_y : bool) ->
+                          if _y then
+                            if _x + _x + _x = _s then
+                              TripleCons ((_x, _x, _x), TripleNil)
+                            else TripleNil
+                          else _choice (_x - 1)
+                        in
+                        _op (* @ *) (_k true) (_k false)
+                    in
+                    _choice (_x - 1)
+                  else _choice (_x - 1)
+                in
+                _op (* @ *) (_k true) (_k false)
+            in
+            _choice (_x - 1)
+          else _choice (_x - 1)
+        in
+        _op (* @ *) (_k true) (_k false)
+    in
+    _choice _n
   
   let testTriple = _testTriple
   let _handleTripleWrap = fun ((_x, _y) : int * int) -> _testTriple _x _y
@@ -158,8 +156,7 @@
   type option = Some of queen_list | None
   type (_, _) eff_internal_effect += Select : (intlist, int) eff_internal_effect
   
-  let rec _filter _x =
-   fun (_x : intlist) ->
+  let rec _filter _x (_x : intlist) =
     begin match _x with
     | End -> Value End
     | Lst (_x, _xs) ->
@@ -170,8 +167,7 @@
   
   let filter = _filter
   
-  let rec _forall _x =
-   fun (_x : queen_list) ->
+  let rec _forall _x (_x : queen_list) =
     begin match _x with
     | Nil -> Value true
     | Cons (_x, _xs) ->
@@ -181,43 +177,38 @@
   let forall = _forall
   
   let _no_attack =
-   fun ((_x, _y) : int * int) ->
-    fun ((_x', _y') : int * int) ->
-     _x <> _x' && _y <> _y' && abs (_x - _x') <> abs (_y - _y')
+   fun ((_x, _y) : int * int) ((_x', _y') : int * int) ->
+    _x <> _x' && _y <> _y' && abs (_x - _x') <> abs (_y - _y')
   
   let no_attack = _no_attack
   
   let _available =
-   fun (_x : int) ->
-    fun (_qs : queen_list) ->
-     fun (_l : intlist) ->
-      coer_arrow
-        (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
-        (coer_arrow coer_refl_ty force_unsafe)
-        _filter
-        (fun (_y : int) ->
-          coer_arrow
-            (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
-            (coer_arrow coer_refl_ty force_unsafe)
-            _forall
-            (_no_attack (_x, _y))
-            _qs)
-        _l
+   fun (_x : int) (_qs : queen_list) (_l : intlist) ->
+    coer_arrow
+      (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+      (coer_arrow coer_refl_ty force_unsafe)
+      _filter
+      (fun (_y : int) ->
+        coer_arrow
+          (coer_arrow coer_refl_ty (coer_return coer_refl_ty))
+          (coer_arrow coer_refl_ty force_unsafe)
+          _forall
+          (_no_attack (_x, _y))
+          _qs)
+      _l
   
   let available = _available
   
   let _find_solution =
    fun (_n : int) ->
-    let rec _init _x =
-     fun (_acc : intlist) ->
+    let rec _init _x (_acc : intlist) =
       if _x = 0 then _acc else _init (_x - 1) (Lst (_x, _acc))
     in
     let ____l = _init _n End in
     let rec _place (_x, _qs) =
       if _x = _n + 1 then Some _qs
       else
-        let rec _loop _x =
-         fun (_x : intlist) ->
+        let rec _loop _x (_x : intlist) =
           begin match _x with
           | End -> None
           | Lst (_x, _xs) ->
@@ -250,9 +241,7 @@
   
   let _testCount =
    fun (_m : int) ->
-    let rec _count _x =
-     fun (_s : int) -> if _s = 0 then _s else _count () (_s - 1)
-    in
+    let rec _count _x (_s : int) = if _s = 0 then _s else _count () (_s - 1) in
     _count () _m
   
   let testCount = _testCount
@@ -268,8 +257,7 @@
   
   let _testGenerator =
    fun (_n : int) ->
-    let rec _generateFromTo (_l, _u) =
-     fun (_x : int) ->
+    let rec _generateFromTo (_l, _u) (_x : int) =
       if _l > _u then _x else _generateFromTo (_l + 1, _u) (_x + _l)
     in
     _generateFromTo (1, _n) 0
@@ -375,9 +363,8 @@
   type (_, _) eff_internal_effect += Tick : (unit, unit) eff_internal_effect
   
   let _compose =
-   fun (_f : 'ty -> 'ty computation) ->
-    fun (_g : 'ty -> 'ty computation) ->
-     fun (_x : 'ty) -> _g _x >>= fun _b -> _f _b
+   fun (_f : 'ty -> 'ty computation) (_g : 'ty -> 'ty computation) (_x : 'ty) ->
+    _g _x >>= fun _b -> _f _b
   
   let compose = _compose
   
@@ -403,7 +390,7 @@
          coer_refl_ty
          (_compose (fun (_h : int -> int) ->
               Call (Tick, (), fun (_y : unit) -> Value (_h 1))))
-         (fun (_x : int) -> fun (_y : int) -> _x + _y)
+         (fun (_x : int) (_y : int) -> _x + _y)
          2)
   
   let test = _test
@@ -431,9 +418,8 @@
     | Write : (string * string, unit) eff_internal_effect
   
   let _compose =
-   fun (_f : 'ty -> 'ty computation) ->
-    fun (_g : 'ty -> 'ty computation) ->
-     fun (_x : 'ty) -> _g _x >>= fun _b -> _f _b
+   fun (_f : 'ty -> 'ty computation) (_g : 'ty -> 'ty computation) (_x : 'ty) ->
+    _g _x >>= fun _b -> _f _b
   
   let compose = _compose
   ======================================================================
@@ -549,8 +535,7 @@
   
   let generate = _generate
   
-  let rec _sum _x =
-   fun (_x : generator) ->
+  let rec _sum _x (_x : generator) =
     begin match _x with Empty -> _x | Thunk (_v, _f) -> _sum (_v + _x) (_f ())
     end
   
@@ -700,8 +685,7 @@
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  let rec _map _x =
-   fun (_x : 'ty list) ->
+  let rec _map _x (_x : 'ty list) =
     begin match _x with
     | [] -> Value []
     | _x :: _xs ->
@@ -712,8 +696,8 @@
   let map = _map
   
   let _apply_all =
-   fun (_fs : ('ty -> 'ty computation) list) ->
-    fun (_x : 'ty) -> _map (fun (_f : 'ty -> 'ty computation) -> _f _x) _fs
+   fun (_fs : ('ty -> 'ty computation) list) (_x : 'ty) ->
+    _map (fun (_f : 'ty -> 'ty computation) -> _f _x) _fs
   
   let apply_all = _apply_all
   
@@ -814,8 +798,7 @@
   let _bigTestLoop =
    fun (_num : int) ->
     let ____finalCase = _createCase _num in
-    let rec _looper _x =
-     fun (_s : int) ->
+    let rec _looper _x (_s : int) =
       if _x = 0 then _s
       else
         let rec _interp (_x, _k) =
@@ -883,7 +866,7 @@
                       end ) )
       end
     in
-    _interp (_createCase _n, fun (_x : int) -> fun (_ : int) -> _x) _n
+    _interp (_createCase _n, fun (_x : int) (_ : int) -> _x) _n
   
   let testState = _testState
   
@@ -907,8 +890,7 @@
       end
     in
     let ____finalCase = _createCase _n in
-    let rec _looper _x =
-     fun (_s : int) ->
+    let rec _looper _x (_s : int) =
       if _x = 0 then _s
       else
         let rec _interp (_x, _k) =
@@ -943,7 +925,7 @@
           end
         in
         _looper (_x - 1)
-          (_s + _interp (____finalCase, fun (_x : int) -> fun (_ : int) -> _x) _n)
+          (_s + _interp (____finalCase, fun (_x : int) (_ : int) -> _x) _n)
     in
     _looper 100 0
   
@@ -1060,8 +1042,7 @@
   
   let _test =
    fun (_n : int) ->
-    let rec _loop _x =
-     fun (_s : int) ->
+    let rec _loop _x (_s : int) =
       if _x = 0 then Value _s
       else Call (Op, _x, fun (_y : unit) -> _loop (_x - 1) _s)
     in
@@ -1135,8 +1116,8 @@
   
   let _test_incr =
    fun (_n : int) ->
-    let rec _loop_incr _x =
-     fun (_x : int) -> if _x = 0 then _x else _loop_incr (_x - 1) (_x + 1)
+    let rec _loop_incr _x (_x : int) =
+      if _x = 0 then _x else _loop_incr (_x - 1) (_x + 1)
     in
     _loop_incr _n 0
   
@@ -1154,9 +1135,9 @@
    fun (_n : int) ->
     let rec _loop_incr' (_x, _k) =
       if _x = 0 then _k ()
-      else _loop_incr' (_x - 1, fun (_ : unit) -> fun (_x : int) -> _k () (_x + 1))
+      else _loop_incr' (_x - 1, fun (_ : unit) (_x : int) -> _k () (_x + 1))
     in
-    _loop_incr' (_n, fun (_x : unit) -> fun (_x : int) -> _x) 0
+    _loop_incr' (_n, fun (_x : unit) (_x : int) -> _x) 0
   
   let test_incr' = _test_incr'
   
@@ -1176,8 +1157,8 @@
   
   let _test_state =
    fun (_n : int) ->
-    let rec _loop_state _x =
-     fun (_x : int) -> if _x = 0 then _x else _loop_state (_x - 1) (_x + 1)
+    let rec _loop_state _x (_x : int) =
+      if _x = 0 then _x else _loop_state (_x - 1) (_x + 1)
     in
     _loop_state _n 0
   
@@ -1205,8 +1186,7 @@
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  let rec _map _x =
-   fun (_x : 'ty list) ->
+  let rec _map _x (_x : 'ty list) =
     begin match _x with
     | [] -> Value []
     | _x :: _xs ->
@@ -1403,7 +1383,7 @@
   
   let _k =
    fun (_b : int) ->
-    let rec _a (_x, _y) = fun (_z : int) -> _x + _y + _z + _b in
+    let rec _a (_x, _y) (_z : int) = _x + _y + _z + _b in
     _a
   
   let k = _k
@@ -1430,7 +1410,7 @@
   type (_, _) eff_internal_effect +=
     | Write : (string * string, unit) eff_internal_effect
   
-  let _a = fun (_b : bool) -> fun (_c : bool) -> _b && _c
+  let _a = fun (_b : bool) (_c : bool) -> _b && _c
   let a = _a
   ======================================================================
   codegen/original.eff
@@ -1512,42 +1492,41 @@
   type (_, _) eff_internal_effect += B : (unit, unit) eff_internal_effect
   
   let _g =
-   fun (_c : unit -> 'ty computation) ->
-    fun (_b : bool) ->
-     if _b then
-       (handler
-          {
-            value_clause = (fun (_id : 'ty) -> Value _id);
-            effect_clauses =
-              (fun (type a)
-                (type b)
-                (eff : (a, b) eff_internal_effect)
-                :
-                (a -> (b -> _) -> _)
-              ->
-                match eff with
-                | A -> fun (() : unit) _k -> _k ()
-                | eff' -> fun arg k -> Call (eff', arg, k));
-          }
-          (fun (_x : 'ty) -> Value _x))
-         (_c ())
-     else
-       (handler
-          {
-            value_clause = (fun (_id : 'ty) -> Value _id);
-            effect_clauses =
-              (fun (type a)
-                (type b)
-                (eff : (a, b) eff_internal_effect)
-                :
-                (a -> (b -> _) -> _)
-              ->
-                match eff with
-                | B -> fun (() : unit) _k -> _k ()
-                | eff' -> fun arg k -> Call (eff', arg, k));
-          }
-          (fun (_x : 'ty) -> Value _x))
-         (_c ())
+   fun (_c : unit -> 'ty computation) (_b : bool) ->
+    if _b then
+      (handler
+         {
+           value_clause = (fun (_id : 'ty) -> Value _id);
+           effect_clauses =
+             (fun (type a)
+               (type b)
+               (eff : (a, b) eff_internal_effect)
+               :
+               (a -> (b -> _) -> _)
+             ->
+               match eff with
+               | A -> fun (() : unit) _k -> _k ()
+               | eff' -> fun arg k -> Call (eff', arg, k));
+         }
+         (fun (_x : 'ty) -> Value _x))
+        (_c ())
+    else
+      (handler
+         {
+           value_clause = (fun (_id : 'ty) -> Value _id);
+           effect_clauses =
+             (fun (type a)
+               (type b)
+               (eff : (a, b) eff_internal_effect)
+               :
+               (a -> (b -> _) -> _)
+             ->
+               match eff with
+               | B -> fun (() : unit) _k -> _k ()
+               | eff' -> fun arg k -> Call (eff', arg, k));
+         }
+         (fun (_x : 'ty) -> Value _x))
+        (_c ())
   
   let g = _g
   
@@ -1599,8 +1578,7 @@
   let _absurd = fun (_void : 'ty) -> match _void with _ -> assert false
   let absurd = _absurd
   
-  let rec _op (* @ *) _x =
-   fun (_ys : 'ty list) ->
+  let rec _op (* @ *) _x (_ys : 'ty list) =
     begin match _x with [] -> _ys | _x :: _xs -> _x :: _op (* @ *) _xs _ys
     end
   
@@ -1850,8 +1828,7 @@
   
   type intlist = IntNil | IntCons of (int * intlist);;
   
-  let rec _concat _x =
-   fun (_x : intlist) ->
+  let rec _concat _x (_x : intlist) =
     begin match _x with
     | IntNil -> _x
     | IntCons (_z, _zs) -> IntCons (_z, _concat _zs _x)
@@ -1896,8 +1873,7 @@
   
   type intlist = IntNil | IntCons of (int * intlist);;
   
-  let rec _concat _x =
-   fun (_x : intlist) ->
+  let rec _concat _x (_x : intlist) =
     begin match _x with
     | IntNil -> _x
     | IntCons (_z, _zs) -> IntCons (_z, _concat _zs _x)
@@ -1936,8 +1912,7 @@
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
   type intlist = IntNil | IntCons of (int * intlist);;
   
-  let rec _concat _x =
-   fun (_x : intlist) ->
+  let rec _concat _x (_x : intlist) =
     begin match _x with
     | IntNil -> _x
     | IntCons (_z, _zs) -> IntCons (_z, _concat _zs _x)
@@ -2019,8 +1994,7 @@
   let _absurd = fun (_void : 'ty) -> match _void with _ -> assert false
   let absurd = _absurd
   
-  let rec _op (* @ *) _x =
-   fun (_ys : solutions) ->
+  let rec _op (* @ *) _x (_ys : solutions) =
     begin match _x with
     | SolutionsNil -> _ys
     | SolutionsCons (_x, _xs) -> SolutionsCons (_x, _op (* @ *) _xs _ys)
@@ -2029,14 +2003,12 @@
   let _op (* @ *) = _op (* @ *)
   
   let _no_attack =
-   fun ((_x, _y) : int * int) ->
-    fun ((_x', _y') : int * int) ->
-     _x <> _x' && _y <> _y' && abs (_x - _x') <> abs (_y - _y')
+   fun ((_x, _y) : int * int) ((_x', _y') : int * int) ->
+    _x <> _x' && _y <> _y' && abs (_x - _x') <> abs (_y - _y')
   
   let no_attack = _no_attack
   
-  let rec _not_attacked _x =
-   fun (_qs : solution) ->
+  let rec _not_attacked _x (_qs : solution) =
     begin match _qs with
     | SolutionEmpty -> true
     | SolutionPlace (_x, _xs) -> _no_attack _x _x && _not_attacked _x _xs
@@ -2045,16 +2017,14 @@
   let not_attacked = _not_attacked
   
   let _available =
-   fun (_number_of_queens : int) ->
-    fun (_x : int) ->
-     fun (_qs : solution) ->
-      let rec _loop (_possible, _y) =
-        if _y < 1 then _possible
-        else if _not_attacked (_x, _y) _qs then
-          _loop (RowsCons (_y, _possible), _y - 1)
-        else _loop (_possible, _y - 1)
-      in
-      _loop (RowsEmpty, _number_of_queens)
+   fun (_number_of_queens : int) (_x : int) (_qs : solution) ->
+    let rec _loop (_possible, _y) =
+      if _y < 1 then _possible
+      else if _not_attacked (_x, _y) _qs then
+        _loop (RowsCons (_y, _possible), _y - 1)
+      else _loop (_possible, _y - 1)
+    in
+    _loop (RowsEmpty, _number_of_queens)
   
   let available = _available
   
@@ -2141,8 +2111,7 @@
           coer_arrow coer_refl_ty (coer_return coer_refl_ty)
             (fun (_ : unit -> solution computation) -> _qs)
         else
-          let rec _choose _x =
-           fun (_x : unit -> solution computation) ->
+          let rec _choose _x (_x : unit -> solution computation) =
             begin match _x with
             | RowsEmpty -> _x ()
             | RowsCons (_x, _xs') ->
@@ -2211,8 +2180,8 @@
   
   let _testGenerator =
    fun (_m : int) ->
-    let rec _sum _x =
-     fun (_x : int) -> if _x = 0 then _x else _sum (_x - 1) (_x + (_x mod 42))
+    let rec _sum _x (_x : int) =
+      if _x = 0 then _x else _sum (_x - 1) (_x + (_x mod 42))
     in
     _sum _m _m
   
@@ -2625,9 +2594,7 @@
   type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
   type (_, _) eff_internal_effect += Put : (int, unit) eff_internal_effect;;
   
-  let rec _loop _x =
-   fun (_x : int) -> if 0 < _x then _loop (_x - 1) (_x + 1) else ()
-  in
+  let rec _loop _x (_x : int) = if 0 < _x then _loop (_x - 1) (_x + 1) else () in
   _loop 10 0
   ======================================================================
   codegen/test17.eff
@@ -2680,8 +2647,7 @@
   
   type nat = Zero | Succ of nat;;
   
-  let rec _add _x =
-   fun (_x : nat) ->
+  let rec _add _x (_x : nat) =
     begin match _x with Zero -> _x | Succ _n -> Succ (_add _x _n)
     end
   in
@@ -2711,14 +2677,13 @@
   
   type nat = Zero | Succ of nat;;
   
-  fun ((_w, _k, _num) : nat * nat * int) ->
-    fun (_x : nat * nat * int) ->
-     begin match _x with
-     | Zero, Zero, 0 -> (_w, _k, Zero, 0, 0)
-     | Zero, _z, _n -> (Zero, _z, Zero, _num, _n)
-     | _x, Zero, _n -> (Zero, _w, _x, 1, _n)
-     | _, _, _ -> (Zero, Zero, Zero, 0, 0)
-     end
+  fun ((_w, _k, _num) : nat * nat * int) (_x : nat * nat * int) ->
+    begin match _x with
+    | Zero, Zero, 0 -> (_w, _k, Zero, 0, 0)
+    | Zero, _z, _n -> (Zero, _z, Zero, _num, _n)
+    | _x, Zero, _n -> (Zero, _w, _x, 1, _n)
+    | _, _, _ -> (Zero, Zero, Zero, 0, 0)
+    end
   ======================================================================
   codegen/test2.eff
   ----------------------------------------------------------------------
@@ -3026,8 +2991,7 @@
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
   type intlist = IntNil | IntCons of (int * intlist)
   
-  let rec _concat _x =
-   fun (_x : intlist) ->
+  let rec _concat _x (_x : intlist) =
     begin match _x with
     | IntNil -> _x
     | IntCons (_z, _zs) -> IntCons (_z, _concat _zs _x)
@@ -3066,12 +3030,11 @@
    fun (_k : int) ->
     let _leaf = fun (_a : int) -> Node (Empty, _a * _k, Empty) in
     let _bot =
-     fun (_t : tree) ->
-      fun (_t2 : tree) ->
-       Node
-         ( Node (Node (_t, 0, _t2), 2, _leaf 13),
-           5,
-           Node (_leaf 9, 7, Node (_t2, 3, Node (_leaf 3, 5, _t2))) )
+     fun (_t : tree) (_t2 : tree) ->
+      Node
+        ( Node (Node (_t, 0, _t2), 2, _leaf 13),
+          5,
+          Node (_leaf 9, 7, Node (_t2, 3, Node (_leaf 3, 5, _t2))) )
     in
     _bot
       (Node (_bot (_leaf 3) (_leaf 4), 10, _bot (_leaf 1) (_leaf 3)))
@@ -3080,7 +3043,7 @@
          (_leaf 10))
   
   let tester = _tester
-  let _max = fun (_a : 'ty) -> fun (_b : 'ty) -> if _a > _b then _a else _b
+  let _max = fun (_a : 'ty) (_b : 'ty) -> if _a > _b then _a else _b
   let max = _max
   
   let _effect_max =
@@ -3103,15 +3066,14 @@
   let effect_max = _effect_max
   let _test_max = _effect_max
   let test_max = _test_max
-  let _op = fun (_x : int) -> fun (_y : int) -> _x - (3 * _y)
+  let _op = fun (_x : int) (_y : int) -> _x - (3 * _y)
   let op = _op
-  let _max = fun (_a : 'ty) -> fun (_b : 'ty) -> if _a > _b then _a else _b
+  let _max = fun (_a : 'ty) (_b : 'ty) -> if _a > _b then _a else _b
   let max = _max
   
   type intlist = Nil | Cons of (int * intlist)
   
-  let rec _op (* @ *) _x =
-   fun (_ys : intlist) ->
+  let rec _op (* @ *) _x (_ys : intlist) =
     begin match _x with
     | Nil -> _ys
     | Cons (_x, _xs) -> Cons (_x, _op (* @ *) _xs _ys)
@@ -3121,8 +3083,7 @@
   
   let _test_general =
    fun (_m : int) ->
-    let rec _maxl _x =
-     fun (_x : intlist) ->
+    let rec _maxl _x (_x : intlist) =
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
@@ -3144,14 +3105,12 @@
   
   let _test_general_loop =
    fun (_m : int) ->
-    let rec _maxl _x =
-     fun (_x : intlist) ->
+    let rec _maxl _x (_x : intlist) =
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let ____t = _tester _m in
-    let rec _looper _x =
-     fun (_s : int) ->
+    let rec _looper _x (_s : int) =
       if _x = 0 then _s
       else
         let rec _explore (_x, _k) =
@@ -3180,13 +3139,11 @@
   
   let _test_leaf_state =
    fun (_m : int) ->
-    let rec _maxl _x =
-     fun (_x : intlist) ->
+    let rec _maxl _x (_x : intlist) =
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
-    let rec _populate_leafs _x =
-     fun (_n : int) ->
+    let rec _populate_leafs _x (_n : int) =
       if _x = _n then Nil else Cons (_x * 3, _populate_leafs (_x + 1) _n)
     in
     let rec _explore (_x, _k) =
@@ -3297,19 +3254,16 @@
   
   let _test_leaf_state_loop =
    fun (_m : int) ->
-    let rec _maxl _x =
-     fun (_x : intlist) ->
+    let rec _maxl _x (_x : intlist) =
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
-    let rec _populate_leafs _x =
-     fun (_n : int) ->
+    let rec _populate_leafs _x (_n : int) =
       if _x = _n then Nil else Cons (_x * 3, _populate_leafs (_x + 1) _n)
     in
     let ____leafs = _populate_leafs 0 154 in
     let ____t = _tester _m in
-    let rec _looper _x =
-     fun (_s : int) ->
+    let rec _looper _x (_s : int) =
       if _x = 0 then _s
       else
         let rec _explore (_x, _k) =
@@ -3426,8 +3380,7 @@
   
   let _test_leaf_state_update =
    fun (_m : int) ->
-    let rec _maxl _x =
-     fun (_x : intlist) ->
+    let rec _maxl _x (_x : intlist) =
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
@@ -3448,8 +3401,7 @@
                 _k false >>= fun _b -> Value (_op (* @ *) _b _b) )
       end
     in
-    let rec _explore (_x, _k) =
-     fun (_x : int) ->
+    let rec _explore (_x, _k) (_x : int) =
       begin match _x with
       | Empty ->
           (closed_handler
@@ -3523,14 +3475,12 @@
   
   let _test_leaf_state_update_loop =
    fun (_m : int) ->
-    let rec _maxl _x =
-     fun (_x : intlist) ->
+    let rec _maxl _x (_x : intlist) =
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let ____t = _tester _m in
-    let rec _looper _x =
-     fun (_s : int) ->
+    let rec _looper _x (_s : int) =
       if _x = 0 then _s
       else
         let rec _explore (_x, _k) =
@@ -3550,8 +3500,7 @@
                     _k false >>= fun _b -> Value (_op (* @ *) _b _b) )
           end
         in
-        let rec _explore (_x, _k) =
-         fun (_x : int) ->
+        let rec _explore (_x, _k) (_x : int) =
           begin match _x with
           | Empty ->
               (closed_handler
@@ -3632,13 +3581,11 @@
   
   let _test_leaf_state_update_merged_handler =
    fun (_m : int) ->
-    let rec _maxl _x =
-     fun (_x : intlist) ->
+    let rec _maxl _x (_x : intlist) =
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
-    let rec _explore (_x, _k) =
-     fun (_x : int) ->
+    let rec _explore (_x, _k) (_x : int) =
       begin match _x with
       | Empty -> _k _x _x
       | Node (_left, _x, _right) ->
@@ -3653,7 +3600,7 @@
     in
     _maxl 0
       (_explore
-         (_tester _m, fun (_x : int) -> fun (_ : int) -> Cons (_x, Nil))
+         (_tester _m, fun (_x : int) (_ : int) -> Cons (_x, Nil))
          (( ~- ) 1))
   
   let test_leaf_state_update_merged_handler =
@@ -3661,18 +3608,15 @@
   
   let _test_leaf_state_update_merged_handler_loop =
    fun (_m : int) ->
-    let rec _maxl _x =
-     fun (_x : intlist) ->
+    let rec _maxl _x (_x : intlist) =
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
     let ____t = _tester _m in
-    let rec _looper _x =
-     fun (_s : int) ->
+    let rec _looper _x (_s : int) =
       if _x = 0 then _s
       else
-        let rec _explore (_x, _k) =
-         fun (_x : int) ->
+        let rec _explore (_x, _k) (_x : int) =
           begin match _x with
           | Empty -> _k _x _x
           | Node (_left, _x, _right) ->
@@ -3689,7 +3633,7 @@
           (_s
           + _maxl 0
               (_explore
-                 (____t, fun (_x : int) -> fun (_ : int) -> Cons (_x, Nil))
+                 (____t, fun (_x : int) (_ : int) -> Cons (_x, Nil))
                  (( ~- ) 1)))
     in
     _looper 100 0
@@ -3722,8 +3666,7 @@
   type (_, _) eff_internal_effect += Decide : (unit, bool) eff_internal_effect
   type int_list = Nil | Cons of (int * int_list);;
   
-  let rec _op (* @ *) _x =
-   fun (_ys : int_list) ->
+  let rec _op (* @ *) _x (_ys : int_list) =
     begin match _x with
     | Nil -> _ys
     | Cons (_x, _xs) -> Cons (_x, _op (* @ *) _xs _ys)

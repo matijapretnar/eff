@@ -201,8 +201,11 @@ let rec pp_term ?max_level ?(top_level = false) state noEff_term ppf =
   | NVariant (l, Some t1) ->
       print ~at_level:1 "%t @[<hov>%t@]" (pp_label l)
         (pp_term state ~max_level:0 t1)
-  | NFun abs_ty ->
-      print ~at_level:2 "@[<hv 2>fun %t@]" (pp_abs_with_ty state abs_ty)
+  | NFun (p, ty, t) ->
+      let params, body = fun_params t in
+      print ~at_level:2 "@[<hv 2>fun %t ->@ %t@]"
+        (pp_params state ((p, ty) :: params))
+        (pp_term state body)
   | NApplyTerm (t1, t2) ->
       print ~at_level:1 "@[<hov 2>%t @,%t@]"
         (pp_term state ~max_level:1 t1)
@@ -293,21 +296,37 @@ let rec pp_term ?max_level ?(top_level = false) state noEff_term ppf =
 and pp_abs state (p, t) ppf =
   print ppf "@[<h> %t ->@ %t@]" (pp_pattern state p) (pp_term state t)
 
+(* The parameters of the functions directly in [t] and their body. OCaml
+   compiles [fun x -> fun y -> e] as a function of one argument that returns
+   a closure, so the parameters are printed together, as [fun x y -> e]. *)
+and fun_params = function
+  | NFun (p, ty, t) ->
+      let params, body = fun_params t in
+      ((p, ty) :: params, body)
+  | t -> ([], t)
+
+and pp_params state params ppf =
+  pp_sequence " "
+    (fun (p, ty) ppf -> print ppf "(%t: %t)" (pp_pattern state p) (pp_type ty))
+    params ppf
+
 and pp_abs_with_ty state (p, ty, t) ppf =
   print ppf "@[<h>(%t: %t) ->@ %t@]" (pp_pattern state p) (pp_type ty)
     (pp_term state t)
 
 and pp_let_rec state lst ppf =
   let pp_let_rec_def (x, (p, t)) ppf =
-    print ppf "%t %t = @,%t" (pp_variable state x) (pp_pattern state p)
-      (pp_term state t)
+    let params, body = fun_params t in
+    print ppf "%t %t %t = @,%t" (pp_variable state x) (pp_pattern state p)
+      (pp_params state params) (pp_term state body)
   in
   pp_lets "let rec" pp_let_rec_def (Assoc.to_list lst) ppf
 
 and pp_top_let_rec state lst ppf =
   let pp_top_let_rec_def (x, (ws, (p, t))) ppf =
-    print ppf "%t %t %t = @,%t" (pp_variable state x) (pp_coercion_vars ws)
-      (pp_pattern state p) (pp_term state t)
+    let params, body = fun_params t in
+    print ppf "%t %t %t %t = @,%t" (pp_variable state x) (pp_coercion_vars ws)
+      (pp_pattern state p) (pp_params state params) (pp_term state body)
   in
   pp_lets "let rec" pp_top_let_rec_def lst ppf
 
