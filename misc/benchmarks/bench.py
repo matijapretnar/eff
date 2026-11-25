@@ -79,11 +79,6 @@ EFF_VARIANTS = {
     "eff-handlers-noopt": ["--no-opts", "--compile-ocaml-handlers"],
 }
 
-# Changes to the suite's Eff programs until upstream has them: a user effect
-# may not have the name of a built-in effect.
-EFF_RENAMES = {"parsing_dollars": [("Read", "ReadChar")]}
-
-
 def log(msg):
     print(msg, file=sys.stderr, flush=True)
 
@@ -117,14 +112,6 @@ def ocamlopt(files, switch, d, effects=False):
     return None
 
 
-def rename_effects(benchmark, source):
-    for old, new in EFF_RENAMES.get(benchmark, []):
-        source = source.replace(f"({old} ", f"({new} ").replace(
-            f"effect {old} ", f"effect {new} "
-        )
-    return source
-
-
 def build(benchmark, variant, args, build_dir):
     """Builds one variant and returns its executable, or None with a log."""
     d = build_dir / benchmark / variant
@@ -142,8 +129,7 @@ def build(benchmark, variant, args, build_dir):
         error = ocamlopt(["main.ml"], args.switch, d, effects=True)
     else:
         eff_dir = suite / "eff" / benchmark
-        source = rename_effects(benchmark, (eff_dir / "main.eff").read_text())
-        (d / "main.eff").write_text(source)
+        shutil.copy(eff_dir / "main.eff", d / "main.eff")
         shutil.copy(eff_dir / "wrapper.ml", d / "wrapper.ml")
         flags = ["--no-stdlib"] + EFF_VARIANTS[variant]
         with open(d / "generated.ml", "w") as out:
