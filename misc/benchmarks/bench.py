@@ -51,6 +51,13 @@ SIZES = {
 
 BASELINE = "native-pure"
 
+# quick tests the whole pipeline in a few minutes. full is for the graphs and
+# takes hours. Options on the command line override these values.
+PROFILES = {
+    "quick": {"sizes": 2, "runs": 3, "warmup": 1, "timeout": 10},
+    "full": {"sizes": None, "runs": None, "warmup": 2, "timeout": 120},
+}
+
 EFF_VARIANTS = {
     "eff-plain": ["--compile-plain-ocaml"],
     "eff-plain-noopt": ["--no-opts", "--compile-plain-ocaml"],
@@ -155,12 +162,27 @@ def run_once(exe, size, timeout):
 def hyperfine(benchmark, size, exes, args, json_dir):
     out = json_dir / f"{benchmark}-{size}.json"
     cmd = ["hyperfine", "-N", "--style", "basic"]
-    cmd += ["--warmup", str(args.warmup), "--min-runs", str(args.runs)]
+    cmd += ["--warmup", str(args.warmup)]
+    # Without a fixed number of runs, hyperfine makes at least 10 runs and
+    # runs for at least 3 seconds.
+    if args.runs:
+        cmd += ["--runs", str(args.runs)]
     cmd += ["--export-json", str(out)]
     for variant, exe in exes.items():
         cmd += ["-n", variant, f"{exe} {size}"]
     subprocess.run(cmd, check=True, stdout=sys.stderr)
-    return {r["command"]: r for r in json.loads(out.read_text())["results"]}
+    return {r["name"]: measurement(r) for r in json.loads(out.read_text())["results"]}
+
+
+def measurement(result):
+    """The wall-clock times, instructions and peak memory of one variant, in
+    the format of hyperfine 2. Instructions vary much less between runs than
+    times."""
+    summary = result["summary"]
+    m = {k: summary["time_wall_clock"][k] for k in ("mean", "stddev", "min", "max")}
+    m["instructions"] = summary.get("instructions", {}).get("mean", "")
+    m["peak_rss"] = summary.get("memory_peak_resident", {}).get("max", "")
+    return m
 
 
 def main():
@@ -171,14 +193,18 @@ def main():
     p.add_argument("--out", type=Path, default=HERE / "_results")
     p.add_argument("--only", help="comma-separated benchmarks")
     p.add_argument("--variants", help="comma-separated variants")
-    p.add_argument("--timeout", type=float, default=60, help="seconds per run")
-    p.add_argument("--warmup", type=int, default=1)
-    p.add_argument("--runs", type=int, default=5, help="minimum runs")
-    p.add_argument("--quick", action="store_true", help="smallest size only")
+    p.add_argument("--profile", choices=PROFILES, default="quick")
+    p.add_argument("--timeout", type=float, help="seconds per check run")
+    p.add_argument("--warmup", type=int, help="hyperfine warm-up runs")
+    p.add_argument("--runs", type=int, help="hyperfine runs per variant")
+    p.add_argument("--sizes", type=int, help="number of smallest sizes to use")
     p.add_argument(
         "--check-only", action="store_true", help="one timed run, no hyperfine"
     )
     args = p.parse_args()
+    for key, value in PROFILES[args.profile].items():
+        if getattr(args, key) is None:
+            setattr(args, key, value)
     args.eff = args.eff.resolve()
     args.suite = args.suite.resolve()
 
@@ -200,12 +226,12 @@ def main():
                 exes[variant] = exe
             else:
                 log(f"{benchmark} {variant}: build failed: {error.splitlines()[0]}")
-                rows.append([benchmark, "", variant, "build-failed"] + [""] * 5)
+                rows.append([benchmark, "", variant, "build-failed"] + [""] * 7)
         if BASELINE not in exes:
             log(f"{benchmark}: no baseline, skipped")
             continue
 
-        sizes = SIZES[benchmark][:1] if args.quick else SIZES[benchmark]
+        sizes = SIZES[benchmark][: args.sizes]
         for size in sizes:
             status, expected, _ = run_once(exes[BASELINE], size, args.timeout)
             if status != "ok":
@@ -220,7 +246,7 @@ def main():
                     passing[variant] = (exe, elapsed)
                 else:
                     log(f"{benchmark} {size} {variant}: {status} {output or ''}")
-                    rows.append([benchmark, size, variant, status] + [""] * 5)
+                    rows.append([benchmark, size, variant, status] + [""] * 7)
                     del exes[variant]
             if args.check_only:
                 # The time of the single run of the check, without statistics
@@ -229,7 +255,7 @@ def main():
                     rows.append(
                         [benchmark, size, variant, "checked", f"{elapsed:.6f}"]
                         + [""] * 3
-                        + [f"{elapsed / base:.3f}"]
+                        + [f"{elapsed / base:.3f}", "", ""]
                     )
                 continue
             exes_passing = {v: exe for v, (exe, _) in passing.items()}
@@ -240,7 +266,7 @@ def main():
                 rows.append(
                     [benchmark, size, variant, "ok"]
                     + [f"{r[k]:.6f}" for k in ("mean", "stddev", "min", "max")]
-                    + [f"{r['mean'] / base:.3f}"]
+                    + [f"{r['mean'] / base:.3f}", r["instructions"], r["peak_rss"]]
                 )
 
     with open(args.out / "summary.csv", "w", newline="") as f:
@@ -248,6 +274,7 @@ def main():
         w.writerow(
             ["benchmark", "size", "variant", "status"]
             + ["mean_s", "stddev_s", "min_s", "max_s", "ratio"]
+            + ["instructions", "peak_rss_bytes"]
         )
         w.writerows(rows)
     log(f"wrote {args.out / 'summary.csv'}")
