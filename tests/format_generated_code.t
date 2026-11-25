@@ -3699,6 +3699,199 @@
   let test_leaf_state_update_merged_handler_loop =
     _test_leaf_state_update_merged_handler_loop
   ======================================================================
+  codegen/tree_explore_nested.eff
+  ----------------------------------------------------------------------
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | RandomFloat : (float, float) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | Write : (string * string, unit) eff_internal_effect
+  
+  type (_, _) eff_internal_effect += Choose : (unit, bool) eff_internal_effect
+  type (_, _) eff_internal_effect += Get : (unit, int) eff_internal_effect
+  type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
+  type tree = Leaf | Node of (tree * int * tree)
+  type intlist = Nil | Cons of (int * intlist)
+  
+  let _operator = fun (_x : int) (_y : int) -> abs (_x - (503 * _y) + 37) mod 1009
+  let operator = _operator
+  
+  let rec _op (* @ *) _x (_ys : intlist) =
+    begin match _x with
+    | Nil -> _ys
+    | Cons (_x, _xs) -> Cons (_x, _op (* @ *) _xs _ys)
+    end
+  
+  let _op (* @ *) = _op (* @ *)
+  
+  let rec _make _x =
+    begin match _x with
+    | 0 -> Leaf
+    | _n ->
+        let _t = _make (_n - 1) in
+        Node (_t, _n, _t)
+    end
+  
+  let make = _make
+  let _max = fun (_a : 'ty) (_b : 'ty) -> if _a > _b then _a else _b
+  let max = _max
+  
+  let rec _maxl _x (_x : intlist) =
+    begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
+    end
+  
+  let maxl = _maxl
+  
+  let _run =
+   fun (_n : int) ->
+    let rec _loop _x =
+      if _x = 0 then fun (_s : int) -> _s
+      else
+        let _b = _maxl 0 in
+        let rec _explore _x (_k : int -> intlist computation) =
+          begin match _x with
+          | Leaf -> Call (Get, (), fun (_y : int) -> _k _y)
+          | Node (_l, _v, _r) ->
+              let _k =
+               fun (_y : bool) ->
+                if _y then
+                  Call
+                    ( Get,
+                      (),
+                      fun (_y : int) ->
+                        Call
+                          ( Set,
+                            abs (_y - (503 * _v) + 37) mod 1009,
+                            fun (_y : unit) ->
+                              _explore _l (fun (_b : int) ->
+                                  _k (abs (_v - (503 * _b) + 37) mod 1009)) ) )
+                else
+                  Call
+                    ( Get,
+                      (),
+                      fun (_y : int) ->
+                        Call
+                          ( Set,
+                            abs (_y - (503 * _v) + 37) mod 1009,
+                            fun (_y : unit) ->
+                              _explore _r (fun (_b : int) ->
+                                  _k (abs (_v - (503 * _b) + 37) mod 1009)) ) )
+              in
+              _k true >>= fun _b ->
+              _k false >>= fun _b -> Value (_op (* @ *) _b _b)
+          end
+        in
+        let _k = fun (_x : int) -> Value (Cons (_x, Nil)) in
+        begin match _make _n with
+        | Leaf ->
+            fun (_s : int) ->
+              (closed_handler
+                 {
+                   value_clause =
+                     (fun (_b : intlist) ->
+                       fun (_ : int) -> _loop (_x - 1) (_b _b));
+                   effect_clauses =
+                     (fun (type a)
+                       (type b)
+                       (eff : (a, b) eff_internal_effect)
+                       :
+                       (a -> (b -> _) -> _)
+                     ->
+                       match eff with
+                       | Get -> fun (() : unit) _k -> fun (_s : int) -> _k _s _s
+                       | Set -> fun (_s : int) _k -> fun (_ : int) -> _k () _s
+                       | _ -> fun _ _ -> assert false);
+                 }
+                 (fun (_x : int -> int) -> _x))
+                (_k _s) _s
+        | Node (_l, _v, _r) ->
+            let _k =
+             fun (_y : bool) ->
+              if _y then
+                Call
+                  ( Get,
+                    (),
+                    fun (_y : int) ->
+                      Call
+                        ( Set,
+                          abs (_y - (503 * _v) + 37) mod 1009,
+                          fun (_y : unit) ->
+                            _explore _l (fun (_b : int) ->
+                                _k (abs (_v - (503 * _b) + 37) mod 1009)) ) )
+              else
+                Call
+                  ( Get,
+                    (),
+                    fun (_y : int) ->
+                      Call
+                        ( Set,
+                          abs (_y - (503 * _v) + 37) mod 1009,
+                          fun (_y : unit) ->
+                            _explore _r (fun (_b : int) ->
+                                _k (abs (_v - (503 * _b) + 37) mod 1009)) ) )
+            in
+            (closed_handler
+               {
+                 value_clause =
+                   (fun (_b : intlist) ->
+                     (closed_handler
+                        {
+                          value_clause =
+                            (fun (_b : intlist) ->
+                              fun (_ : int) ->
+                               _loop (_x - 1) (_b (_op (* @ *) _b _b)));
+                          effect_clauses =
+                            (fun (type a)
+                              (type b)
+                              (eff : (a, b) eff_internal_effect)
+                              :
+                              (a -> (b -> _) -> _)
+                            ->
+                              match eff with
+                              | Get ->
+                                  fun (() : unit) _k -> fun (_s : int) -> _k _s _s
+                              | Set ->
+                                  fun (_s : int) _k -> fun (_ : int) -> _k () _s
+                              | _ -> fun _ _ -> assert false);
+                        }
+                        (fun (_x : int -> int) -> _x))
+                       (_k false));
+                 effect_clauses =
+                   (fun (type a)
+                     (type b)
+                     (eff : (a, b) eff_internal_effect)
+                     :
+                     (a -> (b -> _) -> _)
+                   ->
+                     match eff with
+                     | Get -> fun (() : unit) _k -> fun (_s : int) -> _k _s _s
+                     | Set -> fun (_s : int) _k -> fun (_ : int) -> _k () _s
+                     | _ -> fun _ _ -> assert false);
+               }
+               (fun (_x : int -> int) -> _x))
+              (_k true)
+        end
+    in
+    _loop 10 0
+  
+  let run = _run
+  let _x = _run 5
+  let x = _x
+  ======================================================================
   codegen/two_inputs.eff
   ----------------------------------------------------------------------
   (* primitive effect *)

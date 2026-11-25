@@ -1,0 +1,54 @@
+(* tree_explore of effect-handlers-bench with a separate state handler around
+   the choice handler, as one would write it, instead of the two handlers
+   merged by hand. The state is not restored on backtracking. The optimiser
+   does not yet combine the two handlers, so the state handler stays. run 5
+   is 946. *)
+effect Choose : unit -> bool
+effect Get : unit -> int
+effect Set : int -> unit
+
+type tree = Leaf | Node of tree * int * tree
+type intlist = Nil | Cons of (int * intlist)
+
+let operator x y = abs (x - (503 * y) + 37) mod 1009
+
+let rec ( @ ) xs ys =
+  match xs with
+  | Nil -> ys
+  | Cons (x, xs) -> Cons (x, xs @ ys)
+
+let rec make = function
+  | 0 -> Leaf
+  | n -> let t = make (n - 1) in Node (t, n, t)
+
+let max a b = if a > b then a else b
+
+let rec maxl acc = function
+  | Nil -> acc
+  | Cons (x, xs) -> maxl (max x acc) xs
+
+let run n =
+  let tree = make n in
+  let rec explore t =
+    match t with
+    | Leaf -> perform (Get ())
+    | Node (l, v, r) ->
+        let next = if perform (Choose ()) then l else r in
+        perform (Set (operator (perform (Get ())) v));
+        operator v (explore next)
+  in
+  let paths () =
+    handle explore tree with
+    | y -> Cons (y, Nil)
+    | effect (Choose ()) k -> k true @ k false
+  in
+  let rec loop i =
+    if i = 0 then perform (Get ())
+    else (perform (Set (maxl 0 (paths ()))); loop (i - 1))
+  in
+  (handle loop 10 with
+  | y -> fun _ -> y
+  | effect (Get ()) k -> fun s -> k s s
+  | effect (Set s) k -> fun _ -> k () s) 0
+
+let x = run 5
