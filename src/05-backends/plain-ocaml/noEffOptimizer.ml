@@ -234,16 +234,6 @@ and beta_reduce state ((_, trm1) as abs) trm2 =
   | NotPresent, _ -> trm1
   | NotInlinable, _ -> NoEff.NLet (trm2, abs)
 
-and is_letrec_unused _state defs t =
-  let vars = NoEff.free_vars t in
-  if
-    List.for_all
-      (fun v ->
-        NoEff.Variable.Map.find_opt v vars |> Option.value ~default:0 = 0)
-      (Assoc.keys_of defs)
-  then true
-  else false
-
 and reduce_term' state (n_term : NoEff.n_term) =
   (* Print.debug "Reducing noeff term: %t" (NoEff.print_term n_term); *)
   match n_term with
@@ -262,7 +252,7 @@ and reduce_term' state (n_term : NoEff.n_term) =
             if is_fun c then (v, (p, c)) else (v, (p, naive_lambda_lift state c)))
           defs
       in
-      if is_letrec_unused state defs t then t else NoEff.NLetRec (defs, t)
+      NoEff.NLetRec (defs, t)
   | NApplyTerm (NFun (p, _, c), t) -> beta_reduce state (p, c) t
   | NApplyTerm (NLetRec (e, t), t2) -> NLetRec (e, NApplyTerm (t, t2))
   | NMatch _ -> naive_lambda_lift state n_term

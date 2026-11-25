@@ -894,8 +894,6 @@
     let rec _loop_incr' (_x, _k) =
       if _x = 0 then _k ()
       else _loop_incr' (_x - 1, fun (_ : unit) -> fun (_x : int) -> _k () (_x + 1))
-    and _loop_incr _x =
-     fun (_x : int) -> if _x = 0 then _x else _loop_incr (_x - 1) (_x + 1)
     in
     _loop_incr' (_n, fun (_x : unit) -> fun (_x : int) -> _x) 0
   

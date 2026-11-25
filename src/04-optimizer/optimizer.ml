@@ -77,16 +77,31 @@ let abstraction_inlinability { term = pat, comp; _ } =
       in
       Term.Variable.Map.fold aux (Term.pattern_vars pat) NotPresent
 
+(* The definitions of a [let rec] that its body [comp] calls, directly or
+   through each other. A definition that only calls itself is not used. *)
 let keep_used_bindings defs comp =
-  (* Do proper call graph analysis *)
-  let free_vars_comp = Term.free_vars_comp comp in
-  let free_vars_defs =
-    List.map (fun (_, a) -> Term.free_vars_abs a) (Assoc.to_list defs)
+  let defs = Assoc.to_list defs in
+  let rec reach used fvs =
+    let used' =
+      List.filter
+        (fun (x, _) -> List.mem x used || not (Term.does_not_occur x fvs))
+        defs
+      |> List.map fst
+    in
+    if List.length used' = List.length used then used
+    else
+      reach used'
+        (Term.concat_vars
+           (fvs
+           :: List.filter_map
+                (fun (x, abs) ->
+                  if List.mem x used' && not (List.mem x used) then
+                    Some (Term.free_vars_abs abs)
+                  else None)
+                defs))
   in
-  let free_vars = Term.concat_vars (free_vars_comp :: free_vars_defs) in
-  List.filter
-    (fun (x, _) -> not (Term.does_not_occur x free_vars))
-    (Assoc.to_list defs)
+  let used = reach [] (Term.free_vars_comp comp) in
+  List.filter (fun (x, _) -> List.mem x used) defs
 
 (* [x ↦ ret x], possibly cast into a larger dirt, which elaboration gives as
    the finally clause of a handler that has none in the source *)
