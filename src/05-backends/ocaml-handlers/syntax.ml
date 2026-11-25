@@ -281,6 +281,8 @@ let print_top_handler cases ppf =
     (Print.sequence "" print_top_handler_case cases)
 
 let print_header effects ppf =
+  (* The generated code uses perform, continue and discontinue unqualified. *)
+  print ppf "open Effect\nopen Effect.Deep\n\n";
   print ppf "type empty = |\n";
   List.iter
     (fun (eff, eff_sig, _) -> print_def_effect (eff, eff_sig) ppf)
