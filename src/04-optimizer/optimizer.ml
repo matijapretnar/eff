@@ -111,6 +111,23 @@ let rec extract_cast_value comp =
         (extract_cast_value comp)
   | _ -> None
 
+let rec strip_casts_comp comp =
+  match comp.term with Term.CastComp (c, _) -> strip_casts_comp c | _ -> comp
+
+let rec strip_casts_expr expr =
+  match expr.term with Term.CastExp (e, _) -> strip_casts_expr e | _ -> expr
+
+(* [fun b -> b v], possibly with casts, where [v] does not mention [b] *)
+let is_application_abs (abs : Term.abstraction) =
+  let pat, comp = abs.term in
+  match (pat.term, (strip_casts_comp comp).term) with
+  | Term.PVar b, Term.Apply (e, v) -> (
+      match (strip_casts_expr e).term with
+      | Term.Var { variable; _ } ->
+          variable = b && Term.does_not_occur b (Term.free_vars_expr v)
+      | _ -> false)
+  | _ -> false
+
 let rec optimize_expression state expr =
   (* Print.debug "Optimizing expression: %t" (Term.print_expression expr); *)
   let expr' = optimize_expression' state expr in
@@ -302,6 +319,12 @@ and cast_computation state comp coer =
   | Term.LetRec (defs, comp), _ when state.config.push_coercions ->
       (* Push-Co-Rec-Fun *)
       Term.letRec (defs, cast_computation state comp coer)
+  | Term.Match (expr, cases), _ when state.config.push_coercions ->
+      (* Push-Co-Match, which the paper does not have *)
+      let _, drty = coer.ty in
+      Term.match_
+        (expr, List.map (fun abs -> cast_abstraction state abs coer) cases)
+        drty
   | _, _ -> Term.castComp (comp, coer)
 
 and cast_abstraction state { term = pat, comp; _ } coer =
@@ -319,6 +342,22 @@ and bind_computation state comp bind =
            (Assoc.to_list defs) ->
       (* Do-Rec-Fun *)
       Term.letRec (defs, bind_computation state comp bind)
+  | Term.LetVal (expr, ({ term = pat, _; _ } as abs))
+    when Term.Variable.Map.for_all
+           (fun x _ -> Term.does_not_occur x (Term.free_vars_abs bind))
+           (Term.pattern_vars pat) ->
+      (* A sequence into a let, which copies nothing *)
+      Term.letVal (expr, bind_abstraction state abs bind)
+  | Term.Match (expr, cases)
+    when List.length cases <= 1 || is_application_abs bind ->
+      (* A sequence into a match. It copies the continuation into each
+         branch, so only if there is at most one, or if the continuation is
+         the small [fun b -> b v], where the branches often give the
+         function that [b] applies. *)
+      let _, drty = bind.ty in
+      Term.match_
+        (expr, List.map (fun abs -> bind_abstraction state abs bind) cases)
+        drty
   | _ -> (
       match extract_cast_value comp with
       | Some expr -> beta_reduce state bind expr
