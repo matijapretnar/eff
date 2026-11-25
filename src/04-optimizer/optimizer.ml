@@ -300,53 +300,125 @@ let is_application_abs (abs : Term.abstraction) =
    inside a function body. Replacing [with H handle f w] by [g' w] is correct
    in any context where [g'] is in scope. *)
 
-(* The type of a specialisation of a function with argument type [ty_arg]
-   under a handler of type [hnd_ty]. In [Varying] mode, it also takes the
-   return clause. *)
-let specialisation_ty mode hnd_ty ty_arg =
-  let (ty_in, _), drty_out = hnd_ty in
-  match mode with
-  | Fixed -> Type.arrow (ty_arg, drty_out)
-  | Varying ->
-      Type.arrow
-        ( ty_arg,
-          Type.pure_ty (Type.arrow (Type.arrow (ty_in, drty_out), drty_out)) )
+(* A full call [f v1 ... vn] of a curried function. It is [f v1], or
+   [do b <- c in b' vn] where [c] is a call [f v1 ... vn-1] and [b'] is [b],
+   possibly with casts; the calls before the last are pure, so they are cast to
+   the dirt of the sequence. It gives [f] and the arguments. *)
+let rec curried_call comp =
+  match comp.term with
+  | Term.Apply (({ term = Term.Var _; _ } as f), v) -> Some (f, [ v ])
+  | Term.Bind (c1, { term = { term = Term.PVar b; _ }, c2; _ }) -> (
+      match (curried_call (strip_casts_comp c1), curried_call c2) with
+      | Some (f, vs1), Some (h, vs2)
+        when (match (strip_casts_expr h).term with
+               | Term.Var { variable; _ } -> variable = b
+               | _ -> false)
+             && List.for_all
+                  (fun v -> Term.does_not_occur b (Term.free_vars_expr v))
+                  vs2 ->
+          Some (f, vs1 @ vs2)
+      | _ -> None)
+  | _ -> None
 
-(* The call [g' w k] of a [Varying] specialisation. [g' w] is pure, so it gets
-   the dirt of the call before the sequence. *)
-let varying_call g' w k =
-  match g'.ty.term with
-  | Type.Arrow (_, (ty_h, _)) -> (
-      match ty_h.term with
-      | Type.Arrow (_, (_, drt)) ->
-          let h_pat, h_var = Term.fresh_variable "h" ty_h in
-          let coer =
-            TyCoercion.bangCoercion
-              (TyCoercion.reflTy ty_h, DirtCoercion.empty drt)
-          in
-          Term.bind
-            ( Term.castComp (Term.apply (g', w), coer),
-              Term.abstraction (h_pat, Term.apply (h_var, k)) )
-      | _ -> assert false)
-  | _ -> assert false
+(* The parameters of a curried function [rec f x1. ret λx2. ... ret λxn. M] and
+   its body [M] *)
+let rec curried_params (abs : Term.abstraction) =
+  let pat, body = abs.term in
+  match body.term with
+  | Term.Value { term = Term.Lambda abs'; _ } ->
+      let pats, body' = curried_params abs' in
+      (pat :: pats, body')
+  | _ -> ([ pat ], body)
+
+(* [rec g p1. ret λp2. ... ret λpn. M] *)
+let rec curried_abstraction pats body =
+  match pats with
+  | [ pat ] -> Term.abstraction (pat, body)
+  | pat :: pats ->
+      Term.abstraction
+        (pat, Term.value (Term.lambda (curried_abstraction pats body)))
+  | [] -> assert false
+
+(* The type of a specialisation of a function with argument types [tys] under
+   a handler of type [hnd_ty]. It is curried, and in [Varying] mode it also
+   takes the return clause as its last argument. *)
+let specialisation_ty mode hnd_ty tys =
+  let (ty_in, _), drty_out = hnd_ty in
+  let tys =
+    match mode with
+    | Fixed -> tys
+    | Varying -> tys @ [ Type.arrow (ty_in, drty_out) ]
+  in
+  let rec curried = function
+    | [ ty ] -> Type.arrow (ty, drty_out)
+    | ty :: tys -> Type.arrow (ty, Type.pure_ty (curried tys))
+    | [] -> assert false
+  in
+  curried tys
+
+(* The call [g' a1 ... an] of a curried specialisation. The calls before the
+   last are pure, so they get the dirt of the last before the sequence. *)
+let curried_apply g' args =
+  let rec result_dirt ty = function
+    | [ _ ] -> (
+        match (ty : Type.ty).term with
+        | Type.Arrow (_, (_, drt)) -> drt
+        | _ -> assert false)
+    | _ :: args -> (
+        match ty.term with
+        | Type.Arrow (_, (ty', _)) -> result_dirt ty' args
+        | _ -> assert false)
+    | [] -> assert false
+  in
+  let drt = result_dirt g'.ty args in
+  let rec go comp = function
+    | [] -> comp
+    | arg :: args ->
+        let ty_h, _ = comp.ty in
+        let h_pat, h_var = Term.fresh_variable "h" ty_h in
+        let coer =
+          TyCoercion.bangCoercion
+            (TyCoercion.reflTy ty_h, DirtCoercion.empty drt)
+        in
+        Term.bind
+          ( Term.castComp (comp, coer),
+            Term.abstraction (h_pat, go (Term.apply (h_var, arg)) args) )
+  in
+  match args with
+  | arg :: args -> go (Term.apply (g', arg)) args
+  | [] -> assert false
+
+(* The call of a specialisation [g'] in [mode] with the arguments [vs] and, in
+   [Varying] mode, the return clause [k] *)
+let specialised_call mode g' vs k =
+  match mode with
+  | Fixed -> curried_apply g' vs
+  | Varying -> curried_apply g' (vs @ [ k ])
 
 let extract mode hnd f g' ~left =
+  let call_of_f comp =
+    match curried_call comp with
+    | Some ({ term = Term.Var { variable; _ }; _ }, ws) when variable = f ->
+        Some ws
+    | _ -> None
+  in
   let rec extract_comp comp =
     match comp.term with
-    | Term.Handle
-        ( { term = Term.Handler h'; _ },
-          { term = Term.Apply ({ term = Term.Var { variable; _ }; _ }, w); _ }
-        )
-      when variable = f && Term.same_operation_clauses h' hnd -> (
+    | Term.Handle ({ term = Term.Handler h'; _ }, c)
+      when Term.same_operation_clauses h' hnd && call_of_f c <> None -> (
+        let ws = Option.get (call_of_f c) in
         let fits mode =
-          Type.equal_ty g'.ty (specialisation_ty mode h'.ty w.ty)
+          Type.equal_ty g'.ty
+            (specialisation_ty mode h'.ty
+               (List.map (fun (w : Term.expression) -> w.ty) ws))
         in
         match mode with
         | Fixed when Term.same_return_clause h' hnd && fits Fixed ->
-            Term.apply (g', w)
+            specialised_call Fixed g' ws g'
         | Varying ->
             if fits Varying then
-              varying_call g' w (Term.lambda (extract_abs h'.term.value_clause))
+              specialised_call Varying g' ws
+                (Term.lambda (extract_abs h'.term.value_clause))
             else comp
         | Fixed ->
             left := true;
@@ -434,9 +506,9 @@ let top_definition state x =
 
 (* The newest specialisation of the top-level [x] at [instantiation] that is
    being built for a handler with the operation clauses of [hnd], if a handled
-   call [with hnd handle x v] can go to it. A call that could go to a [Fixed]
+   call [with hnd handle x v1 ... vn] can go to it. A call that could go to a [Fixed]
    one only with another return clause marks it as [left] instead. *)
-let building_specialisation state hnd x instantiation comp =
+let building_specialisation state hnd x instantiation vs =
   let matching entry =
     entry.original = x
     && entry.instantiation = instantiation
@@ -445,11 +517,9 @@ let building_specialisation state hnd x instantiation comp =
   in
   match List.find_opt matching !(state.specialisations) with
   | Some { mode; result = Building b; handler; _ } -> (
-      let v_ty =
-        match comp.term with Term.Apply (_, v) -> v.ty | _ -> assert false
-      in
+      let tys = List.map (fun (v : Term.expression) -> v.ty) vs in
       let fits mode =
-        Type.equal_ty b.name_var.ty (specialisation_ty mode hnd.ty v_ty)
+        Type.equal_ty b.name_var.ty (specialisation_ty mode hnd.ty tys)
       in
       match mode with
       | Fixed when Term.same_return_clause handler hnd ->
@@ -714,56 +784,83 @@ and bind_abstraction state { term = pat, comp; _ } bind =
   Term.abstraction (pat, bind_computation state comp bind)
 
 and handle_computation state hnd comp =
+  match handle_call state hnd comp with
+  | Some comp' -> comp'
+  | None -> handle_other state hnd comp
+
+(* Inline-Top and With-Rec-Fun for a handled full call [x v1 ... vn] of a
+   function, curried if [n > 1]. The specialisation of a curried function is
+   curried too, and it takes the arguments of the whole call, so that its body
+   is the body of the function after all the [fun]s. These rules come before
+   With-Do, which would move the pure calls of a curried call out of the
+   handler. For the same reason, a full curried call of a recursive function
+   that is not specialised stays under the handler: [extract] replaces it
+   later, when it is a recursive call in a specialisation being built. *)
+and handle_call state hnd comp =
+  let arity abs = List.length (fst (curried_params abs)) in
+  let kept vs =
+    if List.length vs > 1 then Some (Term.handle (Term.handler hnd, comp))
+    else None
+  in
+  match curried_call comp with
+  | Some ({ term = Term.Var { variable = x; instantiation; _ }; _ }, vs) -> (
+      match building_specialisation state hnd x instantiation vs with
+      | Some (mode, name_var) ->
+          Some
+            (specialised_call mode name_var vs
+               (Term.lambda hnd.term.value_clause))
+      | None -> (
+          match (top_definition state x, vs) with
+          | Some (TopValue _), [ v ]
+            when state.fuel > 0 && may_specialise state x hnd
+                 && state.config.handler_reductions -> (
+              (* Inline-Top, so that With-Fun or With-Rec-Fun applies. The
+                 guard is that of With-Rec-Fun, also for a non-recursive [x],
+                 so that it stops a cycle through top-level definitions, such
+                 as [many1] calling [many many1]. *)
+              let state' = specialising_under state x hnd in
+              match expand_top_application state x instantiation v with
+              | Some comp' ->
+                  Some
+                    (handle_computation state' hnd
+                       (optimize_computation state' comp'))
+              | None -> assert false)
+          | Some (TopRec abs), _
+            when state.fuel > 0 && may_specialise state x hnd
+                 && state.config.specialize_functions && handles_operations hnd
+                 && Type.equal_dirty comp.ty (fst hnd.ty)
+                 && arity abs = List.length vs -> (
+              match join_group state hnd x instantiation abs vs with
+              | `Joined -> Some (handle_computation state hnd comp)
+              | `Abandoned -> Some (Term.handle (Term.handler hnd, comp))
+              | `Other ->
+                  Some
+                    (with_rec_fun
+                       (specialising_under state x hnd)
+                       hnd x
+                       (Term.apply_sub_abs instantiation abs)
+                       vs ~top:(Some instantiation)))
+          | Some (TopRec abs), _ when arity abs = List.length vs -> kept vs
+          | None, _ -> (
+              match Assoc.lookup x state.rec_functions with
+              | Some abs
+                when state.config.specialize_functions && handles_operations hnd
+                     && may_specialise state x hnd
+                     && Type.equal_dirty comp.ty (fst hnd.ty)
+                     && arity abs = List.length vs ->
+                  Some
+                    (with_rec_fun
+                       (specialising_under state x hnd)
+                       hnd x
+                       (Term.apply_sub_abs instantiation abs)
+                       vs ~top:None)
+              | Some abs when arity abs = List.length vs -> kept vs
+              | _ -> None)
+          | _ -> None))
+  | _ -> None
+
+and handle_other state hnd comp =
   match comp.term with
-  | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
-    when building_specialisation state hnd x instantiation comp <> None -> (
-      match building_specialisation state hnd x instantiation comp with
-      | Some (Fixed, name_var) -> Term.apply (name_var, v)
-      | Some (Varying, name_var) ->
-          varying_call name_var v (Term.lambda hnd.term.value_clause)
-      | None -> assert false)
-  | Term.Apply ({ term = Term.Var { variable = x; instantiation; _ }; _ }, v)
-    when state.fuel > 0 && may_specialise state x hnd
-         &&
-         match top_definition state x with
-         | Some (TopValue _) -> state.config.handler_reductions
-         | Some (TopRec _) ->
-             state.config.specialize_functions && handles_operations hnd
-             && Type.equal_dirty comp.ty (fst hnd.ty)
-         | None -> false -> (
-      (* Inline-Top, so that With-Fun or With-Rec-Fun applies. The guard is
-         that of With-Rec-Fun, also for a non-recursive [x], so that it stops
-         a cycle through top-level definitions, such as [many1] calling
-         [many many1]. *)
-      let state' = specialising_under state x hnd in
-      match top_definition state x with
-      | Some (TopValue _) -> (
-          match expand_top_application state x instantiation v with
-          | Some comp' ->
-              handle_computation state' hnd (optimize_computation state' comp')
-          | None -> assert false)
-      | Some (TopRec abs) -> (
-          match join_group state hnd x instantiation abs comp with
-          | `Joined -> handle_computation state hnd comp
-          | `Abandoned -> Term.handle (Term.handler hnd, comp)
-          | `Other ->
-              with_rec_fun state' hnd x
-                (Term.apply_sub_abs instantiation abs)
-                v ~top:(Some instantiation))
-      | None -> assert false)
-  | Term.Apply ({ term = Term.Var { variable = f; instantiation; _ }; _ }, v)
-    when state.config.specialize_functions && handles_operations hnd
-         && may_specialise state f hnd
-         && Assoc.lookup f state.rec_functions <> None
-         && Type.equal_dirty comp.ty (fst hnd.ty) -> (
-      match Assoc.lookup f state.rec_functions with
-      | Some abs ->
-          with_rec_fun
-            (specialising_under state f hnd)
-            hnd f
-            (Term.apply_sub_abs instantiation abs)
-            v ~top:None
-      | None -> assert false)
   | _ when not state.config.handler_reductions ->
       Term.handle (Term.handler hnd, comp)
   | CastComp (comp', { term = tcoer, dcoer; _ })
@@ -846,7 +943,7 @@ and handle_abstraction state hnd { term = p, c; _ } =
    the call, and all later ones, go to it, and its body is built later. In
    [Fixed] mode, a call under another return clause cannot go to the group,
    so the attempt fails. *)
-and join_group state hnd x instantiation abs comp =
+and join_group state hnd x instantiation abs vs =
   match state.building_group with
   | Some gb
     when Term.Variable.Set.mem x gb.members
@@ -862,11 +959,13 @@ and join_group state hnd x instantiation abs comp =
         `Abandoned)
       else
         let abs = Term.apply_sub_abs instantiation abs in
-        let { ty = ty_arg, _; _ } = abs in
+        let tys =
+          List.map (fun (p : Term.pattern) -> p.ty) (fst (curried_params abs))
+        in
         let g = specialisation_name state x ~top:true in
         let g_var =
           Term.mono_var g
-            (specialisation_ty gb.group_mode gb.group_handler.ty ty_arg)
+            (specialisation_ty gb.group_mode gb.group_handler.ty tys)
         in
         let entry =
           {
@@ -878,7 +977,7 @@ and join_group state hnd x instantiation abs comp =
           }
         in
         state.specialisations := entry :: !(state.specialisations);
-        if building_specialisation state hnd x instantiation comp <> None then (
+        if building_specialisation state hnd x instantiation vs <> None then (
           Queue.add (x, abs, g, g_var) gb.pending;
           `Joined)
         else (
@@ -914,27 +1013,26 @@ and specialisation_name state f ~top =
    Closed specialisations become new top-level definitions, emitted together,
    and are cached, so the next call of a member under an equal handler reuses
    them. *)
-and with_rec_fun state hnd f abs v ~top =
+and with_rec_fun state hnd f abs vs ~top =
   let (ty_in, _), drty_out = hnd.ty in
   let k_ty = Type.arrow (ty_in, drty_out) in
-  let g_ty mode ty_arg = specialisation_ty mode hnd.ty ty_arg in
-  let f_ty_arg =
-    let { ty = ty_arg, _; _ } = abs in
-    ty_arg
+  let g_ty mode tys = specialisation_ty mode hnd.ty tys in
+  let f_tys =
+    List.map (fun (p : Term.pattern) -> p.ty) (fst (curried_params abs))
   in
   let call mode g_var =
-    match mode with
-    | Fixed -> Term.apply (g_var, v)
-    | Varying -> varying_call g_var v (Term.lambda hnd.term.value_clause)
+    specialised_call mode g_var vs (Term.lambda hnd.term.value_clause)
   in
   (* The body of the specialisation [g] of a member with [abs], and how to
      make the definition of [g] from the body once [extract] has rewritten
      it *)
   let build_member state mode abs =
-    let { term = pat, body; _ } = Term.refresh_abstraction Assoc.empty abs in
+    let pats, body =
+      curried_params (Term.refresh_abstraction Assoc.empty abs)
+    in
     let hnd_m, define =
       match mode with
-      | Fixed -> (hnd, fun body -> Term.abstraction (pat, body))
+      | Fixed -> (hnd, fun body -> curried_abstraction pats body)
       | Varying ->
           let k_pat, k_var = Term.fresh_variable "k" k_ty in
           let y_pat, y_var = Term.fresh_variable "y" ty_in in
@@ -942,17 +1040,13 @@ and with_rec_fun state hnd f abs v ~top =
             Term.handler_with_new_value_clause hnd
               (Term.abstraction (y_pat, Term.apply (k_var, y_var)))
           in
-          ( hnd_k,
-            fun body ->
-              Term.abstraction
-                (pat, Term.value (Term.lambda (Term.abstraction (k_pat, body))))
-          )
+          (hnd_k, fun body -> curried_abstraction (pats @ [ k_pat ]) body)
     in
     (define, handle_computation state hnd_m body)
   in
   let build mode =
     let g = specialisation_name state f ~top:(top <> None) in
-    let g_var = Term.mono_var g (g_ty mode f_ty_arg) in
+    let g_var = Term.mono_var g (g_ty mode f_tys) in
     let left = ref false in
     match top with
     | None ->
@@ -1040,7 +1134,7 @@ and with_rec_fun state hnd f abs v ~top =
             &&
             match entry.result with
             | Built { name_var; _ } ->
-                Type.equal_ty name_var.ty (g_ty mode f_ty_arg)
+                Type.equal_ty name_var.ty (g_ty mode f_tys)
             | FixedFails -> true
             | Building _ -> false)
           !(state.specialisations)
