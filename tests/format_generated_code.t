@@ -1034,6 +1034,58 @@
   
   2 + 1
   ======================================================================
+  codegen/local_let_rec_effect.eff
+  ----------------------------------------------------------------------
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | RandomFloat : (float, float) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | Write : (string * string, unit) eff_internal_effect
+  
+  type (_, _) eff_internal_effect += Op : (int, unit) eff_internal_effect
+  
+  let _test =
+   fun (_n : int) ->
+    let rec _loop _x =
+     fun (_s : int) ->
+      if _x = 0 then Value _s
+      else Call (Op, _x, fun (_y : unit) -> _loop (_x - 1) _s)
+    in
+    (closed_handler
+       {
+         value_clause = (fun (_id : int) -> _id);
+         effect_clauses =
+           (fun (type a)
+             (type b)
+             (eff : (a, b) eff_internal_effect)
+             :
+             (a -> (b -> _) -> _)
+           ->
+             match eff with
+             | Op -> fun (_x : int) _k -> _k ()
+             | _ -> fun _ _ -> assert false);
+       }
+       (fun (_x : int) -> _x))
+      (_loop _n 0)
+  
+  let test = _test
+  let _x = _test 3
+  let x = _x
+  ======================================================================
   codegen/loop.eff
   ----------------------------------------------------------------------
   (* primitive effect *)

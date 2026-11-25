@@ -1,0 +1,12 @@
+(* A curried local recursive function that performs an operation. Its
+   occurrence in its own body has the solved, pure type of its first arrow. *)
+effect Op : int -> unit
+
+let test n =
+  let rec loop i s =
+    if i = 0 then s else (perform (Op i); loop (i - 1) s)
+  in
+  handle loop n 0 with
+  | effect (Op x) k -> k ()
+
+let x = test 3

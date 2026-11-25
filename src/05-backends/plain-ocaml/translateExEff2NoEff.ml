@@ -56,6 +56,16 @@ let elab_effect eff : n_effect =
   let ty1, ty2 = eff.ty in
   (eff.term, (elab_ty ty1, elab_ty ty2))
 
+(* A type without parameters and the unit type have only the identity
+   coercion, so they need no coercion function. *)
+let coer_apply ty_name = function
+  | [] -> NoEff.NCoerRefl
+  | coers -> NoEff.NCoerApply (ty_name, coers)
+
+let coer_tuple = function
+  | [] -> NoEff.NCoerRefl
+  | coers -> NoEff.NCoerTuple coers
+
 let rec elab_ty_coercion state coer =
   match coer.term with
   | TyCoercion.ReflTy -> NoEff.NCoerRefl
@@ -83,13 +93,11 @@ let rec elab_ty_coercion state coer =
       | false, false -> NoEff.NCoerHandler (elabA, elabB))
   | TyCoercion.TyCoercionVar par -> NoEff.NCoerVar par
   | TyCoercion.ApplyCoercion { ty_name; tcoers } ->
-      NoEff.NCoerApply
-        ( ty_name,
-          tcoers |> TyParam.Map.values |> List.map fst
-          |> List.map (elab_ty_coercion state) )
+      coer_apply ty_name
+        (tcoers |> TyParam.Map.values |> List.map fst
+        |> List.map (elab_ty_coercion state))
   | TyCoercion.TupleCoercion lst ->
-      let elabs = List.map (elab_ty_coercion state) lst in
-      NoEff.NCoerTuple elabs
+      coer_tuple (List.map (elab_ty_coercion state) lst)
 
 and elab_dirty_coercion state { term = tcoer, dcoer; _ } =
   let tyelab = elab_ty_coercion state tcoer in
@@ -126,7 +134,7 @@ let apply_instantiation_coercion ~same ~other ty_name ty_args =
             "A dirt in an invariant type argument is instantiated to the empty \
              dirt"
   in
-  NoEff.NCoerApply (ty_name, ty_args |> TyParam.Map.values |> List.map coer_arg)
+  coer_apply ty_name (ty_args |> TyParam.Map.values |> List.map coer_arg)
 
 let rec value_coercion_from_impure_dirt empty_dirt_params ty =
   match ty.term with
@@ -141,7 +149,7 @@ let rec value_coercion_from_impure_dirt empty_dirt_params ty =
         ( value_coercion_to_impure_dirt empty_dirt_params ty1,
           computation_coercion_from_impure_dirt empty_dirt_params drty2 )
   | ExEffTypes.Tuple tys ->
-      NoEff.NCoerTuple
+      coer_tuple
         (List.map (value_coercion_from_impure_dirt empty_dirt_params) tys)
   | ExEffTypes.Handler ((ty1, drt1), (ty2, drt2)) -> (
       if Dirt.is_empty drt1 then
@@ -210,7 +218,7 @@ and value_coercion_to_impure_dirt empty_dirt_params ty =
         ( value_coercion_from_impure_dirt empty_dirt_params ty1,
           computation_coercion_to_impure_dirt empty_dirt_params drty2 )
   | ExEffTypes.Tuple tys ->
-      NoEff.NCoerTuple
+      coer_tuple
         (List.map (value_coercion_to_impure_dirt empty_dirt_params) tys)
   | ExEffTypes.Handler ((ty1, drt1), (ty2, drt2)) -> (
       if Dirt.is_empty drt1 then
