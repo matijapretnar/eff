@@ -64,10 +64,12 @@ let rec get_fun_leafs (n_term : NoEff.n_term) =
   | NoEff.NFun ((NoEff.PNNonbinding, _, _) as t) -> Some [ (None, t) ]
   | NoEff.NFun ((NoEff.PNConst _, _, _) as t) -> Some [ (None, t) ]
   | NoEff.NFun _ -> None
-  | NoEff.NCast (t, _)
-  | NoEff.NLetRec (_, t)
-  | NoEff.NLet (_, (_, t))
-  | NoEff.NBind (_, (_, t)) ->
+  (* Lifting moves a cast from a leaf function to its body, so only the
+     identity cast can stay. A function coercion would need to be split, and
+     the parameter type outside it is not known here. *)
+  | NoEff.NCast (t, NoEff.NCoerRefl) -> get_fun_leafs t
+  | NoEff.NCast _ -> None
+  | NoEff.NLetRec (_, t) | NoEff.NLet (_, (_, t)) | NoEff.NBind (_, (_, t)) ->
       get_fun_leafs t
   | NoEff.NMatch (_, lst) ->
       let rec seq l =

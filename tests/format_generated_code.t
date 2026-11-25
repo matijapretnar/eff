@@ -976,6 +976,39 @@
   
   Call (Op1, 1, fun (_y : unit) -> Value _y)
   ======================================================================
+  codegen/lambda_lift_cast.eff
+  ----------------------------------------------------------------------
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | RandomFloat : (float, float) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | Write : (string * string, unit) eff_internal_effect
+  
+  type (_, _) eff_internal_effect += Fail : (unit, empty) eff_internal_effect
+  
+  let _test =
+   fun (_b : bool) ->
+    if _b then Value (42 :: [])
+    else Call (Fail, (), fun (_y : empty) -> match _y with _ -> assert false)
+  
+  let test = _test
+  let _x = _test true
+  let x = _x
+  ======================================================================
   codegen/let_list_to_bind.eff
   ----------------------------------------------------------------------
   (* primitive effect *)

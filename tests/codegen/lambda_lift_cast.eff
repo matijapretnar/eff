@@ -1,0 +1,10 @@
+(* The function in the first branch is cast to a function that may call Fail.
+   Lifting the functions out of the conditional must not keep that cast
+   around the body of the function. *)
+effect Fail : unit -> empty
+
+let test b =
+  let f = if b then (fun _ -> [42]) else (fun kf -> kf ()) in
+  f (fun () -> match perform (Fail ()) with)
+
+let x = test true
