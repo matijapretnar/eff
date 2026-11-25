@@ -1,0 +1,3 @@
+; The suite has its own dune files, for its own build.
+
+(data_only_dirs effect-handlers-bench)
