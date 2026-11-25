@@ -243,6 +243,13 @@ let rec is_handler_value (e : Term.expression) =
   | Term.Tuple es -> List.exists is_handler_value es
   | _ -> false
 
+(* With-Rec-Fun needs a handler with operation clauses. Under one without,
+   which With-Cast leaves when it drops them all, the specialisation would
+   only unfold the function once, and With-Fwd gives the same sequence
+   directly. *)
+let handles_operations (hnd : Term.handler_clauses) =
+  not (Assoc.is_empty hnd.term.effect_clauses.effect_part)
+
 let rec strip_casts_comp comp =
   match comp.term with Term.CastComp (c, _) -> strip_casts_comp c | _ -> comp
 
@@ -720,7 +727,7 @@ and handle_computation state hnd comp =
          match top_definition state x with
          | Some (TopValue _) -> state.config.handler_reductions
          | Some (TopRec _) ->
-             state.config.specialize_functions
+             state.config.specialize_functions && handles_operations hnd
              && Type.equal_dirty comp.ty (fst hnd.ty)
          | None -> false -> (
       (* Inline-Top, so that With-Fun or With-Rec-Fun applies. The guard is
@@ -744,7 +751,8 @@ and handle_computation state hnd comp =
                 v ~top:(Some instantiation))
       | None -> assert false)
   | Term.Apply ({ term = Term.Var { variable = f; instantiation; _ }; _ }, v)
-    when state.config.specialize_functions && may_specialise state f hnd
+    when state.config.specialize_functions && handles_operations hnd
+         && may_specialise state f hnd
          && Assoc.lookup f state.rec_functions <> None
          && Type.equal_dirty comp.ty (fst hnd.ty) -> (
       match Assoc.lookup f state.rec_functions with

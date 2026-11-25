@@ -201,8 +201,7 @@
     let rec _init _x (_acc : intlist) =
       if _x = 0 then _acc else _init (_x - 1) (Lst (_x, _acc))
     in
-    let _acc = End in
-    let ____l = if _n = 0 then _acc else _init (_n - 1) (Lst (_n, _acc)) in
+    let ____l = _init _n End in
     let rec _place (_x, _qs) =
       if _x = _n + 1 then Some _qs
       else
@@ -570,7 +569,7 @@
   ;;
   
   let rec _g _x = if _x = 0 then 1 else _g (_x - 1) in
-  if 5 = 0 then 1 else _g (5 - 1)
+  _g 5
   ======================================================================
   codegen/handler_beta_reduction.eff
   ----------------------------------------------------------------------
@@ -1006,24 +1005,22 @@
       if _x = 0 then Value _s
       else Call (Op, _x, fun (_y : unit) -> _loop (_x - 1) _s)
     in
-    if _n = 0 then 0
-    else
-      (closed_handler
-         {
-           value_clause = (fun (_id : int) -> _id);
-           effect_clauses =
-             (fun (type a)
-               (type b)
-               (eff : (a, b) eff_internal_effect)
-               :
-               (a -> (b -> _) -> _)
-             ->
-               match eff with
-               | Op -> fun (_x : int) _k -> _k ()
-               | _ -> fun _ _ -> assert false);
-         }
-         (fun (_x : int) -> _x))
-        (_loop (_n - 1) 0)
+    (closed_handler
+       {
+         value_clause = (fun (_id : int) -> _id);
+         effect_clauses =
+           (fun (type a)
+             (type b)
+             (eff : (a, b) eff_internal_effect)
+             :
+             (a -> (b -> _) -> _)
+           ->
+             match eff with
+             | Op -> fun (_x : int) _k -> _k ()
+             | _ -> fun _ _ -> assert false);
+       }
+       (fun (_x : int) -> _x))
+      (_loop _n 0)
   
   let test = _test
   let _x = _test 3
@@ -1738,13 +1735,6 @@
   
   let expr, term, factor = (_expr, _term, _factor)
   
-  let rec _handled_op (_x, _k) =
-    _k (fun (_ys : string list) ->
-        begin match _x with [] -> _ys | _x :: _xs -> _x :: _op (* @ *) _xs _ys
-        end)
-  
-  let _handled_op = _handled_op
-  
   let rec _handled_many1 (_x, _k) =
     let rec _checkNums _x =
       begin match _x with
@@ -1770,18 +1760,11 @@
                                     _handled_many1
                                       ( (),
                                         fun (_xs : string list) ->
-                                          _handled_op
-                                            ( _x :: [],
-                                              fun (_b :
-                                                    string list -> string list)
-                                              -> _k (_b _xs) ) )
+                                          _k (_op (* @ *) (_x :: []) _xs) )
                                     >>= fun _b -> _b _xs
                                   else
-                                    _handled_op
-                                      ( _x :: [],
-                                        fun (_b : string list -> string list) ->
-                                          _k (_b []) )
-                                    >>= fun _b -> _b _xs )
+                                    _k (_op (* @ *) (_x :: []) []) >>= fun _b ->
+                                    _b _xs )
                           else _fail ()
                       end)
                 else _checkNums _xs )
@@ -1790,28 +1773,6 @@
     _checkNums [ "0"; "1"; "2"; "3"; "4"; "5"; "6"; "7"; "8"; "9" ]
   
   let _handled_many1 = _handled_many1
-  
-  let rec _handled_parseNum ((_l, _v), _k) =
-    begin match _l with
-    | [] -> Value _v
-    | _x :: _xs ->
-        begin match _x with
-        | "0" -> _parseNum (_xs, _createNumber (_v, 0))
-        | "1" -> _parseNum (_xs, _createNumber (_v, 1))
-        | "2" -> _parseNum (_xs, _createNumber (_v, 2))
-        | "3" -> _parseNum (_xs, _createNumber (_v, 3))
-        | "4" -> _parseNum (_xs, _createNumber (_v, 4))
-        | "5" -> _parseNum (_xs, _createNumber (_v, 5))
-        | "6" -> _parseNum (_xs, _createNumber (_v, 6))
-        | "7" -> _parseNum (_xs, _createNumber (_v, 7))
-        | "8" -> _parseNum (_xs, _createNumber (_v, 8))
-        | "9" -> _parseNum (_xs, _createNumber (_v, 9))
-        | _ -> _fail ()
-        end
-    end
-    >>= fun _y -> _k _y
-  
-  let _handled_parseNum = _handled_parseNum
   
   let rec _handled_expr (_x, _k) =
     Call
@@ -1862,7 +1823,7 @@
         fun (_y : bool) ->
           if _y then
             _handled_many1
-              ((), fun (_i : string list) -> _handled_parseNum ((_i, 0), _k))
+              ((), fun (_i : string list) -> _parseNum (_i, 0) >>= fun _y -> _k _y)
           else
             Value
               (fun (_s : string list) ->
@@ -1909,17 +1870,11 @@
                                 _handled_many1
                                   ( (),
                                     fun (_xs : string list) ->
-                                      _handled_op
-                                        ( _x :: [],
-                                          fun (_b : string list -> string list) ->
-                                            _k (_b _xs) ) )
+                                      _k (_op (* @ *) (_x :: []) _xs) )
                                 >>= fun _b -> _b _xs
                               else
-                                _handled_op
-                                  ( _x :: [],
-                                    fun (_b : string list -> string list) ->
-                                      _k (_b []) )
-                                >>= fun _b -> _b _xs )
+                                _k (_op (* @ *) (_x :: []) []) >>= fun _b ->
+                                _b _xs )
                       else _fail ()
                   end)
             else _checkNums _xs
@@ -1980,7 +1935,8 @@
      fun (_y : bool) ->
       if _y then
         _handled_many1
-          (((), fun (_i : string list) -> _handled_parseNum ((_i, 0), _k)), _k)
+          ( ((), fun (_i : string list) -> _parseNum (_i, 0) >>= fun _y -> _k _y),
+            _k )
       else
         _k (fun (_s : string list) ->
             begin match _s with
@@ -3388,15 +3344,6 @@
   let _absurd = fun (_void : 'ty) -> match _void with _ -> assert false
   let absurd = _absurd
   
-  let rec _handled_op (_x, _k) =
-    _k (fun (_ys : intlist) ->
-        begin match _x with
-        | Nil -> _ys
-        | Cons (_x, _xs) -> Cons (_x, _op (* @ *) _xs _ys)
-        end)
-  
-  let _handled_op = _handled_op
-  
   let _test_leaf_state =
    fun (_m : int) ->
     let rec _maxl _x (_x : intlist) =
@@ -3461,33 +3408,30 @@
               {
                 value_clause =
                   (fun (_b : intlist) ->
-                    _handled_op
-                      ( _b,
-                        fun (_b : intlist -> intlist) ->
-                          (closed_handler
-                             {
-                               value_clause =
-                                 (fun (_b : intlist) ->
-                                   fun (_ : intlist) -> _b _b);
-                               effect_clauses =
-                                 (fun (type a)
-                                   (type b)
-                                   (eff : (a, b) eff_internal_effect)
-                                   :
-                                   (a -> (b -> _) -> _)
-                                 ->
-                                   match eff with
-                                   | Get ->
-                                       fun (() : unit) _k ->
-                                         fun (_s : intlist) ->
-                                          begin match _s with
-                                          | Cons (_x, _rest) -> _k _x _rest
-                                          | Nil -> Nil
-                                          end
-                                   | _ -> fun _ _ -> assert false);
-                             }
-                             (fun (_x : intlist -> intlist) -> _x))
-                            (_k false) ));
+                    (closed_handler
+                       {
+                         value_clause =
+                           (fun (_b : intlist) ->
+                             fun (_ : intlist) -> _op (* @ *) _b _b);
+                         effect_clauses =
+                           (fun (type a)
+                             (type b)
+                             (eff : (a, b) eff_internal_effect)
+                             :
+                             (a -> (b -> _) -> _)
+                           ->
+                             match eff with
+                             | Get ->
+                                 fun (() : unit) _k ->
+                                   fun (_s : intlist) ->
+                                    begin match _s with
+                                    | Cons (_x, _rest) -> _k _x _rest
+                                    | Nil -> Nil
+                                    end
+                             | _ -> fun _ _ -> assert false);
+                       }
+                       (fun (_x : intlist -> intlist) -> _x))
+                      (_k false));
                 effect_clauses =
                   (fun (type a)
                     (type b)
@@ -3584,34 +3528,30 @@
                       {
                         value_clause =
                           (fun (_b : intlist) ->
-                            _handled_op
-                              ( _b,
-                                fun (_b : intlist -> intlist) ->
-                                  (closed_handler
-                                     {
-                                       value_clause =
-                                         (fun (_b : intlist) ->
-                                           fun (_ : intlist) -> _b _b);
-                                       effect_clauses =
-                                         (fun (type a)
-                                           (type b)
-                                           (eff : (a, b) eff_internal_effect)
-                                           :
-                                           (a -> (b -> _) -> _)
-                                         ->
-                                           match eff with
-                                           | Get ->
-                                               fun (() : unit) _k ->
-                                                 fun (_s : intlist) ->
-                                                  begin match _s with
-                                                  | Cons (_x, _rest) ->
-                                                      _k _x _rest
-                                                  | Nil -> Nil
-                                                  end
-                                           | _ -> fun _ _ -> assert false);
-                                     }
-                                     (fun (_x : intlist -> intlist) -> _x))
-                                    (_k false) ));
+                            (closed_handler
+                               {
+                                 value_clause =
+                                   (fun (_b : intlist) ->
+                                     fun (_ : intlist) -> _op (* @ *) _b _b);
+                                 effect_clauses =
+                                   (fun (type a)
+                                     (type b)
+                                     (eff : (a, b) eff_internal_effect)
+                                     :
+                                     (a -> (b -> _) -> _)
+                                   ->
+                                     match eff with
+                                     | Get ->
+                                         fun (() : unit) _k ->
+                                           fun (_s : intlist) ->
+                                            begin match _s with
+                                            | Cons (_x, _rest) -> _k _x _rest
+                                            | Nil -> Nil
+                                            end
+                                     | _ -> fun _ _ -> assert false);
+                               }
+                               (fun (_x : intlist -> intlist) -> _x))
+                              (_k false));
                         effect_clauses =
                           (fun (type a)
                             (type b)
@@ -3639,15 +3579,6 @@
   let test_leaf_state_loop = _test_leaf_state_loop
   
   type (_, _) eff_internal_effect += Set : (int, unit) eff_internal_effect
-  
-  let rec _handled_op (_x, _k) =
-    _k (fun (_ys : intlist) ->
-        begin match _x with
-        | Nil -> _ys
-        | Cons (_x, _xs) -> Cons (_x, _op (* @ *) _xs _ys)
-        end)
-  
-  let _handled_op = _handled_op
   
   let _test_leaf_state_update =
    fun (_m : int) ->
@@ -3704,31 +3635,27 @@
               {
                 value_clause =
                   (fun (_b : intlist) ->
-                    _handled_op
-                      ( _b,
-                        fun (_b : intlist -> intlist) ->
-                          (closed_handler
-                             {
-                               value_clause =
-                                 (fun (_b : intlist) -> fun (_ : int) -> _b _b);
-                               effect_clauses =
-                                 (fun (type a)
-                                   (type b)
-                                   (eff : (a, b) eff_internal_effect)
-                                   :
-                                   (a -> (b -> _) -> _)
-                                 ->
-                                   match eff with
-                                   | Get ->
-                                       fun (() : unit) _k ->
-                                         fun (_s : int) -> _k _s _s
-                                   | Set ->
-                                       fun (_s : int) _k ->
-                                         fun (_ : int) -> _k () _s
-                                   | _ -> fun _ _ -> assert false);
-                             }
-                             (fun (_x : int -> intlist) -> _x))
-                            (_k false) ));
+                    (closed_handler
+                       {
+                         value_clause =
+                           (fun (_b : intlist) ->
+                             fun (_ : int) -> _op (* @ *) _b _b);
+                         effect_clauses =
+                           (fun (type a)
+                             (type b)
+                             (eff : (a, b) eff_internal_effect)
+                             :
+                             (a -> (b -> _) -> _)
+                           ->
+                             match eff with
+                             | Get ->
+                                 fun (() : unit) _k -> fun (_s : int) -> _k _s _s
+                             | Set ->
+                                 fun (_s : int) _k -> fun (_ : int) -> _k () _s
+                             | _ -> fun _ _ -> assert false);
+                       }
+                       (fun (_x : int -> intlist) -> _x))
+                      (_k false));
                 effect_clauses =
                   (fun (type a)
                     (type b)
@@ -3812,32 +3739,29 @@
                       {
                         value_clause =
                           (fun (_b : intlist) ->
-                            _handled_op
-                              ( _b,
-                                fun (_b : intlist -> intlist) ->
-                                  (closed_handler
-                                     {
-                                       value_clause =
-                                         (fun (_b : intlist) ->
-                                           fun (_ : int) -> _b _b);
-                                       effect_clauses =
-                                         (fun (type a)
-                                           (type b)
-                                           (eff : (a, b) eff_internal_effect)
-                                           :
-                                           (a -> (b -> _) -> _)
-                                         ->
-                                           match eff with
-                                           | Get ->
-                                               fun (() : unit) _k ->
-                                                 fun (_s : int) -> _k _s _s
-                                           | Set ->
-                                               fun (_s : int) _k ->
-                                                 fun (_ : int) -> _k () _s
-                                           | _ -> fun _ _ -> assert false);
-                                     }
-                                     (fun (_x : int -> intlist) -> _x))
-                                    (_k false) ));
+                            (closed_handler
+                               {
+                                 value_clause =
+                                   (fun (_b : intlist) ->
+                                     fun (_ : int) -> _op (* @ *) _b _b);
+                                 effect_clauses =
+                                   (fun (type a)
+                                     (type b)
+                                     (eff : (a, b) eff_internal_effect)
+                                     :
+                                     (a -> (b -> _) -> _)
+                                   ->
+                                     match eff with
+                                     | Get ->
+                                         fun (() : unit) _k ->
+                                           fun (_s : int) -> _k _s _s
+                                     | Set ->
+                                         fun (_s : int) _k ->
+                                           fun (_ : int) -> _k () _s
+                                     | _ -> fun _ _ -> assert false);
+                               }
+                               (fun (_x : int -> intlist) -> _x))
+                              (_k false));
                         effect_clauses =
                           (fun (type a)
                             (type b)
