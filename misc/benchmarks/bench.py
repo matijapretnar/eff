@@ -11,7 +11,8 @@ effect-handlers-bench). For each benchmark and input size, the script
 
 It writes summary.csv to the output directory, with one row for each
 benchmark, size and variant. A variant that fails, gives a wrong result, or
-exceeds the time limit at some size is not run at larger sizes.
+exceeds the time limit at some size is not run at larger sizes. Nor is a
+variant whose time, grown as the baseline's, would exceed the limit.
 
 Variants:
   native-<v>          misc/benchmarks/native/<benchmark>_<v>.ml
@@ -25,37 +26,43 @@ Variants:
 import argparse
 import csv
 import json
+import os
 import shutil
 import subprocess
 import sys
 import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 
-# Input sizes for the graphs. Each list is increasing.
+# Input sizes for the graphs. Each list has 8 increasing sizes, which double
+# or, where the work grows exponentially, grow by a constant. The profile
+# quick uses the 5 smallest, at about an eighth of the largest.
 SIZES = {
-    "countdown": [25_000_000, 50_000_000, 100_000_000, 200_000_000, 400_000_000],
-    "fibonacci_recursive": [34, 36, 38, 40, 42],
-    "generator": [21, 22, 23, 24, 25],
-    "handler_sieve": [10_000, 20_000, 30_000, 40_000, 60_000],
-    "iterator": [5_000_000, 10_000_000, 20_000_000, 40_000_000, 80_000_000],
-    "nqueens": [8, 9, 10, 11, 12],
-    "parsing_dollars": [2_500, 5_000, 10_000, 20_000, 40_000],
-    "product_early": [12_500, 25_000, 50_000, 100_000, 200_000],
-    "resume_nontail": [1_250, 2_500, 5_000, 10_000, 20_000],
-    "tree_explore": [12, 13, 14, 15, 16],
-    "triples": [100, 150, 200, 250, 300],
+    "countdown": [2_000_000 * 2**i for i in range(8)],
+    "fibonacci_recursive": [28, 30, 32, 34, 36, 38, 40, 42],
+    "generator": [18, 19, 20, 21, 22, 23, 24, 25],
+    "handler_sieve": [2_500, 5_000, 7_500, 10_000, 15_000, 20_000, 30_000, 40_000],
+    "iterator": [1_250_000 * 2**i for i in range(8)],
+    "nqueens": [5, 6, 7, 8, 9, 10, 11, 12],
+    "parsing_dollars": [1_250, 2_500, 5_000, 7_500, 10_000, 15_000, 20_000, 30_000],
+    "product_early": [3_125 * 2**i for i in range(8)],
+    "resume_nontail": [625 * 2**i for i in range(8)],
+    "tree_explore": [9, 10, 11, 12, 13, 14, 15, 16],
+    "triples": [50, 75, 100, 150, 200, 300, 400, 600],
 }
 
 BASELINE = "native-pure"
 
-# quick tests the whole pipeline in a few minutes. full is for the graphs and
-# takes hours. Options on the command line override these values.
+# quick shows the trends in about a minute: the single timed run of the
+# check, at the 5 smallest sizes, with a limit of 1 s. full is for the final
+# graphs: all sizes, measured by hyperfine with repetitions, which takes
+# hours. Options on the command line override these values.
 PROFILES = {
-    "quick": {"sizes": 2, "runs": 3, "warmup": 1, "timeout": 10},
-    "full": {"sizes": None, "runs": None, "warmup": 2, "timeout": 120},
+    "quick": {"sizes": 5, "timeout": 1, "check_only": True},
+    "full": {"timeout": 120, "warmup": 1, "check_only": False},
 }
 
 EFF_VARIANTS = {
@@ -82,13 +89,25 @@ def native_variants(benchmark):
     )
 
 
-def ocamlopt(args, switch, cwd, effects=False):
-    """Compiles with OCaml 5 effects and multicont if [effects]."""
+def ocamlopt(files, switch, d, effects=False):
+    """Compiles [files] in [d] to [d]/main, with OCaml 5 effects and multicont
+    if [effects]. Returns an error, or None. It skips the compilation if the
+    command and the files are the same as for the existing executable."""
     cmd = ["opam", "exec", "--switch=" + switch, "--", "ocamlfind", "ocamlopt"]
     cmd += ["-O3", "-w", "-a"]
     if effects:
         cmd += ["-package", "multicont", "-linkpkg"]
-    return subprocess.run(cmd + args, cwd=cwd, capture_output=True, text=True)
+    cmd += ["-o", "main"] + files
+    stamp = "\0".join(cmd + [(d / f).read_text() for f in files])
+    if (d / "main").exists() and (d / "stamp").exists():
+        if (d / "stamp").read_text() == stamp:
+            return None
+    (d / "main").unlink(missing_ok=True)
+    result = subprocess.run(cmd, cwd=d, capture_output=True, text=True)
+    if result.returncode != 0:
+        return "ocamlopt: " + result.stderr.strip()
+    (d / "stamp").write_text(stamp)
+    return None
 
 
 def rename_effects(benchmark, source):
@@ -102,20 +121,18 @@ def rename_effects(benchmark, source):
 def build(benchmark, variant, args, build_dir):
     """Builds one variant and returns its executable, or None with a log."""
     d = build_dir / benchmark / variant
-    if d.exists():
-        shutil.rmtree(d)
-    d.mkdir(parents=True)
+    d.mkdir(parents=True, exist_ok=True)
     suite = args.suite / "benchmarks"
     if variant.startswith("native-"):
         src = HERE / "native" / f"{benchmark}_{variant[len('native-'):]}.ml"
         shutil.copy(src, d / "main.ml")
-        result = ocamlopt(["-o", "main", "main.ml"], args.switch, d)
+        error = ocamlopt(["main.ml"], args.switch, d)
     elif variant == "ocaml5":
         src = suite / "ocaml" / benchmark / "main.ml"
         if not src.exists():
             return None, "no OCaml 5 implementation in the suite"
         shutil.copy(src, d / "main.ml")
-        result = ocamlopt(["-o", "main", "main.ml"], args.switch, d, effects=True)
+        error = ocamlopt(["main.ml"], args.switch, d, effects=True)
     else:
         eff_dir = suite / "eff" / benchmark
         source = rename_effects(benchmark, (eff_dir / "main.eff").read_text())
@@ -137,9 +154,9 @@ def build(benchmark, variant, args, build_dir):
         if plain:
             shutil.copy(REPO / "ocamlHeader" / "ocamlHeader.ml", d)
             files = ["ocamlHeader.ml"] + files
-        result = ocamlopt(["-o", "main"] + files, args.switch, d, effects=not plain)
-    if result.returncode != 0:
-        return None, "ocamlopt: " + result.stderr.strip()
+        error = ocamlopt(files, args.switch, d, effects=not plain)
+    if error:
+        return None, error
     return d / "main", None
 
 
@@ -199,7 +216,9 @@ def main():
     p.add_argument("--runs", type=int, help="hyperfine runs per variant")
     p.add_argument("--sizes", type=int, help="number of smallest sizes to use")
     p.add_argument(
-        "--check-only", action="store_true", help="one timed run, no hyperfine"
+        "--check-only",
+        action=argparse.BooleanOptionalAction,
+        help="measure with the single run of the check, without hyperfine",
     )
     args = p.parse_args()
     for key, value in PROFILES[args.profile].items():
@@ -214,14 +233,33 @@ def main():
     json_dir.mkdir(parents=True, exist_ok=True)
     rows = []
 
-    for benchmark in benchmarks:
+    def variants_of(benchmark):
         variants = native_variants(benchmark) + ["ocaml5"] + list(EFF_VARIANTS)
         if args.variants:
             wanted = args.variants.split(",")
             variants = [v for v in variants if v in wanted or v == BASELINE]
+        return variants
+
+    def build_and_start(job):
+        # The first start of a new executable is slow on macOS, so each one
+        # runs once here, where its time does not count.
+        benchmark, variant = job
+        exe, error = build(benchmark, variant, args, build_dir)
+        if exe:
+            run_once(exe, SIZES[benchmark][0], args.timeout)
+        return exe, error
+
+    # The builds are independent, so they run in parallel. The measurements
+    # below run one after another, so that they do not disturb each other.
+    jobs = [(b, v) for b in benchmarks for v in variants_of(b)]
+    with ThreadPoolExecutor(max_workers=os.cpu_count()) as pool:
+        built = dict(zip(jobs, pool.map(build_and_start, jobs)))
+    log(f"built {len(jobs)} executables")
+
+    for benchmark in benchmarks:
         exes = {}
-        for variant in variants:
-            exe, error = build(benchmark, variant, args, build_dir)
+        for variant in variants_of(benchmark):
+            exe, error = built[benchmark, variant]
             if exe:
                 exes[variant] = exe
             else:
@@ -232,22 +270,32 @@ def main():
             continue
 
         sizes = SIZES[benchmark][: args.sizes]
+        last = {}  # the time of each variant at the previous size
         for size in sizes:
-            status, expected, _ = run_once(exes[BASELINE], size, args.timeout)
+            status, expected, base = run_once(exes[BASELINE], size, args.timeout)
             if status != "ok":
                 log(f"{benchmark} {size}: baseline {status}, larger sizes skipped")
                 break
-            passing = {}
+            # A variant probably grows as the baseline does. If its estimate
+            # exceeds the limit, it is skipped without waiting for it.
+            growth = base / last[BASELINE] if BASELINE in last else 1
+            passing = {BASELINE: (exes[BASELINE], base)}
             for variant, exe in list(exes.items()):
-                status, output, elapsed = run_once(exe, size, args.timeout)
-                if status == "ok" and output != expected:
-                    status = "wrong"
+                if variant == BASELINE:
+                    continue
+                if variant in last and last[variant] * growth > args.timeout:
+                    status, output = "skipped", "estimated over the limit"
+                else:
+                    status, output, elapsed = run_once(exe, size, args.timeout)
+                    if status == "ok" and output != expected:
+                        status = "wrong"
                 if status == "ok":
                     passing[variant] = (exe, elapsed)
                 else:
                     log(f"{benchmark} {size} {variant}: {status} {output or ''}")
                     rows.append([benchmark, size, variant, status] + [""] * 7)
                     del exes[variant]
+            last = {v: t for v, (_, t) in passing.items()}
             if args.check_only:
                 # The time of the single run of the check, without statistics
                 base = passing[BASELINE][1]
@@ -265,7 +313,10 @@ def main():
                 r = results[variant]
                 rows.append(
                     [benchmark, size, variant, "ok"]
-                    + [f"{r[k]:.6f}" for k in ("mean", "stddev", "min", "max")]
+                    + [
+                        "" if r[k] is None else f"{r[k]:.6f}"
+                        for k in ("mean", "stddev", "min", "max")
+                    ]
                     + [f"{r['mean'] / base:.3f}", r["instructions"], r["peak_rss"]]
                 )
 
