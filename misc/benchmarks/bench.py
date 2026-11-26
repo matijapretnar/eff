@@ -56,6 +56,9 @@ SIZES = {
 
 BASELINE = "native-pure"
 
+# Seconds for compiling a benchmark with Eff
+EFF_TIMEOUT = 120
+
 # Seconds for the first start of an executable, which waits for the check of
 # macOS
 WARM_UP_TIMEOUT = 120
@@ -144,13 +147,17 @@ def build(benchmark, variant, args, build_dir):
         shutil.copy(eff_dir / "wrapper.ml", d / "wrapper.ml")
         flags = ["--no-stdlib"] + EFF_VARIANTS[variant]
         with open(d / "generated.ml", "w") as out:
-            gen = subprocess.run(
-                [str(args.eff)] + flags + ["main.eff"],
-                cwd=d,
-                stdout=out,
-                stderr=subprocess.PIPE,
-                text=True,
-            )
+            try:
+                gen = subprocess.run(
+                    [str(args.eff)] + flags + ["main.eff"],
+                    cwd=d,
+                    stdout=out,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    timeout=EFF_TIMEOUT,
+                )
+            except subprocess.TimeoutExpired:
+                return None, f"eff: no result after {EFF_TIMEOUT} s"
         if gen.returncode != 0:
             return None, "eff: " + gen.stderr.strip()
         files = ["generated.ml", "wrapper.ml"]
