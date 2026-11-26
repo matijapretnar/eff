@@ -70,6 +70,11 @@ type state = {
           with one definition: [let rec f x = M in N] is the paper's
           [let f = rec f x. M in N], and a group of several mutually recursive
           definitions has no counterpart in the paper. *)
+  handled_locals :
+    (Term.variable, Term.expression * Term.handler_clauses * bool ref) Assoc.t;
+      (** For a local function [k] that a handler [H] has passed on its way in,
+          the name of its specialisation [k_H] for the operation clauses of [H],
+          and whether a handled call uses it; see With-Let-Fun. *)
   specialising : (Term.variable * Term.effect_fingerprint) list;
       (** The functions whose body With-Rec-Fun is rewriting under a handler, as
           the source function and the fingerprint of the handler. Inside, a
@@ -102,6 +107,7 @@ let initial_state config =
     fuel = !Config.optimization_fuel;
     config;
     rec_functions = Assoc.empty;
+    handled_locals = Assoc.empty;
     specialising = [];
     origins = ref Term.Variable.Map.empty;
     top_definitions = Assoc.empty;
@@ -841,6 +847,20 @@ and handle_call state hnd comp =
                        (Term.apply_sub_abs instantiation abs)
                        vs ~top:(Some instantiation)))
           | Some (TopRec abs), _ when arity abs = List.length vs -> kept vs
+          | None, [ v ]
+            when match Assoc.lookup x state.handled_locals with
+                 | Some (_, h, _) ->
+                     Term.same_operation_clauses h hnd
+                     && Type.equal_dirty comp.ty (fst hnd.ty)
+                 | None -> false -> (
+              (* With-Let-Fun; see [handle_let] *)
+              match Assoc.lookup x state.handled_locals with
+              | Some (k_h, _, used) ->
+                  used := true;
+                  Some
+                    (specialised_call Varying k_h [ v ]
+                       (Term.lambda hnd.term.value_clause))
+              | None -> assert false)
           | None, _ -> (
               match Assoc.lookup x state.rec_functions with
               | Some abs
@@ -909,8 +929,7 @@ and handle_other state hnd comp =
       Term.match_ (expr, List.map (handle_abstraction state hnd) cases) drty_out
       |> reduce_computation state
   | LetVal (expr, abs) ->
-      Term.letVal (expr, handle_abstraction state hnd abs)
-      |> reduce_computation state
+      handle_let state hnd expr abs |> reduce_computation state
   | LetRec (defs, comp) ->
       Term.letRec
         (defs, handle_computation (add_rec_definitions state defs) hnd comp)
@@ -936,6 +955,64 @@ and handle_other state hnd comp =
 
 and handle_abstraction state hnd { term = p, c; _ } =
   Term.abstraction (p, handle_computation state hnd c)
+
+(* With-Let-Fun: the handler [hnd] passes [let k = fun y -> M in N]. Handled
+   calls of [k] in [N] under the operation clauses of [hnd] go to a
+   specialisation [k_H = fun y r -> with H[r] handle M] next to [k], where
+   [H[r]] has the return clause [r]. This is the [Varying] mode of With-Rec-Fun
+   for a function that is not recursive: [M] is handled once, and the calls
+   share [k_H] even if With-Do has given their handlers different return
+   clauses. A continuation that a handler clause calls more than once is such
+   a [k], and the recursive calls that [extract] has to find are in [M].
+   [k_H] is made only if [N] calls it. *)
+and handle_let state hnd expr abs =
+  let pat, _ = abs.term in
+  match (pat.term, expr.term) with
+  | Term.PVar k, Term.Lambda a
+    when state.config.specialize_functions && handles_operations hnd
+         && Type.equal_dirty (snd a.ty) (fst hnd.ty) ->
+      let k_h_var =
+        Term.mono_var (Term.Variable.refresh k)
+          (specialisation_ty Varying hnd.ty [ fst a.ty ])
+      in
+      let k_h =
+        match k_h_var.term with
+        | Term.Var { variable; _ } -> variable
+        | _ -> assert false
+      in
+      let used = ref false in
+      let state' =
+        {
+          state with
+          handled_locals =
+            Assoc.update k (k_h_var, hnd, used) state.handled_locals;
+        }
+      in
+      let { term = _, body'; _ } = handle_abstraction state' hnd abs in
+      if not !used then Term.letVal (expr, Term.abstraction (pat, body'))
+      else
+        let (ty_in, _), drty_out = hnd.ty in
+        let { term = y_pat, m; _ } = Term.refresh_abstraction Assoc.empty a in
+        let r_pat, r_var =
+          Term.fresh_variable "k" (Type.arrow (ty_in, drty_out))
+        in
+        let x_pat, x_var = Term.fresh_variable "y" ty_in in
+        let hnd_r =
+          Term.handler_with_new_value_clause hnd
+            (Term.abstraction (x_pat, Term.apply (r_var, x_var)))
+        in
+        let k_h_def =
+          curried_abstraction [ y_pat; r_pat ]
+            (handle_computation state hnd_r m)
+        in
+        Term.letVal
+          ( expr,
+            Term.abstraction
+              ( pat,
+                Term.letVal
+                  ( Term.lambda k_h_def,
+                    Term.abstraction (Term.pVar k_h k_h_var.ty, body') ) ) )
+  | _ -> Term.letVal (expr, handle_abstraction state hnd abs)
 
 (* A handled call [with hnd handle x v] of a member [x] of the group whose
    specialisation is being built joins it, if the operation clauses and the
