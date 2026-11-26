@@ -423,9 +423,14 @@ and apply_sub_exp sub expression =
 and apply_sub_expr' sub expression =
   match expression with
   | Var v ->
+      (* The parameters that [original_ty] binds are generalised, so [sub]
+         does not mention them. Its other parameters are free, as in the type
+         of a function in its own recursive definition, and [sub] solves
+         them. *)
       Var
         {
           v with
+          original_ty = Substitution.apply_sub_ty sub v.original_ty;
           instantiation =
             Substitution.apply_substitutions_to_substitution sub v.instantiation;
         }
