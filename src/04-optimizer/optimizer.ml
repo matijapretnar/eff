@@ -56,6 +56,8 @@ type group_build = {
   members : Term.Variable.Set.t;
   group_handler : Term.handler_clauses;
   group_mode : specialisation_mode;
+  group_lift : bool;
+      (** Whether the members lift their continuations; see [lift_candidate]. *)
   group_instantiation : Substitution.t;
   root : cached_specialisation;
   pending :
@@ -75,6 +77,15 @@ type state = {
       (** For a local function [k] that a handler [H] has passed on its way in,
           the name of its specialisation [k_H] for the operation clauses of [H],
           and whether a handled call uses it; see With-Let-Fun. *)
+  lifted :
+    (Term.variable
+    * Term.handler_clauses
+    * specialisation_mode
+    * Term.expression)
+    list;
+      (** The continuations [k] that the specialisation being built lifts, with
+          the handler [H] under which it is built, the mode, and [k_H]; see
+          [lift_candidate]. *)
   specialising : (Term.variable * Term.effect_fingerprint) list;
       (** The functions whose body With-Rec-Fun is rewriting under a handler, as
           the source function and the fingerprint of the handler. Inside, a
@@ -108,6 +119,7 @@ let initial_state config =
     config;
     rec_functions = Assoc.empty;
     handled_locals = Assoc.empty;
+    lifted = [];
     specialising = [];
     origins = ref Term.Variable.Map.empty;
     top_definitions = Assoc.empty;
@@ -454,12 +466,94 @@ let curried_apply g' args =
   | arg :: args -> go (Term.apply (g', arg)) args
   | [] -> assert false
 
-(* The call of a specialisation [g'] in [mode] with the arguments [vs] and, in
-   [Varying] mode, the return clause [k] *)
-let specialised_call mode g' vs k =
-  match mode with
-  | Fixed -> curried_apply g' vs
-  | Varying -> curried_apply g' (vs @ [ k ])
+(* Lifting continuations
+
+   A function can take a continuation [k : A -> B ! Δ], whose result the
+   handler [H] handles, as a Varying specialisation takes its return clause.
+   Inside the specialisation under [H], a call of [k] then becomes
+   [with H handle k a], and [H] stays at run time, because [k] is unknown. So
+   the specialisation takes [k_H = fun a -> with H handle k a] instead of [k],
+   [with H handle k a] becomes [k_H a], and a call passes
+   [fun a -> with H handle k0 a] for its [k0], which the handler rules rewrite
+   where [k0] is known. This is valid if [k] occurs only so, which is checked
+   after the body is built. If it does not, the specialisation is built again
+   without lifting.
+
+   A [Varying] specialisation is called under handlers with different return
+   clauses, so its [k_H] takes the return clause [r] too, as
+   [fun a r -> with H[r] handle k a]: it is the [Varying] specialisation of
+   [k], as in With-Let-Fun.
+
+   A candidate is a parameter whose type is a function with the input type of
+   [H]. As specialisations are curried, every parameter is a variable of its
+   own, and whether a specialisation lifts can be read off its type. *)
+
+let lift_candidate (hnd : Term.handler_clauses) (ty : Type.ty) =
+  match ty.term with
+  | Type.Arrow (_, drty) -> Type.equal_dirty drty (fst hnd.ty)
+  | _ -> false
+
+(* The type of a lifted parameter of type [ty] in [mode] *)
+let lifted_ty mode (hnd : Term.handler_clauses) (ty : Type.ty) =
+  match ty.term with
+  | Type.Arrow (a_ty, _) when lift_candidate hnd ty ->
+      specialisation_ty mode hnd.ty [ a_ty ]
+  | _ -> ty
+
+(* Whether [g'] is a specialisation in [mode], lifted or not, for arguments of
+   types [tys] under [hnd] *)
+let fits_specialisation mode (hnd : Term.handler_clauses) (g' : Term.expression)
+    tys =
+  Type.equal_ty g'.ty (specialisation_ty mode hnd.ty tys)
+  || Type.equal_ty g'.ty
+       (specialisation_ty mode hnd.ty (List.map (lifted_ty mode hnd) tys))
+
+(* The call of a specialisation [g'] in [mode] under [hnd] with the arguments
+   [vs] and, in [Varying] mode, the return clause [k]. An argument for a
+   lifted parameter becomes [fun a -> with hnd handle v a], or
+   [fun a r -> with hnd[r] handle v a] in [Varying] mode. It also tells
+   whether there is such an argument, as the call then needs the handler
+   rules. *)
+let specialised_call mode (hnd : Term.handler_clauses) (g' : Term.expression) vs
+    k =
+  let rec params (ty : Type.ty) = function
+    | [] -> []
+    | _ :: vs -> (
+        match ty.term with
+        | Type.Arrow (ty_p, (ty', _)) -> ty_p :: params ty' vs
+        | _ -> assert false)
+  in
+  let lift (v : Term.expression) ty_p =
+    if Type.equal_ty v.ty ty_p then (v, false)
+    else
+      match v.ty.term with
+      | Type.Arrow (a_ty, _) ->
+          let a_pat, a_var = Term.fresh_variable "a" a_ty in
+          let handled h = Term.handle (Term.handler h, Term.apply (v, a_var)) in
+          let body =
+            match mode with
+            | Fixed -> handled hnd
+            | Varying ->
+                let (ty_in, _), drty_out = hnd.ty in
+                let r_pat, r_var =
+                  Term.fresh_variable "k" (Type.arrow (ty_in, drty_out))
+                in
+                let y_pat, y_var = Term.fresh_variable "y" ty_in in
+                Term.value
+                  (Term.lambda
+                     (Term.abstraction
+                        ( r_pat,
+                          handled
+                            (Term.handler_with_new_value_clause hnd
+                               (Term.abstraction
+                                  (y_pat, Term.apply (r_var, y_var)))) )))
+          in
+          (Term.lambda (Term.abstraction (a_pat, body)), true)
+      | _ -> assert false
+  in
+  let vs', wrapped = List.split (List.map2 lift vs (params g'.ty vs)) in
+  let args = match mode with Fixed -> vs' | Varying -> vs' @ [ k ] in
+  (curried_apply g' args, List.mem true wrapped)
 
 let extract mode hnd f g' ~left =
   let call_of_f comp =
@@ -475,20 +569,21 @@ let extract mode hnd f g' ~left =
       when Term.same_operation_clauses h' hnd && call_of_f c <> None -> (
         let ws = Option.get (call_of_f c) in
         let fits mode =
-          Type.equal_ty g'.ty
-            (specialisation_ty mode h'.ty
-               (List.map (fun (w : Term.expression) -> w.ty) ws))
+          fits_specialisation mode h' g'
+            (List.map (fun (w : Term.expression) -> w.ty) ws)
         in
         match mode with
         | Fixed when Term.same_return_clause h' hnd && fits Fixed ->
-            Some (specialised_call Fixed g' ws g')
+            Some (fst (specialised_call Fixed h' g' ws g'))
         | Varying ->
             if fits Varying then
               let value_clause =
                 let pat, c = h'.term.value_clause.term in
                 Term.abstraction (pat, extract_comp c)
               in
-              Some (specialised_call Varying g' ws (Term.lambda value_clause))
+              Some
+                (fst
+                   (specialised_call Varying h' g' ws (Term.lambda value_clause)))
             else Some comp
         | Fixed ->
             left := true;
@@ -542,9 +637,7 @@ let building_specialisation state hnd x instantiation vs =
   match List.find_opt matching !(state.specialisations) with
   | Some { mode; result = Building b; handler; _ } -> (
       let tys = List.map (fun (v : Term.expression) -> v.ty) vs in
-      let fits mode =
-        Type.equal_ty b.name_var.ty (specialisation_ty mode hnd.ty tys)
-      in
+      let fits mode = fits_specialisation mode hnd b.name_var tys in
       match mode with
       | Fixed when Term.same_return_clause handler hnd ->
           if fits Fixed then Some (Fixed, b.name_var) else None
@@ -826,13 +919,37 @@ and handle_call state hnd comp =
     if List.length vs > 1 then Some (Term.handle (Term.handler hnd, comp))
     else None
   in
+  (* A handled call of a lifted continuation; see [lift_candidate]. The
+     handler must be the one under which [k_H] was made, return clause
+     included. *)
+  let lifted_continuation k (a : Term.expression) =
+    List.find_map
+      (fun (k', h, mode, (k_h : Term.expression)) ->
+        if
+          k' = k
+          && Term.same_operation_clauses h hnd
+          && (mode = Varying || Term.same_return_clause h hnd)
+          && Type.equal_ty k_h.ty (specialisation_ty mode hnd.ty [ a.ty ])
+        then Some (mode, k_h)
+        else None)
+      state.lifted
+  in
   match curried_call comp with
+  | Some ({ term = Term.Var { variable = k; _ }; _ }, [ a ])
+    when lifted_continuation k a <> None ->
+      let mode, k_h = Option.get (lifted_continuation k a) in
+      Some
+        (fst
+           (specialised_call mode hnd k_h [ a ]
+              (Term.lambda hnd.term.value_clause)))
   | Some ({ term = Term.Var { variable = x; instantiation; _ }; _ }, vs) -> (
       match building_specialisation state hnd x instantiation vs with
       | Some (mode, name_var) ->
-          Some
-            (specialised_call mode name_var vs
-               (Term.lambda hnd.term.value_clause))
+          let call, wrapped =
+            specialised_call mode hnd name_var vs
+              (Term.lambda hnd.term.value_clause)
+          in
+          Some (if wrapped then optimize_computation state call else call)
       | None -> (
           match (top_definition state x, vs) with
           | Some (TopValue _), [ v ]
@@ -876,8 +993,9 @@ and handle_call state hnd comp =
               | Some (k_h, _, used) ->
                   used := true;
                   Some
-                    (specialised_call Varying k_h [ v ]
-                       (Term.lambda hnd.term.value_clause))
+                    (fst
+                       (specialised_call Varying hnd k_h [ v ]
+                          (Term.lambda hnd.term.value_clause)))
               | None -> assert false)
           | None, _ -> (
               match Assoc.lookup x state.rec_functions with
@@ -1058,6 +1176,11 @@ and join_group state hnd x instantiation abs vs =
           List.map (fun (p : Term.pattern) -> p.ty) (fst (curried_params abs))
         in
         let g = specialisation_name state x ~top:true in
+        let tys =
+          if gb.group_lift then
+            List.map (lifted_ty gb.group_mode gb.group_handler) tys
+          else tys
+        in
         let g_var =
           Term.mono_var g
             (specialisation_ty gb.group_mode gb.group_handler.ty tys)
@@ -1116,14 +1239,35 @@ and with_rec_fun state hnd f abs vs ~top =
     List.map (fun (p : Term.pattern) -> p.ty) (fst (curried_params abs))
   in
   let call mode g_var =
-    specialised_call mode g_var vs (Term.lambda hnd.term.value_clause)
+    let call, wrapped =
+      specialised_call mode hnd g_var vs (Term.lambda hnd.term.value_clause)
+    in
+    if wrapped then optimize_computation state call else call
   in
   (* The body of the specialisation [g] of a member with [abs], and how to
      make the definition of [g] from the body once [extract] has rewritten
-     it *)
-  let build_member state mode abs =
+     it. If [lift], the parameters that are candidates are lifted, and the
+     result also has the lifted continuations and the state in which they
+     are known. *)
+  let build_member state mode ~lift abs =
     let pats, body =
       curried_params (Term.refresh_abstraction Assoc.empty abs)
+    in
+    let pats, lifted =
+      if not lift then (pats, [])
+      else
+        List.split
+          (List.map
+             (fun (p : Term.pattern) ->
+               match p.term with
+               | Term.PVar k when lift_candidate hnd p.ty ->
+                   let k_h_pat, k_h_var =
+                     Term.fresh_variable "k" (lifted_ty mode hnd p.ty)
+                   in
+                   (k_h_pat, [ (k, k_h_var) ])
+               | _ -> (p, []))
+             pats)
+        |> fun (pats, lifted) -> (pats, List.concat lifted)
     in
     let hnd_m, define =
       match mode with
@@ -1137,17 +1281,46 @@ and with_rec_fun state hnd f abs vs ~top =
           in
           (hnd_k, fun body -> curried_abstraction (pats @ [ k_pat ]) body)
     in
-    (define, handle_computation state hnd_m body)
+    let state_m =
+      {
+        state with
+        lifted =
+          List.map (fun (k, k_h) -> (k, hnd_m, mode, k_h)) lifted @ state.lifted;
+      }
+    in
+    ( (define, handle_computation state_m hnd_m body),
+      (List.map fst lifted, state_m) )
   in
-  let build mode =
+  (* After [extract], the calls of the specialisations that it made pass
+     [fun a -> with H handle k a] for a lifted [k], which the handler rules
+     turn into [k_H a] in a state that knows [k_H]. The lifting is valid if no
+     [k] is left. *)
+  let finish_body (ks, state_m) body =
+    if ks = [] then Some body
+    else
+      let body =
+        optimize_computation
+          { state_m with fuel = !Config.optimization_fuel }
+          body
+      in
+      let fvs = Term.free_vars_comp body in
+      if List.for_all (fun k -> Term.does_not_occur k fvs) ks then Some body
+      else None
+  in
+  let build mode ~lift =
     let g = specialisation_name state f ~top:(top <> None) in
-    let g_var = Term.mono_var g (g_ty mode f_tys) in
+    let lifted_tys =
+      if lift then List.map (lifted_ty mode hnd) f_tys else f_tys
+    in
+    let g_var = Term.mono_var g (g_ty mode lifted_tys) in
     let left = ref false in
     match top with
-    | None ->
-        let define, body = build_member state mode abs in
+    | None -> (
+        let (define, body), lifting = build_member state mode ~lift abs in
         let body' = extract mode hnd f g_var ~left body in
-        ([ (f, g, g_var, define body') ], !left)
+        match finish_body lifting body' with
+        | Some body'' -> Some ([ (f, g, g_var, define body'') ], !left)
+        | None -> None)
     | Some instantiation ->
         let root =
           {
@@ -1166,18 +1339,21 @@ and with_rec_fun state hnd f abs vs ~top =
               |> Option.value ~default:(Term.Variable.Set.singleton f);
             group_handler = hnd;
             group_mode = mode;
+            group_lift = lift;
             group_instantiation = instantiation;
             root;
             pending = Queue.create ();
           }
         in
         let state_g = { state with building_group = Some gb } in
-        let first = (f, g, g_var, build_member state_g mode abs) in
+        let first = (f, g, g_var, build_member state_g mode ~lift abs) in
         let rec rest built =
           match Queue.take_opt gb.pending with
           | None -> List.rev built
           | Some (x, abs_x, g_x, g_var_x) ->
-              rest ((x, g_x, g_var_x, build_member state_g mode abs_x) :: built)
+              rest
+                ((x, g_x, g_var_x, build_member state_g mode ~lift abs_x)
+                :: built)
         in
         let members = first :: rest [] in
         let names =
@@ -1210,11 +1386,16 @@ and with_rec_fun state hnd f abs vs ~top =
           List.filter
             (fun e -> not (List.memq e entries))
             !(state.specialisations);
-        ( List.map
-            (fun (x, g, g_var, (define, body)) ->
-              (x, g, g_var, define (extract_all body)))
-            members,
-          !left )
+        let finished =
+          List.map
+            (fun (x, g, g_var, ((define, body), lifting)) ->
+              Option.map
+                (fun body -> (x, g, g_var, define body))
+                (finish_body lifting (extract_all body)))
+            members
+        in
+        if List.mem None finished then None
+        else Some (List.map Option.get finished, !left)
   in
   let lookup mode =
     match top with
@@ -1229,7 +1410,7 @@ and with_rec_fun state hnd f abs vs ~top =
             &&
             match entry.result with
             | Built { name_var; _ } ->
-                Type.equal_ty name_var.ty (g_ty mode f_tys)
+                fits_specialisation mode hnd name_var f_tys
             | FixedFails -> true
             | Building _ -> false)
           !(state.specialisations)
@@ -1258,7 +1439,11 @@ and with_rec_fun state hnd f abs vs ~top =
             0 enclosing
         in
         let left_before = enclosing_left () in
-        let members, left = build mode in
+        let members, left =
+          match build mode ~lift:true with
+          | Some result -> result
+          | None -> Option.get (build mode ~lift:false)
+        in
         let names =
           List.fold_left
             (fun names (_, g, _, _) -> Term.Variable.Set.add g names)

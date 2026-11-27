@@ -3206,42 +3206,27 @@
     let rec _populate_leafs _x (_n : int) =
       if _x = _n then Nil else Cons (_x * 3, _populate_leafs (_x + 1) _n)
     in
-    let rec _explore _x (_k : int -> intlist computation)
+    let rec _explore _x
+        (_k : int -> (intlist -> intlist -> intlist) -> intlist -> intlist)
         (_k : intlist -> intlist -> intlist) =
       begin match _x with
       | Empty ->
           fun (_s : intlist) ->
-            begin match _s with
-            | Cons (_x, _rest) ->
-                (closed_handler
-                   {
-                     value_clause = (fun (_y : intlist) -> _k _y);
-                     effect_clauses =
-                       (fun (type a)
-                         (type b)
-                         (eff : (a, b) eff_internal_effect)
-                         :
-                         (a -> (b -> _) -> _)
-                       ->
-                         match eff with
-                         | Get ->
-                             fun (() : unit) _k ->
-                               fun (_s : intlist) ->
-                                begin match _s with
-                                | Cons (_x, _rest) -> _k _x _rest
-                                | Nil -> Nil
-                                end
-                         | _ -> fun _ _ -> assert false);
-                   }
-                   (fun (_x : intlist -> intlist) -> _x))
-                  (_k _x) _rest
-            | Nil -> Nil
+            begin match _s with Cons (_x, _rest) -> _k _x _k _rest | Nil -> Nil
             end
       | Node (_left, _x, _right) ->
           let _k =
            fun (_y : bool) (_k : intlist -> intlist -> intlist) ->
-            if _y then _explore _left (fun (_b : int) -> _k (_x - (3 * _b))) _k
-            else _explore _right (fun (_b : int) -> _k (_x - (3 * _b))) _k
+            if _y then
+              _explore _left
+                (fun (_a : int) (_k : intlist -> intlist -> intlist) ->
+                  _k (_x - (3 * _a)) _k)
+                _k
+            else
+              _explore _right
+                (fun (_a : int) (_k : intlist -> intlist -> intlist) ->
+                  _k (_x - (3 * _a)) _k)
+                _k
           in
           _k true (fun (_b : intlist) ->
               _k false (fun (_b : intlist) -> _k (_op (* @ *) _b _b)))
@@ -3249,7 +3234,8 @@
     in
     _maxl 0
       (_explore (_tester _m)
-         (fun (_x : int) -> Value (Cons (_x, Nil)))
+         (fun (_a : int) (_k : intlist -> intlist -> intlist) ->
+           _k (Cons (_a, Nil)))
          (fun (_x : intlist) (_ : intlist) -> _x)
          (_populate_leafs 0 154))
   
@@ -3269,43 +3255,29 @@
     let rec _looper _x (_s : int) =
       if _x = 0 then _s
       else
-        let rec _explore _x (_k : int -> intlist computation)
+        let rec _explore _x
+            (_k : int -> (intlist -> intlist -> intlist) -> intlist -> intlist)
             (_k : intlist -> intlist -> intlist) =
           begin match _x with
           | Empty ->
               fun (_s : intlist) ->
                 begin match _s with
-                | Cons (_x, _rest) ->
-                    (closed_handler
-                       {
-                         value_clause = (fun (_y : intlist) -> _k _y);
-                         effect_clauses =
-                           (fun (type a)
-                             (type b)
-                             (eff : (a, b) eff_internal_effect)
-                             :
-                             (a -> (b -> _) -> _)
-                           ->
-                             match eff with
-                             | Get ->
-                                 fun (() : unit) _k ->
-                                   fun (_s : intlist) ->
-                                    begin match _s with
-                                    | Cons (_x, _rest) -> _k _x _rest
-                                    | Nil -> Nil
-                                    end
-                             | _ -> fun _ _ -> assert false);
-                       }
-                       (fun (_x : intlist -> intlist) -> _x))
-                      (_k _x) _rest
+                | Cons (_x, _rest) -> _k _x _k _rest
                 | Nil -> Nil
                 end
           | Node (_left, _x, _right) ->
               let _k =
                fun (_y : bool) (_k : intlist -> intlist -> intlist) ->
                 if _y then
-                  _explore _left (fun (_b : int) -> _k (_x - (3 * _b))) _k
-                else _explore _right (fun (_b : int) -> _k (_x - (3 * _b))) _k
+                  _explore _left
+                    (fun (_a : int) (_k : intlist -> intlist -> intlist) ->
+                      _k (_x - (3 * _a)) _k)
+                    _k
+                else
+                  _explore _right
+                    (fun (_a : int) (_k : intlist -> intlist -> intlist) ->
+                      _k (_x - (3 * _a)) _k)
+                    _k
               in
               _k true (fun (_b : intlist) ->
                   _k false (fun (_b : intlist) -> _k (_op (* @ *) _b _b)))
@@ -3315,7 +3287,8 @@
           (_s
           + _maxl 0
               (_explore ____t
-                 (fun (_x : int) -> Value (Cons (_x, Nil)))
+                 (fun (_a : int) (_k : intlist -> intlist -> intlist) ->
+                   _k (Cons (_a, Nil)))
                  (fun (_x : intlist) (_ : intlist) -> _x)
                  ____leafs))
     in
@@ -3331,32 +3304,24 @@
       begin match _x with Nil -> _x | Cons (_x, _xs) -> _maxl (_max _x _x) _xs
       end
     in
-    let rec _explore _x (_k : int -> intlist computation)
+    let rec _explore _x
+        (_k : int -> (intlist -> int -> intlist) -> int -> intlist)
         (_k : intlist -> int -> intlist) (_x : int) =
       begin match _x with
-      | Empty ->
-          (closed_handler
-             {
-               value_clause = (fun (_y : intlist) -> _k _y);
-               effect_clauses =
-                 (fun (type a)
-                   (type b)
-                   (eff : (a, b) eff_internal_effect)
-                   :
-                   (a -> (b -> _) -> _)
-                 ->
-                   match eff with
-                   | Get -> fun (() : unit) _k -> fun (_s : int) -> _k _s _s
-                   | Set -> fun (_s : int) _k -> fun (_ : int) -> _k () _s
-                   | _ -> fun _ _ -> assert false);
-             }
-             (fun (_x : int -> intlist) -> _x))
-            (_k _x) _x
+      | Empty -> _k _x _k _x
       | Node (_left, _x, _right) ->
           let _k =
            fun (_y : bool) (_k : intlist -> int -> intlist) ->
-            if _y then _explore _left (fun (_b : int) -> _k (_x - (3 * _b))) _k
-            else _explore _right (fun (_b : int) -> _k (_x - (3 * _b))) _k
+            if _y then
+              _explore _left
+                (fun (_a : int) (_k : intlist -> int -> intlist) ->
+                  _k (_x - (3 * _a)) _k)
+                _k
+            else
+              _explore _right
+                (fun (_a : int) (_k : intlist -> int -> intlist) ->
+                  _k (_x - (3 * _a)) _k)
+                _k
           in
           _k true
             (fun (_b : intlist) ->
@@ -3366,7 +3331,7 @@
     in
     _maxl 0
       (_explore (_tester _m)
-         (fun (_x : int) -> Value (Cons (_x, Nil)))
+         (fun (_a : int) (_k : intlist -> int -> intlist) -> _k (Cons (_a, Nil)))
          (fun (_x : intlist) (_ : int) -> _x)
          (( ~- ) 1))
   
@@ -3382,33 +3347,24 @@
     let rec _looper _x (_s : int) =
       if _x = 0 then _s
       else
-        let rec _explore _x (_k : int -> intlist computation)
+        let rec _explore _x
+            (_k : int -> (intlist -> int -> intlist) -> int -> intlist)
             (_k : intlist -> int -> intlist) (_x : int) =
           begin match _x with
-          | Empty ->
-              (closed_handler
-                 {
-                   value_clause = (fun (_y : intlist) -> _k _y);
-                   effect_clauses =
-                     (fun (type a)
-                       (type b)
-                       (eff : (a, b) eff_internal_effect)
-                       :
-                       (a -> (b -> _) -> _)
-                     ->
-                       match eff with
-                       | Get -> fun (() : unit) _k -> fun (_s : int) -> _k _s _s
-                       | Set -> fun (_s : int) _k -> fun (_ : int) -> _k () _s
-                       | _ -> fun _ _ -> assert false);
-                 }
-                 (fun (_x : int -> intlist) -> _x))
-                (_k _x) _x
+          | Empty -> _k _x _k _x
           | Node (_left, _x, _right) ->
               let _k =
                fun (_y : bool) (_k : intlist -> int -> intlist) ->
                 if _y then
-                  _explore _left (fun (_b : int) -> _k (_x - (3 * _b))) _k
-                else _explore _right (fun (_b : int) -> _k (_x - (3 * _b))) _k
+                  _explore _left
+                    (fun (_a : int) (_k : intlist -> int -> intlist) ->
+                      _k (_x - (3 * _a)) _k)
+                    _k
+                else
+                  _explore _right
+                    (fun (_a : int) (_k : intlist -> int -> intlist) ->
+                      _k (_x - (3 * _a)) _k)
+                    _k
               in
               _k true
                 (fun (_b : intlist) ->
@@ -3420,7 +3376,8 @@
           (_s
           + _maxl 0
               (_explore ____t
-                 (fun (_x : int) -> Value (Cons (_x, Nil)))
+                 (fun (_a : int) (_k : intlist -> int -> intlist) ->
+                   _k (Cons (_a, Nil)))
                  (fun (_x : intlist) (_ : int) -> _x)
                  (( ~- ) 1)))
     in
@@ -3552,39 +3509,23 @@
     let rec _loop _x =
       if _x = 0 then fun (_s : int) -> _s
       else
-        let rec _explore _x (_k : int -> intlist computation)
+        let rec _explore _x (_k : int -> (intlist -> int -> int) -> int -> int)
             (_k : intlist -> int -> int) =
           begin match _x with
-          | Leaf ->
-              fun (_s : int) ->
-                (closed_handler
-                   {
-                     value_clause = (fun (_y : intlist) -> _k _y);
-                     effect_clauses =
-                       (fun (type a)
-                         (type b)
-                         (eff : (a, b) eff_internal_effect)
-                         :
-                         (a -> (b -> _) -> _)
-                       ->
-                         match eff with
-                         | Get -> fun (() : unit) _k -> fun (_s : int) -> _k _s _s
-                         | Set -> fun (_s : int) _k -> fun (_ : int) -> _k () _s
-                         | _ -> fun _ _ -> assert false);
-                   }
-                   (fun (_x : int -> int) -> _x))
-                  (_k _s) _s
+          | Leaf -> fun (_s : int) -> _k _s _k _s
           | Node (_l, _v, _r) ->
               let _k =
                fun (_y : bool) (_k : intlist -> int -> int) (_x : int) ->
                 if _y then
                   _explore _l
-                    (fun (_b : int) -> _k (abs (_v - (503 * _b) + 37) mod 1009))
+                    (fun (_a : int) (_k : intlist -> int -> int) ->
+                      _k (abs (_v - (503 * _a) + 37) mod 1009) _k)
                     _k
                     (abs (_x - (503 * _v) + 37) mod 1009)
                 else
                   _explore _r
-                    (fun (_b : int) -> _k (abs (_v - (503 * _b) + 37) mod 1009))
+                    (fun (_a : int) (_k : intlist -> int -> int) ->
+                      _k (abs (_v - (503 * _a) + 37) mod 1009) _k)
                     _k
                     (abs (_x - (503 * _v) + 37) mod 1009)
               in
@@ -3593,7 +3534,7 @@
           end
         in
         _explore (_make _n)
-          (fun (_x : int) -> Value (Cons (_x, Nil)))
+          (fun (_a : int) (_k : intlist -> int -> int) -> _k (Cons (_a, Nil)))
           (fun (_b : intlist) (_ : int) -> _loop (_x - 1) (_maxl 0 _b))
     in
     _loop 10 0
