@@ -417,6 +417,14 @@ let rec curried_abstraction pats body =
         (pat, Term.value (Term.lambda (curried_abstraction pats body)))
   | [] -> assert false
 
+(* The type [ty1 -> ... -> tyn -> drty] of a curried function, where the
+   calls before the last are pure *)
+let rec curried_ty tys drty =
+  match tys with
+  | [ ty ] -> Type.arrow (ty, drty)
+  | ty :: tys -> Type.arrow (ty, Type.pure_ty (curried_ty tys drty))
+  | [] -> assert false
+
 (* The type of a specialisation of a function with argument types [tys] under
    a handler of type [hnd_ty]. It is curried, and in [Varying] mode it also
    takes the return clause as its last argument. *)
@@ -427,12 +435,7 @@ let specialisation_ty mode hnd_ty tys =
     | Fixed -> tys
     | Varying -> tys @ [ Type.arrow (ty_in, drty_out) ]
   in
-  let rec curried = function
-    | [ ty ] -> Type.arrow (ty, drty_out)
-    | ty :: tys -> Type.arrow (ty, Type.pure_ty (curried tys))
-    | [] -> assert false
-  in
-  curried tys
+  curried_ty tys drty_out
 
 (* The call [g' a1 ... an] of a curried specialisation. The calls before the
    last are pure, so they get the dirt of the last before the sequence. *)
@@ -622,6 +625,90 @@ let top_definition state x =
               Some (TopRec definition)
           | _ -> None)
         !(state.specialisations)
+
+(* Static arguments
+
+   A recursive function [let rec f x1 ... xn = M] whose recursive calls all
+   pass some [xi] unchanged, such as [many m] repeating the parser [m], keeps
+   a handled call [with H handle m ()] in its specialisation under [H],
+   because [m] is unknown there. If a handled call [f v1 ... vn] gives such an
+   [xi] a known function [vi], we specialise [f] to it first: a local [f']
+   without the static parameters, whose body is [M] with [vi] for [xi] and
+   with the recursive calls going to [f'], and With-Rec-Fun then specialises
+   [f'], where Inline-Top sees [vi]. Members of a group of mutually recursive
+   top-level functions are left out.
+
+   [static_arguments state f instantiation vs] gives the parameters and the
+   body of [f], and for each parameter the argument to substitute if it is
+   static. *)
+let static_arguments state f instantiation (vs : Term.expression list) =
+  let definition =
+    match top_definition state f with
+    | Some (TopRec abs)
+      when Term.Variable.Set.cardinal
+             (Term.Variable.Map.find_opt f !(state.groups)
+             |> Option.value ~default:(Term.Variable.Set.singleton f))
+           <= 1 ->
+        Some abs
+    | Some _ -> None
+    | None -> Assoc.lookup f state.rec_functions
+  in
+  match definition with
+  | None -> None
+  | Some abs ->
+      let pats, body = curried_params (Term.apply_sub_abs instantiation abs) in
+      if List.length pats <> List.length vs then None
+      else
+        (* The arguments of the recursive calls, which must be full calls *)
+        let calls = ref [] in
+        let _ =
+          rewrite
+            (fun c ->
+              match curried_call c with
+              | Some ({ term = Term.Var { variable; _ }; _ }, args)
+                when variable = f ->
+                  calls := (args, c.ty) :: !calls;
+                  Some c
+              | _ -> None)
+            body
+        in
+        let occurrences =
+          Term.Variable.Map.find_opt f (Term.free_vars_comp body)
+          |> Option.value ~default:0
+        in
+        let known (e : Term.expression) =
+          match e.term with
+          | Term.Var { variable; _ } ->
+              top_definition state variable <> None
+              || Assoc.lookup variable state.rec_functions <> None
+          | _ -> false
+        in
+        let static =
+          List.mapi
+            (fun i ((p : Term.pattern), vi) ->
+              match p.term with
+              | Term.PVar x
+                when known vi
+                     && List.for_all
+                          (fun (args, _) ->
+                            match (List.nth args i : Term.expression).term with
+                            | Term.Var { variable; _ } -> variable = x
+                            | _ -> false)
+                          !calls ->
+                  Some vi
+              | _ -> None)
+            (List.combine pats vs)
+        in
+        if
+          List.length !calls = occurrences
+          && List.for_all
+               (fun (args, ty) ->
+                 List.length args = List.length pats
+                 && Type.equal_dirty ty body.ty)
+               !calls
+          && List.exists Option.is_some static
+        then Some (pats, body, static)
+        else None
 
 (* The newest specialisation of the top-level [x] at [instantiation] that is
    being built for a handler with the operation clauses of [hnd], if a handled
@@ -950,6 +1037,57 @@ and handle_call state hnd comp =
               (Term.lambda hnd.term.value_clause)
           in
           Some (if wrapped then optimize_computation state call else call)
+      | None
+        when state.fuel > 0 && state.config.specialize_functions
+             && handles_operations hnd && may_specialise state x hnd
+             && Type.equal_dirty comp.ty (fst hnd.ty)
+             && static_arguments state x instantiation vs <> None ->
+          (* Static arguments; see [static_arguments]. *)
+          let pats, body, static =
+            Option.get (static_arguments state x instantiation vs)
+          in
+          let dynamic l =
+            List.filteri (fun i _ -> Option.is_none (List.nth static i)) l
+          in
+          let pats' =
+            match dynamic pats with [] -> [ Term.pTuple [] ] | pats' -> pats'
+          in
+          let args' l =
+            match dynamic l with [] -> [ Term.tuple [] ] | l' -> l'
+          in
+          let f' = specialisation_name state x ~top:false in
+          let f'_var =
+            Term.mono_var f'
+              (curried_ty
+                 (List.map (fun (p : Term.pattern) -> p.ty) pats')
+                 body.ty)
+          in
+          let body =
+            rewrite
+              (fun c ->
+                match curried_call c with
+                | Some ({ term = Term.Var { variable; _ }; _ }, args)
+                  when variable = x ->
+                    Some (curried_apply f'_var (args' args))
+                | _ -> None)
+              body
+          in
+          let body =
+            List.fold_left2
+              (fun body (p : Term.pattern) vi ->
+                match vi with
+                | None -> body
+                | Some vi -> (
+                    match Term.beta_reduce (Term.abstraction (p, body)) vi with
+                    | Some body -> body
+                    | None -> assert false))
+              body pats static
+          in
+          Some
+            (handle_computation state hnd
+               (Term.letRec
+                  ( Assoc.of_list [ (f', curried_abstraction pats' body) ],
+                    curried_apply f'_var (args' vs) )))
       | None -> (
           match (top_definition state x, vs) with
           | Some (TopValue _), [ v ]

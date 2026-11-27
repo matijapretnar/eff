@@ -1,0 +1,17 @@
+(* many m repeats m, which it passes unchanged to its recursive call. Under
+   the handler, m is known, so m () should not need a handler at run time. *)
+effect More : unit -> bool
+effect Digit : unit -> int
+
+let digit () = perform (Digit ())
+
+let rec many m =
+  if perform (More ()) then (let x = m () in let xs = many m in x :: xs) else []
+
+let test () =
+  (handle many digit with
+  | effect (More ()) k -> (fun n -> if n = 0 then k false 0 else k true (n - 1))
+  | effect (Digit ()) k -> (fun n -> k n n)
+  | xs -> (fun _ -> xs)) 3
+
+let x = test ()

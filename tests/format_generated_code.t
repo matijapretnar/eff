@@ -2370,6 +2370,63 @@
   1;;
   1, 2
   ======================================================================
+  codegen/static_argument.eff
+  ----------------------------------------------------------------------
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Print : (string, unit) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Read : (unit, string) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += Raise : (string, empty) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect += RandomInt : (int, int) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | RandomFloat : (float, float) eff_internal_effect
+  
+  (* primitive effect *)
+  type (_, _) eff_internal_effect +=
+    | Write : (string * string, unit) eff_internal_effect
+  
+  type (_, _) eff_internal_effect += More : (unit, bool) eff_internal_effect
+  type (_, _) eff_internal_effect += Digit : (unit, int) eff_internal_effect
+  
+  let _digit = fun (() : unit) -> Call (Digit, (), fun (_y : int) -> Value _y)
+  let digit = _digit
+  
+  let rec _many _x =
+    Call
+      ( More,
+        (),
+        fun (_y : bool) ->
+          if _y then
+            _x () >>= fun _x ->
+            _many _x >>= fun _xs -> Value (_x :: _xs)
+          else Value [] )
+  
+  let many = _many
+  
+  let _test =
+   fun (() : unit) ->
+    let rec _many () (_k : int list -> int -> int list) =
+      let _k =
+       fun (_y : bool) ->
+        if _y then fun (_n : int) ->
+          _many () (fun (_xs : int list) -> _k (_n :: _xs)) _n
+        else _k []
+      in
+      fun (_n : int) -> if _n = 0 then _k false 0 else _k true (_n - 1)
+    in
+    _many () (fun (_x : int list) (_ : int) -> _x) 3
+  
+  let test = _test
+  let _x = _test ()
+  let x = _x
+  ======================================================================
   codegen/substitution.eff
   ----------------------------------------------------------------------
   (* primitive effect *)
